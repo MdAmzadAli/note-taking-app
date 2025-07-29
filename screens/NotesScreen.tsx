@@ -28,10 +28,14 @@ interface SimpleNote {
 
 export default function NotesScreen() {
   const [notes, setNotes] = useState<SimpleNote[]>([]);
+  const [filteredNotes, setFilteredNotes] = useState<SimpleNote[]>([]);
   const [isCreating, setIsCreating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [currentNoteText, setCurrentNoteText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [templates, setTemplates] = useState<CustomTemplate[]>([]);
+  const [filteredTemplates, setFilteredTemplates] = useState<CustomTemplate[]>([]);
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<CustomTemplate | null>(null);
   const [templateValues, setTemplateValues] = useState<Record<string, string>>({});
@@ -39,12 +43,31 @@ export default function NotesScreen() {
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [currentView, setCurrentView] = useState<'notes' | 'template'>('notes');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
 
   useEffect(() => {
     loadNotes();
     loadTemplates();
   }, []);
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const filtered = notes.filter(note => 
+        note.content.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredNotes(filtered);
+      
+      const filteredTemps = templates.filter(template =>
+        template.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredTemplates(filteredTemps);
+    } else {
+      setFilteredNotes(notes);
+      setFilteredTemplates(templates);
+    }
+  }, [searchQuery, notes, templates]);
 
   const loadNotes = async () => {
     try {
@@ -57,7 +80,9 @@ export default function NotesScreen() {
         updatedAt: note.updatedAt,
       }));
 
-      setNotes(simpleNotes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      const sortedNotes = simpleNotes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setNotes(sortedNotes);
+      setFilteredNotes(sortedNotes);
     } catch (error) {
       console.error('Error loading notes:', error);
     }
@@ -67,6 +92,7 @@ export default function NotesScreen() {
     try {
       const templatesData = await getCustomTemplates();
       setTemplates(templatesData);
+      setFilteredTemplates(templatesData);
     } catch (error) {
       console.error('Error loading templates:', error);
     }
@@ -92,23 +118,51 @@ export default function NotesScreen() {
 
     try {
       const now = new Date().toISOString();
-      const newNote: Note = {
-        id: Date.now().toString(),
-        title: currentNoteText.substring(0, 50) + (currentNoteText.length > 50 ? '...' : ''),
-        content: currentNoteText,
-        profession: 'general',
-        fields: {},
-        createdAt: now,
-        updatedAt: now,
-      };
+      
+      if (isEditing && editingNoteId) {
+        // Update existing note
+        const existingNote = notes.find(n => n.id === editingNoteId);
+        if (existingNote) {
+          const updatedNote: Note = {
+            id: existingNote.id,
+            title: currentNoteText.substring(0, 50) + (currentNoteText.length > 50 ? '...' : ''),
+            content: currentNoteText,
+            profession: 'general',
+            fields: {},
+            createdAt: existingNote.createdAt,
+            updatedAt: now,
+          };
+          await saveNote(updatedNote);
+        }
+      } else {
+        // Create new note
+        const newNote: Note = {
+          id: Date.now().toString(),
+          title: currentNoteText.substring(0, 50) + (currentNoteText.length > 50 ? '...' : ''),
+          content: currentNoteText,
+          profession: 'general',
+          fields: {},
+          createdAt: now,
+          updatedAt: now,
+        };
+        await saveNote(newNote);
+      }
 
-      await saveNote(newNote);
       setCurrentNoteText('');
       setIsCreating(false);
+      setIsEditing(false);
+      setEditingNoteId(null);
       loadNotes();
     } catch (error) {
       Alert.alert('Error', 'Failed to save note');
     }
+  };
+
+  const editNote = (note: SimpleNote) => {
+    setCurrentNoteText(note.content);
+    setEditingNoteId(note.id);
+    setIsEditing(true);
+    setIsCreating(true);
   };
 
   const deleteNoteHandler = async (noteId: string) => {
@@ -203,7 +257,7 @@ export default function NotesScreen() {
   };
 
   const renderNote = ({ item }: { item: SimpleNote }) => (
-    <View style={styles.noteCard}>
+    <TouchableOpacity style={styles.noteCard} onPress={() => editNote(item)}>
       <View style={styles.noteHeader}>
         <Text style={styles.noteDate}>
           {new Date(item.createdAt).toLocaleDateString()} {new Date(item.createdAt).toLocaleTimeString()}
@@ -215,7 +269,7 @@ export default function NotesScreen() {
       <Text style={styles.noteContent} numberOfLines={3}>
         {item.content}
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 
   const renderTemplateField = (field: FieldType) => (
@@ -270,18 +324,18 @@ export default function NotesScreen() {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Fill {selectedTemplate.name}</Text>
           <View style={styles.headerButtons}>
-            <TouchableOpacity style={styles.saveButton} onPress={saveTemplateEntryHandler}>
-              <Text style={styles.saveButtonText}>Save</Text>
+            <TouchableOpacity style={styles.iconButton} onPress={saveTemplateEntryHandler}>
+              <Text style={styles.iconButtonText}>✓</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.cancelButton}
+              style={styles.iconButton}
               onPress={() => {
                 setIsFillingTemplate(false);
                 setSelectedTemplate(null);
                 setTemplateValues({});
               }}
             >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              <Text style={styles.iconButtonText}>✕</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -297,28 +351,30 @@ export default function NotesScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>New Note</Text>
+          <Text style={styles.headerTitle}>{isEditing ? 'Edit Note' : 'New Note'}</Text>
           <View style={styles.headerButtons}>
             <TouchableOpacity
-              style={[styles.voiceButton, isListening && styles.voiceButtonActive]}
+              style={[styles.iconButton, isListening && styles.voiceButtonActive]}
               onPress={handleVoiceInput}
               disabled={isListening}
             >
-              <Text style={styles.voiceButtonText}>
+              <Text style={styles.iconButtonText}>
                 {isListening ? '🔴' : '🎤'}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.saveButton} onPress={saveCurrentNote}>
-              <Text style={styles.saveButtonText}>Save</Text>
+            <TouchableOpacity style={styles.iconButton} onPress={saveCurrentNote}>
+              <Text style={styles.iconButtonText}>✓</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.cancelButton}
+              style={styles.iconButton}
               onPress={() => {
                 setIsCreating(false);
+                setIsEditing(false);
+                setEditingNoteId(null);
                 setCurrentNoteText('');
               }}
             >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              <Text style={styles.iconButtonText}>✕</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -343,14 +399,38 @@ export default function NotesScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Notes</Text>
         <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.menuButton} onPress={openMenu}>
-            <Text style={styles.menuButtonText}>☰</Text>
+          <TouchableOpacity style={styles.iconButton} onPress={() => setIsSearchVisible(!isSearchVisible)}>
+            <Text style={styles.iconButtonText}>🔍</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.addButton} onPress={() => setIsCreating(true)}>
-            <Text style={styles.addButtonText}>+ New Note</Text>
+          <TouchableOpacity style={styles.iconButton} onPress={openMenu}>
+            <Text style={styles.iconButtonText}>☰</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton} onPress={() => setIsCreating(true)}>
+            <Text style={styles.iconButtonText}>+</Text>
           </TouchableOpacity>
         </View>
       </View>
+
+      {isSearchVisible && (
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search notes..."
+            autoFocus
+          />
+          <TouchableOpacity 
+            style={styles.searchCloseButton} 
+            onPress={() => {
+              setIsSearchVisible(false);
+              setSearchQuery('');
+            }}
+          >
+            <Text style={styles.searchCloseText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {notes.length === 0 ? (
         <View style={styles.emptyState}>
@@ -360,7 +440,7 @@ export default function NotesScreen() {
         </View>
       ) : (
         <FlatList
-          data={notes}
+          data={filteredNotes}
           renderItem={renderNote}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.notesList}
@@ -378,14 +458,22 @@ export default function NotesScreen() {
                     <Text style={styles.menuCloseText}>×</Text>
                   </TouchableOpacity>
                 </View>
-                {templates.length === 0 ? (
+                <View style={styles.menuSearchContainer}>
+                  <TextInput
+                    style={styles.menuSearchInput}
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    placeholder="Search templates..."
+                  />
+                </View>
+                {filteredTemplates.length === 0 ? (
                   <View style={styles.emptyMenuContainer}>
                     <Text style={styles.emptyMenuText}>No templates available</Text>
                     <Text style={styles.emptyMenuSubtext}>Create templates in the Templates tab first</Text>
                   </View>
                 ) : (
                   <FlatList
-                    data={templates}
+                    data={filteredTemplates}
                     renderItem={({ item }) => (
                       <TouchableOpacity
                         style={styles.menuItem}
@@ -440,6 +528,60 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  iconButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 40,
+    alignItems: 'center',
+  },
+  iconButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  searchInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+  },
+  searchCloseButton: {
+    marginLeft: 8,
+    padding: 8,
+  },
+  searchCloseText: {
+    fontSize: 18,
+    color: '#666',
+  },
+  menuSearchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  menuSearchInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+    backgroundColor: 'white',
   },
   voiceButton: {
     backgroundColor: '#4CAF50',

@@ -25,13 +25,30 @@ interface TemplateEntriesScreenProps {
 
 export default function TemplateEntriesScreen({ templateId, onBack }: TemplateEntriesScreenProps) {
   const [entries, setEntries] = useState<TemplateEntry[]>([]);
+  const [filteredEntries, setFilteredEntries] = useState<TemplateEntry[]>([]);
   const [template, setTemplate] = useState<CustomTemplate | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [templateValues, setTemplateValues] = useState<Record<string, string>>({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   useEffect(() => {
     loadData();
   }, [templateId]);
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const filtered = entries.filter(entry => {
+        const entryText = Object.values(entry.values).join(' ').toLowerCase();
+        return entryText.includes(searchQuery.toLowerCase());
+      });
+      setFilteredEntries(filtered);
+    } else {
+      setFilteredEntries(entries);
+    }
+  }, [searchQuery, entries]);
 
   const loadData = async () => {
     try {
@@ -44,7 +61,9 @@ export default function TemplateEntriesScreen({ templateId, onBack }: TemplateEn
       setTemplate(templateData || null);
       
       const templateEntries = allEntries.filter(entry => entry.templateId === templateId);
-      setEntries(templateEntries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      const sortedEntries = templateEntries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setEntries(sortedEntries);
+      setFilteredEntries(sortedEntries);
     } catch (error) {
       console.error('Error loading template entries:', error);
     }
@@ -61,24 +80,49 @@ export default function TemplateEntriesScreen({ templateId, onBack }: TemplateEn
     }
 
     try {
-      const entry: TemplateEntry = {
-        id: Date.now().toString(),
-        templateId: template.id,
-        templateName: template.name,
-        values: templateValues,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      const now = new Date().toISOString();
+      
+      if (isEditing && editingEntryId) {
+        // Update existing entry
+        const existingEntry = entries.find(e => e.id === editingEntryId);
+        if (existingEntry) {
+          const updatedEntry: TemplateEntry = {
+            ...existingEntry,
+            values: templateValues,
+            updatedAt: now,
+          };
+          await saveTemplateEntry(updatedEntry);
+        }
+      } else {
+        // Create new entry
+        const entry: TemplateEntry = {
+          id: Date.now().toString(),
+          templateId: template.id,
+          templateName: template.name,
+          values: templateValues,
+          createdAt: now,
+          updatedAt: now,
+        };
+        await saveTemplateEntry(entry);
+      }
 
-      await saveTemplateEntry(entry);
       setTemplateValues({});
       setIsCreating(false);
+      setIsEditing(false);
+      setEditingEntryId(null);
       loadData();
       Alert.alert('Success', 'Entry saved successfully!');
     } catch (error) {
       console.error('Error saving entry:', error);
       Alert.alert('Error', 'Failed to save entry');
     }
+  };
+
+  const editEntry = (entry: TemplateEntry) => {
+    setTemplateValues(entry.values);
+    setEditingEntryId(entry.id);
+    setIsEditing(true);
+    setIsCreating(true);
   };
 
   const deleteEntryHandler = async (entryId: string) => {
@@ -150,7 +194,7 @@ export default function TemplateEntriesScreen({ templateId, onBack }: TemplateEn
   );
 
   const renderEntry = ({ item }: { item: TemplateEntry }) => (
-    <View style={styles.entryCard}>
+    <TouchableOpacity style={styles.entryCard} onPress={() => editEntry(item)}>
       <View style={styles.entryHeader}>
         <Text style={styles.entryDate}>
           {new Date(item.createdAt).toLocaleDateString()} {new Date(item.createdAt).toLocaleTimeString()}
@@ -173,7 +217,7 @@ export default function TemplateEntriesScreen({ templateId, onBack }: TemplateEn
           return null;
         })}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   if (!template) {
@@ -193,22 +237,24 @@ export default function TemplateEntriesScreen({ templateId, onBack }: TemplateEn
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Text style={styles.backButtonText}>← Back</Text>
+          <TouchableOpacity style={styles.iconButton} onPress={onBack}>
+            <Text style={styles.iconButtonText}>←</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>New {template.name}</Text>
+          <Text style={styles.headerTitle}>{isEditing ? `Edit ${template.name}` : `New ${template.name}`}</Text>
           <View style={styles.headerButtons}>
-            <TouchableOpacity style={styles.saveButton} onPress={saveEntry}>
-              <Text style={styles.saveButtonText}>Save</Text>
+            <TouchableOpacity style={styles.iconButton} onPress={saveEntry}>
+              <Text style={styles.iconButtonText}>✓</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.cancelButton}
+              style={styles.iconButton}
               onPress={() => {
                 setIsCreating(false);
+                setIsEditing(false);
+                setEditingEntryId(null);
                 setTemplateValues({});
               }}
             >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              <Text style={styles.iconButtonText}>✕</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -223,14 +269,40 @@ export default function TemplateEntriesScreen({ templateId, onBack }: TemplateEn
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>← Back</Text>
+        <TouchableOpacity style={styles.iconButton} onPress={onBack}>
+          <Text style={styles.iconButtonText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{template.name}</Text>
-        <TouchableOpacity style={styles.addButton} onPress={() => setIsCreating(true)}>
-          <Text style={styles.addButtonText}>+ New Entry</Text>
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity style={styles.iconButton} onPress={() => setIsSearchVisible(!isSearchVisible)}>
+            <Text style={styles.iconButtonText}>🔍</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton} onPress={() => setIsCreating(true)}>
+            <Text style={styles.iconButtonText}>+</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {isSearchVisible && (
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search entries..."
+            autoFocus
+          />
+          <TouchableOpacity 
+            style={styles.searchCloseButton} 
+            onPress={() => {
+              setIsSearchVisible(false);
+              setSearchQuery('');
+            }}
+          >
+            <Text style={styles.searchCloseText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {entries.length === 0 ? (
         <View style={styles.emptyState}>
@@ -240,7 +312,7 @@ export default function TemplateEntriesScreen({ templateId, onBack }: TemplateEn
         </View>
       ) : (
         <FlatList
-          data={entries}
+          data={filteredEntries}
           renderItem={renderEntry}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.entriesList}
@@ -274,12 +346,55 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
+  iconButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 40,
+    alignItems: 'center',
+  },
+  iconButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  searchInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+  },
+  searchCloseButton: {
+    marginLeft: 8,
+    padding: 8,
+  },
+  searchCloseText: {
+    fontSize: 18,
+    color: '#666',
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
     flex: 1,
     textAlign: 'center',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 8,
   },
   headerButtons: {
     flexDirection: 'row',

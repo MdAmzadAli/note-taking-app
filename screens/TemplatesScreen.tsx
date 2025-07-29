@@ -27,12 +27,15 @@ import { mockSpeechToText } from '@/utils/speech';
 
 export default function TemplatesScreen() {
   const [templates, setTemplates] = useState<CustomTemplate[]>([]);
+  const [filteredTemplates, setFilteredTemplates] = useState<CustomTemplate[]>([]);
   const [settings, setSettings] = useState<UserSettings>({ profession: 'doctor', viewMode: 'paragraph' });
   const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
   const [isFillingTemplate, setIsFillingTemplate] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<CustomTemplate | null>(null);
   const [newTemplate, setNewTemplate] = useState({ name: '', fields: [] as FieldType[] });
   const [templateValues, setTemplateValues] = useState<Record<string, string>>({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   useEffect(() => {
     loadData();
