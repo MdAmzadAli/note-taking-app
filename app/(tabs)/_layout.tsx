@@ -15,7 +15,14 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
+        headerShown: true,
+        headerStyle: {
+          backgroundColor: Colors[colorScheme ?? 'light'].background,
+        },
+        headerTitleStyle: {
+          fontSize: 18,
+          fontWeight: '600',
+        },
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
         tabBarStyle: Platform.select({
@@ -29,6 +36,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Notes',
+          headerTitle: 'Notes',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="doc.text" color={color} />,
         }}
       />
@@ -36,6 +44,7 @@ export default function TabLayout() {
         name="templates"
         options={{
           title: 'Templates',
+          headerTitle: 'Templates',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="doc.badge.plus" color={color} />,
         }}
       />
@@ -43,6 +52,7 @@ export default function TabLayout() {
         name="reminders"
         options={{
           title: 'Reminders',
+          headerTitle: 'Reminders',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="bell" color={color} />,
         }}
       />
@@ -50,6 +60,7 @@ export default function TabLayout() {
         name="tasks"
         options={{
           title: 'Tasks',
+          headerTitle: 'Tasks',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="checklist" color={color} />,
         }}
       />
@@ -57,6 +68,7 @@ export default function TabLayout() {
         name="search"
         options={{
           title: 'Search',
+          headerTitle: 'Search',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="magnifyingglass" color={color} />,
         }}
       />
@@ -64,6 +76,7 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: 'Settings',
+          headerTitle: 'Settings',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="gearshape" color={color} />,
         }}
       />
