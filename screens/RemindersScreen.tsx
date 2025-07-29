@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Reminder } from '@/types';
 import { getReminders, saveReminder, deleteReminder, getUserSettings } from '@/utils/storage';
 import { scheduleNotification, cancelNotification } from '@/utils/notifications';

@@ -16,6 +16,7 @@ import {
   Platform,
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Note, CustomTemplate, TemplateEntry, FieldType } from '@/types';
 import { getNotes, saveNote, deleteNote, getUserSettings, getCustomTemplates, saveTemplateEntry, getTemplateEntries } from '@/utils/storage';
 import { mockSpeechToText } from '@/utils/speech';
