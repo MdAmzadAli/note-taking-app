@@ -1,7 +1,4 @@
-` tags. I will pay close attention to indentation, structure, and completeness, and avoid using any forbidden words.
 
-```
-<replit_final_file>
 import React, { useState, useEffect } from 'react';
 import {
   View,
