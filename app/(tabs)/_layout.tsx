@@ -33,10 +33,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="search"
+        name="templates"
         options={{
-          title: 'Search',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="magnifyingglass" color={color} />,
+          title: 'Templates',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="doc.badge.plus" color={color} />,
         }}
       />
       <Tabs.Screen

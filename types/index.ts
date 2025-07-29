@@ -32,6 +32,30 @@ export interface Task {
   profession: string;
 }
 
+export interface FieldType {
+  id: string;
+  label: string;
+  type: 'text' | 'number' | 'longtext' | 'date';
+  required?: boolean;
+}
+
+export interface CustomTemplate {
+  id: string;
+  name: string;
+  fields: FieldType[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TemplateEntry {
+  id: string;
+  templateId: string;
+  templateName: string;
+  values: Record<string, string>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface UserSettings {
   profession: 'doctor' | 'lawyer' | 'developer';
   viewMode: 'paragraph' | 'bullet';
