@@ -1,6 +1,18 @@
 
-// Fallback for using react-native-vector-icons on Android and web.
+import React from 'react';
+import { Platform } from 'react-native';
 
+// Import iOS component if available
+let IOSIconSymbol: any = null;
+try {
+  if (Platform.OS === 'ios') {
+    IOSIconSymbol = require('./IconSymbol.ios').IconSymbol;
+  }
+} catch (error) {
+  // iOS component not available, use fallback
+}
+
+// Fallback for using react-native-vector-icons on Android and web.
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { SymbolWeight, SymbolViewProps } from 'expo-symbols';
 import { ComponentProps } from 'react';
@@ -20,7 +32,8 @@ type IconSymbolName =
   | 'checkmark.square'
   | 'gearshape'
   | 'gear'
-  | 'document.badge.plus';
+  | 'document.badge.plus'
+  | 'line.horizontal.3';
 
 /**
  * Add your SF Symbols to Ionicons mappings here.
@@ -41,6 +54,7 @@ const MAPPING = {
   'gearshape': 'settings',
   'gear': 'settings',
   'document.badge.plus': 'add-circle',
+  'line.horizontal.3': 'menu',
 } as IconMapping;
 
 /**
@@ -53,6 +67,7 @@ export function IconSymbol({
   size = 24,
   color,
   style,
+  weight = 'regular',
 }: {
   name: IconSymbolName;
   size?: number;
@@ -60,5 +75,19 @@ export function IconSymbol({
   style?: StyleProp<TextStyle>;
   weight?: SymbolWeight;
 }) {
+  // Use iOS native symbols if available and on iOS platform
+  if (Platform.OS === 'ios' && IOSIconSymbol) {
+    return (
+      <IOSIconSymbol
+        name={name}
+        size={size}
+        color={color}
+        style={style}
+        weight={weight}
+      />
+    );
+  }
+
+  // Fallback to Ionicons for other platforms
   return <Ionicons color={color} size={size} name={MAPPING[name]} style={style} />;
 }
