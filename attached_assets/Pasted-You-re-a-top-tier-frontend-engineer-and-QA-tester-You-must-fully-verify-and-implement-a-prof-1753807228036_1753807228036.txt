@@ -1,0 +1,132 @@
+You're a top-tier frontend engineer and QA tester.
+
+You must **fully verify and implement** a professional visual redesign of a mobile-first note-taking app. The app is functionally complete — your job is to **ensure the styling matches the modern UI spec below**, and **implement any missing pieces** with proper planning and code, not just suggestions.
+
+❗ Rules:
+- DO NOT change the app’s logic or layout.
+- VERIFY and FIX styling across **ALL tabs/screens/routes** of the app.
+- If something is not done as per spec, **implement it** immediately and cleanly.
+- Pay special attention to **mobile spacing issues**, especially top padding from system status bars.
+
+---
+
+✅ 🔍 **Checklist: Visual Redesign Verification + Implementation**
+
+### 🧭 General
+- [ ] Every **tab/screen/page** is fully checked for visuals (home, notes list, editor, search, settings, etc.)
+- [ ] App layout and features are fully preserved
+
+---
+
+### 🎨 Color Palette
+- [ ] Background: `#F9FAFB`
+- [ ] Notes/cards: `#FFFFFF`
+- [ ] Primary: `#3B82F6`
+- [ ] Accent: `#10B981`
+- [ ] Borders: `#E5E7EB`
+- [ ] Text: `#111827`, Subtle: `#6B7280`
+- [ ] Use CSS variables or Tailwind config to define and reuse these colors
+
+If any tab is missing the palette, **apply it immediately with consistent naming.**
+
+---
+
+### ✍️ Typography
+- [ ] Font: `'Inter', sans-serif`
+- [ ] Titles: `20px`, bold  
+- [ ] Body: `16px`, line height `1.6`
+- [ ] Labels: `13px`, gray
+- [ ] Ensure uniform font across all screens
+
+---
+
+### 📐 Spacing & Padding
+- [ ] Global padding: `16px`
+- [ ] Use spacing scale (`4px`, `8px`, `12px`, `16px`, `24px`)
+- [ ] All cards, buttons, inputs have consistent inner padding: `12px 16px`
+
+---
+
+### 📱 Safe Area / Status Bar Handling
+- [ ] No nav bar or top content collides with mobile status bar
+- [ ] Add `padding-top: env(safe-area-inset-top)` or `24px` top padding where needed
+- [ ] Use `SafeAreaView` (React Native) or `padding-top` with media queries for notch-safe zones
+- [ ] Test on iPhone + Android notch devices (emulated)
+
+---
+
+### 🧾 Note Cards
+- [ ] Rounded corners: `12px`
+- [ ] Box shadow: `0 2px 6px rgba(0,0,0,0.05)`
+- [ ] Internal padding: `16px`
+- [ ] Border: `1px solid #E5E7EB`
+- [ ] Subtle scale/hover: `transform: scale(1.01)`, `transition: 0.2s`
+
+---
+
+### 🔍 Search Bar
+- [ ] Clear placement, top-aligned
+- [ ] Padding inside: `12px`
+- [ ] Placeholder: `#6B7280`
+- [ ] Icon aligned
+- [ ] Responsive and non-overlapping with nav bar
+
+---
+
+### 🔘 Buttons
+- [ ] Primary: `#3B82F6`, white text
+- [ ] Secondary: Transparent, border + text in `#3B82F6`
+- [ ] Rounded: `8px`
+- [ ] On hover: darken or elevate
+- [ ] Transition: `all 0.2s ease-in-out`
+
+---
+
+### 📝 Inputs & Textareas
+- [ ] Border: `1px solid #E5E7EB`
+- [ ] Border-radius: `8px`
+- [ ] Padding: `12px`
+- [ ] Focus: border `#3B82F6`, light glow or shadow
+- [ ] No layout shift on focus
+
+---
+
+### 🌀 Transitions
+- [ ] Apply to: buttons, inputs, cards
+- [ ] Use: `transition: all 0.2s ease-in-out`
+- [ ] Confirm transitions across **all tabs/screens**
+
+---
+
+### 🌙 Dark Mode (Optional, Scaffold Only)
+- [ ] Prepare `dark:` classes or theme variables
+- [ ] Don’t implement full mode yet — just structure
+
+---
+
+### ✅ Accessibility & Responsiveness
+- [ ] Contrast ratio meets WCAG AA
+- [ ] Tap areas: minimum `44x44px`
+- [ ] Font sizes: min `13px`
+- [ ] Fully responsive on all screen sizes (min-width 320px)
+
+---
+
+### 📌 Missing or Incomplete?
+If **any item above is missing**, do the following:
+1. Identify file + location where it should be fixed
+2. Implement the fix **cleanly with consistent class naming**
+3. Re-test the screen it affects
+4. Mark it as ✅ in your log
+
+---
+
+🧠 Bonus (Optional):
+- Show a simple report summary at the end in markdown format:
+  - ✅ Fully implemented
+  - ⚠️ Was missing, now fixed
+  - ❌ Still missing (only if it's blocked)
+
+---
+
+Begin the verification and implementation process now. Confirm that all screens have been covered and that no part of the redesign spec is left behind.
