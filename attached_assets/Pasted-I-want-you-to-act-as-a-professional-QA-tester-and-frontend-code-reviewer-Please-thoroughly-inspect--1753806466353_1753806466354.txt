@@ -1,0 +1,89 @@
+I want you to act as a professional QA tester and frontend code reviewer. Please thoroughly inspect the note-taking mobile app and verify that all of the following UI/UX changes have been implemented correctly.
+
+Do NOT suggest — instead, **verify in actual code and UI** that each item is implemented.
+
+---
+
+🧪 ✅ **UI/UX Visual Redesign Verification Checklist**
+
+1. 🎯 **General**
+   - The app layout and component structure remain unchanged.
+   - All previous functionalities (note creation, search, editing, deleting) still work.
+
+2. 🎨 **Color Palette**
+   - Light theme colors implemented using:
+     - Background: `#F9FAFB`
+     - Note cards: `#FFFFFF`
+     - Primary (buttons/links): `#3B82F6`
+     - Accent: `#10B981`
+     - Border: `#E5E7EB`
+     - Text: `#111827`, Secondary text: `#6B7280`
+   - Colors are applied using CSS variables or Tailwind config.
+
+3. ✍️ **Typography**
+   - Font family is `'Inter', sans-serif`
+   - Titles: `20px`, bold  
+   - Body text: `16px`, line height `1.6`
+   - Labels/help text: `13px`, color `#6B7280`
+
+4. 📐 **Spacing & Padding**
+   - Consistent padding/margin using spacing scale (`8px`, `16px`, `24px`)
+   - Section spacing applied correctly
+   - Inputs, buttons, and cards have uniform inner padding (`12px 16px`)
+
+5. 📱 **Mobile Top Spacing (Status Bar)**
+   - Navigation bar/header does NOT clash with the mobile status bar
+   - There is **at least `padding-top: env(safe-area-inset-top)` or `padding-top: 24px`** for devices with notches (e.g. iPhones, Androids)
+   - Use `SafeAreaView` or equivalent handling if using React Native or similar frameworks
+   - App content does not overlap or get hidden under the system UI
+
+6. 🧾 **Note Cards**
+   - Rounded corners (`12px`), box-shadow added
+   - Light border using `#E5E7EB`
+   - Padding inside card: `16px`
+   - Cards scale subtly on hover/tap (scale 1.01)
+
+7. 🔍 **Search Bar**
+   - Positioned clearly at the top (sticky if applicable)
+   - Proper padding inside (`12px`)
+   - Placeholder text is legible and colored `#6B7280`
+   - Icon is aligned and not overflowing
+
+8. 🧩 **Buttons**
+   - Primary: blue (`#3B82F6`), white text
+   - Secondary: transparent with blue text and border
+   - Rounded corners (`8px`)
+   - Smooth hover, active, and disabled transitions
+
+9. 📝 **Inputs/Textareas**
+   - Consistent border radius (`8px`)
+   - `12px` inner padding
+   - Focus state changes border color to `#3B82F6`
+   - No layout shift on focus
+
+10. 🔄 **Transitions**
+    - Transitions implemented: `all 0.2s ease-in-out` for buttons, cards, and inputs
+    - Cards hover with subtle elevation or scale
+
+11. 🌗 **Dark Mode Readiness**
+    - CSS variables or `dark:` classes set up
+    - Dark mode not yet implemented but scaffolded
+
+12. ✅ **Accessibility**
+    - All text contrast meets WCAG AA
+    - Buttons and inputs are large enough to tap (at least `44x44px`)
+    - Focus outlines visible
+
+13. 📱 **Responsive Behavior**
+    - Layout adjusts well on small mobile screens
+    - No component gets cut off or overflows viewport
+    - Font sizes adapt using relative units (`rem`, `em`)
+
+---
+
+💡 Additional:
+If any part of this checklist fails or is partially implemented, give:
+- Precise file + line numbers
+- Correction steps to apply the required fix
+
+Then give a ✅ / ❌ summary table for each section.
