@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,9 @@ import {
   FlatList,
   SafeAreaView,
   Modal,
+  Animated,
+  Dimensions,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { Note, CustomTemplate, TemplateEntry, FieldType } from '@/types';
 import { getNotes, saveNote, deleteNote, getUserSettings, getCustomTemplates, saveTemplateEntry, getTemplateEntries } from '@/utils/storage';
@@ -32,6 +35,8 @@ export default function NotesScreen() {
   const [selectedTemplate, setSelectedTemplate] = useState<CustomTemplate | null>(null);
   const [templateValues, setTemplateValues] = useState<Record<string, string>>({});
   const [isFillingTemplate, setIsFillingTemplate] = useState(false);
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
 
   useEffect(() => {
     loadNotes();
@@ -130,9 +135,10 @@ export default function NotesScreen() {
     setTemplateValues({});
     setIsFillingTemplate(true);
     setShowTemplateMenu(false);
+    closeMenu();
   };
 
-  const saveTemplateEntry = async () => {
+  const saveTemplateEntryHandler = async () => {
     if (!selectedTemplate) return;
 
     try {
@@ -166,6 +172,25 @@ export default function NotesScreen() {
     } catch (error) {
       Alert.alert('Error', 'Failed to convert speech to text');
     }
+  };
+
+  const openMenu = () => {
+    setIsMenuVisible(true);
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closeMenu = () => {
+    Animated.timing(slideAnim, {
+      toValue: -Dimensions.get('window').width,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsMenuVisible(false);
+    });
   };
 
   const renderNote = ({ item }: { item: SimpleNote }) => (
@@ -224,7 +249,7 @@ export default function NotesScreen() {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Fill {selectedTemplate.name}</Text>
           <View style={styles.headerButtons}>
-            <TouchableOpacity style={styles.saveButton} onPress={saveTemplateEntry}>
+            <TouchableOpacity style={styles.saveButton} onPress={saveTemplateEntryHandler}>
               <Text style={styles.saveButtonText}>Save</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -297,8 +322,8 @@ export default function NotesScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Notes</Text>
         <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.menuButton} onPress={() => setShowTemplateMenu(true)}>
-            <Text style={styles.menuButtonText}>📋</Text>
+          <TouchableOpacity style={styles.menuButton} onPress={openMenu}>
+            <Text style={styles.menuButtonText}>☰</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.addButton} onPress={() => setIsCreating(true)}>
             <Text style={styles.addButtonText}>+ New Note</Text>
@@ -321,46 +346,43 @@ export default function NotesScreen() {
         />
       )}
 
-      <Modal
-        visible={showTemplateMenu}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowTemplateMenu(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Choose Template</Text>
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => setShowTemplateMenu(false)}
-              >
-                <Text style={styles.modalCloseText}>×</Text>
-              </TouchableOpacity>
-            </View>
-            {templates.length === 0 ? (
-              <View style={styles.emptyTemplatesContainer}>
-                <Text style={styles.emptyTemplatesText}>No templates available</Text>
-                <Text style={styles.emptyTemplatesSubtext}>Create templates in the Templates tab first</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={templates}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.templateMenuItem}
-                    onPress={() => startFillingTemplate(item)}
-                  >
-                    <Text style={styles.templateMenuItemTitle}>{item.name}</Text>
-                    <Text style={styles.templateMenuItemSubtitle}>{item.fields.length} fields</Text>
+      {isMenuVisible && (
+        <TouchableWithoutFeedback onPress={closeMenu}>
+          <View style={styles.menuOverlay}>
+            <TouchableWithoutFeedback>
+              <Animated.View style={[styles.slidingMenu, { transform: [{ translateX: slideAnim }] }]}>
+                <View style={styles.menuHeader}>
+                  <Text style={styles.menuTitle}>Templates</Text>
+                  <TouchableOpacity style={styles.menuCloseButton} onPress={closeMenu}>
+                    <Text style={styles.menuCloseText}>×</Text>
                   </TouchableOpacity>
+                </View>
+                {templates.length === 0 ? (
+                  <View style={styles.emptyMenuContainer}>
+                    <Text style={styles.emptyMenuText}>No templates available</Text>
+                    <Text style={styles.emptyMenuSubtext}>Create templates in the Templates tab first</Text>
+                  </View>
+                ) : (
+                  <FlatList
+                    data={templates}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => startFillingTemplate(item)}
+                      >
+                        <Text style={styles.menuItemTitle}>{item.name}</Text>
+                        <Text style={styles.menuItemSubtitle}>{item.fields.length} fields</Text>
+                      </TouchableOpacity>
+                    )}
+                    keyExtractor={(item) => item.id}
+                    style={styles.menuList}
+                  />
                 )}
-                keyExtractor={(item) => item.id}
-              />
-            )}
+              </Animated.View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
-      </Modal>
+        </TouchableWithoutFeedback>
+      )}
     </SafeAreaView>
   );
 }
@@ -502,66 +524,85 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   menuButtonText: {
-    fontSize: 18,
+    fontSize: 20,
+    color: 'white',
+    fontWeight: 'bold',
   },
-  modalOverlay: {
-    flex: 1,
+  menuOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    zIndex: 1000,
   },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
+  slidingMenu: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
     width: '80%',
-    maxHeight: '70%',
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  modalHeader: {
+  menuHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    backgroundColor: '#007AFF',
   },
-  modalTitle: {
+  menuTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: 'white',
   },
-  modalCloseButton: {
+  menuCloseButton: {
     padding: 4,
   },
-  modalCloseText: {
+  menuCloseText: {
     fontSize: 24,
-    color: '#666',
+    color: 'white',
+    fontWeight: 'bold',
   },
-  templateMenuItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+  menuList: {
+    flex: 1,
+  },
+  menuItem: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
-  templateMenuItemTitle: {
+  menuItemTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 4,
   },
-  templateMenuItemSubtitle: {
+  menuItemSubtitle: {
     fontSize: 12,
     color: '#666',
   },
-  emptyTemplatesContainer: {
+  emptyMenuContainer: {
     alignItems: 'center',
     paddingVertical: 40,
+    paddingHorizontal: 20,
   },
-  emptyTemplatesText: {
+  emptyMenuText: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
   },
-  emptyTemplatesSubtext: {
+  emptyMenuSubtext: {
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
