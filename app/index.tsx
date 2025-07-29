@@ -1,14 +1,13 @@
 
 import React, { useEffect, useState } from 'react';
-import { View, Text } from 'react-native';
-import { useRouter } from 'expo-router';
-import OnboardingScreen from '@/screens/OnboardingScreen';
+import { View, StyleSheet } from 'react-native';
+import { router } from 'expo-router';
 import { getUserSettings } from '@/utils/storage';
+import OnboardingScreen from '@/screens/OnboardingScreen';
 
 export default function Index() {
   const [isLoading, setIsLoading] = useState(true);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const router = useRouter();
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   useEffect(() => {
     checkOnboardingStatus();
@@ -17,34 +16,37 @@ export default function Index() {
   const checkOnboardingStatus = async () => {
     try {
       const settings = await getUserSettings();
-      
       if (settings.isOnboardingComplete) {
-        // User has completed onboarding, navigate to main app
         router.replace('/(tabs)');
       } else {
-        // Show onboarding
-        setShowOnboarding(true);
+        setNeedsOnboarding(true);
       }
     } catch (error) {
       console.error('Error checking onboarding status:', error);
-      // Default to showing onboarding
-      setShowOnboarding(true);
+      setNeedsOnboarding(true);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleOnboardingComplete = () => {
+    router.replace('/(tabs)');
+  };
+
   if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-        <Text>Loading...</Text>
-      </View>
-    );
+    return <View style={styles.loading} />;
   }
 
-  if (showOnboarding) {
-    return <OnboardingScreen />;
+  if (needsOnboarding) {
+    return <OnboardingScreen onComplete={handleOnboardingComplete} />;
   }
 
-  return null;
+  return <View style={styles.loading} />;
 }
+
+const styles = StyleSheet.create({
+  loading: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+});

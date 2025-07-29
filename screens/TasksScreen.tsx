@@ -3,133 +3,129 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  Alert,
-  Modal,
   TextInput,
-  ScrollView,
+  TouchableOpacity,
+  FlatList,
+  StyleSheet,
+  Alert,
+  Switch,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Task } from '@/types';
-import { PROFESSIONS, ProfessionType } from '@/constants/professions';
-import { 
-  getTasks, 
-  saveTask, 
-  deleteTask, 
-  getSelectedProfession 
-} from '@/utils/storage';
+import { getTasks, saveTask, deleteTask, getUserSettings } from '@/utils/storage';
 import { scheduleNotification, cancelNotification } from '@/utils/notifications';
-import { simulateVoiceToText } from '@/utils/speech';
+import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 
 export default function TasksScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [profession, setProfession] = useState<ProfessionType>('doctor');
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(9, 0, 0, 0);
-    return tomorrow;
-  });
+  const [isCreating, setIsCreating] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [selectedDate, setSelectedDate] = useState(getTomorrowDate());
+  const [reminderTime, setReminderTime] = useState(new Date());
+  const [hasReminder, setHasReminder] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [isVoiceRecording, setIsVoiceRecording] = useState(false);
-  const [hasReminder, setHasReminder] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'today' | 'tomorrow' | 'overdue'>('all');
 
   useEffect(() => {
-    loadData();
+    loadTasksAndSettings();
   }, []);
 
-  const loadData = async () => {
+  function getTomorrowDate(): Date {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(9, 0, 0, 0); // Default to 9 AM
+    return tomorrow;
+  }
+
+  const loadTasksAndSettings = async () => {
     try {
-      const [tasksData, professionData] = await Promise.all([
+      const [tasksData, settings] = await Promise.all([
         getTasks(),
-        getSelectedProfession(),
+        getUserSettings(),
       ]);
-      
       setTasks(tasksData);
-      if (professionData) setProfession(professionData);
+      setProfession(settings.profession);
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('Error loading tasks:', error);
     }
   };
 
-  const handleCreateTask = () => {
-    setTitle('');
-    setDescription('');
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(9, 0, 0, 0);
-    setSelectedDate(tomorrow);
-    setHasReminder(false);
-    setEditingTask(null);
-    setIsModalVisible(true);
-  };
+  const professionConfig = PROFESSIONS[profession];
 
-  const handleEditTask = (task: Task) => {
-    setTitle(task.title);
-    setDescription(task.description || '');
-    setSelectedDate(task.scheduledDate ? new Date(task.scheduledDate) : new Date());
-    setHasReminder(!!task.reminderTime);
-    setEditingTask(task);
-    setIsModalVisible(true);
-  };
-
-  const handleSaveTask = async () => {
-    if (!title.trim()) {
+  const createTask = async () => {
+    if (!newTitle.trim()) {
       Alert.alert('Error', 'Please enter a task title');
       return;
     }
 
     try {
-      let notificationId: string | undefined;
-
-      // Cancel existing notification if editing
-      if (editingTask?.notificationId) {
-        await cancelNotification(editingTask.notificationId);
-      }
-
-      // Schedule new notification if reminder is enabled
-      if (hasReminder) {
-        notificationId = await scheduleNotification(
-          {
-            title: 'Task Reminder',
-            body: title,
-            data: { taskId: editingTask?.id || Date.now().toString() },
-          },
-          selectedDate
-        );
-      }
-
-      const taskData: Task = {
-        id: editingTask?.id || Date.now().toString(),
-        title,
-        description,
-        isCompleted: editingTask?.isCompleted || false,
+      const task: Task = {
+        id: Date.now().toString(),
+        title: newTitle.trim(),
+        description: newDescription.trim(),
+        isCompleted: false,
         scheduledDate: selectedDate.toISOString(),
-        reminderTime: hasReminder ? selectedDate.toISOString() : undefined,
-        notificationId: notificationId || editingTask?.notificationId,
-        createdAt: editingTask?.createdAt || new Date().toISOString(),
+        createdAt: new Date().toISOString(),
         profession,
       };
 
-      await saveTask(taskData);
-      await loadData();
-      setIsModalVisible(false);
-      resetForm();
+      // Schedule reminder if enabled
+      if (hasReminder) {
+        const reminderDate = new Date(selectedDate);
+        reminderDate.setHours(reminderTime.getHours());
+        reminderDate.setMinutes(reminderTime.getMinutes());
+        
+        const notificationId = await scheduleNotification(
+          `${professionConfig.icon} Task Reminder`,
+          `Task: ${task.title}`,
+          reminderDate
+        );
+
+        if (notificationId) {
+          task.notificationId = notificationId;
+          task.reminderTime = reminderDate.toISOString();
+        }
+      }
+
+      await saveTask(task);
+      await loadTasksAndSettings();
+      
+      // Reset form
+      setNewTitle('');
+      setNewDescription('');
+      setSelectedDate(getTomorrowDate());
+      setReminderTime(new Date());
+      setHasReminder(false);
+      setIsCreating(false);
     } catch (error) {
-      console.error('Error saving task:', error);
-      Alert.alert('Error', 'Failed to save task');
+      console.error('Error creating task:', error);
+      Alert.alert('Error', 'Failed to create task');
     }
   };
 
-  const handleDeleteTask = async (task: Task) => {
+  const toggleTaskComplete = async (task: Task) => {
+    try {
+      const updatedTask = {
+        ...task,
+        isCompleted: !task.isCompleted,
+      };
+
+      if (updatedTask.isCompleted && task.notificationId) {
+        await cancelNotification(task.notificationId);
+      }
+
+      await saveTask(updatedTask);
+      await loadTasksAndSettings();
+    } catch (error) {
+      console.error('Error updating task:', error);
+      Alert.alert('Error', 'Failed to update task');
+    }
+  };
+
+  const deleteTaskById = async (task: Task) => {
     Alert.alert(
       'Delete Task',
       'Are you sure you want to delete this task?',
@@ -144,7 +140,7 @@ export default function TasksScreen() {
                 await cancelNotification(task.notificationId);
               }
               await deleteTask(task.id);
-              await loadData();
+              await loadTasksAndSettings();
             } catch (error) {
               console.error('Error deleting task:', error);
               Alert.alert('Error', 'Failed to delete task');
@@ -155,268 +151,305 @@ export default function TasksScreen() {
     );
   };
 
-  const handleCompleteTask = async (task: Task) => {
-    try {
-      const updatedTask = { ...task, isCompleted: !task.isCompleted };
-      await saveTask(updatedTask);
-      await loadData();
-    } catch (error) {
-      console.error('Error updating task:', error);
-      Alert.alert('Error', 'Failed to update task');
-    }
-  };
-
-  const handleVoiceInput = async () => {
-    setIsVoiceRecording(true);
-    try {
-      const speechText = await simulateVoiceToText();
-      setTitle(speechText);
-    } catch (error) {
-      console.error('Error with voice input:', error);
-      Alert.alert('Error', 'Voice input failed');
-    } finally {
-      setIsVoiceRecording(false);
-    }
-  };
-
-  const resetForm = () => {
-    setTitle('');
-    setDescription('');
-    const tomorrow = new Date();
+  const getFilteredTasks = () => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(9, 0, 0, 0);
-    setSelectedDate(tomorrow);
-    setHasReminder(false);
-    setEditingTask(null);
+
+    return tasks.filter(task => {
+      if (task.profession !== profession) return false;
+
+      const taskDate = new Date(task.scheduledDate || task.createdAt);
+      const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
+
+      switch (filter) {
+        case 'today':
+          return taskDay.getTime() === today.getTime();
+        case 'tomorrow':
+          return taskDay.getTime() === tomorrow.getTime();
+        case 'overdue':
+          return taskDay < today && !task.isCompleted;
+        default:
+          return true;
+      }
+    });
   };
 
-  const professionConfig = PROFESSIONS[profession];
-  const professionTasks = tasks.filter(task => task.profession === profession);
-  const pendingTasks = professionTasks.filter(t => !t.isCompleted);
-  const completedTasks = professionTasks.filter(t => t.isCompleted);
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setSelectedDate(selectedDate);
+    }
+  };
 
-  const renderTask = ({ item }: { item: Task }) => (
-    <View style={[styles.taskItem, { backgroundColor: professionConfig.colors.primary }]}>
-      <TouchableOpacity
-        style={styles.taskContent}
-        onPress={() => handleEditTask(item)}
-      >
+  const onTimeChange = (event: any, selectedTime?: Date) => {
+    setShowTimePicker(false);
+    if (selectedTime) {
+      setReminderTime(selectedTime);
+    }
+  };
+
+  const getTaskStatus = (task: Task) => {
+    if (task.isCompleted) return { icon: '✅', color: '#4CAF50', text: 'Completed' };
+    
+    const now = new Date();
+    const taskDate = new Date(task.scheduledDate || task.createdAt);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
+    
+    if (taskDay < today) return { icon: '🔴', color: '#e74c3c', text: 'Overdue' };
+    if (taskDay.getTime() === today.getTime()) return { icon: '🟡', color: '#f39c12', text: 'Today' };
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    if (taskDay.getTime() === tomorrow.getTime()) return { icon: '🟢', color: '#2ecc71', text: 'Tomorrow' };
+    
+    return { icon: '📅', color: '#3498db', text: 'Upcoming' };
+  };
+
+  const renderTaskItem = ({ item }: { item: Task }) => {
+    const status = getTaskStatus(item);
+    
+    return (
+      <View style={[
+        styles.taskItem,
+        { borderLeftColor: professionConfig.colors.secondary },
+        item.isCompleted && styles.completedTask,
+      ]}>
         <View style={styles.taskHeader}>
-          <Text style={[styles.taskTitle, { color: professionConfig.colors.text }]}>
-            {item.title}
-          </Text>
           <TouchableOpacity
-            onPress={() => handleCompleteTask(item)}
-            style={[
-              styles.checkBox,
-              item.isCompleted && { backgroundColor: professionConfig.colors.secondary }
-            ]}
+            style={styles.checkboxContainer}
+            onPress={() => toggleTaskComplete(item)}
           >
-            {item.isCompleted && <Text style={styles.checkMark}>✓</Text>}
+            <Text style={styles.checkbox}>
+              {item.isCompleted ? '✅' : '⭕'}
+            </Text>
           </TouchableOpacity>
-        </View>
-        
-        {item.description && (
-          <Text style={[styles.taskDescription, { color: professionConfig.colors.text }]}>
-            {item.description}
-          </Text>
-        )}
-        
-        <Text style={styles.taskDate}>
-          {new Date(item.scheduledDate || item.createdAt).toLocaleDateString()}
-          {item.reminderTime && ' 🔔'}
-        </Text>
-      </TouchableOpacity>
-      
-      <TouchableOpacity
-        onPress={() => handleDeleteTask(item)}
-        style={styles.deleteButton}
-      >
-        <Text style={styles.deleteButtonText}>×</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
-          Tomorrow's Tasks
-        </Text>
-        <Text style={styles.headerIcon}>{professionConfig.icon}</Text>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.content}>
-        {pendingTasks.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: professionConfig.colors.text }]}>
-              Pending Tasks ({pendingTasks.length})
+          
+          <View style={styles.taskInfo}>
+            <Text style={[
+              styles.taskTitle,
+              { color: professionConfig.colors.text },
+              item.isCompleted && styles.completedText,
+            ]}>
+              {item.title}
             </Text>
-            <FlatList
-              data={pendingTasks.sort((a, b) => new Date(a.scheduledDate || a.createdAt).getTime() - new Date(b.scheduledDate || b.createdAt).getTime())}
-              renderItem={renderTask}
-              keyExtractor={item => item.id}
-              scrollEnabled={false}
-            />
-          </View>
-        )}
-
-        {completedTasks.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: professionConfig.colors.text }]}>
-              Completed Tasks ({completedTasks.length})
-            </Text>
-            <FlatList
-              data={completedTasks}
-              renderItem={renderTask}
-              keyExtractor={item => item.id}
-              scrollEnabled={false}
-            />
-          </View>
-        )}
-
-        {professionTasks.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={[styles.emptyText, { color: professionConfig.colors.text }]}>
-              No tasks scheduled. Tap + to add your first task for tomorrow.
-            </Text>
-          </View>
-        )}
-      </ScrollView>
-
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: professionConfig.colors.secondary }]}
-        onPress={handleCreateTask}
-      >
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
-
-      <Modal
-        visible={isModalVisible}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <SafeAreaView style={[styles.modalContainer, { backgroundColor: professionConfig.colors.background }]}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setIsModalVisible(false)}>
-              <Text style={[styles.modalButton, { color: professionConfig.colors.text }]}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: professionConfig.colors.text }]}>
-              {editingTask ? 'Edit Task' : 'New Task'}
-            </Text>
-            <TouchableOpacity onPress={handleSaveTask}>
-              <Text style={[styles.modalButton, { color: professionConfig.colors.secondary }]}>Save</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.modalContent}>
-            <View style={styles.fieldContainer}>
-              <Text style={[styles.fieldLabel, { color: professionConfig.colors.text }]}>Task Title</Text>
-              <TextInput
-                style={[styles.fieldInput, { 
-                  backgroundColor: professionConfig.colors.primary,
-                  color: professionConfig.colors.text 
-                }]}
-                placeholder="Enter task title..."
-                placeholderTextColor={professionConfig.colors.text + '80'}
-                value={title}
-                onChangeText={setTitle}
-              />
-            </View>
-
-            <View style={styles.fieldContainer}>
-              <Text style={[styles.fieldLabel, { color: professionConfig.colors.text }]}>Description (Optional)</Text>
-              <TextInput
-                style={[styles.fieldInput, styles.multilineInput, { 
-                  backgroundColor: professionConfig.colors.primary,
-                  color: professionConfig.colors.text 
-                }]}
-                placeholder="Enter description..."
-                placeholderTextColor={professionConfig.colors.text + '80'}
-                value={description}
-                onChangeText={setDescription}
-                multiline
-                numberOfLines={3}
-              />
-            </View>
-
-            <View style={styles.fieldContainer}>
-              <Text style={[styles.fieldLabel, { color: professionConfig.colors.text }]}>Scheduled Date</Text>
-              <TouchableOpacity
-                style={[styles.dateTimeButton, { backgroundColor: professionConfig.colors.primary }]}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text style={[styles.dateTimeText, { color: professionConfig.colors.text }]}>
-                  {selectedDate.toLocaleDateString()}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.fieldContainer}>
-              <View style={styles.reminderHeader}>
-                <Text style={[styles.fieldLabel, { color: professionConfig.colors.text }]}>Set Reminder</Text>
-                <TouchableOpacity
-                  style={[
-                    styles.toggleButton,
-                    hasReminder && { backgroundColor: professionConfig.colors.secondary }
-                  ]}
-                  onPress={() => setHasReminder(!hasReminder)}
-                >
-                  <Text style={[styles.toggleText, hasReminder && { color: 'white' }]}>
-                    {hasReminder ? 'ON' : 'OFF'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+            
+            {item.description && (
+              <Text style={[styles.taskDescription, item.isCompleted && styles.completedText]}>
+                {item.description}
+              </Text>
+            )}
+            
+            <View style={styles.taskMeta}>
+              <Text style={[styles.statusBadge, { color: status.color }]}>
+                {status.icon} {status.text}
+              </Text>
               
-              {hasReminder && (
-                <TouchableOpacity
-                  style={[styles.dateTimeButton, { backgroundColor: professionConfig.colors.primary }]}
-                  onPress={() => setShowTimePicker(true)}
-                >
-                  <Text style={[styles.dateTimeText, { color: professionConfig.colors.text }]}>
-                    {selectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </Text>
-                </TouchableOpacity>
+              {item.scheduledDate && (
+                <Text style={styles.taskDate}>
+                  📅 {new Date(item.scheduledDate).toLocaleDateString()}
+                </Text>
+              )}
+              
+              {item.reminderTime && !item.isCompleted && (
+                <Text style={styles.reminderTime}>
+                  🔔 {new Date(item.reminderTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
               )}
             </View>
+          </View>
+          
+          <TouchableOpacity onPress={() => deleteTaskById(item)}>
+            <Text style={styles.deleteButton}>🗑️</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
 
+  const renderFilterButton = (filterType: typeof filter, label: string) => (
+    <TouchableOpacity
+      style={[
+        styles.filterButton,
+        filter === filterType && { backgroundColor: professionConfig.colors.secondary },
+      ]}
+      onPress={() => setFilter(filterType)}
+    >
+      <Text style={[
+        styles.filterButtonText,
+        filter === filterType && { color: 'white' },
+      ]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  if (isCreating) {
+    return (
+      <View style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
+        <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
+          <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
+            New Task
+          </Text>
+          <View style={styles.headerButtons}>
             <TouchableOpacity
-              style={[styles.voiceButton, { backgroundColor: professionConfig.colors.secondary }]}
-              onPress={handleVoiceInput}
-              disabled={isVoiceRecording}
+              style={[styles.saveButton, { backgroundColor: professionConfig.colors.secondary }]}
+              onPress={createTask}
             >
-              <Text style={styles.voiceButtonText}>
-                {isVoiceRecording ? '🎤 Recording...' : '🎤 Voice Input'}
+              <Text style={styles.saveButtonText}>Save</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => {
+                setIsCreating(false);
+                setNewTitle('');
+                setNewDescription('');
+                setSelectedDate(getTomorrowDate());
+                setHasReminder(false);
+              }}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.formContainer}>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: professionConfig.colors.text }]}>
+              Task Title *
+            </Text>
+            <TextInput
+              style={[styles.input, { borderColor: professionConfig.colors.secondary }]}
+              value={newTitle}
+              onChangeText={setNewTitle}
+              placeholder="Enter task title"
+              placeholderTextColor="#999"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: professionConfig.colors.text }]}>
+              Description
+            </Text>
+            <TextInput
+              style={[styles.textArea, { borderColor: professionConfig.colors.secondary }]}
+              value={newDescription}
+              onChangeText={setNewDescription}
+              placeholder="Enter task description (optional)"
+              placeholderTextColor="#999"
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: professionConfig.colors.text }]}>
+              Scheduled Date
+            </Text>
+            <TouchableOpacity
+              style={[styles.dateButton, { borderColor: professionConfig.colors.secondary }]}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={styles.dateButtonText}>
+                📅 {selectedDate.toLocaleDateString()}
               </Text>
             </TouchableOpacity>
-          </ScrollView>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <View style={styles.reminderHeader}>
+              <Text style={[styles.label, { color: professionConfig.colors.text }]}>
+                Set Reminder
+              </Text>
+              <Switch
+                value={hasReminder}
+                onValueChange={setHasReminder}
+                trackColor={{
+                  false: '#ccc',
+                  true: professionConfig.colors.secondary,
+                }}
+                thumbColor={hasReminder ? '#fff' : '#f4f3f4'}
+              />
+            </View>
+            
+            {hasReminder && (
+              <TouchableOpacity
+                style={[styles.timeButton, { borderColor: professionConfig.colors.secondary }]}
+                onPress={() => setShowTimePicker(true)}
+              >
+                <Text style={styles.timeButtonText}>
+                  🕐 {reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           {showDatePicker && (
             <DateTimePicker
               value={selectedDate}
               mode="date"
               display="default"
-              onChange={(event, date) => {
-                setShowDatePicker(false);
-                if (date) setSelectedDate(date);
-              }}
+              onChange={onDateChange}
+              minimumDate={new Date()}
             />
           )}
 
           {showTimePicker && (
             <DateTimePicker
-              value={selectedDate}
+              value={reminderTime}
               mode="time"
               display="default"
-              onChange={(event, date) => {
-                setShowTimePicker(false);
-                if (date) setSelectedDate(date);
-              }}
+              onChange={onTimeChange}
             />
           )}
-        </SafeAreaView>
-      </Modal>
-    </SafeAreaView>
+        </View>
+      </View>
+    );
+  }
+
+  const filteredTasks = getFilteredTasks();
+
+  return (
+    <View style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
+      <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
+        <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
+          Tasks ✅
+        </Text>
+        <TouchableOpacity
+          style={[styles.addButton, { backgroundColor: professionConfig.colors.secondary }]}
+          onPress={() => setIsCreating(true)}
+        >
+          <Text style={styles.addButtonText}>+ New</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.filtersContainer}>
+        {renderFilterButton('all', 'All')}
+        {renderFilterButton('today', 'Today')}
+        {renderFilterButton('tomorrow', 'Tomorrow')}
+        {renderFilterButton('overdue', 'Overdue')}
+      </View>
+
+      <FlatList
+        data={filteredTasks}
+        keyExtractor={(item) => item.id}
+        renderItem={renderTaskItem}
+        contentContainerStyle={styles.tasksList}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text style={[styles.emptyText, { color: professionConfig.colors.text }]}>
+              {filter === 'all' 
+                ? "No tasks yet. Tap 'New' to create your first task."
+                : `No ${filter} tasks found.`
+              }
+            </Text>
+          </View>
+        }
+      />
+    </View>
   );
 }
 
@@ -428,168 +461,99 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
+    paddingTop: 50,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
   },
-  headerIcon: {
-    fontSize: 32,
-  },
-  content: {
-    padding: 16,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  taskItem: {
+  headerButtons: {
     flexDirection: 'row',
-    padding: 16,
-    marginBottom: 12,
+    gap: 8,
+  },
+  addButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  taskContent: {
-    flex: 1,
-  },
-  taskHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  taskTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    flex: 1,
-  },
-  checkBox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#ddd',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkMark: {
+  addButtonText: {
     color: 'white',
-    fontSize: 14,
     fontWeight: 'bold',
   },
-  taskDescription: {
-    fontSize: 14,
-    marginBottom: 8,
+  saveButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
-  taskDate: {
-    fontSize: 12,
+  saveButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  cancelButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#ccc',
+  },
+  cancelButtonText: {
+    color: '#333',
+    fontWeight: 'bold',
+  },
+  filtersContainer: {
+    flexDirection: 'row',
+    padding: 16,
+    gap: 8,
+  },
+  filterButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#f0f0f0',
+  },
+  filterButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
     color: '#666',
   },
-  deleteButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#ff4444',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  deleteButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 100,
-  },
-  emptyText: {
-    fontSize: 16,
-    textAlign: 'center',
-    opacity: 0.6,
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  fabText: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  modalContainer: {
-    flex: 1,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  modalButton: {
-    fontSize: 16,
-  },
-  modalContent: {
+  formContainer: {
     flex: 1,
     padding: 16,
   },
-  fieldContainer: {
-    marginBottom: 16,
+  inputGroup: {
+    marginBottom: 20,
   },
-  fieldLabel: {
+  label: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginBottom: 8,
   },
-  fieldInput: {
+  input: {
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    backgroundColor: 'white',
   },
-  multilineInput: {
-    height: 80,
+  textArea: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: 'white',
+    minHeight: 80,
     textAlignVertical: 'top',
   },
-  dateTimeButton: {
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
+  dateButton: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: 'white',
+    alignItems: 'center',
   },
-  dateTimeText: {
+  dateButtonText: {
     fontSize: 16,
+    color: '#333',
   },
   reminderHeader: {
     flexDirection: 'row',
@@ -597,26 +561,91 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  toggleButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 16,
+  timeButton: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: 'white',
+    alignItems: 'center',
   },
-  toggleText: {
+  timeButtonText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  tasksList: {
+    padding: 16,
+  },
+  taskItem: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  completedTask: {
+    opacity: 0.7,
+  },
+  taskHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  checkboxContainer: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  checkbox: {
+    fontSize: 18,
+  },
+  taskInfo: {
+    flex: 1,
+  },
+  taskTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  taskDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  taskMeta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  statusBadge: {
     fontSize: 12,
     fontWeight: 'bold',
   },
-  voiceButton: {
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 16,
+  taskDate: {
+    fontSize: 12,
+    color: '#666',
   },
-  voiceButtonText: {
-    color: 'white',
+  reminderTime: {
+    fontSize: 12,
+    color: '#f39c12',
+  },
+  completedText: {
+    textDecorationLine: 'line-through',
+  },
+  deleteButton: {
+    fontSize: 18,
+    padding: 4,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
     fontSize: 16,
-    fontWeight: '600',
+    textAlign: 'center',
+    opacity: 0.7,
   },
 });

@@ -5,25 +5,21 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   Alert,
   ScrollView,
   Switch,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 import { UserSettings } from '@/types';
-import { 
-  getUserSettings, 
-  saveUserSettings, 
-  saveSelectedProfession,
-  clearAllData,
-} from '@/utils/storage';
+import { getUserSettings, saveUserSettings, clearAllData } from '@/utils/storage';
 
 export default function SettingsScreen() {
-  const [settings, setSettings] = useState<UserSettings | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
+  const [settings, setSettings] = useState<UserSettings>({
+    profession: 'doctor',
+    viewMode: 'paragraph',
+    isOnboardingComplete: true,
+  });
+  const [currentProfession, setCurrentProfession] = useState<ProfessionType>('doctor');
 
   useEffect(() => {
     loadSettings();
@@ -33,74 +29,67 @@ export default function SettingsScreen() {
     try {
       const userSettings = await getUserSettings();
       setSettings(userSettings);
+      setCurrentProfession(userSettings.profession);
     } catch (error) {
       console.error('Error loading settings:', error);
     }
   };
 
-  const handleProfessionChange = async (newProfession: ProfessionType) => {
-    if (!settings) return;
+  const updateSettings = async (newSettings: Partial<UserSettings>) => {
+    try {
+      const updatedSettings = { ...settings, ...newSettings };
+      await saveUserSettings(updatedSettings);
+      setSettings(updatedSettings);
+      
+      if (newSettings.profession) {
+        setCurrentProfession(newSettings.profession);
+      }
+    } catch (error) {
+      console.error('Error updating settings:', error);
+      Alert.alert('Error', 'Failed to update settings');
+    }
+  };
 
+  const changeProfession = (profession: ProfessionType) => {
     Alert.alert(
       'Change Profession',
-      `Are you sure you want to switch to ${PROFESSIONS[newProfession].name}? This will change your app theme and note templates.`,
+      `Switch to ${PROFESSIONS[profession].name}? Your existing notes will remain but new notes will use the ${profession} template.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Switch',
-          onPress: async () => {
-            setIsLoading(true);
-            try {
-              const updatedSettings = { ...settings, profession: newProfession };
-              await saveSelectedProfession(newProfession);
-              await saveUserSettings(updatedSettings);
-              setSettings(updatedSettings);
-            } catch (error) {
-              console.error('Error changing profession:', error);
-              Alert.alert('Error', 'Failed to change profession');
-            } finally {
-              setIsLoading(false);
-            }
-          },
+          text: 'Change',
+          onPress: () => updateSettings({ profession }),
         },
       ]
     );
   };
 
-  const handleViewModeChange = async (newViewMode: 'paragraph' | 'bullet') => {
-    if (!settings) return;
-
-    setIsLoading(true);
-    try {
-      const updatedSettings = { ...settings, viewMode: newViewMode };
-      await saveUserSettings(updatedSettings);
-      setSettings(updatedSettings);
-    } catch (error) {
-      console.error('Error changing view mode:', error);
-      Alert.alert('Error', 'Failed to change view mode');
-    } finally {
-      setIsLoading(false);
-    }
+  const toggleViewMode = () => {
+    const newViewMode = settings.viewMode === 'paragraph' ? 'bullet' : 'paragraph';
+    updateSettings({ viewMode: newViewMode });
   };
 
-  const handleClearData = () => {
+  const resetAllData = () => {
     Alert.alert(
-      'Clear All Data',
+      'Reset All Data',
       'This will delete all your notes, reminders, and tasks. This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete All',
+          text: 'Reset',
           style: 'destructive',
           onPress: async () => {
             try {
               await clearAllData();
-              Alert.alert('Success', 'All data has been cleared');
-              // Navigate back to onboarding
-              router.replace('/');
+              await updateSettings({
+                profession: 'doctor',
+                viewMode: 'paragraph',
+                isOnboardingComplete: false,
+              });
+              Alert.alert('Success', 'All data has been reset');
             } catch (error) {
-              console.error('Error clearing data:', error);
-              Alert.alert('Error', 'Failed to clear data');
+              console.error('Error resetting data:', error);
+              Alert.alert('Error', 'Failed to reset data');
             }
           },
         },
@@ -108,41 +97,30 @@ export default function SettingsScreen() {
     );
   };
 
-  if (!settings) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading settings...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const currentProfession = PROFESSIONS[settings.profession];
+  const professionConfig = PROFESSIONS[currentProfession];
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: currentProfession.colors.background }]}>
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: currentProfession.colors.text }]}>
-          Settings
+    <View style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
+      <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
+        <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
+          Settings ⚙️
         </Text>
-        <Text style={styles.headerIcon}>⚙️</Text>
       </View>
 
       <ScrollView style={styles.content}>
         {/* Current Profession */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: currentProfession.colors.text }]}>
+          <Text style={[styles.sectionTitle, { color: professionConfig.colors.text }]}>
             Current Profession
           </Text>
-          <View style={[styles.currentProfessionCard, { backgroundColor: currentProfession.colors.primary }]}>
-            <Text style={styles.professionIcon}>{currentProfession.icon}</Text>
-            <View style={styles.professionInfo}>
-              <Text style={[styles.professionName, { color: currentProfession.colors.text }]}>
-                {currentProfession.name}
+          <View style={[styles.currentProfessionCard, { borderColor: professionConfig.colors.secondary }]}>
+            <Text style={styles.currentProfessionIcon}>{professionConfig.icon}</Text>
+            <View style={styles.currentProfessionInfo}>
+              <Text style={[styles.currentProfessionName, { color: professionConfig.colors.text }]}>
+                {professionConfig.name}
               </Text>
-              <Text style={[styles.professionHeader, { color: currentProfession.colors.text }]}>
-                {currentProfession.header}
+              <Text style={styles.currentProfessionHeader}>
+                {professionConfig.header}
               </Text>
             </View>
           </View>
@@ -150,113 +128,104 @@ export default function SettingsScreen() {
 
         {/* Change Profession */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: currentProfession.colors.text }]}>
-            Switch Profession
+          <Text style={[styles.sectionTitle, { color: professionConfig.colors.text }]}>
+            Change Profession
           </Text>
-          {Object.entries(PROFESSIONS).map(([key, config]) => {
-            const professionKey = key as ProfessionType;
-            const isSelected = settings.profession === professionKey;
-            
-            return (
-              <TouchableOpacity
-                key={professionKey}
-                style={[
-                  styles.professionOption,
-                  { backgroundColor: config.colors.primary },
-                  isSelected && { opacity: 0.5 }
-                ]}
-                onPress={() => handleProfessionChange(professionKey)}
-                disabled={isSelected || isLoading}
-              >
-                <Text style={styles.optionIcon}>{config.icon}</Text>
-                <View style={styles.optionInfo}>
-                  <Text style={[styles.optionName, { color: config.colors.text }]}>
-                    {config.name}
-                  </Text>
-                  <Text style={[styles.optionDescription, { color: config.colors.text }]}>
-                    {config.header}
-                  </Text>
-                </View>
-                {isSelected && (
-                  <Text style={[styles.selectedIndicator, { color: config.colors.secondary }]}>
-                    ✓
-                  </Text>
-                )}
-              </TouchableOpacity>
-            );
-          })}
+          {Object.entries(PROFESSIONS).map(([key, config]) => (
+            <TouchableOpacity
+              key={key}
+              style={[
+                styles.professionOption,
+                currentProfession === key && {
+                  backgroundColor: professionConfig.colors.primary,
+                  borderColor: professionConfig.colors.secondary,
+                },
+              ]}
+              onPress={() => changeProfession(key as ProfessionType)}
+              disabled={currentProfession === key}
+            >
+              <Text style={styles.professionIcon}>{config.icon}</Text>
+              <View style={styles.professionInfo}>
+                <Text style={[
+                  styles.professionName,
+                  currentProfession === key && { color: professionConfig.colors.text }
+                ]}>
+                  {config.name}
+                </Text>
+                <Text style={[
+                  styles.professionHeader,
+                  currentProfession === key && { color: professionConfig.colors.text }
+                ]}>
+                  {config.header}
+                </Text>
+              </View>
+              {currentProfession === key && (
+                <Text style={styles.currentBadge}>✓</Text>
+              )}
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* View Mode */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: currentProfession.colors.text }]}>
-            Note View Mode
+          <Text style={[styles.sectionTitle, { color: professionConfig.colors.text }]}>
+            Display Preferences
           </Text>
-          
-          <View style={[styles.viewModeOption, { backgroundColor: currentProfession.colors.primary }]}>
-            <View style={styles.viewModeInfo}>
-              <Text style={[styles.viewModeTitle, { color: currentProfession.colors.text }]}>
-                Paragraph View
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={[styles.settingName, { color: professionConfig.colors.text }]}>
+                View Mode
               </Text>
-              <Text style={[styles.viewModeDescription, { color: currentProfession.colors.text }]}>
-                Show notes as continuous text
-              </Text>
-            </View>
-            <Switch
-              value={settings.viewMode === 'paragraph'}
-              onValueChange={(value) => handleViewModeChange(value ? 'paragraph' : 'bullet')}
-              trackColor={{ false: '#ccc', true: currentProfession.colors.secondary }}
-              disabled={isLoading}
-            />
-          </View>
-
-          <View style={[styles.viewModeOption, { backgroundColor: currentProfession.colors.primary }]}>
-            <View style={styles.viewModeInfo}>
-              <Text style={[styles.viewModeTitle, { color: currentProfession.colors.text }]}>
-                Bullet Point View
-              </Text>
-              <Text style={[styles.viewModeDescription, { color: currentProfession.colors.text }]}>
-                Show notes as structured bullet points
+              <Text style={styles.settingDescription}>
+                {settings.viewMode === 'paragraph' ? 'Paragraph format' : 'Bullet point format'}
               </Text>
             </View>
             <Switch
               value={settings.viewMode === 'bullet'}
-              onValueChange={(value) => handleViewModeChange(value ? 'bullet' : 'paragraph')}
-              trackColor={{ false: '#ccc', true: currentProfession.colors.secondary }}
-              disabled={isLoading}
+              onValueChange={toggleViewMode}
+              trackColor={{
+                false: '#ccc',
+                true: professionConfig.colors.secondary,
+              }}
+              thumbColor={settings.viewMode === 'bullet' ? '#fff' : '#f4f3f4'}
             />
           </View>
         </View>
 
         {/* App Info */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: currentProfession.colors.text }]}>
+          <Text style={[styles.sectionTitle, { color: professionConfig.colors.text }]}>
             App Information
           </Text>
-          <View style={[styles.infoCard, { backgroundColor: currentProfession.colors.primary }]}>
-            <Text style={[styles.infoText, { color: currentProfession.colors.text }]}>
-              Notes App v1.0.0
+          <View style={styles.infoCard}>
+            <Text style={styles.infoText}>
+              📱 Professional Note-Taking App
             </Text>
-            <Text style={[styles.infoText, { color: currentProfession.colors.text }]}>
-              Professional note-taking made simple
+            <Text style={styles.infoText}>
+              📝 Offline storage with AsyncStorage
+            </Text>
+            <Text style={styles.infoText}>
+              🎤 Voice input support (simulated)
+            </Text>
+            <Text style={styles.infoText}>
+              🔔 Local notifications
             </Text>
           </View>
         </View>
 
         {/* Danger Zone */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: '#ff4444' }]}>
+          <Text style={[styles.sectionTitle, { color: '#e74c3c' }]}>
             Danger Zone
           </Text>
-          <TouchableOpacity
-            style={styles.dangerButton}
-            onPress={handleClearData}
-          >
-            <Text style={styles.dangerButtonText}>Clear All Data</Text>
+          <TouchableOpacity style={styles.dangerButton} onPress={resetAllData}>
+            <Text style={styles.dangerButtonText}>
+              🗑️ Reset All Data
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -264,118 +233,122 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#666',
-  },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    padding: 16,
+    paddingTop: 50,
     alignItems: 'center',
-    padding: 20,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-  },
-  headerIcon: {
-    fontSize: 32,
   },
   content: {
     flex: 1,
     padding: 16,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 32,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   currentProfessionCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 12,
     padding: 16,
+    borderWidth: 2,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  currentProfessionIcon: {
+    fontSize: 32,
+    marginRight: 16,
+  },
+  currentProfessionInfo: {
+    flex: 1,
+  },
+  currentProfessionName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  currentProfessionHeader: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
+  },
+  professionOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
     borderRadius: 8,
+    padding: 16,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#eee',
   },
   professionIcon: {
-    fontSize: 32,
+    fontSize: 24,
     marginRight: 16,
   },
   professionInfo: {
     flex: 1,
   },
   professionName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
+    color: '#333',
   },
   professionHeader: {
-    fontSize: 14,
-    opacity: 0.8,
-  },
-  professionOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  optionIcon: {
-    fontSize: 24,
-    marginRight: 16,
-  },
-  optionInfo: {
-    flex: 1,
-  },
-  optionName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  optionDescription: {
     fontSize: 12,
-    opacity: 0.8,
+    color: '#666',
+    marginTop: 2,
   },
-  selectedIndicator: {
-    fontSize: 20,
+  currentBadge: {
+    fontSize: 18,
+    color: '#4CAF50',
     fontWeight: 'bold',
   },
-  viewModeOption: {
+  settingRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    alignItems: 'center',
+    backgroundColor: 'white',
     borderRadius: 8,
-    marginBottom: 8,
+    padding: 16,
   },
-  viewModeInfo: {
+  settingInfo: {
     flex: 1,
   },
-  viewModeTitle: {
+  settingName: {
     fontSize: 16,
     fontWeight: 'bold',
   },
-  viewModeDescription: {
-    fontSize: 12,
-    opacity: 0.8,
+  settingDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
   },
   infoCard: {
-    padding: 16,
+    backgroundColor: 'white',
     borderRadius: 8,
+    padding: 16,
   },
   infoText: {
     fontSize: 14,
-    marginBottom: 4,
+    color: '#666',
+    marginBottom: 8,
   },
   dangerButton: {
-    backgroundColor: '#ff4444',
-    padding: 16,
+    backgroundColor: '#e74c3c',
     borderRadius: 8,
+    padding: 16,
     alignItems: 'center',
   },
   dangerButtonText: {

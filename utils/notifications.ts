@@ -1,60 +1,37 @@
-
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
-export interface NotificationData {
-  title: string;
-  body: string;
-  data?: any;
-}
-
-export const setupNotifications = async (): Promise<boolean> => {
+export const requestNotificationPermissions = async (): Promise<boolean> => {
   try {
     const { status } = await Notifications.requestPermissionsAsync();
-    
-    if (status !== 'granted') {
-      console.log('Notification permissions not granted');
-      return false;
-    }
-
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'default',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
-    }
-
-    return true;
+    return status === 'granted';
   } catch (error) {
-    console.error('Error setting up notifications:', error);
+    console.error('Error requesting notification permissions:', error);
     return false;
   }
 };
 
 export const scheduleNotification = async (
-  notificationData: NotificationData,
-  scheduledDate: Date
+  title: string,
+  body: string,
+  trigger: Date | number
 ): Promise<string | null> => {
   try {
-    const trigger = scheduledDate.getTime() > Date.now() 
-      ? { date: scheduledDate }
-      : null;
-
-    if (!trigger) {
-      console.log('Cannot schedule notification in the past');
+    const hasPermission = await requestNotificationPermissions();
+    if (!hasPermission) {
+      console.warn('Notification permissions not granted');
       return null;
     }
 
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: {
-        title: notificationData.title,
-        body: notificationData.body,
-        data: notificationData.data || {},
+        title,
+        body,
         sound: true,
       },
-      trigger,
+      trigger: typeof trigger === 'number' 
+        ? { seconds: trigger }
+        : { date: trigger },
     });
 
     return notificationId;
@@ -77,23 +54,5 @@ export const cancelAllNotifications = async (): Promise<void> => {
     await Notifications.cancelAllScheduledNotificationsAsync();
   } catch (error) {
     console.error('Error canceling all notifications:', error);
-  }
-};
-
-export const sendImmediateNotification = async (
-  notificationData: NotificationData
-): Promise<void> => {
-  try {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: notificationData.title,
-        body: notificationData.body,
-        data: notificationData.data || {},
-        sound: true,
-      },
-      trigger: null, // Send immediately
-    });
-  } catch (error) {
-    console.error('Error sending immediate notification:', error);
   }
 };

@@ -1,12 +1,42 @@
-
 import * as Speech from 'expo-speech';
 import { Alert } from 'react-native';
+
+export interface SpeechResult {
+  text: string;
+  success: boolean;
+  error?: string;
+}
 
 export interface SpeechOptions {
   language?: string;
   pitch?: number;
   rate?: number;
 }
+
+// Note: Expo Speech is primarily for text-to-speech
+// For speech-to-text, we'll need to use a different approach
+// This is a placeholder for the speech recognition functionality
+export const startSpeechRecognition = async (): Promise<SpeechResult> => {
+  try {
+    // This would typically integrate with a speech recognition service
+    // For now, we'll return a mock implementation
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({
+          text: "This is a placeholder for speech recognition",
+          success: false,
+          error: "Speech recognition not implemented yet - requires native module or external API"
+        });
+      }, 1000);
+    });
+  } catch (error) {
+    return {
+      text: "",
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error"
+    };
+  }
+};
 
 export const speakText = async (
   text: string,
@@ -114,4 +144,14 @@ export const extractFieldsFromSpeech = (
   }
 
   return fields;
+};
+
+// Mock speech-to-text for demo purposes
+export const mockSpeechToText = (profession: string): string => {
+  const mockTexts = {
+    doctor: "Patient complains of headache and fever symptoms lasting 3 days",
+    lawyer: "Client needs assistance with contract review and legal documentation",
+    developer: "Implement user authentication system with JWT tokens"
+  };
+  return mockTexts[profession as keyof typeof mockTexts] || "Sample voice input text";
 };
