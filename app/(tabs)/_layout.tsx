@@ -1,6 +1,7 @@
-import React from 'react';
 import { Tabs } from 'expo-router';
+import React from 'react';
 import { Platform } from 'react-native';
+
 import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
@@ -14,70 +15,86 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: true,
-        headerStyle: {
-          backgroundColor: Colors[colorScheme ?? 'light'].background,
-        },
-        headerTitleStyle: {
-          fontSize: 18,
-          fontWeight: '600',
-        },
+        tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].tabIconDefault,
+        headerShown: false,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
         tabBarStyle: Platform.select({
           ios: {
             position: 'absolute',
-            backgroundColor: 'transparent',
+            backgroundColor: 'rgba(255, 255, 255, 0.85)',
             borderTopWidth: 0,
+            elevation: 0,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.04,
+            shadowRadius: 8,
           },
           default: {
-            backgroundColor: Colors[colorScheme ?? 'light'].surface,
+            backgroundColor: Colors[colorScheme ?? 'light'].backgroundSecondary,
             borderTopWidth: 1,
             borderTopColor: Colors[colorScheme ?? 'light'].border,
-            height: 65,
-            paddingBottom: 8,
+            elevation: 8,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.04,
+            shadowRadius: 8,
             paddingTop: 8,
+            paddingBottom: 8,
+            height: 64,
           },
         }),
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '500',
+          letterSpacing: 0.1,
+        },
       }}>
       <Tabs.Screen
         name="index"
         options={{
           title: 'Notes',
-          headerTitle: 'Notes',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="doc.text" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="templates"
-        options={{
-          title: 'Templates',
-          headerTitle: 'Templates',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="doc.badge.plus" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="reminders"
-        options={{
-          title: 'Reminders',
-          headerTitle: 'Reminders',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="bell" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="note.text" color={color} />,
         }}
       />
       <Tabs.Screen
         name="tasks"
         options={{
           title: 'Tasks',
-          headerTitle: 'Tasks',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="checklist" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="checkmark.square" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="reminders"
+        options={{
+          title: 'Reminders',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="bell" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="templates"
+        options={{
+          title: 'Templates',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="document.badge.plus" color={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
-          headerTitle: 'Settings',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="gearshape" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="gear" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="search"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="explore"
+        options={{
+          href: null,
         }}
       />
     </Tabs>

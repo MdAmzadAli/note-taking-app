@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -93,7 +92,7 @@ export default function TasksScreen() {
         const reminderDate = new Date(selectedDate);
         reminderDate.setHours(reminderTime.getHours());
         reminderDate.setMinutes(reminderTime.getMinutes());
-        
+
         const notificationId = await scheduleNotification(
           `${professionConfig.icon} Task Reminder`,
           `Task: ${task.title}`,
@@ -108,7 +107,7 @@ export default function TasksScreen() {
 
       await saveTask(task);
       await loadTasksAndSettings();
-      
+
       // Reset form
       setNewTitle('');
       setNewDescription('');
@@ -162,7 +161,7 @@ export default function TasksScreen() {
         const reminderDate = new Date(selectedDate);
         reminderDate.setHours(reminderTime.getHours());
         reminderDate.setMinutes(reminderTime.getMinutes());
-        
+
         const notificationId = await scheduleNotification(
           `${professionConfig.icon} Task Reminder`,
           `Task: ${updatedTask.title}`,
@@ -177,7 +176,7 @@ export default function TasksScreen() {
 
       await saveTask(updatedTask);
       await loadTasksAndSettings();
-      
+
       // Reset form
       setNewTitle('');
       setNewDescription('');
@@ -278,25 +277,25 @@ export default function TasksScreen() {
 
   const getTaskStatus = (task: Task) => {
     if (task.isCompleted) return { icon: '✅', color: '#4CAF50', text: 'Completed' };
-    
+
     const now = new Date();
     const taskDate = new Date(task.scheduledDate || task.createdAt);
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
-    
+
     if (taskDay < today) return { icon: '🔴', color: '#e74c3c', text: 'Overdue' };
     if (taskDay.getTime() === today.getTime()) return { icon: '🟡', color: '#f39c12', text: 'Today' };
-    
+
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
     if (taskDay.getTime() === tomorrow.getTime()) return { icon: '🟢', color: '#2ecc71', text: 'Tomorrow' };
-    
+
     return { icon: '📅', color: '#3498db', text: 'Upcoming' };
   };
 
   const renderTaskItem = ({ item }: { item: Task }) => {
     const status = getTaskStatus(item);
-    
+
     return (
       <TouchableOpacity 
         style={[
@@ -318,7 +317,7 @@ export default function TasksScreen() {
               {item.isCompleted ? '✅' : '⭕'}
             </Text>
           </TouchableOpacity>
-          
+
           <View style={styles.taskInfo}>
             <Text style={[
               styles.taskTitle,
@@ -327,24 +326,24 @@ export default function TasksScreen() {
             ]}>
               {item.title}
             </Text>
-            
+
             {item.description && (
               <Text style={[styles.taskDescription, item.isCompleted && styles.completedText]}>
                 {item.description}
               </Text>
             )}
-            
+
             <View style={styles.taskMeta}>
               <Text style={[styles.statusBadge, { color: status.color }]}>
                 {status.icon} {status.text}
               </Text>
-              
+
               {item.scheduledDate && (
                 <Text style={styles.taskDate}>
                   📅 {new Date(item.scheduledDate).toLocaleDateString()}
                 </Text>
               )}
-              
+
               {item.reminderTime && !item.isCompleted && (
                 <Text style={styles.reminderTime}>
                   🔔 {new Date(item.reminderTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -352,7 +351,7 @@ export default function TasksScreen() {
               )}
             </View>
           </View>
-          
+
           <TouchableOpacity onPress={(e) => {
             e.stopPropagation();
             deleteTaskById(item);
@@ -470,7 +469,7 @@ export default function TasksScreen() {
                 thumbColor={hasReminder ? '#fff' : '#f4f3f4'}
               />
             </View>
-            
+
             {hasReminder && (
               <TouchableOpacity
                 style={[styles.timeButton, { borderColor: professionConfig.colors.secondary }]}
@@ -578,218 +577,164 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    paddingTop: 50,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    paddingTop: Platform.OS === 'ios' ? 52 : 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    letterSpacing: -0.5,
   },
   headerButtons: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
   },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 8,
+  iconButton: {
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+    minWidth: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  searchButton: {
-    backgroundColor: '#34C759',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  searchButtonText: {
-    fontSize: 16,
-  },
-  addButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  addButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+  iconButtonText: {
+    fontSize: 18,
+    fontWeight: '500',
   },
   searchContainer: {
-    backgroundColor: 'white',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
   },
   searchInput: {
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    padding: 12,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
     fontSize: 16,
-    backgroundColor: '#f8f8f8',
+    fontWeight: '400',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  saveButton: {
-    paddingHorizontal: 16,
+  filterContainer: {
+    paddingHorizontal: 24,
     paddingVertical: 8,
-    borderRadius: 8,
   },
-  saveButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  cancelButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#ccc',
-  },
-  cancelButtonText: {
-    color: '#333',
-    fontWeight: 'bold',
-  },
-  filtersContainer: {
+  filterScroll: {
     flexDirection: 'row',
-    padding: 16,
-    gap: 8,
   },
   filterButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
+    marginRight: 12,
+    backgroundColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  filterButtonActive: {
+    backgroundColor: '#3B82F6',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
   },
   filterButtonText: {
     fontSize: 14,
+    color: '#374151',
     fontWeight: '500',
-    color: '#666',
   },
-  formContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
+  filterButtonTextActive: {
+    color: 'white',
     fontWeight: '600',
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: 'white',
-  },
-  textArea: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: 'white',
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  dateButton: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: 'white',
-    alignItems: 'center',
-  },
-  dateButtonText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  reminderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  timeButton: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: 'white',
-    alignItems: 'center',
-  },
-  timeButtonText: {
-    fontSize: 16,
-    color: '#333',
   },
   tasksList: {
-    padding: 16,
+    padding: 24,
+    paddingTop: 16,
   },
   taskItem: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    elevation: 2,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  completedTask: {
+  taskItemCompleted: {
     opacity: 0.7,
   },
   taskHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'flex-start',
-  },
-  checkboxContainer: {
-    marginRight: 12,
-    marginTop: 2,
-  },
-  checkbox: {
-    fontSize: 18,
-  },
-  taskInfo: {
-    flex: 1,
+    marginBottom: 12,
   },
   taskTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: '600',
+    flex: 1,
+    marginRight: 12,
+    lineHeight: 24,
   },
-  taskDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  taskMeta: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  statusBadge: {
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  taskDate: {
-    fontSize: 12,
-    color: '#666',
-  },
-  reminderTime: {
-    fontSize: 12,
-    color: '#f39c12',
-  },
-  completedText: {
+  taskTitleCompleted: {
     textDecorationLine: 'line-through',
   },
-  deleteButton: {
-    fontSize: 18,
-    padding: 4,
+  taskActions: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  emptyState: {
+  actionButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(229, 231, 235, 0.6)',
+    minWidth: 36,
+    minHeight: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
   },
-  emptyText: {
+  actionButtonText: {
     fontSize: 16,
-    textAlign: 'center',
-    opacity: 0.7,
+  },
+  taskDescription: {
+    fontSize: 15,
+    marginBottom: 12,
+    lineHeight: 22,
+    fontWeight: '400',
+  },
+  taskStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  statusIcon: {
+    fontSize: 14,
+  },
+  statusText: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  taskDate: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+    letterSpacing: 0.1,
   },
 });

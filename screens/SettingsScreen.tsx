@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -40,7 +39,7 @@ export default function SettingsScreen() {
       const updatedSettings = { ...settings, ...newSettings };
       await saveUserSettings(updatedSettings);
       setSettings(updatedSettings);
-      
+
       if (newSettings.profession) {
         setCurrentProfession(newSettings.profession);
       }
@@ -234,41 +233,51 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    padding: 16,
-    paddingTop: 50,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    paddingTop: Platform.OS === 'ios' ? 52 : 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    letterSpacing: -0.5,
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: 24,
   },
   section: {
     marginBottom: 32,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginBottom: 16,
+    letterSpacing: -0.3,
   },
   currentProfessionCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 2,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 2,
-    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 3,
   },
   currentProfessionIcon: {
-    fontSize: 32,
+    fontSize: 40,
     marginRight: 16,
   },
   currentProfessionInfo: {
@@ -276,84 +285,60 @@ const styles = StyleSheet.create({
   },
   currentProfessionName: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    letterSpacing: -0.2,
   },
   currentProfessionHeader: {
     fontSize: 14,
-    color: '#666',
-    marginTop: 2,
+    color: '#6B7280',
+    marginTop: 4,
+    fontWeight: '400',
   },
-  professionOption: {
+  professionGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  professionCard: {
+    width: '48%',
     backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#eee',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  professionCardSelected: {
+    borderColor: '#3B82F6',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 5,
   },
   professionIcon: {
-    fontSize: 24,
-    marginRight: 16,
-  },
-  professionInfo: {
-    flex: 1,
+    fontSize: 36,
+    marginBottom: 12,
   },
   professionName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 15,
+    fontWeight: '600',
+    textAlign: 'center',
+    color: '#111827',
+    letterSpacing: -0.1,
   },
-  professionHeader: {
+  professionDescription: {
     fontSize: 12,
-    color: '#666',
-    marginTop: 2,
-  },
-  currentBadge: {
-    fontSize: 18,
-    color: '#4CAF50',
-    fontWeight: 'bold',
-  },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
-  },
-  settingInfo: {
-    flex: 1,
-  },
-  settingName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  settingDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
-  },
-  infoCard: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  dangerButton: {
-    backgroundColor: '#e74c3c',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-  },
-  dangerButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 16,
+    fontWeight: '400',
   },
 });

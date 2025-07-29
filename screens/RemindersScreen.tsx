@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -115,7 +114,7 @@ export default function RemindersScreen() {
 
       await saveReminder(reminder);
       await loadRemindersAndSettings();
-      
+
       // Reset form
       setNewTitle('');
       setNewDescription('');
@@ -167,7 +166,7 @@ export default function RemindersScreen() {
 
       await saveReminder(updatedReminder);
       await loadRemindersAndSettings();
-      
+
       // Reset form
       setNewTitle('');
       setNewDescription('');
@@ -247,7 +246,7 @@ export default function RemindersScreen() {
 
   const renderReminderItem = ({ item }: { item: Reminder }) => {
     const isOverdue = new Date(item.dateTime) < new Date() && !item.isCompleted;
-    
+
     return (
       <TouchableOpacity 
         style={[
@@ -270,7 +269,7 @@ export default function RemindersScreen() {
               {item.isCompleted ? '✅' : '⏰'}
             </Text>
           </TouchableOpacity>
-          
+
           <View style={styles.reminderInfo}>
             <Text style={[
               styles.reminderTitle,
@@ -279,20 +278,20 @@ export default function RemindersScreen() {
             ]}>
               {item.title}
             </Text>
-            
+
             {item.description && (
               <Text style={[styles.reminderDescription, item.isCompleted && styles.completedText]}>
                 {item.description}
               </Text>
             )}
-            
+
             <Text style={[styles.reminderDateTime, isOverdue && styles.overdueText]}>
               {new Date(item.dateTime).toLocaleDateString()} at{' '}
               {new Date(item.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               {isOverdue && ' (Overdue)'}
             </Text>
           </View>
-          
+
           <TouchableOpacity onPress={(e) => {
             e.stopPropagation();
             deleteReminderById(item);
@@ -392,7 +391,7 @@ export default function RemindersScreen() {
                   📅 {selectedDate.toLocaleDateString()}
                 </Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[styles.dateTimeButton, { borderColor: professionConfig.colors.secondary }]}
                 onPress={() => setShowTimePicker(true)}
@@ -487,16 +486,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    paddingTop: 50,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    paddingTop: Platform.OS === 'ios' ? 52 : 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    letterSpacing: -0.5,
   },
   headerButtons: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
   },
   headerActions: {
     flexDirection: 'row',
@@ -521,41 +527,53 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   searchContainer: {
-    backgroundColor: 'white',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
   },
   searchInput: {
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    padding: 12,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
     fontSize: 16,
-    backgroundColor: '#f8f8f8',
+    fontWeight: '400',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
   },
   saveButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
   },
   saveButtonText: {
     color: 'white',
-    fontWeight: 'bold',
+    fontWeight: '600',
+    fontSize: 16,
+    letterSpacing: 0.3,
   },
   cancelButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#ccc',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
   },
   cancelButtonText: {
-    color: '#333',
-    fontWeight: 'bold',
+    color: '#374151',
+    fontWeight: '600',
+    fontSize: 16,
   },
   formContainer: {
-    flex: 1,
-    padding: 16,
+    padding: 24,
   },
   inputGroup: {
     marginBottom: 20,
