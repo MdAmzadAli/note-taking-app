@@ -7,103 +7,135 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  Alert
+  SafeAreaView,
+  Alert,
 } from 'react-native';
-import { Note, Profession, UserSettings } from '../types';
-import { PROFESSION_CONFIGS } from '../constants/professions';
-import { StorageService } from '../utils/storage';
-import { SearchService } from '../utils/search';
-import { SpeechService } from '../utils/speech';
+import Fuse from 'fuse.js';
+import { Note, UserSettings } from '@/types';
+import { PROFESSIONS, ProfessionType } from '@/constants/professions';
+import { getNotes, getSelectedProfession, getUserSettings } from '@/utils/storage';
+import { simulateVoiceToText } from '@/utils/speech';
 
-interface SearchScreenProps {
-  profession: Profession;
-  settings: UserSettings;
-}
-
-export const SearchScreen: React.FC<SearchScreenProps> = ({ profession, settings }) => {
+export default function SearchScreen() {
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [filteredNotes, setFilteredNotes] = useState<Note[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Note[]>([]);
-  const [groupedResults, setGroupedResults] = useState<Record<Profession, Note[]>>({});
-  const [isVoiceSearch, setIsVoiceSearch] = useState(false);
-  
-  const config = PROFESSION_CONFIGS[profession];
+  const [profession, setProfession] = useState<ProfessionType>('doctor');
+  const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [isVoiceRecording, setIsVoiceRecording] = useState(false);
 
   useEffect(() => {
-    if (searchQuery.trim()) {
-      performSearch();
-    } else {
-      setSearchResults([]);
-      setGroupedResults({});
-    }
-  }, [searchQuery]);
+    loadData();
+  }, []);
 
-  const performSearch = async () => {
+  useEffect(() => {
+    handleSearch(searchQuery);
+  }, [searchQuery, notes]);
+
+  const loadData = async () => {
     try {
-      const allNotes = await StorageService.getNotes();
-      const results = SearchService.searchNotes(allNotes, searchQuery);
-      setSearchResults(results);
+      const [notesData, professionData, settingsData] = await Promise.all([
+        getNotes(),
+        getSelectedProfession(),
+        getUserSettings(),
+      ]);
       
-      const grouped = SearchService.groupNotesByProfession(results);
-      setGroupedResults(grouped);
+      setNotes(notesData);
+      if (professionData) setProfession(professionData);
+      setSettings(settingsData);
     } catch (error) {
-      Alert.alert('Error', 'Failed to search notes');
+      console.error('Error loading data:', error);
     }
   };
 
-  const startVoiceSearch = async () => {
-    const hasPermission = await SpeechService.requestPermissions();
-    if (!hasPermission) {
-      Alert.alert('Permission Required', 'Please enable microphone access');
+  const handleSearch = (query: string) => {
+    if (!query.trim()) {
+      setFilteredNotes(notes);
       return;
     }
 
-    setIsVoiceSearch(true);
+    const fuse = new Fuse(notes, {
+      keys: [
+        'title',
+        'content',
+        'fields.Patient Name',
+        'fields.Symptoms',
+        'fields.Diagnosis',
+        'fields.Prescription',
+        'fields.Client Name',
+        'fields.Case Summary',
+        'fields.Action Items',
+        'fields.Legal References',
+        'fields.Feature',
+        'fields.Code Snippet',
+        'fields.To-Do',
+        'fields.Notes',
+      ],
+      threshold: 0.4,
+      includeScore: true,
+    });
+
+    const results = fuse.search(query);
+    setFilteredNotes(results.map(result => result.item));
+  };
+
+  const handleVoiceSearch = async () => {
+    setIsVoiceRecording(true);
     try {
-      // Simulate voice search with profession-specific terms
-      const searchTerms = {
-        doctor: ['headache', 'fever', 'diagnosis', 'prescription', 'symptoms'],
-        lawyer: ['contract', 'client', 'case', 'legal', 'agreement'],
-        developer: ['authentication', 'API', 'feature', 'code', 'testing']
-      };
-      
-      const terms = searchTerms[profession] || searchTerms.developer;
-      const randomQuery = terms[Math.floor(Math.random() * terms.length)];
-      
-      setTimeout(() => {
-        setSearchQuery(randomQuery);
-        setIsVoiceSearch(false);
-      }, 2000);
+      const speechText = await simulateVoiceToText();
+      setSearchQuery(speechText);
     } catch (error) {
+      console.error('Error with voice search:', error);
       Alert.alert('Error', 'Voice search failed');
-      setIsVoiceSearch(false);
+    } finally {
+      setIsVoiceRecording(false);
     }
   };
 
+  const groupNotesByProfession = (notes: Note[]) => {
+    return notes.reduce((acc, note) => {
+      if (!acc[note.profession]) {
+        acc[note.profession] = [];
+      }
+      acc[note.profession].push(note);
+      return acc;
+    }, {} as Record<ProfessionType, Note[]>);
+  };
+
+  const groupedNotes = groupNotesByProfession(filteredNotes);
+
   const renderNote = ({ item }: { item: Note }) => {
-    const noteConfig = PROFESSION_CONFIGS[item.profession];
+    const noteConfig = PROFESSIONS[item.profession];
     return (
-      <View style={[styles.noteItem, { backgroundColor: noteConfig.colors.secondary }]}>
+      <View style={[styles.noteItem, { backgroundColor: noteConfig.colors.primary }]}>
         <View style={styles.noteHeader}>
           <Text style={[styles.noteTitle, { color: noteConfig.colors.text }]}>
             {item.title}
           </Text>
-          <Text style={[styles.professionBadge, { backgroundColor: noteConfig.colors.primary }]}>
-            {item.profession}
+          <Text style={[styles.professionBadge, { 
+            backgroundColor: noteConfig.colors.secondary,
+            color: 'white'
+          }]}>
+            {noteConfig.icon} {noteConfig.name}
           </Text>
         </View>
-        {settings.viewMode === 'paragraph' ? (
+        
+        {settings?.viewMode === 'paragraph' ? (
           <Text style={[styles.noteContent, { color: noteConfig.colors.text }]} numberOfLines={3}>
             {Object.values(item.fields).join(' ')}
           </Text>
         ) : (
           <View>
             {Object.entries(item.fields).map(([field, value]) => (
-              <Text key={field} style={[styles.bulletPoint, { color: noteConfig.colors.text }]}>
-                • {field}: {value}
-              </Text>
+              value ? (
+                <Text key={field} style={[styles.bulletPoint, { color: noteConfig.colors.text }]}>
+                  • {field}: {value}
+                </Text>
+              ) : null
             ))}
           </View>
         )}
+        
         <Text style={styles.noteDate}>
           {new Date(item.createdAt).toLocaleDateString()}
         </Text>
@@ -111,173 +143,167 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ profession, settings
     );
   };
 
-  const renderGroupedResults = () => {
-    return Object.entries(groupedResults).map(([prof, notes]) => {
-      if (notes.length === 0) return null;
-      
-      const profConfig = PROFESSION_CONFIGS[prof];
-      return (
-        <View key={prof} style={styles.groupContainer}>
-          <Text style={[styles.groupTitle, { color: profConfig.colors.primary }]}>
-            {profConfig.header} ({notes.length})
-          </Text>
-          <FlatList
-            data={notes}
-            renderItem={renderNote}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-          />
-        </View>
-      );
-    });
+  const renderProfessionSection = (profession: ProfessionType, notes: Note[]) => {
+    const config = PROFESSIONS[profession];
+    return (
+      <View key={profession} style={styles.professionSection}>
+        <Text style={[styles.sectionHeader, { color: config.colors.text }]}>
+          {config.icon} {config.name} ({notes.length})
+        </Text>
+        {notes.map(note => (
+          <View key={note.id}>
+            {renderNote({ item: note })}
+          </View>
+        ))}
+      </View>
+    );
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: config.colors.background }]}>
-      <View style={[styles.header, { backgroundColor: config.colors.primary }]}>
-        <Text style={[styles.headerTitle, { color: config.colors.text }]}>
-          Search Notes
-        </Text>
-      </View>
-
+    <SafeAreaView style={styles.container}>
       <View style={styles.searchContainer}>
-        <TextInput
-          style={[styles.searchInput, { 
-            backgroundColor: config.colors.secondary,
-            color: config.colors.text
-          }]}
-          placeholder="Search notes..."
-          placeholderTextColor={config.colors.text + '80'}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        <TouchableOpacity
-          style={[styles.voiceButton, { 
-            backgroundColor: isVoiceSearch ? '#FF6B6B' : config.colors.primary 
-          }]}
-          onPress={startVoiceSearch}
-          disabled={isVoiceSearch}
-        >
-          <Text style={styles.voiceButtonText}>
-            {isVoiceSearch ? '🔴' : '🎤'}
+        <View style={styles.searchInputContainer}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search notes..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          <TouchableOpacity
+            style={styles.voiceButton}
+            onPress={handleVoiceSearch}
+            disabled={isVoiceRecording}
+          >
+            <Text style={styles.voiceButtonText}>
+              {isVoiceRecording ? '🎤' : '🎤'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        
+        {searchQuery.length > 0 && (
+          <Text style={styles.resultsCount}>
+            {filteredNotes.length} result{filteredNotes.length !== 1 ? 's' : ''} found
           </Text>
-        </TouchableOpacity>
+        )}
       </View>
 
-      {searchQuery.trim() ? (
-        <FlatList
-          data={[1]} // Dummy data to render grouped results
-          renderItem={() => <View>{renderGroupedResults()}</View>}
-          keyExtractor={() => 'grouped'}
-          contentContainerStyle={styles.resultsList}
-          showsVerticalScrollIndicator={false}
-        />
-      ) : (
-        <View style={styles.emptyState}>
-          <Text style={[styles.emptyText, { color: config.colors.text }]}>
-            Enter a search term to find notes
-          </Text>
-        </View>
-      )}
-    </View>
+      <FlatList
+        data={Object.entries(groupedNotes)}
+        renderItem={({ item: [profession, notes] }) => 
+          renderProfessionSection(profession as ProfessionType, notes)
+        }
+        keyExtractor={([profession]) => profession}
+        contentContainerStyle={styles.notesList}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>
+              {searchQuery ? 'No notes found matching your search.' : 'Start typing to search your notes.'}
+            </Text>
+          </View>
+        }
+      />
+    </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: 50
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold'
+    flex: 1,
+    backgroundColor: '#f8f9fa',
   },
   searchContainer: {
-    flexDirection: 'row',
     padding: 16,
-    gap: 12
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   searchInput: {
     flex: 1,
-    padding: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 8,
-    fontSize: 16
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#f8f9fa',
   },
   voiceButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center'
+    marginLeft: 8,
+    padding: 12,
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
   },
   voiceButtonText: {
-    fontSize: 20
+    fontSize: 20,
   },
-  resultsList: {
-    padding: 16
+  resultsCount: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#666',
   },
-  groupContainer: {
-    marginBottom: 24
+  notesList: {
+    padding: 16,
   },
-  groupTitle: {
+  professionSection: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 12
+    marginBottom: 12,
   },
   noteItem: {
     padding: 16,
     marginBottom: 12,
     borderRadius: 8,
-    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2
+    shadowRadius: 4,
+    elevation: 3,
   },
   noteHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8
+    marginBottom: 8,
   },
   noteTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    flex: 1
+    flex: 1,
   },
   professionBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 12,
     fontSize: 12,
-    color: 'white',
-    textTransform: 'capitalize'
+    fontWeight: 'bold',
   },
   noteContent: {
     fontSize: 14,
     marginBottom: 8,
-    lineHeight: 20
   },
   bulletPoint: {
     fontSize: 14,
-    marginBottom: 4
+    marginBottom: 4,
   },
   noteDate: {
     fontSize: 12,
-    color: '#7F8C8D',
-    textAlign: 'right'
+    color: '#666',
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    paddingTop: 100,
   },
   emptyText: {
     fontSize: 16,
-    opacity: 0.6
-  }
+    textAlign: 'center',
+    opacity: 0.6,
+  },
 });

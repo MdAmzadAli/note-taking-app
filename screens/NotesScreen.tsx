@@ -1,77 +1,99 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
   StyleSheet,
+  SafeAreaView,
   Alert,
   TextInput,
-  Modal
+  Modal,
+  ScrollView,
 } from 'react-native';
-import { Note, Profession, UserSettings } from '../types';
-import { PROFESSION_CONFIGS } from '../constants/professions';
-import { StorageService } from '../utils/storage';
-import { SpeechService } from '../utils/speech';
+import { Note, UserSettings } from '@/types';
+import { PROFESSIONS, ProfessionType } from '@/constants/professions';
+import { 
+  getNotes, 
+  saveNote, 
+  deleteNote, 
+  getSelectedProfession, 
+  getUserSettings 
+} from '@/utils/storage';
+import { simulateVoiceToText, extractFieldsFromSpeech } from '@/utils/speech';
 
-interface NotesScreenProps {
-  profession: Profession;
-  settings: UserSettings;
-}
-
-export const NotesScreen: React.FC<NotesScreenProps> = ({ profession, settings }) => {
+export default function NotesScreen() {
   const [notes, setNotes] = useState<Note[]>([]);
+  const [profession, setProfession] = useState<ProfessionType>('doctor');
+  const [settings, setSettings] = useState<UserSettings | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [currentNote, setCurrentNote] = useState<Partial<Note>>({});
-  
-  const config = PROFESSION_CONFIGS[profession];
-
-  const loadNotes = useCallback(async () => {
-    try {
-      const allNotes = await StorageService.getNotes();
-      const professionNotes = allNotes.filter(note => note.profession === profession);
-      setNotes(professionNotes);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to load notes');
-    }
-  }, [profession]);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [isVoiceRecording, setIsVoiceRecording] = useState(false);
 
   useEffect(() => {
-    loadNotes();
-  }, [loadNotes]);
+    loadData();
+  }, []);
 
-  const createNewNote = () => {
-    const newNote: Partial<Note> = {
-      id: Date.now().toString(),
-      profession,
-      title: '',
-      fields: config.fields.reduce((acc, field) => ({ ...acc, [field]: '' }), {}),
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    setCurrentNote(newNote);
+  const loadData = async () => {
+    try {
+      const [notesData, professionData, settingsData] = await Promise.all([
+        getNotes(),
+        getSelectedProfession(),
+        getUserSettings(),
+      ]);
+      
+      setNotes(notesData);
+      if (professionData) setProfession(professionData);
+      setSettings(settingsData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
+  };
+
+  const handleCreateNote = () => {
+    const professionConfig = PROFESSIONS[profession];
+    const initialData: Record<string, string> = {};
+    professionConfig.fields.forEach(field => {
+      initialData[field.name] = '';
+    });
+    
+    setFormData(initialData);
+    setEditingNote(null);
     setIsModalVisible(true);
   };
 
-  const saveNote = async () => {
-    if (!currentNote.title?.trim()) {
-      Alert.alert('Error', 'Please enter a title');
-      return;
-    }
+  const handleEditNote = (note: Note) => {
+    setFormData(note.fields);
+    setEditingNote(note);
+    setIsModalVisible(true);
+  };
 
+  const handleSaveNote = async () => {
     try {
-      await StorageService.saveNote(currentNote as Note);
+      const title = formData[Object.keys(formData)[0]] || 'Untitled Note';
+      const noteData: Note = {
+        id: editingNote?.id || Date.now().toString(),
+        title,
+        content: Object.values(formData).join(' '),
+        profession,
+        fields: formData,
+        createdAt: editingNote?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await saveNote(noteData);
+      await loadData();
       setIsModalVisible(false);
-      setCurrentNote({});
-      loadNotes();
+      setFormData({});
     } catch (error) {
+      console.error('Error saving note:', error);
       Alert.alert('Error', 'Failed to save note');
     }
   };
 
-  const deleteNote = async (noteId: string) => {
+  const handleDeleteNote = async (noteId: string) => {
     Alert.alert(
       'Delete Note',
       'Are you sure you want to delete this note?',
@@ -82,70 +104,72 @@ export const NotesScreen: React.FC<NotesScreenProps> = ({ profession, settings }
           style: 'destructive',
           onPress: async () => {
             try {
-              await StorageService.deleteNote(noteId);
-              loadNotes();
+              await deleteNote(noteId);
+              await loadData();
             } catch (error) {
+              console.error('Error deleting note:', error);
               Alert.alert('Error', 'Failed to delete note');
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
 
-  const startVoiceInput = async () => {
-    const hasPermission = await SpeechService.requestPermissions();
-    if (!hasPermission) {
-      Alert.alert('Permission Required', 'Please enable microphone access');
-      return;
-    }
-
-    setIsRecording(true);
+  const handleVoiceInput = async () => {
+    setIsVoiceRecording(true);
     try {
-      const speechText = await SpeechService.simulateVoiceRecognition(profession);
-      const parsedFields = SpeechService.parseFieldsFromText(speechText, config.fields);
+      const speechText = await simulateVoiceToText();
+      const extractedFields = extractFieldsFromSpeech(speechText, profession);
       
-      setCurrentNote(prev => ({
+      setFormData(prev => ({
         ...prev,
-        fields: { ...prev.fields, ...parsedFields },
-        title: prev.title || `${config.header} - ${new Date().toLocaleDateString()}`
+        ...extractedFields,
       }));
     } catch (error) {
-      Alert.alert('Error', 'Voice recognition failed');
+      console.error('Error with voice input:', error);
+      Alert.alert('Error', 'Voice input failed');
     } finally {
-      setIsRecording(false);
+      setIsVoiceRecording(false);
     }
   };
 
+  const professionConfig = PROFESSIONS[profession];
+  const professionNotes = notes.filter(note => note.profession === profession);
+
   const renderNote = ({ item }: { item: Note }) => (
     <TouchableOpacity
-      style={[styles.noteItem, { backgroundColor: config.colors.secondary }]}
-      onPress={() => {
-        setCurrentNote(item);
-        setIsModalVisible(true);
-      }}
+      style={[styles.noteItem, { backgroundColor: professionConfig.colors.primary }]}
+      onPress={() => handleEditNote(item)}
     >
       <View style={styles.noteHeader}>
-        <Text style={[styles.noteTitle, { color: config.colors.text }]}>
+        <Text style={[styles.noteTitle, { color: professionConfig.colors.text }]}>
           {item.title}
         </Text>
-        <TouchableOpacity onPress={() => deleteNote(item.id)}>
-          <Text style={styles.deleteButton}>×</Text>
+        <TouchableOpacity
+          onPress={() => handleDeleteNote(item.id)}
+          style={styles.deleteButton}
+        >
+          <Text style={styles.deleteButtonText}>×</Text>
         </TouchableOpacity>
       </View>
-      {settings.viewMode === 'paragraph' ? (
-        <Text style={[styles.noteContent, { color: config.colors.text }]} numberOfLines={3}>
+      
+      {settings?.viewMode === 'paragraph' ? (
+        <Text style={[styles.noteContent, { color: professionConfig.colors.text }]} numberOfLines={3}>
           {Object.values(item.fields).join(' ')}
         </Text>
       ) : (
         <View>
           {Object.entries(item.fields).map(([field, value]) => (
-            <Text key={field} style={[styles.bulletPoint, { color: config.colors.text }]}>
-              • {field}: {value}
-            </Text>
+            value ? (
+              <Text key={field} style={[styles.bulletPoint, { color: professionConfig.colors.text }]}>
+                • {field}: {value}
+              </Text>
+            ) : null
           ))}
         </View>
       )}
+      
       <Text style={styles.noteDate}>
         {new Date(item.createdAt).toLocaleDateString()}
       </Text>
@@ -153,217 +177,241 @@ export const NotesScreen: React.FC<NotesScreenProps> = ({ profession, settings }
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: config.colors.background }]}>
-      <View style={[styles.header, { backgroundColor: config.colors.primary }]}>
-        <Text style={[styles.headerTitle, { color: config.colors.text }]}>
-          {config.header}
+    <SafeAreaView style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
+          {professionConfig.header}
         </Text>
-        <TouchableOpacity style={styles.addButton} onPress={createNewNote}>
-          <Text style={styles.addButtonText}>+</Text>
-        </TouchableOpacity>
+        <Text style={styles.headerIcon}>{professionConfig.icon}</Text>
       </View>
 
       <FlatList
-        data={notes}
+        data={professionNotes}
         renderItem={renderNote}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         contentContainerStyle={styles.notesList}
-        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text style={[styles.emptyText, { color: professionConfig.colors.text }]}>
+              No notes yet. Tap + to create your first note.
+            </Text>
+          </View>
+        }
       />
 
-      <Modal visible={isModalVisible} animationType="slide">
-        <View style={[styles.modalContainer, { backgroundColor: config.colors.background }]}>
-          <View style={[styles.modalHeader, { backgroundColor: config.colors.primary }]}>
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: professionConfig.colors.secondary }]}
+        onPress={handleCreateNote}
+      >
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
+
+      <Modal
+        visible={isModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: professionConfig.colors.background }]}>
+          <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setIsModalVisible(false)}>
-              <Text style={[styles.modalButton, { color: config.colors.text }]}>Cancel</Text>
+              <Text style={[styles.modalButton, { color: professionConfig.colors.text }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: config.colors.text }]}>
-              {currentNote.id ? 'Edit Note' : 'New Note'}
+            <Text style={[styles.modalTitle, { color: professionConfig.colors.text }]}>
+              {editingNote ? 'Edit Note' : 'New Note'}
             </Text>
-            <TouchableOpacity onPress={saveNote}>
-              <Text style={[styles.modalButton, { color: config.colors.text }]}>Save</Text>
+            <TouchableOpacity onPress={handleSaveNote}>
+              <Text style={[styles.modalButton, { color: professionConfig.colors.secondary }]}>Save</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.modalContent}>
-            <TextInput
-              style={[styles.titleInput, { 
-                backgroundColor: config.colors.secondary,
-                color: config.colors.text
-              }]}
-              placeholder="Note title"
-              placeholderTextColor={config.colors.text + '80'}
-              value={currentNote.title || ''}
-              onChangeText={(text) => setCurrentNote(prev => ({ ...prev, title: text }))}
-            />
-
-            {config.fields.map((field) => (
-              <View key={field} style={styles.fieldContainer}>
-                <Text style={[styles.fieldLabel, { color: config.colors.text }]}>
-                  {field}
+          <ScrollView style={styles.modalContent}>
+            {professionConfig.fields.map((field) => (
+              <View key={field.name} style={styles.fieldContainer}>
+                <Text style={[styles.fieldLabel, { color: professionConfig.colors.text }]}>
+                  {field.name}
                 </Text>
                 <TextInput
-                  style={[styles.fieldInput, { 
-                    backgroundColor: config.colors.secondary,
-                    color: config.colors.text
-                  }]}
-                  placeholder={`Enter ${field.toLowerCase()}`}
-                  placeholderTextColor={config.colors.text + '80'}
-                  multiline
-                  value={currentNote.fields?.[field] || ''}
-                  onChangeText={(text) => 
-                    setCurrentNote(prev => ({
-                      ...prev,
-                      fields: { ...prev.fields, [field]: text }
-                    }))
-                  }
+                  style={[
+                    styles.fieldInput,
+                    field.type === 'multiline' && styles.multilineInput,
+                    { 
+                      backgroundColor: professionConfig.colors.primary,
+                      color: professionConfig.colors.text 
+                    }
+                  ]}
+                  placeholder={field.placeholder}
+                  placeholderTextColor={professionConfig.colors.text + '80'}
+                  value={formData[field.name] || ''}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, [field.name]: text }))}
+                  multiline={field.type === 'multiline'}
+                  numberOfLines={field.type === 'multiline' ? 4 : 1}
                 />
               </View>
             ))}
 
             <TouchableOpacity
-              style={[styles.voiceButton, { 
-                backgroundColor: isRecording ? '#FF6B6B' : config.colors.primary 
-              }]}
-              onPress={startVoiceInput}
-              disabled={isRecording}
+              style={[styles.voiceButton, { backgroundColor: professionConfig.colors.secondary }]}
+              onPress={handleVoiceInput}
+              disabled={isVoiceRecording}
             >
-              <Text style={[styles.voiceButtonText, { color: config.colors.text }]}>
-                {isRecording ? 'Recording...' : '🎤 Voice Input'}
+              <Text style={styles.voiceButtonText}>
+                {isVoiceRecording ? '🎤 Recording...' : '🎤 Voice Input'}
               </Text>
             </TouchableOpacity>
-          </View>
-        </View>
+          </ScrollView>
+        </SafeAreaView>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: 50
+    padding: 20,
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold'
+    fontWeight: 'bold',
   },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  addButtonText: {
-    fontSize: 24,
-    color: 'white',
-    fontWeight: 'bold'
+  headerIcon: {
+    fontSize: 32,
   },
   notesList: {
-    padding: 16
+    padding: 16,
   },
   noteItem: {
     padding: 16,
     marginBottom: 12,
     borderRadius: 8,
-    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2
+    shadowRadius: 4,
+    elevation: 3,
   },
   noteHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8
+    marginBottom: 8,
   },
   noteTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    flex: 1
+    flex: 1,
   },
   deleteButton: {
-    fontSize: 24,
-    color: '#FF6B6B',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#ff4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteButtonText: {
+    color: 'white',
+    fontSize: 16,
     fontWeight: 'bold',
-    paddingLeft: 8
   },
   noteContent: {
     fontSize: 14,
     marginBottom: 8,
-    lineHeight: 20
   },
   bulletPoint: {
     fontSize: 14,
-    marginBottom: 4
+    marginBottom: 4,
   },
   noteDate: {
     fontSize: 12,
-    color: '#7F8C8D',
-    textAlign: 'right'
+    color: '#666',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 100,
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+    opacity: 0.6,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  fabText: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
   },
   modalContainer: {
-    flex: 1
+    flex: 1,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: 50
-  },
-  modalButton: {
-    fontSize: 16,
-    fontWeight: '600'
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold'
+    fontWeight: 'bold',
+  },
+  modalButton: {
+    fontSize: 16,
   },
   modalContent: {
     flex: 1,
-    padding: 16
-  },
-  titleInput: {
-    padding: 12,
-    borderRadius: 8,
-    fontSize: 16,
-    marginBottom: 16
+    padding: 16,
   },
   fieldContainer: {
-    marginBottom: 16
+    marginBottom: 16,
   },
   fieldLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8
+    fontWeight: 'bold',
+    marginBottom: 8,
   },
   fieldInput: {
-    padding: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 8,
-    fontSize: 14,
-    minHeight: 80,
-    textAlignVertical: 'top'
+    padding: 12,
+    fontSize: 16,
+  },
+  multilineInput: {
+    height: 100,
+    textAlignVertical: 'top',
   },
   voiceButton: {
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 16
+    marginTop: 16,
   },
   voiceButtonText: {
+    color: 'white',
     fontSize: 16,
-    fontWeight: 'bold'
-  }
+    fontWeight: '600',
+  },
 });

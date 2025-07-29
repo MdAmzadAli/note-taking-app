@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { View } from 'react-native';
-import { SearchScreen } from '../../screens/SearchScreen';
+import SearchScreen from '@/screens/SearchScreen';
 import { StorageService } from '../../utils/storage';
 import { UserSettings } from '../../types';
 
