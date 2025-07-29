@@ -1,3 +1,4 @@
+
 import * as Speech from 'expo-speech';
 import { Alert } from 'react-native';
 
@@ -146,18 +147,8 @@ export const extractFieldsFromSpeech = (
   return fields;
 };
 
-// Mock speech-to-text for demo purposes
-export const mockSpeechToText = (profession: string): string => {
-  const mockTexts = {
-    doctor: "Patient complains of headache and fever symptoms lasting 3 days",
-    lawyer: "Client needs assistance with contract review and legal documentation",
-    developer: "Implement user authentication system with JWT tokens"
-  };
-  return mockTexts[profession as keyof typeof mockTexts] || "Sample voice input text";
-};
 // Mock speech-to-text implementation for MVP
 // In production, you would integrate with expo-speech or react-native-voice
-
 export const mockSpeechToText = async (): Promise<string> => {
   return new Promise((resolve) => {
     // Simulate speech recognition delay
@@ -191,4 +182,14 @@ export const stopListening = async (): Promise<void> => {
 export const isSpeechRecognitionAvailable = (): boolean => {
   // For MVP, always return true since we're using mock
   return true;
+};
+
+// Profession-specific mock voice input
+export const mockSpeechByProfession = (profession: string): string => {
+  const mockTexts = {
+    doctor: "Patient complains of headache and fever symptoms lasting 3 days",
+    lawyer: "Client needs assistance with contract review and legal documentation",
+    developer: "Implement user authentication system with JWT tokens"
+  };
+  return mockTexts[profession as keyof typeof mockTexts] || "Sample voice input text";
 };
