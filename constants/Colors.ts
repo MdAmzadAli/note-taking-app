@@ -1,6 +1,8 @@
 
+
 /**
  * Color palette for the note-taking app redesign
+ * Modern UI colors matching the specification
  */
 
 const tintColorLight = '#3B82F6';
@@ -58,7 +60,7 @@ export const Typography = {
   },
 };
 
-// Spacing scale
+// Spacing scale (4px, 8px, 12px, 16px, 24px)
 export const Spacing = {
   xs: 4,
   sm: 8,
@@ -79,7 +81,7 @@ export const BorderRadius = {
   full: 9999,
 };
 
-// Shadow styles
+// Shadow styles matching specification
 export const Shadows = {
   sm: {
     shadowColor: '#000',
@@ -103,3 +105,11 @@ export const Shadows = {
     elevation: 5,
   },
 };
+
+// Safe area constants
+export const SafeArea = {
+  ios: 60,
+  android: 32,
+  default: 24,
+};
+

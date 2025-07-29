@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    paddingTop: Platform.OS === 'ios' ? 52 : 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 32,
     backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -536,6 +536,11 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
   },
   iconButtonText: {
     fontSize: 16,
@@ -597,6 +602,7 @@ const styles = StyleSheet.create({
     elevation: 2,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    transform: [{ scale: 1 }],
   },
   noteHeader: {
     flexDirection: 'row',
@@ -627,6 +633,8 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FECACA',
   },
   deleteButtonText: {
     fontSize: 16,
@@ -707,41 +715,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
-  notesList: {
-    padding: 16,
-  },
-  noteCard: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  noteHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  noteDate: {
-    fontSize: 12,
-    color: '#666',
-  },
-  deleteButton: {
-    padding: 4,
-  },
-  deleteButtonText: {
-    fontSize: 16,
-  },
-  noteContent: {
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 20,
-  },
+  
   emptyState: {
     flex: 1,
     justifyContent: 'center',

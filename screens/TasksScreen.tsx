@@ -547,6 +547,13 @@ export default function TasksScreen() {
         {renderFilterButton('overdue', 'Overdue')}
       </View>
 
+      <View style={styles.filtersContainer}>
+        {renderFilterButton('all', 'All')}
+        {renderFilterButton('today', 'Today')}
+        {renderFilterButton('tomorrow', 'Tomorrow')}
+        {renderFilterButton('overdue', 'Overdue')}
+      </View>
+
       <FlatList
         data={filteredTasks}
         keyExtractor={(item) => item.id}
@@ -578,14 +585,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingVertical: 16,
-    paddingTop: Platform.OS === 'ios' ? 52 : 16,
+    paddingTop: Platform.OS === 'ios' ? 60 : 32,
+    backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
     elevation: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
   headerTitle: {
     fontSize: 24,
@@ -646,9 +656,12 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
-  filterContainer: {
-    paddingHorizontal: 24,
-    paddingVertical: 8,
+  filtersContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
   filterScroll: {
     flexDirection: 'row',
@@ -698,6 +711,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderLeftWidth: 4,
+    borderLeftColor: '#3B82F6',
   },
   taskItemCompleted: {
     opacity: 0.7,
@@ -740,24 +754,48 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontWeight: '400',
   },
-  taskStatus: {
+  checkboxContainer: {
+    marginRight: 12,
+    padding: 4,
+  },
+  checkbox: {
+    fontSize: 20,
+  },
+  taskInfo: {
+    flex: 1,
+  },
+  taskMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
+    gap: 12,
+    marginTop: 8,
   },
-  statusIcon: {
-    fontSize: 14,
-  },
-  statusText: {
+  statusBadge: {
     fontSize: 13,
     fontWeight: '600',
-    letterSpacing: 0.2,
+    fontFamily: 'Inter',
   },
   taskDate: {
     fontSize: 13,
     color: '#6B7280',
     fontWeight: '500',
-    letterSpacing: 0.1,
+    fontFamily: 'Inter',
+  },
+  reminderTime: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  deleteButton: {
+    fontSize: 18,
+    padding: 8,
+  },
+  completedTask: {
+    opacity: 0.7,
+  },
+  completedText: {
+    textDecorationLine: 'line-through',
+    opacity: 0.6,
   },
 });
