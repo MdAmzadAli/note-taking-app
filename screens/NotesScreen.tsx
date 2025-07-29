@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -16,6 +15,7 @@ import {
   TouchableWithoutFeedback,
   Platform,
 } from 'react-native';
+import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Note, CustomTemplate, TemplateEntry, FieldType } from '@/types';
 import { getNotes, saveNote, deleteNote, getUserSettings, getCustomTemplates, saveTemplateEntry, getTemplateEntries } from '@/utils/storage';
 import { mockSpeechToText } from '@/utils/speech';
@@ -768,6 +768,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     fontFamily: 'Inter',
+    lineHeight: 25.6,
   },
   fieldContainer: {
     backgroundColor: '#FFFFFF',
