@@ -21,13 +21,8 @@ const MAPPING = {
   'doc.text': 'description',
   'magnifyingglass': 'search',
   'bell': 'notifications',
-  'checklist': 'checklist',
+  'checklist': 'check-circle',
   'gearshape': 'settings',
-  'note.text': 'description',
-  'checkmark.square': 'check-box',
-  'document.badge.plus': 'post-add',
-  'gear': 'settings',
-  'line.horizontal.3': 'menu',
 } as IconMapping;
 
 /**

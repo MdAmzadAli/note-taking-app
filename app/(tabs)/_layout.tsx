@@ -15,16 +15,16 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: colorScheme === 'dark' ? '#FFFFFF' : '#000000',
-        tabBarInactiveTintColor: colorScheme === 'dark' ? '#A1A1AA' : '#71717A',
+        tabBarInactiveTintColor: colorScheme === 'dark' ? '#9CA3AF' : '#6B7280',
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
         tabBarStyle: Platform.select({
           ios: {
             position: 'absolute',
-            backgroundColor: colorScheme === 'dark' ? '#18181B' : '#FFFFFF',
+            backgroundColor: colorScheme === 'dark' ? '#1F1F1F' : '#FFFFFF',
             borderTopWidth: 1,
-            borderTopColor: colorScheme === 'dark' ? '#3F3F46' : '#E4E4E7',
+            borderTopColor: colorScheme === 'dark' ? '#374151' : '#E5E7EB',
             elevation: 0,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: -2 },
@@ -35,9 +35,9 @@ export default function TabLayout() {
             height: 64,
           },
           default: {
-            backgroundColor: colorScheme === 'dark' ? '#18181B' : '#FFFFFF',
+            backgroundColor: colorScheme === 'dark' ? '#1F1F1F' : '#FFFFFF',
             borderTopWidth: 1,
-            borderTopColor: colorScheme === 'dark' ? '#3F3F46' : '#E4E4E7',
+            borderTopColor: colorScheme === 'dark' ? '#374151' : '#E5E7EB',
             elevation: 8,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: -2 },
@@ -50,12 +50,8 @@ export default function TabLayout() {
         }),
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '600',
+          fontWeight: '500',
           letterSpacing: 0.1,
-          color: colorScheme === 'dark' ? '#FFFFFF' : '#000000',
-        },
-        tabBarIconStyle: {
-          marginBottom: 2,
         },
       }}>
       <Tabs.Screen
@@ -89,15 +85,14 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Menu',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="line.horizontal.3" color={color} />,
+          title: 'Settings',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="gear" color={color} />,
         }}
       />
       <Tabs.Screen
         name="search"
         options={{
-          title: 'Search',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="magnifyingglass" color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen
