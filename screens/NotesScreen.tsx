@@ -58,7 +58,7 @@ export default function NotesScreen() {
         note.content.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredNotes(filtered);
-      
+
       const filteredTemps = templates.filter(template =>
         template.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
@@ -118,7 +118,7 @@ export default function NotesScreen() {
 
     try {
       const now = new Date().toISOString();
-      
+
       if (isEditing && editingNoteId) {
         // Update existing note
         const existingNote = notes.find(n => n.id === editingNoteId);
