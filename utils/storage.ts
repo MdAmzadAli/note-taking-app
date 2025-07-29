@@ -74,6 +74,16 @@ export class StorageService {
     }
   }
 
+  static async deleteReminder(reminderId: string): Promise<void> {
+    try {
+      const reminders = await this.getReminders();
+      const filteredReminders = reminders.filter(r => r.id !== reminderId);
+      await AsyncStorage.setItem(KEYS.REMINDERS, JSON.stringify(filteredReminders));
+    } catch (error) {
+      console.error('Error deleting reminder:', error);
+    }
+  }
+
   static async getTasks(): Promise<Task[]> {
     try {
       const tasks = await AsyncStorage.getItem(KEYS.TASKS);

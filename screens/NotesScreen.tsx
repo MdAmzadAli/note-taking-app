@@ -101,22 +101,20 @@ export const NotesScreen: React.FC<NotesScreenProps> = ({ profession, settings }
     }
 
     setIsRecording(true);
-    // Simulate voice input for demo - in real app, integrate with speech recognition
-    setTimeout(() => {
-      const sampleText = profession === 'doctor' 
-        ? "Patient complains of headache and fever for 2 days. Diagnosis is viral infection. Prescribed rest and fluids."
-        : profession === 'lawyer'
-        ? "Client John Smith needs help with contract review. Case summary involves breach of terms. Action items include document review."
-        : "Feature request for user authentication. Code snippet needed for login form. To-do includes testing and deployment.";
+    try {
+      const speechText = await SpeechService.simulateVoiceRecognition(profession);
+      const parsedFields = SpeechService.parseFieldsFromText(speechText, config.fields);
       
-      const parsedFields = SpeechService.parseFieldsFromText(sampleText, config.fields);
       setCurrentNote(prev => ({
         ...prev,
         fields: { ...prev.fields, ...parsedFields },
-        title: prev.title || `${profession} note ${Date.now()}`
+        title: prev.title || `${config.header} - ${new Date().toLocaleDateString()}`
       }));
+    } catch (error) {
+      Alert.alert('Error', 'Voice recognition failed');
+    } finally {
       setIsRecording(false);
-    }, 2000);
+    }
   };
 
   const renderNote = ({ item }: { item: Note }) => (

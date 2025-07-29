@@ -58,13 +58,25 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ profession, settings
     }
 
     setIsVoiceSearch(true);
-    // Simulate voice search for demo
-    setTimeout(() => {
-      const sampleQueries = ['headache', 'contract', 'authentication'];
-      const randomQuery = sampleQueries[Math.floor(Math.random() * sampleQueries.length)];
-      setSearchQuery(randomQuery);
+    try {
+      // Simulate voice search with profession-specific terms
+      const searchTerms = {
+        doctor: ['headache', 'fever', 'diagnosis', 'prescription', 'symptoms'],
+        lawyer: ['contract', 'client', 'case', 'legal', 'agreement'],
+        developer: ['authentication', 'API', 'feature', 'code', 'testing']
+      };
+      
+      const terms = searchTerms[profession] || searchTerms.developer;
+      const randomQuery = terms[Math.floor(Math.random() * terms.length)];
+      
+      setTimeout(() => {
+        setSearchQuery(randomQuery);
+        setIsVoiceSearch(false);
+      }, 2000);
+    } catch (error) {
+      Alert.alert('Error', 'Voice search failed');
       setIsVoiceSearch(false);
-    }, 2000);
+    }
   };
 
   const renderNote = ({ item }: { item: Note }) => {
