@@ -1,70 +1,35 @@
 /**
- * Modern, professional color palette for the note-taking app
+ * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
+ * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
  */
 
 const tintColorLight = '#3B82F6';
-const tintColorDark = '#60A5FA';
+const tintColorDark = '#fff';
 
 export const Colors = {
   light: {
-    text: '#111827', // Rich dark gray for main text
-    textSecondary: '#6B7280', // Medium gray for secondary text
-    background: '#F8F9FA', // Clean light background
-    backgroundSecondary: '#FFFFFF', // Pure white for cards
+    text: '#111827',
+    subtleText: '#6B7280',
+    background: '#F9FAFB',
     surface: '#FFFFFF',
-    surfaceElevated: '#FFFFFF',
     tint: tintColorLight,
-    accent: '#10B981', // Modern emerald green
-    accentSecondary: '#F59E0B', // Warm amber
-    icon: '#6B7280',
-    iconActive: tintColorLight,
-    tabIconDefault: '#9CA3AF',
-    tabIconSelected: tintColorLight,
+    primary: '#3B82F6',
+    accent: '#10B981',
     border: '#E5E7EB',
-    borderLight: '#F3F4F6',
-    shadow: 'rgba(59, 130, 246, 0.08)', // Subtle blue shadow
-    cardShadow: 'rgba(0, 0, 0, 0.04)',
-    success: '#10B981',
-    warning: '#F59E0B',
-    error: '#EF4444',
-    card: '#FFFFFF',
-    input: '#FFFFFF',
-    inputBorder: '#E5E7EB',
-    inputFocus: tintColorLight,
-    buttonPrimary: '#3B82F6',
-    buttonSecondary: '#F3F4F6',
-    buttonText: '#FFFFFF',
-    buttonTextSecondary: '#374151',
+    tabIconDefault: '#6B7280',
+    tabIconSelected: tintColorLight,
   },
   dark: {
-    text: '#F9FAFB', // Very light gray for main text
-    textSecondary: '#D1D5DB', // Light gray for secondary text
-    background: '#0F172A', // Deep dark blue-gray
-    backgroundSecondary: '#1E293B', // Slightly lighter dark
-    surface: '#1E293B',
-    surfaceElevated: '#334155',
+    text: '#ECEDEE',
+    subtleText: '#9CA3AF',
+    background: '#151718',
+    surface: '#1F2937',
     tint: tintColorDark,
-    accent: '#34D399', // Brighter emerald for dark mode
-    accentSecondary: '#FBBF24', // Brighter amber
-    icon: '#9CA3AF',
-    iconActive: tintColorDark,
-    tabIconDefault: '#6B7280',
-    tabIconSelected: tintColorDark,
+    primary: '#3B82F6',
+    accent: '#10B981',
     border: '#374151',
-    borderLight: '#475569',
-    shadow: 'rgba(96, 165, 250, 0.12)', // Subtle blue shadow for dark
-    cardShadow: 'rgba(0, 0, 0, 0.3)',
-    success: '#34D399',
-    warning: '#FBBF24',
-    error: '#F87171',
-    card: '#1E293B',
-    input: '#334155',
-    inputBorder: '#475569',
-    inputFocus: tintColorDark,
-    buttonPrimary: '#60A5FA',
-    buttonSecondary: '#334155',
-    buttonText: '#FFFFFF',
-    buttonTextSecondary: '#F9FAFB',
+    tabIconDefault: '#9BA1A6',
+    tabIconSelected: tintColorDark,
   },
 };
 
