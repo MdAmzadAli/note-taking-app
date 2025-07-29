@@ -17,6 +17,7 @@ import {
 import { Note, CustomTemplate, TemplateEntry, FieldType } from '@/types';
 import { getNotes, saveNote, deleteNote, getUserSettings, getCustomTemplates, saveTemplateEntry, getTemplateEntries } from '@/utils/storage';
 import { mockSpeechToText } from '@/utils/speech';
+import TemplateEntriesScreen from './TemplateEntriesScreen';
 
 interface SimpleNote {
   id: string;
@@ -36,6 +37,8 @@ export default function NotesScreen() {
   const [templateValues, setTemplateValues] = useState<Record<string, string>>({});
   const [isFillingTemplate, setIsFillingTemplate] = useState(false);
   const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const [currentView, setCurrentView] = useState<'notes' | 'template'>('notes');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
 
   useEffect(() => {
@@ -128,6 +131,12 @@ export default function NotesScreen() {
         },
       ]
     );
+  };
+
+  const navigateToTemplate = (template: CustomTemplate) => {
+    setSelectedTemplateId(template.id);
+    setCurrentView('template');
+    closeMenu();
   };
 
   const startFillingTemplate = (template: CustomTemplate) => {
@@ -242,6 +251,18 @@ export default function NotesScreen() {
       )}
     </View>
   );
+
+  if (currentView === 'template' && selectedTemplateId) {
+    return (
+      <TemplateEntriesScreen
+        templateId={selectedTemplateId}
+        onBack={() => {
+          setCurrentView('notes');
+          setSelectedTemplateId(null);
+        }}
+      />
+    );
+  }
 
   if (isFillingTemplate && selectedTemplate) {
     return (
@@ -368,7 +389,7 @@ export default function NotesScreen() {
                     renderItem={({ item }) => (
                       <TouchableOpacity
                         style={styles.menuItem}
-                        onPress={() => startFillingTemplate(item)}
+                        onPress={() => navigateToTemplate(item)}
                       >
                         <Text style={styles.menuItemTitle}>{item.name}</Text>
                         <Text style={styles.menuItemSubtitle}>{item.fields.length} fields</Text>
