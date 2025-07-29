@@ -1,143 +1,123 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
+  FlatList,
   StyleSheet,
   Alert,
-  Modal,
-  FlatList,
   SafeAreaView,
+  Modal,
+  ScrollView,
+  Platform,
 } from 'react-native';
-import { CustomTemplate, FieldType, TemplateEntry, UserSettings } from '@/types';
-import {
-  getCustomTemplates,
-  saveCustomTemplate,
-  deleteCustomTemplate,
-  getTemplateEntries,
-  saveTemplateEntry,
-  deleteTemplateEntry,
-  getUserSettings,
-} from '@/utils/storage';
-import { PROFESSIONS } from '@/constants/professions';
-import { mockSpeechToText } from '@/utils/speech';
+import { CustomTemplate, FieldType } from '@/types';
+import { getCustomTemplates, saveCustomTemplate, deleteCustomTemplate, getUserSettings } from '@/utils/storage';
+import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 
 export default function TemplatesScreen() {
   const [templates, setTemplates] = useState<CustomTemplate[]>([]);
-  const [filteredTemplates, setFilteredTemplates] = useState<CustomTemplate[]>([]);
-  const [settings, setSettings] = useState<UserSettings>({ profession: 'doctor', viewMode: 'paragraph' });
-  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
-  const [isFillingTemplate, setIsFillingTemplate] = useState(false);
-  const [isEditingTemplate, setIsEditingTemplate] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<CustomTemplate | null>(null);
-  const [newTemplate, setNewTemplate] = useState({ name: '', fields: [] as FieldType[] });
-  const [templateValues, setTemplateValues] = useState<Record<string, string>>({});
+  const [profession, setProfession] = useState<ProfessionType>('doctor');
+  const [isCreating, setIsCreating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<CustomTemplate | null>(null);
+  const [templateName, setTemplateName] = useState('');
+  const [templateDescription, setTemplateDescription] = useState('');
+  const [fields, setFields] = useState<FieldType[]>([]);
+  const [newFieldName, setNewFieldName] = useState('');
+  const [newFieldType, setNewFieldType] = useState<'text' | 'longtext' | 'number'>('text');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   useEffect(() => {
-    loadData();
+    loadTemplatesAndSettings();
   }, []);
 
-  useEffect(() => {
-    if (searchQuery.trim()) {
-      const filtered = templates.filter(template =>
-        template.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredTemplates(filtered);
-    } else {
-      setFilteredTemplates(templates);
-    }
-  }, [searchQuery, templates]);
-
-  const loadData = async () => {
+  const loadTemplatesAndSettings = async () => {
     try {
-      const [templatesData, userSettings] = await Promise.all([
+      const [templatesData, settings] = await Promise.all([
         getCustomTemplates(),
         getUserSettings(),
       ]);
       setTemplates(templatesData);
-      setFilteredTemplates(templatesData);
-      setSettings(userSettings);
+      setProfession(settings.profession);
     } catch (error) {
-      console.error('Error loading templates data:', error);
+      console.error('Error loading templates:', error);
     }
   };
 
   const addField = () => {
+    if (!newFieldName.trim()) {
+      Alert.alert('Error', 'Please enter a field name');
+      return;
+    }
+
     const newField: FieldType = {
       id: Date.now().toString(),
-      label: '',
-      type: 'text',
+      label: newFieldName.trim(),
+      type: newFieldType,
       required: false,
     };
-    setNewTemplate(prev => ({
-      ...prev,
-      fields: [...prev.fields, newField],
-    }));
-  };
 
-  const updateField = (fieldId: string, updates: Partial<FieldType>) => {
-    setNewTemplate(prev => ({
-      ...prev,
-      fields: prev.fields.map(field =>
-        field.id === fieldId ? { ...field, ...updates } : field
-      ),
-    }));
+    setFields([...fields, newField]);
+    setNewFieldName('');
   };
 
   const removeField = (fieldId: string) => {
-    setNewTemplate(prev => ({
-      ...prev,
-      fields: prev.fields.filter(field => field.id !== fieldId),
-    }));
+    setFields(fields.filter(f => f.id !== fieldId));
   };
 
   const saveTemplate = async () => {
-    if (!newTemplate.name.trim()) {
+    if (!templateName.trim()) {
       Alert.alert('Error', 'Please enter a template name');
       return;
     }
 
-    if (newTemplate.fields.length === 0) {
+    if (fields.length === 0) {
       Alert.alert('Error', 'Please add at least one field');
       return;
     }
 
-    for (const field of newTemplate.fields) {
-      if (!field.label.trim()) {
-        Alert.alert('Error', 'All fields must have a label');
-        return;
-      }
-    }
-
     try {
       const template: CustomTemplate = {
-        id: Date.now().toString(),
-        name: newTemplate.name.trim(),
-        fields: newTemplate.fields,
-        createdAt: new Date().toISOString(),
+        id: editingTemplate?.id || Date.now().toString(),
+        name: templateName.trim(),
+        description: templateDescription.trim(),
+        fields,
+        profession,
+        createdAt: editingTemplate?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
       await saveCustomTemplate(template);
-      await loadData();
-      setIsCreatingTemplate(false);
-      setNewTemplate({ name: '', fields: [] });
-      Alert.alert('Success', 'Template created successfully!');
+      await loadTemplatesAndSettings();
+
+      // Reset form
+      setTemplateName('');
+      setTemplateDescription('');
+      setFields([]);
+      setIsCreating(false);
+      setIsEditing(false);
+      setEditingTemplate(null);
     } catch (error) {
       console.error('Error saving template:', error);
       Alert.alert('Error', 'Failed to save template');
     }
   };
 
-  const deleteTemplate = async (templateId: string) => {
+  const startEditingTemplate = (template: CustomTemplate) => {
+    setEditingTemplate(template);
+    setTemplateName(template.name);
+    setTemplateDescription(template.description || '');
+    setFields([...template.fields]);
+    setIsEditing(true);
+  };
+
+  const deleteTemplateById = async (templateId: string) => {
     Alert.alert(
       'Delete Template',
-      'This will also delete all entries created from this template. Are you sure?',
+      'Are you sure you want to delete this template?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -146,8 +126,7 @@ export default function TemplatesScreen() {
           onPress: async () => {
             try {
               await deleteCustomTemplate(templateId);
-              await loadData();
-              Alert.alert('Success', 'Template deleted successfully');
+              await loadTemplatesAndSettings();
             } catch (error) {
               console.error('Error deleting template:', error);
               Alert.alert('Error', 'Failed to delete template');
@@ -158,229 +137,71 @@ export default function TemplatesScreen() {
     );
   };
 
-  const startFillingTemplate = (template: CustomTemplate) => {
-    setSelectedTemplate(template);
-    setTemplateValues({});
-    setIsFillingTemplate(true);
-  };
+  const filteredTemplates = searchQuery.trim()
+    ? templates.filter(template =>
+        template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (template.description && template.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : templates;
 
-  const startEditingTemplate = (template: CustomTemplate) => {
-    setSelectedTemplate(template);
-    setNewTemplate({
-      name: template.name,
-      fields: template.fields.map(field => ({ ...field }))
-    });
-    setIsEditingTemplate(true);
-  };
-
-  const updateTemplate = async () => {
-    if (!selectedTemplate || !newTemplate.name.trim()) {
-      Alert.alert('Error', 'Please enter a template name');
-      return;
-    }
-
-    if (newTemplate.fields.length === 0) {
-      Alert.alert('Error', 'Please add at least one field');
-      return;
-    }
-
-    for (const field of newTemplate.fields) {
-      if (!field.label.trim()) {
-        Alert.alert('Error', 'All fields must have a label');
-        return;
-      }
-    }
-
-    try {
-      const updatedTemplate: CustomTemplate = {
-        ...selectedTemplate,
-        name: newTemplate.name.trim(),
-        fields: newTemplate.fields,
-        updatedAt: new Date().toISOString(),
-      };
-
-      await saveCustomTemplate(updatedTemplate);
-      await loadData();
-      setIsEditingTemplate(false);
-      setSelectedTemplate(null);
-      setNewTemplate({ name: '', fields: [] });
-      Alert.alert('Success', 'Template updated successfully!');
-    } catch (error) {
-      console.error('Error updating template:', error);
-      Alert.alert('Error', 'Failed to update template');
-    }
-  };
-
-  const saveEntry = async () => {
-    if (!selectedTemplate) return;
-
-    try {
-      const entry: TemplateEntry = {
-        id: Date.now().toString(),
-        templateId: selectedTemplate.id,
-        templateName: selectedTemplate.name,
-        values: templateValues,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      await saveTemplateEntry(entry);
-      await loadData();
-      setIsFillingTemplate(false);
-      setSelectedTemplate(null);
-      setTemplateValues({});
-      Alert.alert('Success', 'Entry saved successfully!');
-    } catch (error) {
-      console.error('Error saving entry:', error);
-      Alert.alert('Error', 'Failed to save entry');
-    }
-  };
-
-  const handleVoiceInput = async (fieldId: string) => {
-    try {
-      const speechText = await mockSpeechToText();
-      setTemplateValues(prev => ({
-        ...prev,
-        [fieldId]: (prev[fieldId] || '') + (prev[fieldId] ? '\n' : '') + speechText,
-      }));
-    } catch (error) {
-      Alert.alert('Error', 'Failed to convert speech to text');
-    }
-  };
-
-  const professionConfig = PROFESSIONS[settings.profession];
-
-  const renderField = (field: FieldType, isEditing = false) => (
-    <View key={field.id} style={styles.fieldContainer}>
-      {isEditing ? (
-        <>
-          <View style={styles.fieldHeader}>
-            <TextInput
-              style={styles.fieldLabelInput}
-              value={field.label}
-              onChangeText={(text) => updateField(field.id, { label: text })}
-              placeholder="Field label"
-            />
-            <TouchableOpacity
-              style={styles.removeFieldButton}
-              onPress={() => removeField(field.id)}
-            >
-              <Text style={styles.removeFieldText}>×</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.fieldTypeContainer}>
-            <Text style={styles.fieldTypeLabel}>Type:</Text>
-            {['text', 'number', 'longtext', 'date'].map((type) => (
-              <TouchableOpacity
-                key={type}
-                style={[
-                  styles.fieldTypeButton,
-                  field.type === type && styles.fieldTypeButtonActive,
-                ]}
-                onPress={() => updateField(field.id, { type: type as any })}
-              >
-                <Text
-                  style={[
-                    styles.fieldTypeButtonText,
-                    field.type === type && styles.fieldTypeButtonTextActive,
-                  ]}
-                >
-                  {type}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </>
-      ) : (
-        <>
-          <View style={styles.fieldInputHeader}>
-            <Text style={styles.fieldLabel}>{field.label}</Text>
-            {(field.type === 'text' || field.type === 'longtext') && (
-              <TouchableOpacity
-                style={styles.voiceButton}
-                onPress={() => handleVoiceInput(field.id)}
-              >
-                <Text style={styles.voiceButtonText}>🎤</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          {field.type === 'longtext' ? (
-            <TextInput
-              style={[styles.fieldInput, styles.longTextInput]}
-              value={templateValues[field.id] || ''}
-              onChangeText={(text) => setTemplateValues(prev => ({ ...prev, [field.id]: text }))}
-              placeholder={`Enter ${field.label.toLowerCase()}`}
-              multiline
-              textAlignVertical="top"
-            />
-          ) : (
-            <TextInput
-              style={styles.fieldInput}
-              value={templateValues[field.id] || ''}
-              onChangeText={(text) => setTemplateValues(prev => ({ ...prev, [field.id]: text }))}
-              placeholder={`Enter ${field.label.toLowerCase()}`}
-              keyboardType={field.type === 'number' ? 'numeric' : 'default'}
-            />
-          )}
-        </>
-      )}
-    </View>
-  );
-
-  const renderTemplate = ({ item }: { item: CustomTemplate }) => (
-    <TouchableOpacity style={styles.templateCard} onPress={() => startEditingTemplate(item)}>
+  const renderTemplateItem = ({ item }: { item: CustomTemplate }) => (
+    <TouchableOpacity
+      style={styles.templateItem}
+      onPress={() => startEditingTemplate(item)}
+    >
       <View style={styles.templateHeader}>
         <Text style={styles.templateName}>{item.name}</Text>
-        <View style={styles.templateActions}>
-          <TouchableOpacity
-            style={styles.useButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              startFillingTemplate(item);
-            }}
-          >
-            <Text style={styles.useButtonText}>Use</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              deleteTemplate(item.id);
-            }}
-          >
-            <Text style={styles.deleteButtonText}>🗑️</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          onPress={(e) => {
+            e.stopPropagation();
+            deleteTemplateById(item.id);
+          }}
+          style={styles.deleteButton}
+        >
+          <Text style={styles.deleteButtonText}>Delete</Text>
+        </TouchableOpacity>
       </View>
+      {item.description && (
+        <Text style={styles.templateDescription}>{item.description}</Text>
+      )}
       <Text style={styles.templateMeta}>
         {item.fields.length} fields • Created {new Date(item.createdAt).toLocaleDateString()}
       </Text>
     </TouchableOpacity>
   );
 
-  
+  const renderField = ({ item, index }: { item: FieldType; index: number }) => (
+    <View style={styles.fieldItem}>
+      <View style={styles.fieldInfo}>
+        <Text style={styles.fieldName}>{item.label}</Text>
+        <Text style={styles.fieldType}>{item.type}</Text>
+      </View>
+      <TouchableOpacity onPress={() => removeField(item.id)}>
+        <Text style={styles.removeFieldText}>Remove</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
-  if (isCreatingTemplate || isEditingTemplate) {
+  if (isCreating || isEditing) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
-        <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
-          <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
-            {isEditingTemplate ? 'Edit Template' : 'Create Template'}
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>
+            {isEditing ? 'Edit Template' : 'New Template'}
           </Text>
           <View style={styles.headerButtons}>
-            <TouchableOpacity 
-              style={styles.saveButton} 
-              onPress={isEditingTemplate ? updateTemplate : saveTemplate}
-            >
+            <TouchableOpacity style={styles.saveButton} onPress={saveTemplate}>
               <Text style={styles.saveButtonText}>Save</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.cancelButton}
               onPress={() => {
-                setIsCreatingTemplate(false);
-                setIsEditingTemplate(false);
-                setSelectedTemplate(null);
-                setNewTemplate({ name: '', fields: [] });
+                setIsCreating(false);
+                setIsEditing(false);
+                setEditingTemplate(null);
+                setTemplateName('');
+                setTemplateDescription('');
+                setFields([]);
               }}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -388,80 +209,95 @@ export default function TemplatesScreen() {
           </View>
         </View>
 
-        <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Template Name</Text>
+        <ScrollView style={styles.formContainer} contentContainerStyle={styles.formContent}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Template Name *</Text>
             <TextInput
-              style={styles.templateNameInput}
-              value={newTemplate.name}
-              onChangeText={(text) => setNewTemplate(prev => ({ ...prev, name: text }))}
-              placeholder="e.g., Patient Note, Case Brief"
+              style={styles.input}
+              value={templateName}
+              onChangeText={setTemplateName}
+              placeholder="Enter template name"
+              placeholderTextColor="#6B7280"
             />
           </View>
 
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Fields</Text>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Description</Text>
+            <TextInput
+              style={styles.textArea}
+              value={templateDescription}
+              onChangeText={setTemplateDescription}
+              placeholder="Enter template description (optional)"
+              placeholderTextColor="#6B7280"
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+
+          <View style={styles.fieldsSection}>
+            <Text style={styles.sectionTitle}>Fields</Text>
+
+            <View style={styles.addFieldContainer}>
+              <TextInput
+                style={styles.fieldInput}
+                value={newFieldName}
+                onChangeText={setNewFieldName}
+                placeholder="Field name"
+                placeholderTextColor="#6B7280"
+              />
+              <View style={styles.fieldTypeContainer}>
+                {(['text', 'longtext', 'number'] as const).map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    style={[
+                      styles.typeButton,
+                      newFieldType === type && styles.typeButtonActive,
+                    ]}
+                    onPress={() => setNewFieldType(type)}
+                  >
+                    <Text style={[
+                      styles.typeButtonText,
+                      newFieldType === type && styles.typeButtonTextActive,
+                    ]}>
+                      {type}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
               <TouchableOpacity style={styles.addFieldButton} onPress={addField}>
-                <Text style={styles.addFieldButtonText}>+ Add Field</Text>
+                <Text style={styles.addFieldButtonText}>Add Field</Text>
               </TouchableOpacity>
             </View>
-            {newTemplate.fields.map(field => renderField(field, true))}
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
 
-  if (isFillingTemplate && selectedTemplate) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
-        <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
-          <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
-            Fill {selectedTemplate.name}
-          </Text>
-          <View style={styles.headerButtons}>
-            <TouchableOpacity style={styles.saveButton} onPress={saveEntry}>
-              <Text style={styles.saveButtonText}>Save</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => {
-                setIsFillingTemplate(false);
-                setSelectedTemplate(null);
-                setTemplateValues({});
-              }}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
+            <FlatList
+              data={fields}
+              keyExtractor={(item) => item.id}
+              renderItem={renderField}
+              style={styles.fieldsList}
+              scrollEnabled={false}
+            />
           </View>
-        </View>
-
-        <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-          {selectedTemplate.fields.map(field => renderField(field, false))}
         </ScrollView>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
-      <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
-        <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
-          Custom Templates
-        </Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Templates</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.searchButton}
             onPress={() => setIsSearchVisible(!isSearchVisible)}
           >
-            <Text style={styles.searchButtonText}>🔍</Text>
+            <Text style={styles.searchButtonText}>Search</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.addButton}
-            onPress={() => setIsCreatingTemplate(true)}
+            onPress={() => setIsCreating(true)}
           >
-            <Text style={styles.addButtonText}>+</Text>
+            <Text style={styles.addButtonText}>New Template</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -473,27 +309,28 @@ export default function TemplatesScreen() {
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Search templates..."
-            placeholderTextColor="#999"
+            placeholderTextColor="#6B7280"
           />
         </View>
       )}
 
-      {
-        templates.length === 0 ? (
+      <FlatList
+        data={filteredTemplates}
+        keyExtractor={(item) => item.id}
+        renderItem={renderTemplateItem}
+        contentContainerStyle={styles.templatesList}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>📋</Text>
-            <Text style={styles.emptyTitle}>No templates yet</Text>
-            <Text style={styles.emptySubtext}>Create your first custom template</Text>
+            <Text style={styles.emptyText}>
+              {searchQuery.trim() 
+                ? 'No templates found for your search.'
+                : 'No templates yet. Tap "New Template" to create your first template.'
+              }
+            </Text>
           </View>
-        ) : (
-          <FlatList
-            data={filteredTemplates}
-            renderItem={renderTemplate}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.list}
-          />
-        )
-      }
+        }
+      />
     </SafeAreaView>
   );
 }
@@ -501,285 +338,322 @@ export default function TemplatesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingTop: Platform.OS === 'ios' ? 60 : 24,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#E5E7EB',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    gap: 8,
+    color: '#000000',
+    fontFamily: 'Inter',
   },
   headerActions: {
     flexDirection: 'row',
     gap: 8,
   },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   searchButton: {
-    backgroundColor: '#34C759',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderRadius: 8,
-  },
-  searchButtonText: {
-    fontSize: 16,
-  },
-  addButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  addButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  searchContainer: {
-    backgroundColor: 'white',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  searchInput: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#f8f8f8',
-  },
-  saveButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  saveButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  cancelButton: {
-    backgroundColor: '#ccc',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  cancelButtonText: {
-    color: '#333',
-    fontWeight: 'bold',
-  },
-  
-  content: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 16,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  templateNameInput: {
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: 'white',
-  },
-  addFieldButton: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  addFieldButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  fieldContainer: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  fieldHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  fieldLabelInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 4,
-    padding: 8,
-    fontSize: 14,
-    marginRight: 8,
-  },
-  removeFieldButton: {
-    backgroundColor: '#f44336',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    borderColor: '#E5E7EB',
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  removeFieldText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+  searchButtonText: {
+    fontSize: 13,
+    color: '#000000',
+    fontFamily: 'Inter',
+    fontWeight: '500',
   },
-  fieldTypeContainer: {
-    flexDirection: 'row',
+  addButton: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minHeight: 44,
     alignItems: 'center',
-    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
-  fieldTypeLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginRight: 8,
+  addButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+    fontSize: 13,
   },
-  fieldTypeButton: {
-    backgroundColor: '#f0f0f0',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginRight: 4,
-    marginBottom: 4,
-  },
-  fieldTypeButtonActive: {
-    backgroundColor: '#007AFF',
-  },
-  fieldTypeButtonText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  fieldTypeButtonTextActive: {
-    color: 'white',
-  },
-  fieldInputHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  saveButton: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minHeight: 44,
     alignItems: 'center',
-    marginBottom: 8,
+    justifyContent: 'center',
   },
-  fieldLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+    fontSize: 13,
+    fontFamily: 'Inter',
   },
-  voiceButton: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  voiceButtonText: {
-    fontSize: 12,
-  },
-  fieldInput: {
+  cancelButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#E5E7EB',
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    color: '#000000',
+    fontWeight: '500',
+    fontSize: 13,
+    fontFamily: 'Inter',
+  },
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     borderRadius: 8,
-    padding: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
     fontSize: 16,
-    backgroundColor: 'white',
+    fontFamily: 'Inter',
+    color: '#000000',
   },
-  longTextInput: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  list: {
+  templatesList: {
     padding: 16,
   },
-  templateCard: {
-    backgroundColor: 'white',
-    borderRadius: 8,
+  templateItem: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   templateHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 8,
   },
   templateName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000000',
+    fontFamily: 'Inter',
     flex: 1,
-  },
-  templateActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  useButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  useButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
+    marginRight: 12,
   },
   deleteButton: {
-    padding: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   deleteButtonText: {
+    fontSize: 13,
+    color: '#000000',
+    fontFamily: 'Inter',
+  },
+  templateDescription: {
     fontSize: 16,
+    color: '#6B7280',
+    marginBottom: 8,
+    lineHeight: 25.6,
+    fontFamily: 'Inter',
   },
   templateMeta: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 13,
+    color: '#6B7280',
+    fontFamily: 'Inter',
   },
-  
-  emptyState: {
+  formContainer: {
     flex: 1,
-    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  formContent: {
+    padding: 16,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000000',
+    fontFamily: 'Inter',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#FFFFFF',
+    fontFamily: 'Inter',
+    color: '#000000',
+    minHeight: 44,
+  },
+  textArea: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#FFFFFF',
+    fontFamily: 'Inter',
+    color: '#000000',
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  fieldsSection: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000000',
+    fontFamily: 'Inter',
+    marginBottom: 16,
+  },
+  addFieldContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  fieldInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#FFFFFF',
+    fontFamily: 'Inter',
+    color: '#000000',
+    marginBottom: 12,
+    minHeight: 44,
+  },
+  fieldTypeContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  typeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  typeButtonActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  typeButtonText: {
+    fontSize: 13,
+    color: '#000000',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  typeButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  addFieldButton: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
     alignItems: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  addFieldButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+    fontSize: 13,
+    fontFamily: 'Inter',
+  },
+  fieldsList: {
+    maxHeight: 300,
+  },
+  fieldItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  fieldInfo: {
+    flex: 1,
+  },
+  fieldName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000000',
+    fontFamily: 'Inter',
+  },
+  fieldType: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontFamily: 'Inter',
+    marginTop: 2,
+  },
+  removeFieldText: {
+    fontSize: 13,
+    color: '#000000',
+    fontFamily: 'Inter',
+    fontWeight: '500',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
     paddingHorizontal: 32,
   },
   emptyText: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  emptySubtext: {
     fontSize: 16,
-    color: '#666',
+    color: '#6B7280',
     textAlign: 'center',
+    fontFamily: 'Inter',
+    lineHeight: 25.6,
   },
 });
