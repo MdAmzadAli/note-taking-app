@@ -1,77 +1,76 @@
 
 export type ProfessionType = 'doctor' | 'lawyer' | 'developer';
 
+export interface FieldConfig {
+  name: string;
+  placeholder: string;
+  type: 'text' | 'multiline';
+  required?: boolean;
+}
+
 export interface ProfessionConfig {
   name: string;
-  description: string;
   icon: string;
   header: string;
+  fields: FieldConfig[];
   colors: {
     primary: string;
     secondary: string;
-    text: string;
     background: string;
+    text: string;
   };
-  fields: {
-    name: string;
-    placeholder: string;
-    type: 'text' | 'multiline';
-  }[];
 }
 
 export const PROFESSIONS: Record<ProfessionType, ProfessionConfig> = {
   doctor: {
     name: 'Doctor',
-    description: 'Medical professional',
     icon: '🩺',
     header: 'Patient Notes',
+    fields: [
+      { name: 'Patient Name', placeholder: 'Enter patient name', type: 'text', required: true },
+      { name: 'Symptoms', placeholder: 'Describe symptoms', type: 'multiline' },
+      { name: 'Diagnosis', placeholder: 'Enter diagnosis', type: 'multiline' },
+      { name: 'Prescription', placeholder: 'Enter prescription details', type: 'multiline' },
+    ],
     colors: {
       primary: '#E3F2FD',
       secondary: '#2196F3',
+      background: '#F8FBFF',
       text: '#1565C0',
-      background: '#FAFAFA',
     },
-    fields: [
-      { name: 'Patient Name', placeholder: 'Enter patient name...', type: 'text' },
-      { name: 'Symptoms', placeholder: 'Describe symptoms...', type: 'multiline' },
-      { name: 'Diagnosis', placeholder: 'Enter diagnosis...', type: 'multiline' },
-      { name: 'Prescription', placeholder: 'Enter prescription details...', type: 'multiline' },
-    ],
   },
   lawyer: {
     name: 'Lawyer',
-    description: 'Legal professional',
     icon: '⚖️',
     header: 'Case Notes',
-    colors: {
-      primary: '#F5F5F5',
-      secondary: '#424242',
-      text: '#212121',
-      background: '#FAFAFA',
-    },
     fields: [
-      { name: 'Client Name', placeholder: 'Enter client name...', type: 'text' },
-      { name: 'Case Summary', placeholder: 'Summarize the case...', type: 'multiline' },
-      { name: 'Action Items', placeholder: 'List action items...', type: 'multiline' },
-      { name: 'Legal References', placeholder: 'Relevant laws/cases...', type: 'multiline' },
+      { name: 'Client Name', placeholder: 'Enter client name', type: 'text', required: true },
+      { name: 'Case Summary', placeholder: 'Describe the case', type: 'multiline' },
+      { name: 'Action Items', placeholder: 'List required actions', type: 'multiline' },
+      { name: 'Legal References', placeholder: 'Relevant laws/cases', type: 'multiline' },
     ],
+    colors: {
+      primary: '#F5F5DC',
+      secondary: '#5D4037',
+      background: '#FAFAFA',
+      text: '#3E2723',
+    },
   },
   developer: {
     name: 'Developer',
-    description: 'Software developer',
     icon: '💻',
     header: 'Dev Notes',
+    fields: [
+      { name: 'Feature', placeholder: 'Feature or task name', type: 'text', required: true },
+      { name: 'Code Snippet', placeholder: 'Code examples or snippets', type: 'multiline' },
+      { name: 'To-Do', placeholder: 'Tasks to complete', type: 'multiline' },
+      { name: 'Notes', placeholder: 'Additional notes', type: 'multiline' },
+    ],
     colors: {
       primary: '#F3E5F5',
-      secondary: '#9C27B0',
-      text: '#4A148C',
+      secondary: '#7B1FA2',
       background: '#FAFAFA',
+      text: '#4A148C',
     },
-    fields: [
-      { name: 'Feature', placeholder: 'Feature description...', type: 'text' },
-      { name: 'Code Snippet', placeholder: 'Enter code...', type: 'multiline' },
-      { name: 'To-Do', placeholder: 'List tasks...', type: 'multiline' },
-      { name: 'Notes', placeholder: 'Additional notes...', type: 'multiline' },
-    ],
   },
 };

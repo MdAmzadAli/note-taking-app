@@ -5,70 +5,88 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
+  SafeAreaView,
   Alert,
-  Switch
+  ScrollView,
+  Switch,
 } from 'react-native';
-import { Profession, UserSettings } from '../types';
-import { PROFESSION_CONFIGS } from '../constants/professions';
-import { StorageService } from '../utils/storage';
+import { useRouter } from 'expo-router';
+import { PROFESSIONS, ProfessionType } from '@/constants/professions';
+import { UserSettings } from '@/types';
+import { 
+  getUserSettings, 
+  saveUserSettings, 
+  saveSelectedProfession,
+  clearAllData,
+} from '@/utils/storage';
 
-interface SettingsScreenProps {
-  profession: Profession;
-  settings: UserSettings;
-  onProfessionChange: (profession: Profession) => void;
-  onSettingsChange: (settings: UserSettings) => void;
-}
+export default function SettingsScreen() {
+  const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({
-  profession,
-  settings,
-  onProfessionChange,
-  onSettingsChange
-}) => {
-  const [currentSettings, setCurrentSettings] = useState<UserSettings>(settings);
-  
-  const config = PROFESSION_CONFIGS[profession];
+  useEffect(() => {
+    loadSettings();
+  }, []);
 
-  const changeProfession = (newProfession: Profession) => {
+  const loadSettings = async () => {
+    try {
+      const userSettings = await getUserSettings();
+      setSettings(userSettings);
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
+
+  const handleProfessionChange = async (newProfession: ProfessionType) => {
+    if (!settings) return;
+
     Alert.alert(
       'Change Profession',
-      `Are you sure you want to change to ${PROFESSION_CONFIGS[newProfession].header}? This will affect your note templates and theme.`,
+      `Are you sure you want to switch to ${PROFESSIONS[newProfession].name}? This will change your app theme and note templates.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Change',
+          text: 'Switch',
           onPress: async () => {
+            setIsLoading(true);
             try {
-              const updatedSettings = { ...currentSettings, profession: newProfession };
-              await StorageService.saveSettings(updatedSettings);
-              setCurrentSettings(updatedSettings);
-              onProfessionChange(newProfession);
-              onSettingsChange(updatedSettings);
+              const updatedSettings = { ...settings, profession: newProfession };
+              await saveSelectedProfession(newProfession);
+              await saveUserSettings(updatedSettings);
+              setSettings(updatedSettings);
             } catch (error) {
+              console.error('Error changing profession:', error);
               Alert.alert('Error', 'Failed to change profession');
+            } finally {
+              setIsLoading(false);
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
 
-  const toggleViewMode = async () => {
+  const handleViewModeChange = async (newViewMode: 'paragraph' | 'bullet') => {
+    if (!settings) return;
+
+    setIsLoading(true);
     try {
-      const newViewMode = currentSettings.viewMode === 'paragraph' ? 'bullet' : 'paragraph';
-      const updatedSettings = { ...currentSettings, viewMode: newViewMode };
-      await StorageService.saveSettings(updatedSettings);
-      setCurrentSettings(updatedSettings);
-      onSettingsChange(updatedSettings);
+      const updatedSettings = { ...settings, viewMode: newViewMode };
+      await saveUserSettings(updatedSettings);
+      setSettings(updatedSettings);
     } catch (error) {
-      Alert.alert('Error', 'Failed to update view mode');
+      console.error('Error changing view mode:', error);
+      Alert.alert('Error', 'Failed to change view mode');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const clearAllData = () => {
+  const handleClearData = () => {
     Alert.alert(
       'Clear All Data',
-      'This will delete all your notes, tasks, and reminders. This action cannot be undone.',
+      'This will delete all your notes, reminders, and tasks. This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -76,216 +94,293 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           style: 'destructive',
           onPress: async () => {
             try {
-              await StorageService.saveSettings({
-                profession: null,
-                viewMode: 'paragraph',
-                hasCompletedOnboarding: false
-              });
-              // In a real app, you would also clear notes, tasks, and reminders
-              Alert.alert('Success', 'All data cleared. Please restart the app.');
+              await clearAllData();
+              Alert.alert('Success', 'All data has been cleared');
+              // Navigate back to onboarding
+              router.replace('/');
             } catch (error) {
+              console.error('Error clearing data:', error);
               Alert.alert('Error', 'Failed to clear data');
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
 
+  if (!settings) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading settings...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const currentProfession = PROFESSIONS[settings.profession];
+
   return (
-    <View style={[styles.container, { backgroundColor: config.colors.background }]}>
-      <View style={[styles.header, { backgroundColor: config.colors.primary }]}>
-        <Text style={[styles.headerTitle, { color: config.colors.text }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: currentProfession.colors.background }]}>
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, { color: currentProfession.colors.text }]}>
           Settings
         </Text>
+        <Text style={styles.headerIcon}>⚙️</Text>
       </View>
 
-      <View style={styles.content}>
+      <ScrollView style={styles.content}>
+        {/* Current Profession */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: config.colors.text }]}>
+          <Text style={[styles.sectionTitle, { color: currentProfession.colors.text }]}>
             Current Profession
           </Text>
-          <View style={[styles.currentProfession, { backgroundColor: config.colors.secondary }]}>
-            <Text style={[styles.professionText, { color: config.colors.text }]}>
-              {config.header}
-            </Text>
-            <Text style={[styles.professionSubtext, { color: config.colors.text }]}>
-              {config.fields.join(' • ')}
-            </Text>
+          <View style={[styles.currentProfessionCard, { backgroundColor: currentProfession.colors.primary }]}>
+            <Text style={styles.professionIcon}>{currentProfession.icon}</Text>
+            <View style={styles.professionInfo}>
+              <Text style={[styles.professionName, { color: currentProfession.colors.text }]}>
+                {currentProfession.name}
+              </Text>
+              <Text style={[styles.professionHeader, { color: currentProfession.colors.text }]}>
+                {currentProfession.header}
+              </Text>
+            </View>
           </View>
         </View>
 
+        {/* Change Profession */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: config.colors.text }]}>
-            Change Profession
+          <Text style={[styles.sectionTitle, { color: currentProfession.colors.text }]}>
+            Switch Profession
           </Text>
-          {Object.entries(PROFESSION_CONFIGS).map(([key, profConfig]) => (
-            <TouchableOpacity
-              key={key}
-              style={[
-                styles.professionOption,
-                { 
-                  backgroundColor: key === profession ? config.colors.primary : config.colors.secondary,
-                  opacity: key === profession ? 0.7 : 1
-                }
-              ]}
-              onPress={() => key !== profession && changeProfession(key as Profession)}
-              disabled={key === profession}
-            >
-              <Text style={[
-                styles.optionText,
-                { color: key === profession ? config.colors.text : profConfig.colors.text }
-              ]}>
-                {profConfig.header}
-              </Text>
-              {key === profession && (
-                <Text style={[styles.currentIndicator, { color: config.colors.text }]}>
-                  Current
-                </Text>
-              )}
-            </TouchableOpacity>
-          ))}
+          {Object.entries(PROFESSIONS).map(([key, config]) => {
+            const professionKey = key as ProfessionType;
+            const isSelected = settings.profession === professionKey;
+            
+            return (
+              <TouchableOpacity
+                key={professionKey}
+                style={[
+                  styles.professionOption,
+                  { backgroundColor: config.colors.primary },
+                  isSelected && { opacity: 0.5 }
+                ]}
+                onPress={() => handleProfessionChange(professionKey)}
+                disabled={isSelected || isLoading}
+              >
+                <Text style={styles.optionIcon}>{config.icon}</Text>
+                <View style={styles.optionInfo}>
+                  <Text style={[styles.optionName, { color: config.colors.text }]}>
+                    {config.name}
+                  </Text>
+                  <Text style={[styles.optionDescription, { color: config.colors.text }]}>
+                    {config.header}
+                  </Text>
+                </View>
+                {isSelected && (
+                  <Text style={[styles.selectedIndicator, { color: config.colors.secondary }]}>
+                    ✓
+                  </Text>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
+        {/* View Mode */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: config.colors.text }]}>
-            View Mode
+          <Text style={[styles.sectionTitle, { color: currentProfession.colors.text }]}>
+            Note View Mode
           </Text>
-          <View style={[styles.switchContainer, { backgroundColor: config.colors.secondary }]}>
-            <Text style={[styles.switchLabel, { color: config.colors.text }]}>
-              {currentSettings.viewMode === 'paragraph' ? 'Paragraph View' : 'Bullet Point View'}
-            </Text>
+          
+          <View style={[styles.viewModeOption, { backgroundColor: currentProfession.colors.primary }]}>
+            <View style={styles.viewModeInfo}>
+              <Text style={[styles.viewModeTitle, { color: currentProfession.colors.text }]}>
+                Paragraph View
+              </Text>
+              <Text style={[styles.viewModeDescription, { color: currentProfession.colors.text }]}>
+                Show notes as continuous text
+              </Text>
+            </View>
             <Switch
-              value={currentSettings.viewMode === 'bullet'}
-              onValueChange={toggleViewMode}
-              trackColor={{ false: '#767577', true: config.colors.primary }}
-              thumbColor={currentSettings.viewMode === 'bullet' ? '#f4f3f4' : '#f4f3f4'}
+              value={settings.viewMode === 'paragraph'}
+              onValueChange={(value) => handleViewModeChange(value ? 'paragraph' : 'bullet')}
+              trackColor={{ false: '#ccc', true: currentProfession.colors.secondary }}
+              disabled={isLoading}
             />
           </View>
-          <Text style={[styles.switchDescription, { color: config.colors.text }]}>
-            {currentSettings.viewMode === 'paragraph' 
-              ? 'Notes display as flowing paragraphs'
-              : 'Notes display as structured bullet points'
-            }
-          </Text>
+
+          <View style={[styles.viewModeOption, { backgroundColor: currentProfession.colors.primary }]}>
+            <View style={styles.viewModeInfo}>
+              <Text style={[styles.viewModeTitle, { color: currentProfession.colors.text }]}>
+                Bullet Point View
+              </Text>
+              <Text style={[styles.viewModeDescription, { color: currentProfession.colors.text }]}>
+                Show notes as structured bullet points
+              </Text>
+            </View>
+            <Switch
+              value={settings.viewMode === 'bullet'}
+              onValueChange={(value) => handleViewModeChange(value ? 'bullet' : 'paragraph')}
+              trackColor={{ false: '#ccc', true: currentProfession.colors.secondary }}
+              disabled={isLoading}
+            />
+          </View>
         </View>
 
+        {/* App Info */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: config.colors.text }]}>
-            Data Management
+          <Text style={[styles.sectionTitle, { color: currentProfession.colors.text }]}>
+            App Information
+          </Text>
+          <View style={[styles.infoCard, { backgroundColor: currentProfession.colors.primary }]}>
+            <Text style={[styles.infoText, { color: currentProfession.colors.text }]}>
+              Notes App v1.0.0
+            </Text>
+            <Text style={[styles.infoText, { color: currentProfession.colors.text }]}>
+              Professional note-taking made simple
+            </Text>
+          </View>
+        </View>
+
+        {/* Danger Zone */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: '#ff4444' }]}>
+            Danger Zone
           </Text>
           <TouchableOpacity
-            style={[styles.dangerButton, { borderColor: '#FF6B6B' }]}
-            onPress={clearAllData}
+            style={styles.dangerButton}
+            onPress={handleClearData}
           >
             <Text style={styles.dangerButtonText}>Clear All Data</Text>
           </TouchableOpacity>
         </View>
-
-        <View style={styles.appInfo}>
-          <Text style={[styles.appInfoText, { color: config.colors.text }]}>
-            ProfNotes v1.0.0
-          </Text>
-          <Text style={[styles.appInfoText, { color: config.colors.text }]}>
-            Professional note-taking made simple
-          </Text>
-        </View>
-      </View>
-    </View>
+      </ScrollView>
+    </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
   },
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: 50
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold'
+    fontWeight: 'bold',
+  },
+  headerIcon: {
+    fontSize: 32,
   },
   content: {
     flex: 1,
-    padding: 16
+    padding: 16,
   },
   section: {
-    marginBottom: 32
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 12
+    marginBottom: 12,
   },
-  currentProfession: {
+  currentProfessionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
     borderRadius: 8,
-    alignItems: 'center'
   },
-  professionText: {
-    fontSize: 20,
+  professionIcon: {
+    fontSize: 32,
+    marginRight: 16,
+  },
+  professionInfo: {
+    flex: 1,
+  },
+  professionName: {
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 4
   },
-  professionSubtext: {
+  professionHeader: {
     fontSize: 14,
-    opacity: 0.8
+    opacity: 0.8,
   },
   professionOption: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
     borderRadius: 8,
-    marginBottom: 8
+    marginBottom: 8,
   },
-  optionText: {
+  optionIcon: {
+    fontSize: 24,
+    marginRight: 16,
+  },
+  optionInfo: {
+    flex: 1,
+  },
+  optionName: {
     fontSize: 16,
-    fontWeight: '500'
-  },
-  currentIndicator: {
-    fontSize: 12,
     fontWeight: 'bold',
-    opacity: 0.8
   },
-  switchContainer: {
+  optionDescription: {
+    fontSize: 12,
+    opacity: 0.8,
+  },
+  selectedIndicator: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  viewModeOption: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 16,
     borderRadius: 8,
-    marginBottom: 8
+    marginBottom: 8,
   },
-  switchLabel: {
+  viewModeInfo: {
+    flex: 1,
+  },
+  viewModeTitle: {
     fontSize: 16,
-    fontWeight: '500'
+    fontWeight: 'bold',
   },
-  switchDescription: {
+  viewModeDescription: {
+    fontSize: 12,
+    opacity: 0.8,
+  },
+  infoCard: {
+    padding: 16,
+    borderRadius: 8,
+  },
+  infoText: {
     fontSize: 14,
-    opacity: 0.7,
-    fontStyle: 'italic'
+    marginBottom: 4,
   },
   dangerButton: {
+    backgroundColor: '#ff4444',
     padding: 16,
     borderRadius: 8,
-    borderWidth: 2,
-    alignItems: 'center'
+    alignItems: 'center',
   },
   dangerButtonText: {
-    color: '#FF6B6B',
+    color: 'white',
     fontSize: 16,
-    fontWeight: 'bold'
+    fontWeight: 'bold',
   },
-  appInfo: {
-    alignItems: 'center',
-    marginTop: 32
-  },
-  appInfoText: {
-    fontSize: 14,
-    opacity: 0.6,
-    marginBottom: 4
-  }
 });

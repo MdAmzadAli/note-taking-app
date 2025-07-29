@@ -1,26 +1,12 @@
 
-import { ProfessionType } from '@/constants/professions';
-
 export interface Note {
   id: string;
   title: string;
   content: string;
-  profession: ProfessionType;
+  profession: string;
   fields: Record<string, string>;
   createdAt: string;
   updatedAt: string;
-  tags?: string[];
-}
-
-export interface Task {
-  id: string;
-  title: string;
-  description?: string;
-  completed: boolean;
-  dueDate?: string;
-  reminderTime?: string;
-  createdAt: string;
-  profession: ProfessionType;
 }
 
 export interface Reminder {
@@ -31,14 +17,31 @@ export interface Reminder {
   isCompleted: boolean;
   notificationId?: string;
   createdAt: string;
-  profession: ProfessionType;
+  profession: string;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  isCompleted: boolean;
+  scheduledDate?: string;
+  reminderTime?: string;
+  notificationId?: string;
+  createdAt: string;
+  profession: string;
 }
 
 export interface UserSettings {
-  selectedProfession: ProfessionType;
+  profession: 'doctor' | 'lawyer' | 'developer';
   viewMode: 'paragraph' | 'bullet';
-  notifications: boolean;
-  speechEnabled: boolean;
+  isOnboardingComplete?: boolean;
 }
 
-export { ProfessionType };
+export interface SearchFilters {
+  profession?: string;
+  dateRange?: {
+    start: string;
+    end: string;
+  };
+}

@@ -7,14 +7,18 @@ import {
   StyleSheet,
   SafeAreaView,
   Alert,
+  Dimensions,
 } from 'react-native';
-import { router } from 'expo-router';
-import { saveSelectedProfession } from '@/utils/storage';
+import { useRouter } from 'expo-router';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
+import { saveSelectedProfession, saveUserSettings } from '@/utils/storage';
+
+const { width } = Dimensions.get('window');
 
 export default function OnboardingScreen() {
   const [selectedProfession, setSelectedProfession] = useState<ProfessionType | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
   const handleProfessionSelect = (profession: ProfessionType) => {
     setSelectedProfession(profession);
@@ -22,13 +26,21 @@ export default function OnboardingScreen() {
 
   const handleContinue = async () => {
     if (!selectedProfession) {
-      Alert.alert('Please select a profession', 'Choose your profession to continue');
+      Alert.alert('Selection Required', 'Please select your profession to continue.');
       return;
     }
 
     setIsLoading(true);
     try {
+      // Save selected profession and initial settings
       await saveSelectedProfession(selectedProfession);
+      await saveUserSettings({
+        profession: selectedProfession,
+        viewMode: 'paragraph',
+        isOnboardingComplete: true,
+      });
+
+      // Navigate to main app
       router.replace('/(tabs)');
     } catch (error) {
       console.error('Error saving profession:', error);
@@ -41,36 +53,58 @@ export default function OnboardingScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Welcome to NotePro</Text>
-        <Text style={styles.subtitle}>Choose your profession to get started</Text>
-        
+        <Text style={styles.title}>Welcome to Notes App</Text>
+        <Text style={styles.subtitle}>
+          Choose your profession to get started with personalized templates
+        </Text>
+
         <View style={styles.professionsContainer}>
-          {Object.entries(PROFESSIONS).map(([key, profession]) => (
-            <TouchableOpacity
-              key={key}
-              style={[
-                styles.professionCard,
-                { backgroundColor: profession.colors.primary },
-                selectedProfession === key && styles.selectedCard,
-              ]}
-              onPress={() => handleProfessionSelect(key as ProfessionType)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.professionIcon}>{profession.icon}</Text>
-              <Text style={[styles.professionTitle, { color: profession.colors.text }]}>
-                {profession.name}
-              </Text>
-              <Text style={[styles.professionDescription, { color: profession.colors.text }]}>
-                {profession.description}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {Object.entries(PROFESSIONS).map(([key, config]) => {
+            const professionKey = key as ProfessionType;
+            const isSelected = selectedProfession === professionKey;
+            
+            return (
+              <TouchableOpacity
+                key={professionKey}
+                style={[
+                  styles.professionCard,
+                  { backgroundColor: config.colors.primary },
+                  isSelected && { 
+                    borderColor: config.colors.secondary,
+                    borderWidth: 3,
+                    transform: [{ scale: 1.05 }],
+                  }
+                ]}
+                onPress={() => handleProfessionSelect(professionKey)}
+              >
+                <Text style={styles.professionIcon}>{config.icon}</Text>
+                <Text style={[styles.professionName, { color: config.colors.text }]}>
+                  {config.name}
+                </Text>
+                <Text style={[styles.professionDescription, { color: config.colors.text }]}>
+                  {config.header}
+                </Text>
+                <View style={styles.fieldsPreview}>
+                  {config.fields.slice(0, 3).map((field, index) => (
+                    <Text key={index} style={[styles.fieldName, { color: config.colors.text }]}>
+                      • {field.name}
+                    </Text>
+                  ))}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         <TouchableOpacity
           style={[
             styles.continueButton,
-            !selectedProfession && styles.disabledButton,
+            { 
+              backgroundColor: selectedProfession 
+                ? PROFESSIONS[selectedProfession].colors.secondary 
+                : '#ccc',
+              opacity: selectedProfession ? 1 : 0.6,
+            }
           ]}
           onPress={handleContinue}
           disabled={!selectedProfession || isLoading}
@@ -87,7 +121,7 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#fff',
   },
   content: {
     flex: 1,
@@ -95,7 +129,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 10,
@@ -106,51 +140,49 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 40,
     color: '#666',
+    lineHeight: 22,
   },
   professionsContainer: {
-    gap: 16,
     marginBottom: 40,
   },
   professionCard: {
     padding: 20,
+    marginBottom: 16,
     borderRadius: 12,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  selectedCard: {
-    transform: [{ scale: 1.02 }],
-    shadowOpacity: 0.2,
-    elevation: 5,
+    minHeight: 160,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   professionIcon: {
-    fontSize: 40,
+    fontSize: 48,
     marginBottom: 8,
   },
-  professionTitle: {
+  professionName: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 4,
   },
   professionDescription: {
     fontSize: 14,
-    textAlign: 'center',
+    marginBottom: 12,
+    fontWeight: '600',
+  },
+  fieldsPreview: {
+    alignItems: 'center',
+  },
+  fieldName: {
+    fontSize: 12,
+    marginBottom: 2,
     opacity: 0.8,
   },
   continueButton: {
-    backgroundColor: '#007AFF',
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
   },
-  disabledButton: {
-    backgroundColor: '#ccc',
-  },
   continueButtonText: {
-    color: '#fff',
+    color: 'white',
     fontSize: 18,
     fontWeight: '600',
   },
