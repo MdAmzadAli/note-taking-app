@@ -89,14 +89,15 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="gear" color={color} />,
+          title: 'Menu',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="line.horizontal.3" color={color} />,
         }}
       />
       <Tabs.Screen
         name="search"
         options={{
-          href: null,
+          title: 'Search',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="magnifyingglass" color={color} />,
         }}
       />
       <Tabs.Screen

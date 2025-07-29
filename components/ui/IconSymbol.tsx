@@ -23,6 +23,11 @@ const MAPPING = {
   'bell': 'notifications',
   'checklist': 'check-circle',
   'gearshape': 'settings',
+  'note.text': 'note',
+  'checkmark.square': 'check-box',
+  'document.badge.plus': 'note-add',
+  'gear': 'settings',
+  'line.horizontal.3': 'menu',
 } as IconMapping;
 
 /**
