@@ -27,15 +27,12 @@ import { mockSpeechToText } from '@/utils/speech';
 
 export default function TemplatesScreen() {
   const [templates, setTemplates] = useState<CustomTemplate[]>([]);
-  const [entries, setEntries] = useState<TemplateEntry[]>([]);
   const [settings, setSettings] = useState<UserSettings>({ profession: 'doctor', viewMode: 'paragraph' });
   const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
   const [isFillingTemplate, setIsFillingTemplate] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<CustomTemplate | null>(null);
   const [newTemplate, setNewTemplate] = useState({ name: '', fields: [] as FieldType[] });
   const [templateValues, setTemplateValues] = useState<Record<string, string>>({});
-  const [editingEntry, setEditingEntry] = useState<TemplateEntry | null>(null);
-  const [viewMode, setViewMode] = useState<'templates' | 'entries'>('templates');
 
   useEffect(() => {
     loadData();
@@ -43,13 +40,11 @@ export default function TemplatesScreen() {
 
   const loadData = async () => {
     try {
-      const [templatesData, entriesData, userSettings] = await Promise.all([
+      const [templatesData, userSettings] = await Promise.all([
         getCustomTemplates(),
-        getTemplateEntries(),
         getUserSettings(),
       ]);
       setTemplates(templatesData);
-      setEntries(entriesData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
       setSettings(userSettings);
     } catch (error) {
       console.error('Error loading templates data:', error);
@@ -150,18 +145,7 @@ export default function TemplatesScreen() {
   const startFillingTemplate = (template: CustomTemplate) => {
     setSelectedTemplate(template);
     setTemplateValues({});
-    setEditingEntry(null);
     setIsFillingTemplate(true);
-  };
-
-  const editEntry = (entry: TemplateEntry) => {
-    const template = templates.find(t => t.id === entry.templateId);
-    if (template) {
-      setSelectedTemplate(template);
-      setTemplateValues(entry.values);
-      setEditingEntry(entry);
-      setIsFillingTemplate(true);
-    }
   };
 
   const saveEntry = async () => {
@@ -169,11 +153,11 @@ export default function TemplatesScreen() {
 
     try {
       const entry: TemplateEntry = {
-        id: editingEntry?.id || Date.now().toString(),
+        id: Date.now().toString(),
         templateId: selectedTemplate.id,
         templateName: selectedTemplate.name,
         values: templateValues,
-        createdAt: editingEntry?.createdAt || new Date().toISOString(),
+        createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
@@ -182,36 +166,11 @@ export default function TemplatesScreen() {
       setIsFillingTemplate(false);
       setSelectedTemplate(null);
       setTemplateValues({});
-      setEditingEntry(null);
-      Alert.alert('Success', `Entry ${editingEntry ? 'updated' : 'saved'} successfully!`);
+      Alert.alert('Success', 'Entry saved successfully!');
     } catch (error) {
       console.error('Error saving entry:', error);
       Alert.alert('Error', 'Failed to save entry');
     }
-  };
-
-  const deleteEntry = async (entryId: string) => {
-    Alert.alert(
-      'Delete Entry',
-      'Are you sure you want to delete this entry?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteTemplateEntry(entryId);
-              await loadData();
-              Alert.alert('Success', 'Entry deleted successfully');
-            } catch (error) {
-              console.error('Error deleting entry:', error);
-              Alert.alert('Error', 'Failed to delete entry');
-            }
-          },
-        },
-      ]
-    );
   };
 
   const handleVoiceInput = async (fieldId: string) => {
@@ -330,37 +289,7 @@ export default function TemplatesScreen() {
     </View>
   );
 
-  const renderEntry = ({ item }: { item: TemplateEntry }) => (
-    <View style={styles.entryCard}>
-      <View style={styles.entryHeader}>
-        <Text style={styles.entryTitle}>{item.templateName}</Text>
-        <View style={styles.entryActions}>
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => editEntry(item)}
-          >
-            <Text style={styles.editButtonText}>✏️</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => deleteEntry(item.id)}
-          >
-            <Text style={styles.deleteButtonText}>🗑️</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-      <Text style={styles.entryMeta}>
-        {new Date(item.createdAt).toLocaleDateString()}
-      </Text>
-      <View style={styles.entryContent}>
-        {Object.entries(item.values).slice(0, 2).map(([key, value]) => (
-          <Text key={key} style={styles.entryField} numberOfLines={1}>
-            {value}
-          </Text>
-        ))}
-      </View>
-    </View>
-  );
+  
 
   if (isCreatingTemplate) {
     return (
@@ -415,7 +344,7 @@ export default function TemplatesScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
         <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
           <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
-            {editingEntry ? 'Edit' : 'Fill'} {selectedTemplate.name}
+            Fill {selectedTemplate.name}
           </Text>
           <View style={styles.headerButtons}>
             <TouchableOpacity style={styles.saveButton} onPress={saveEntry}>
@@ -427,7 +356,6 @@ export default function TemplatesScreen() {
                 setIsFillingTemplate(false);
                 setSelectedTemplate(null);
                 setTemplateValues({});
-                setEditingEntry(null);
               }}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -456,26 +384,7 @@ export default function TemplatesScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, viewMode === 'templates' && styles.activeTab]}
-          onPress={() => setViewMode('templates')}
-        >
-          <Text style={[styles.tabText, viewMode === 'templates' && styles.activeTabText]}>
-            Templates ({templates.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, viewMode === 'entries' && styles.activeTab]}
-          onPress={() => setViewMode('entries')}
-        >
-          <Text style={[styles.tabText, viewMode === 'entries' && styles.activeTabText]}>
-            Entries ({entries.length})
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {viewMode === 'templates' ? (
+      {
         templates.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>📋</Text>
@@ -490,22 +399,7 @@ export default function TemplatesScreen() {
             contentContainerStyle={styles.list}
           />
         )
-      ) : (
-        entries.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>📝</Text>
-            <Text style={styles.emptyTitle}>No entries yet</Text>
-            <Text style={styles.emptySubtext}>Fill a template to create your first entry</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={entries}
-            renderItem={renderEntry}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.list}
-          />
-        )
-      )}
+      }
     </SafeAreaView>
   );
 }
@@ -560,29 +454,7 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: 'bold',
   },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#007AFF',
-  },
-  tabText: {
-    fontSize: 16,
-    color: '#666',
-  },
-  activeTabText: {
-    color: '#007AFF',
-    fontWeight: 'bold',
-  },
+  
   content: {
     flex: 1,
   },
@@ -767,51 +639,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
   },
-  entryCard: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  entryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  entryTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    flex: 1,
-  },
-  entryActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  editButton: {
-    padding: 4,
-  },
-  editButtonText: {
-    fontSize: 16,
-  },
-  entryMeta: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 8,
-  },
-  entryContent: {
-    gap: 4,
-  },
-  entryField: {
-    fontSize: 14,
-    color: '#333',
-  },
+  
   emptyState: {
     flex: 1,
     justifyContent: 'center',
