@@ -1,0 +1,55 @@
+Act as a senior React Native + Expo developer. I have a note-taking app project where the UI adapts based on the profession selected during onboarding (Doctor, Lawyer, Developer). The UI is generally like a notepad, but with a powerful customizable section.
+
+Now, I want you to **read the full codebase** (or project file provided), and then:
+
+## 🔍 1. VERIFY BEFORE IMPLEMENTING
+- With precision and care, verify whether **each feature** below is **actually implemented** (no mock data, no stubs).
+- Don’t skip steps — progressively verify each function works with real data and flows properly.
+- Only implement what’s **missing or incomplete**, and make sure each change integrates cleanly with the app logic.
+
+## ✨ Core MVP Features (Must Be Functional, Not Mockups):
+
+### 1. Profession-based Onboarding
+- On app launch, ask the user to select their profession: Doctor, Lawyer, Developer.
+- Store the profession locally (AsyncStorage or secure storage).
+- Based on profession, show a standard notepad interface AND enable a **Custom Section** below.
+
+### 2. ✍️ Custom Form Builder for Notes
+- Let users **create their own structured note forms** (called “Custom Sections”).
+  - Users can define a title (e.g., “Patient Note” or “Client Brief”).
+  - Add multiple fields: text, multi-line text, dropdowns, checkboxes, etc.
+  - Users can create any structure they want and save it.
+- These forms should be persistently saved (using local DB like SQLite or AsyncStorage).
+- When the user opens a form template, show a UI to fill it and save the submission as a note.
+
+### 3. 🎙 Voice Input Everywhere
+- In all note fields (normal or custom), allow users to use **voice-to-text**.
+- Use **Expo Speech-to-Text or a working cross-platform plugin**.
+- Voice must accurately convert to text in all supported languages (at least English, Hindi).
+
+### 4. 🔔 Reminders
+- Let users add reminders to any note or task.
+- Support **voice input** to add reminders.
+- Trigger local device notifications at the scheduled time.
+- Use **Expo Notifications** or similar, with real scheduling logic.
+
+### 5. 🔍 Search Functionality (Must Be Fast & Fuzzy)
+- Add a powerful search bar to search:
+  - Standard notes
+  - Custom form submissions
+- Voice-to-text supported in the search input.
+- Use **Fuse.js** or better to allow **fuzzy keyword matching**.
+- No fake filtering — ensure this works with real data storage.
+
+### 6. 🛠 Settings
+- Allow changing writing style: paragraph, bullet list, etc.
+- Option to reset profession or delete all saved templates.
+
+### 💡 Guidelines
+- Use Expo (React Native) and SQLite or AsyncStorage for all persistent storage.
+- Focus on **clean, minimal UI** for each profession.
+- Use only required libraries — no unnecessary complexity.
+- Build **real functionality**, not placeholders.
+- Structure project cleanly with proper folder structure.
+
+Now, analyze the current project and **implement what’s missing**, verifying each step logically and precisely.
