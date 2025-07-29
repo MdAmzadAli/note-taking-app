@@ -402,10 +402,10 @@ export default function NotesScreen() {
         <Text style={styles.headerTitle}>My Notes</Text>
         <View style={styles.headerButtons}>
           <TouchableOpacity style={styles.iconButton} onPress={() => setIsSearchVisible(!isSearchVisible)}>
-            <Text style={styles.iconButtonText}>Search</Text>
+            <IconSymbol size={20} name="magnifyingglass" color="#FFFFFF" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton} onPress={openMenu}>
-            <Text style={styles.iconButtonText}>Menu</Text>
+            <IconSymbol size={20} name="line.horizontal.3" color="#FFFFFF" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton} onPress={() => setIsCreating(true)}>
             <Text style={styles.iconButtonText}>New Note</Text>
@@ -527,8 +527,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',

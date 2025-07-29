@@ -13,6 +13,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Task } from '@/types';
 import { getTasks, saveTask, deleteTask, getUserSettings } from '@/utils/storage';
 import { scheduleNotification, cancelNotification } from '@/utils/notifications';
@@ -507,7 +508,7 @@ export default function TasksScreen() {
             style={styles.searchButton}
             onPress={() => setIsSearchVisible(!isSearchVisible)}
           >
-            <Text style={styles.searchButtonText}>Search</Text>
+            <IconSymbol size={20} name="magnifyingglass" color="#FFFFFF" />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.addButton}
@@ -594,8 +595,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
