@@ -31,6 +31,7 @@ export default function TemplatesScreen() {
   const [settings, setSettings] = useState<UserSettings>({ profession: 'doctor', viewMode: 'paragraph' });
   const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
   const [isFillingTemplate, setIsFillingTemplate] = useState(false);
+  const [isEditingTemplate, setIsEditingTemplate] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<CustomTemplate | null>(null);
   const [newTemplate, setNewTemplate] = useState({ name: '', fields: [] as FieldType[] });
   const [templateValues, setTemplateValues] = useState<Record<string, string>>({});
@@ -41,6 +42,17 @@ export default function TemplatesScreen() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const filtered = templates.filter(template =>
+        template.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredTemplates(filtered);
+    } else {
+      setFilteredTemplates(templates);
+    }
+  }, [searchQuery, templates]);
+
   const loadData = async () => {
     try {
       const [templatesData, userSettings] = await Promise.all([
@@ -48,6 +60,7 @@ export default function TemplatesScreen() {
         getUserSettings(),
       ]);
       setTemplates(templatesData);
+      setFilteredTemplates(templatesData);
       setSettings(userSettings);
     } catch (error) {
       console.error('Error loading templates data:', error);
@@ -149,6 +162,53 @@ export default function TemplatesScreen() {
     setSelectedTemplate(template);
     setTemplateValues({});
     setIsFillingTemplate(true);
+  };
+
+  const startEditingTemplate = (template: CustomTemplate) => {
+    setSelectedTemplate(template);
+    setNewTemplate({
+      name: template.name,
+      fields: template.fields.map(field => ({ ...field }))
+    });
+    setIsEditingTemplate(true);
+  };
+
+  const updateTemplate = async () => {
+    if (!selectedTemplate || !newTemplate.name.trim()) {
+      Alert.alert('Error', 'Please enter a template name');
+      return;
+    }
+
+    if (newTemplate.fields.length === 0) {
+      Alert.alert('Error', 'Please add at least one field');
+      return;
+    }
+
+    for (const field of newTemplate.fields) {
+      if (!field.label.trim()) {
+        Alert.alert('Error', 'All fields must have a label');
+        return;
+      }
+    }
+
+    try {
+      const updatedTemplate: CustomTemplate = {
+        ...selectedTemplate,
+        name: newTemplate.name.trim(),
+        fields: newTemplate.fields,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await saveCustomTemplate(updatedTemplate);
+      await loadData();
+      setIsEditingTemplate(false);
+      setSelectedTemplate(null);
+      setNewTemplate({ name: '', fields: [] });
+      Alert.alert('Success', 'Template updated successfully!');
+    } catch (error) {
+      console.error('Error updating template:', error);
+      Alert.alert('Error', 'Failed to update template');
+    }
   };
 
   const saveEntry = async () => {
@@ -268,19 +328,25 @@ export default function TemplatesScreen() {
   );
 
   const renderTemplate = ({ item }: { item: CustomTemplate }) => (
-    <View style={styles.templateCard}>
+    <TouchableOpacity style={styles.templateCard} onPress={() => startEditingTemplate(item)}>
       <View style={styles.templateHeader}>
         <Text style={styles.templateName}>{item.name}</Text>
         <View style={styles.templateActions}>
           <TouchableOpacity
             style={styles.useButton}
-            onPress={() => startFillingTemplate(item)}
+            onPress={(e) => {
+              e.stopPropagation();
+              startFillingTemplate(item);
+            }}
           >
             <Text style={styles.useButtonText}>Use</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.deleteButton}
-            onPress={() => deleteTemplate(item.id)}
+            onPress={(e) => {
+              e.stopPropagation();
+              deleteTemplate(item.id);
+            }}
           >
             <Text style={styles.deleteButtonText}>🗑️</Text>
           </TouchableOpacity>
@@ -289,26 +355,31 @@ export default function TemplatesScreen() {
       <Text style={styles.templateMeta}>
         {item.fields.length} fields • Created {new Date(item.createdAt).toLocaleDateString()}
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 
   
 
-  if (isCreatingTemplate) {
+  if (isCreatingTemplate || isEditingTemplate) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
         <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
           <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
-            Create Template
+            {isEditingTemplate ? 'Edit Template' : 'Create Template'}
           </Text>
           <View style={styles.headerButtons}>
-            <TouchableOpacity style={styles.saveButton} onPress={saveTemplate}>
+            <TouchableOpacity 
+              style={styles.saveButton} 
+              onPress={isEditingTemplate ? updateTemplate : saveTemplate}
+            >
               <Text style={styles.saveButtonText}>Save</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.cancelButton}
               onPress={() => {
                 setIsCreatingTemplate(false);
+                setIsEditingTemplate(false);
+                setSelectedTemplate(null);
                 setNewTemplate({ name: '', fields: [] });
               }}
             >
@@ -379,13 +450,33 @@ export default function TemplatesScreen() {
         <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
           Custom Templates
         </Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setIsCreatingTemplate(true)}
-        >
-          <Text style={styles.addButtonText}>+ New</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.searchButton}
+            onPress={() => setIsSearchVisible(!isSearchVisible)}
+          >
+            <Text style={styles.searchButtonText}>🔍</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setIsCreatingTemplate(true)}
+          >
+            <Text style={styles.addButtonText}>+</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {isSearchVisible && (
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search templates..."
+            placeholderTextColor="#999"
+          />
+        </View>
+      )}
 
       {
         templates.length === 0 ? (
@@ -396,7 +487,7 @@ export default function TemplatesScreen() {
           </View>
         ) : (
           <FlatList
-            data={templates}
+            data={filteredTemplates}
             renderItem={renderTemplate}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.list}
@@ -427,6 +518,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  searchButton: {
+    backgroundColor: '#34C759',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  searchButtonText: {
+    fontSize: 16,
+  },
   addButton: {
     backgroundColor: '#007AFF',
     paddingHorizontal: 16,
@@ -436,6 +540,20 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  searchContainer: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#f8f8f8',
   },
   saveButton: {
     backgroundColor: '#007AFF',

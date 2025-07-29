@@ -19,17 +19,33 @@ import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 
 export default function RemindersScreen() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [filteredReminders, setFilteredReminders] = useState<Reminder[]>([]);
   const [profession, setProfession] = useState<ProfessionType>('doctor');
   const [isCreating, setIsCreating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   useEffect(() => {
     loadRemindersAndSettings();
   }, []);
+
+  useEffect(() => {
+    let filtered = reminders.filter(r => r.profession === profession);
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(reminder =>
+        reminder.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (reminder.description && reminder.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+    }
+    setFilteredReminders(filtered);
+  }, [searchQuery, reminders, profession]);
 
   const loadRemindersAndSettings = async () => {
     try {
@@ -39,6 +55,8 @@ export default function RemindersScreen() {
       ]);
       setReminders(remindersData);
       setProfession(settings.profession);
+      const filtered = remindersData.filter(r => r.profession === settings.profession);
+      setFilteredReminders(filtered);
     } catch (error) {
       console.error('Error loading reminders:', error);
     }
@@ -106,6 +124,59 @@ export default function RemindersScreen() {
     } catch (error) {
       console.error('Error creating reminder:', error);
       Alert.alert('Error', 'Failed to create reminder');
+    }
+  };
+
+  const startEditingReminder = (reminder: Reminder) => {
+    setEditingReminder(reminder);
+    setNewTitle(reminder.title);
+    setNewDescription(reminder.description || '');
+    setSelectedDate(new Date(reminder.dateTime));
+    setIsEditing(true);
+  };
+
+  const updateReminder = async () => {
+    if (!editingReminder || !newTitle.trim()) {
+      Alert.alert('Error', 'Please enter a reminder title');
+      return;
+    }
+
+    try {
+      // Cancel old notification if exists
+      if (editingReminder.notificationId) {
+        await cancelNotification(editingReminder.notificationId);
+      }
+
+      const updatedReminder: Reminder = {
+        ...editingReminder,
+        title: newTitle.trim(),
+        description: newDescription.trim(),
+        dateTime: selectedDate.toISOString(),
+      };
+
+      // Schedule new notification
+      const notificationId = await scheduleNotification(
+        `${professionConfig.icon} Reminder`,
+        updatedReminder.title,
+        selectedDate
+      );
+
+      if (notificationId) {
+        updatedReminder.notificationId = notificationId;
+      }
+
+      await saveReminder(updatedReminder);
+      await loadRemindersAndSettings();
+      
+      // Reset form
+      setNewTitle('');
+      setNewDescription('');
+      setSelectedDate(new Date());
+      setIsEditing(false);
+      setEditingReminder(null);
+    } catch (error) {
+      console.error('Error updating reminder:', error);
+      Alert.alert('Error', 'Failed to update reminder');
     }
   };
 
@@ -178,16 +249,22 @@ export default function RemindersScreen() {
     const isOverdue = new Date(item.dateTime) < new Date() && !item.isCompleted;
     
     return (
-      <View style={[
-        styles.reminderItem,
-        { borderLeftColor: professionConfig.colors.secondary },
-        item.isCompleted && styles.completedReminder,
-        isOverdue && styles.overdueReminder,
-      ]}>
+      <TouchableOpacity 
+        style={[
+          styles.reminderItem,
+          { borderLeftColor: professionConfig.colors.secondary },
+          item.isCompleted && styles.completedReminder,
+          isOverdue && styles.overdueReminder,
+        ]}
+        onPress={() => startEditingReminder(item)}
+      >
         <View style={styles.reminderHeader}>
           <TouchableOpacity
             style={styles.checkboxContainer}
-            onPress={() => toggleReminderComplete(item)}
+            onPress={(e) => {
+              e.stopPropagation();
+              toggleReminderComplete(item);
+            }}
           >
             <Text style={styles.checkbox}>
               {item.isCompleted ? '✅' : '⏰'}
@@ -216,25 +293,28 @@ export default function RemindersScreen() {
             </Text>
           </View>
           
-          <TouchableOpacity onPress={() => deleteReminderById(item)}>
+          <TouchableOpacity onPress={(e) => {
+            e.stopPropagation();
+            deleteReminderById(item);
+          }}>
             <Text style={styles.deleteButton}>🗑️</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
-  if (isCreating) {
+  if (isCreating || isEditing) {
     return (
       <View style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
         <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
           <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
-            New Reminder
+            {isEditing ? 'Edit Reminder' : 'New Reminder'}
           </Text>
           <View style={styles.headerButtons}>
             <TouchableOpacity
               style={[styles.saveButton, { backgroundColor: professionConfig.colors.secondary }]}
-              onPress={createReminder}
+              onPress={isEditing ? updateReminder : createReminder}
             >
               <Text style={styles.saveButtonText}>Save</Text>
             </TouchableOpacity>
@@ -242,6 +322,8 @@ export default function RemindersScreen() {
               style={styles.cancelButton}
               onPress={() => {
                 setIsCreating(false);
+                setIsEditing(false);
+                setEditingReminder(null);
                 setNewTitle('');
                 setNewDescription('');
                 setSelectedDate(new Date());
@@ -351,16 +433,36 @@ export default function RemindersScreen() {
         <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
           Reminders ⏰
         </Text>
-        <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: professionConfig.colors.secondary }]}
-          onPress={() => setIsCreating(true)}
-        >
-          <Text style={styles.addButtonText}>+ New</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.searchButton}
+            onPress={() => setIsSearchVisible(!isSearchVisible)}
+          >
+            <Text style={styles.searchButtonText}>🔍</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: professionConfig.colors.secondary }]}
+            onPress={() => setIsCreating(true)}
+          >
+            <Text style={styles.addButtonText}>+</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
+      {isSearchVisible && (
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search reminders..."
+            placeholderTextColor="#999"
+          />
+        </View>
+      )}
+
       <FlatList
-        data={reminders.filter(r => r.profession === profession)}
+        data={filteredReminders}
         keyExtractor={(item) => item.id}
         renderItem={renderReminderItem}
         contentContainerStyle={styles.remindersList}
@@ -368,7 +470,7 @@ export default function RemindersScreen() {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={[styles.emptyText, { color: professionConfig.colors.text }]}>
-              No reminders yet. Tap "New" to create your first reminder.
+              {searchQuery.trim() ? 'No reminders found for your search.' : 'No reminders yet. Tap "+" to create your first reminder.'}
             </Text>
           </View>
         }
@@ -396,6 +498,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  searchButton: {
+    backgroundColor: '#34C759',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  searchButtonText: {
+    fontSize: 16,
+  },
   addButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -404,6 +519,20 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  searchContainer: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#f8f8f8',
   },
   saveButton: {
     paddingHorizontal: 16,

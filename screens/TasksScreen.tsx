@@ -18,8 +18,11 @@ import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 
 export default function TasksScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [profession, setProfession] = useState<ProfessionType>('doctor');
   const [isCreating, setIsCreating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [selectedDate, setSelectedDate] = useState(getTomorrowDate());
@@ -28,10 +31,23 @@ export default function TasksScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [filter, setFilter] = useState<'all' | 'today' | 'tomorrow' | 'overdue'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   useEffect(() => {
     loadTasksAndSettings();
   }, []);
+
+  useEffect(() => {
+    let filtered = getFilteredTasks();
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(task =>
+        task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (task.description && task.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+    }
+    setFilteredTasks(filtered);
+  }, [searchQuery, tasks, filter, profession]);
 
   function getTomorrowDate(): Date {
     const tomorrow = new Date();
@@ -103,6 +119,76 @@ export default function TasksScreen() {
     } catch (error) {
       console.error('Error creating task:', error);
       Alert.alert('Error', 'Failed to create task');
+    }
+  };
+
+  const startEditingTask = (task: Task) => {
+    setEditingTask(task);
+    setNewTitle(task.title);
+    setNewDescription(task.description || '');
+    setSelectedDate(new Date(task.scheduledDate || task.createdAt));
+    if (task.reminderTime) {
+      setReminderTime(new Date(task.reminderTime));
+      setHasReminder(true);
+    } else {
+      setHasReminder(false);
+    }
+    setIsEditing(true);
+  };
+
+  const updateTask = async () => {
+    if (!editingTask || !newTitle.trim()) {
+      Alert.alert('Error', 'Please enter a task title');
+      return;
+    }
+
+    try {
+      // Cancel old notification if exists
+      if (editingTask.notificationId) {
+        await cancelNotification(editingTask.notificationId);
+      }
+
+      const updatedTask: Task = {
+        ...editingTask,
+        title: newTitle.trim(),
+        description: newDescription.trim(),
+        scheduledDate: selectedDate.toISOString(),
+        reminderTime: undefined,
+        notificationId: undefined,
+      };
+
+      // Schedule reminder if enabled
+      if (hasReminder) {
+        const reminderDate = new Date(selectedDate);
+        reminderDate.setHours(reminderTime.getHours());
+        reminderDate.setMinutes(reminderTime.getMinutes());
+        
+        const notificationId = await scheduleNotification(
+          `${professionConfig.icon} Task Reminder`,
+          `Task: ${updatedTask.title}`,
+          reminderDate
+        );
+
+        if (notificationId) {
+          updatedTask.notificationId = notificationId;
+          updatedTask.reminderTime = reminderDate.toISOString();
+        }
+      }
+
+      await saveTask(updatedTask);
+      await loadTasksAndSettings();
+      
+      // Reset form
+      setNewTitle('');
+      setNewDescription('');
+      setSelectedDate(getTomorrowDate());
+      setReminderTime(new Date());
+      setHasReminder(false);
+      setIsEditing(false);
+      setEditingTask(null);
+    } catch (error) {
+      console.error('Error updating task:', error);
+      Alert.alert('Error', 'Failed to update task');
     }
   };
 
@@ -212,15 +298,21 @@ export default function TasksScreen() {
     const status = getTaskStatus(item);
     
     return (
-      <View style={[
-        styles.taskItem,
-        { borderLeftColor: professionConfig.colors.secondary },
-        item.isCompleted && styles.completedTask,
-      ]}>
+      <TouchableOpacity 
+        style={[
+          styles.taskItem,
+          { borderLeftColor: professionConfig.colors.secondary },
+          item.isCompleted && styles.completedTask,
+        ]}
+        onPress={() => startEditingTask(item)}
+      >
         <View style={styles.taskHeader}>
           <TouchableOpacity
             style={styles.checkboxContainer}
-            onPress={() => toggleTaskComplete(item)}
+            onPress={(e) => {
+              e.stopPropagation();
+              toggleTaskComplete(item);
+            }}
           >
             <Text style={styles.checkbox}>
               {item.isCompleted ? '✅' : '⭕'}
@@ -261,11 +353,14 @@ export default function TasksScreen() {
             </View>
           </View>
           
-          <TouchableOpacity onPress={() => deleteTaskById(item)}>
+          <TouchableOpacity onPress={(e) => {
+            e.stopPropagation();
+            deleteTaskById(item);
+          }}>
             <Text style={styles.deleteButton}>🗑️</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -286,17 +381,17 @@ export default function TasksScreen() {
     </TouchableOpacity>
   );
 
-  if (isCreating) {
+  if (isCreating || isEditing) {
     return (
       <View style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
         <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
           <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
-            New Task
+            {isEditing ? 'Edit Task' : 'New Task'}
           </Text>
           <View style={styles.headerButtons}>
             <TouchableOpacity
               style={[styles.saveButton, { backgroundColor: professionConfig.colors.secondary }]}
-              onPress={createTask}
+              onPress={isEditing ? updateTask : createTask}
             >
               <Text style={styles.saveButtonText}>Save</Text>
             </TouchableOpacity>
@@ -304,6 +399,8 @@ export default function TasksScreen() {
               style={styles.cancelButton}
               onPress={() => {
                 setIsCreating(false);
+                setIsEditing(false);
+                setEditingTask(null);
                 setNewTitle('');
                 setNewDescription('');
                 setSelectedDate(getTomorrowDate());
@@ -409,21 +506,39 @@ export default function TasksScreen() {
     );
   }
 
-  const filteredTasks = getFilteredTasks();
-
   return (
     <View style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
       <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
         <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
           Tasks ✅
         </Text>
-        <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: professionConfig.colors.secondary }]}
-          onPress={() => setIsCreating(true)}
-        >
-          <Text style={styles.addButtonText}>+ New</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.searchButton}
+            onPress={() => setIsSearchVisible(!isSearchVisible)}
+          >
+            <Text style={styles.searchButtonText}>🔍</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: professionConfig.colors.secondary }]}
+            onPress={() => setIsCreating(true)}
+          >
+            <Text style={styles.addButtonText}>+</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {isSearchVisible && (
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search tasks..."
+            placeholderTextColor="#999"
+          />
+        </View>
+      )}
 
       <View style={styles.filtersContainer}>
         {renderFilterButton('all', 'All')}
@@ -441,8 +556,10 @@ export default function TasksScreen() {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={[styles.emptyText, { color: professionConfig.colors.text }]}>
-              {filter === 'all' 
-                ? "No tasks yet. Tap 'New' to create your first task."
+              {searchQuery.trim() 
+                ? 'No tasks found for your search.'
+                : filter === 'all' 
+                ? "No tasks yet. Tap '+' to create your first task."
                 : `No ${filter} tasks found.`
               }
             </Text>
@@ -472,6 +589,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  searchButton: {
+    backgroundColor: '#34C759',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  searchButtonText: {
+    fontSize: 16,
+  },
   addButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -480,6 +610,20 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  searchContainer: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#f8f8f8',
   },
   saveButton: {
     paddingHorizontal: 16,
