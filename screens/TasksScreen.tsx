@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -9,6 +10,7 @@ import {
   Alert,
   Switch,
   Platform,
+  SafeAreaView,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Task } from '@/types';
@@ -95,7 +97,7 @@ export default function TasksScreen() {
         reminderDate.setMinutes(reminderTime.getMinutes());
 
         const notificationId = await scheduleNotification(
-          `${professionConfig.icon} Task Reminder`,
+          `Task Reminder`,
           `Task: ${task.title}`,
           reminderDate
         );
@@ -164,7 +166,7 @@ export default function TasksScreen() {
         reminderDate.setMinutes(reminderTime.getMinutes());
 
         const notificationId = await scheduleNotification(
-          `${professionConfig.icon} Task Reminder`,
+          `Task Reminder`,
           `Task: ${updatedTask.title}`,
           reminderDate
         );
@@ -277,21 +279,21 @@ export default function TasksScreen() {
   };
 
   const getTaskStatus = (task: Task) => {
-    if (task.isCompleted) return { icon: '✅', color: '#4CAF50', text: 'Completed' };
+    if (task.isCompleted) return { icon: '✅', color: '#000000', text: 'Completed' };
 
     const now = new Date();
     const taskDate = new Date(task.scheduledDate || task.createdAt);
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
 
-    if (taskDay < today) return { icon: '🔴', color: '#e74c3c', text: 'Overdue' };
-    if (taskDay.getTime() === today.getTime()) return { icon: '🟡', color: '#f39c12', text: 'Today' };
+    if (taskDay < today) return { icon: '🔴', color: '#000000', text: 'Overdue' };
+    if (taskDay.getTime() === today.getTime()) return { icon: '🟡', color: '#000000', text: 'Today' };
 
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    if (taskDay.getTime() === tomorrow.getTime()) return { icon: '🟢', color: '#2ecc71', text: 'Tomorrow' };
+    if (taskDay.getTime() === tomorrow.getTime()) return { icon: '🟢', color: '#000000', text: 'Tomorrow' };
 
-    return { icon: '📅', color: '#3498db', text: 'Upcoming' };
+    return { icon: '📅', color: '#000000', text: 'Upcoming' };
   };
 
   const renderTaskItem = ({ item }: { item: Task }) => {
@@ -301,7 +303,6 @@ export default function TasksScreen() {
       <TouchableOpacity 
         style={[
           styles.taskItem,
-          { borderLeftColor: professionConfig.colors.secondary },
           item.isCompleted && styles.completedTask,
         ]}
         onPress={() => startEditingTask(item)}
@@ -322,7 +323,6 @@ export default function TasksScreen() {
           <View style={styles.taskInfo}>
             <Text style={[
               styles.taskTitle,
-              { color: professionConfig.colors.text },
               item.isCompleted && styles.completedText,
             ]}>
               {item.title}
@@ -357,7 +357,7 @@ export default function TasksScreen() {
             e.stopPropagation();
             deleteTaskById(item);
           }}>
-            <Text style={styles.deleteButton}>🗑️</Text>
+            <Text style={styles.deleteButton}>Delete</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -368,13 +368,13 @@ export default function TasksScreen() {
     <TouchableOpacity
       style={[
         styles.filterButton,
-        filter === filterType && { backgroundColor: professionConfig.colors.secondary },
+        filter === filterType && styles.filterButtonActive,
       ]}
       onPress={() => setFilter(filterType)}
     >
       <Text style={[
         styles.filterButtonText,
-        filter === filterType && { color: 'white' },
+        filter === filterType && styles.filterButtonTextActive,
       ]}>
         {label}
       </Text>
@@ -383,14 +383,14 @@ export default function TasksScreen() {
 
   if (isCreating || isEditing) {
     return (
-      <View style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
-        <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
-          <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>
             {isEditing ? 'Edit Task' : 'New Task'}
           </Text>
           <View style={styles.headerButtons}>
             <TouchableOpacity
-              style={[styles.saveButton, { backgroundColor: professionConfig.colors.secondary }]}
+              style={styles.saveButton}
               onPress={isEditing ? updateTask : createTask}
             >
               <Text style={styles.saveButtonText}>Save</Text>
@@ -414,39 +414,33 @@ export default function TasksScreen() {
 
         <View style={styles.formContainer}>
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: professionConfig.colors.text }]}>
-              Task Title *
-            </Text>
+            <Text style={styles.label}>Task Title *</Text>
             <TextInput
-              style={[styles.input, { borderColor: professionConfig.colors.secondary }]}
+              style={styles.input}
               value={newTitle}
               onChangeText={setNewTitle}
               placeholder="Enter task title"
-              placeholderTextColor="#999"
+              placeholderTextColor="#6B7280"
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: professionConfig.colors.text }]}>
-              Description
-            </Text>
+            <Text style={styles.label}>Description</Text>
             <TextInput
-              style={[styles.textArea, { borderColor: professionConfig.colors.secondary }]}
+              style={styles.textArea}
               value={newDescription}
               onChangeText={setNewDescription}
               placeholder="Enter task description (optional)"
-              placeholderTextColor="#999"
+              placeholderTextColor="#6B7280"
               multiline
               numberOfLines={3}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: professionConfig.colors.text }]}>
-              Scheduled Date
-            </Text>
+            <Text style={styles.label}>Scheduled Date</Text>
             <TouchableOpacity
-              style={[styles.dateButton, { borderColor: professionConfig.colors.secondary }]}
+              style={styles.dateButton}
               onPress={() => setShowDatePicker(true)}
             >
               <Text style={styles.dateButtonText}>
@@ -457,23 +451,21 @@ export default function TasksScreen() {
 
           <View style={styles.inputGroup}>
             <View style={styles.reminderHeader}>
-              <Text style={[styles.label, { color: professionConfig.colors.text }]}>
-                Set Reminder
-              </Text>
+              <Text style={styles.label}>Set Reminder</Text>
               <Switch
                 value={hasReminder}
                 onValueChange={setHasReminder}
                 trackColor={{
-                  false: '#ccc',
-                  true: professionConfig.colors.secondary,
+                  false: '#E5E7EB',
+                  true: '#000000',
                 }}
-                thumbColor={hasReminder ? '#fff' : '#f4f3f4'}
+                thumbColor={hasReminder ? '#FFFFFF' : '#6B7280'}
               />
             </View>
 
             {hasReminder && (
               <TouchableOpacity
-                style={[styles.timeButton, { borderColor: professionConfig.colors.secondary }]}
+                style={styles.timeButton}
                 onPress={() => setShowTimePicker(true)}
               >
                 <Text style={styles.timeButtonText}>
@@ -502,28 +494,26 @@ export default function TasksScreen() {
             />
           )}
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
-      <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
-        <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
-          Tasks ✅
-        </Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Tasks</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.searchButton}
             onPress={() => setIsSearchVisible(!isSearchVisible)}
           >
-            <Text style={styles.searchButtonText}>🔍</Text>
+            <Text style={styles.searchButtonText}>Search</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: professionConfig.colors.secondary }]}
+            style={styles.addButton}
             onPress={() => setIsCreating(true)}
           >
-            <Text style={styles.addButtonText}>+</Text>
+            <Text style={styles.addButtonText}>New Task</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -535,17 +525,10 @@ export default function TasksScreen() {
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Search tasks..."
-            placeholderTextColor="#999"
+            placeholderTextColor="#6B7280"
           />
         </View>
       )}
-
-      <View style={styles.filtersContainer}>
-        {renderFilterButton('all', 'All')}
-        {renderFilterButton('today', 'Today')}
-        {renderFilterButton('tomorrow', 'Tomorrow')}
-        {renderFilterButton('overdue', 'Overdue')}
-      </View>
 
       <View style={styles.filtersContainer}>
         {renderFilterButton('all', 'All')}
@@ -562,24 +545,25 @@ export default function TasksScreen() {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={[styles.emptyText, { color: professionConfig.colors.text }]}>
+            <Text style={styles.emptyText}>
               {searchQuery.trim() 
                 ? 'No tasks found for your search.'
                 : filter === 'all' 
-                ? "No tasks yet. Tap '+' to create your first task."
+                ? "No tasks yet. Tap 'New Task' to create your first task."
                 : `No ${filter} tasks found.`
               }
             </Text>
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
@@ -587,39 +571,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 32,
+    paddingTop: Platform.OS === 'ios' ? 60 : 24,
     backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    letterSpacing: -0.5,
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000000',
+    fontFamily: 'Inter',
   },
   headerActions: {
     flexDirection: 'row',
     gap: 8,
   },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   searchButton: {
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     borderRadius: 8,
-    backgroundColor: 'rgba(59, 130, 246, 0.08)',
-    minWidth: 44,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
   searchButtonText: {
-    fontSize: 16,
+    fontSize: 13,
+    color: '#000000',
+    fontFamily: 'Inter',
+    fontWeight: '500',
   },
   addButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#000000',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
@@ -629,9 +618,41 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontWeight: '500',
     fontFamily: 'Inter',
-    fontSize: 16,
+    fontSize: 13,
+  },
+  saveButton: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+    fontSize: 13,
+    fontFamily: 'Inter',
+  },
+  cancelButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    color: '#000000',
+    fontWeight: '500',
+    fontSize: 13,
+    fontFamily: 'Inter',
   },
   searchContainer: {
     paddingHorizontal: 16,
@@ -649,51 +670,38 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     fontSize: 16,
     fontFamily: 'Inter',
-    color: '#111827',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 1,
+    color: '#000000',
   },
   filtersContainer: {
+    flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
-  },
-  filterScroll: {
-    flexDirection: 'row',
+    gap: 8,
   },
   filterButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 24,
-    marginRight: 12,
-    backgroundColor: '#F3F4F6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   filterButtonActive: {
-    backgroundColor: '#3B82F6',
-    shadowColor: '#3B82F6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: '#000000',
+    borderColor: '#000000',
   },
   filterButtonText: {
-    fontSize: 14,
-    color: '#374151',
+    fontSize: 13,
+    color: '#000000',
     fontWeight: '500',
+    fontFamily: 'Inter',
   },
   filterButtonTextActive: {
-    color: 'white',
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontWeight: '500',
   },
   tasksList: {
     padding: 16,
@@ -703,15 +711,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    borderLeftWidth: 4,
-    borderLeftColor: '#3B82F6',
   },
   taskItemCompleted: {
     opacity: 0.7,
@@ -720,39 +721,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
   },
   taskTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '500',
     flex: 1,
     marginRight: 12,
-    lineHeight: 24,
+    lineHeight: 25.6,
+    color: '#000000',
+    fontFamily: 'Inter',
   },
   taskTitleCompleted: {
     textDecorationLine: 'line-through',
-  },
-  taskActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(229, 231, 235, 0.6)',
-    minWidth: 36,
-    minHeight: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionButtonText: {
-    fontSize: 16,
-  },
-  taskDescription: {
-    fontSize: 15,
-    marginBottom: 12,
-    lineHeight: 22,
-    fontWeight: '400',
   },
   checkboxContainer: {
     marginRight: 12,
@@ -764,6 +744,14 @@ const styles = StyleSheet.create({
   taskInfo: {
     flex: 1,
   },
+  taskDescription: {
+    fontSize: 16,
+    marginBottom: 8,
+    lineHeight: 25.6,
+    fontWeight: '400',
+    color: '#6B7280',
+    fontFamily: 'Inter',
+  },
   taskMeta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -772,8 +760,9 @@ const styles = StyleSheet.create({
   },
   statusBadge: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
     fontFamily: 'Inter',
+    color: '#000000',
   },
   taskDate: {
     fontSize: 13,
@@ -788,8 +777,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
   deleteButton: {
-    fontSize: 18,
-    padding: 8,
+    fontSize: 13,
+    color: '#000000',
+    fontFamily: 'Inter',
+    fontWeight: '500',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   completedTask: {
     opacity: 0.7,
@@ -797,5 +790,91 @@ const styles = StyleSheet.create({
   completedText: {
     textDecorationLine: 'line-through',
     opacity: 0.6,
+  },
+  formContainer: {
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000000',
+    fontFamily: 'Inter',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#FFFFFF',
+    fontFamily: 'Inter',
+    color: '#000000',
+    minHeight: 44,
+  },
+  textArea: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#FFFFFF',
+    fontFamily: 'Inter',
+    color: '#000000',
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  dateButton: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  dateButtonText: {
+    fontSize: 16,
+    color: '#000000',
+    fontFamily: 'Inter',
+  },
+  reminderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  timeButton: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  timeButtonText: {
+    fontSize: 16,
+    color: '#000000',
+    fontFamily: 'Inter',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    fontFamily: 'Inter',
+    lineHeight: 25.6,
   },
 });

@@ -1,41 +1,39 @@
-
-
 /**
- * Color palette for the note-taking app redesign
- * Modern UI colors matching the specification
+ * Strict 3-color palette for mobile-first note-taking app
+ * Only white, black, and grayscale variants allowed
  */
 
-const tintColorLight = '#3B82F6';
-const tintColorDark = '#fff';
+const tintColorLight = '#000000';
+const tintColorDark = '#FFFFFF';
 
 export const Colors = {
   light: {
-    text: '#111827',
+    text: '#000000',
     subtleText: '#6B7280',
-    background: '#F9FAFB',
+    background: '#FFFFFF',
     surface: '#FFFFFF',
     tint: tintColorLight,
-    primary: '#3B82F6',
-    accent: '#10B981',
+    primary: '#000000',
+    accent: '#000000',
     border: '#E5E7EB',
     tabIconDefault: '#6B7280',
     tabIconSelected: tintColorLight,
   },
   dark: {
-    text: '#ECEDEE',
+    text: '#FFFFFF',
     subtleText: '#9CA3AF',
-    background: '#151718',
-    surface: '#1F2937',
+    background: '#000000',
+    surface: '#111111',
     tint: tintColorDark,
-    primary: '#3B82F6',
-    accent: '#10B981',
+    primary: '#FFFFFF',
+    accent: '#FFFFFF',
     border: '#374151',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
   },
 };
 
-// Typography scale
+// Typography scale - Inter font only
 export const Typography = {
   fontFamily: {
     regular: 'Inter',
@@ -44,72 +42,40 @@ export const Typography = {
     bold: 'Inter',
   },
   fontSize: {
-    xs: 13,
-    sm: 14,
-    base: 16,
-    lg: 18,
-    xl: 20,
-    '2xl': 24,
-    '3xl': 30,
-    '4xl': 36,
+    label: 13,
+    body: 16,
+    title: 20,
   },
   lineHeight: {
-    tight: 1.25,
     normal: 1.6,
-    relaxed: 1.75,
   },
 };
 
-// Spacing scale (4px, 8px, 12px, 16px, 24px)
+// Spacing scale - mobile-safe
 export const Spacing = {
   xs: 4,
   sm: 8,
   md: 12,
   lg: 16,
   xl: 24,
-  '2xl': 32,
-  '3xl': 48,
+  safeTop: 24,
 };
 
-// Border radius scale
+// Border radius
 export const BorderRadius = {
   sm: 4,
   md: 8,
   lg: 12,
-  xl: 16,
-  '2xl': 24,
-  full: 9999,
 };
 
-// Shadow styles matching specification
+// Minimal mobile shadows
 export const Shadows = {
-  sm: {
+  none: {},
+  subtle: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
     elevation: 1,
   },
-  md: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  lg: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
 };
-
-// Safe area constants
-export const SafeArea = {
-  ios: 60,
-  android: 32,
-  default: 24,
-};
-

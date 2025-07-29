@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -8,6 +9,7 @@ import {
   StyleSheet,
   Alert,
   Platform,
+  SafeAreaView,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Reminder } from '@/types';
@@ -103,7 +105,7 @@ export default function RemindersScreen() {
 
       // Schedule notification
       const notificationId = await scheduleNotification(
-        `${professionConfig.icon} Reminder`,
+        `Reminder`,
         reminder.title,
         selectedDate
       );
@@ -155,7 +157,7 @@ export default function RemindersScreen() {
 
       // Schedule new notification
       const notificationId = await scheduleNotification(
-        `${professionConfig.icon} Reminder`,
+        `Reminder`,
         updatedReminder.title,
         selectedDate
       );
@@ -251,7 +253,6 @@ export default function RemindersScreen() {
       <TouchableOpacity 
         style={[
           styles.reminderItem,
-          { borderLeftColor: professionConfig.colors.secondary },
           item.isCompleted && styles.completedReminder,
           isOverdue && styles.overdueReminder,
         ]}
@@ -273,7 +274,6 @@ export default function RemindersScreen() {
           <View style={styles.reminderInfo}>
             <Text style={[
               styles.reminderTitle,
-              { color: professionConfig.colors.text },
               item.isCompleted && styles.completedText,
             ]}>
               {item.title}
@@ -296,7 +296,7 @@ export default function RemindersScreen() {
             e.stopPropagation();
             deleteReminderById(item);
           }}>
-            <Text style={styles.deleteButton}>🗑️</Text>
+            <Text style={styles.deleteButton}>Delete</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -305,14 +305,14 @@ export default function RemindersScreen() {
 
   if (isCreating || isEditing) {
     return (
-      <View style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
-        <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
-          <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>
             {isEditing ? 'Edit Reminder' : 'New Reminder'}
           </Text>
           <View style={styles.headerButtons}>
             <TouchableOpacity
-              style={[styles.saveButton, { backgroundColor: professionConfig.colors.secondary }]}
+              style={styles.saveButton}
               onPress={isEditing ? updateReminder : createReminder}
             >
               <Text style={styles.saveButtonText}>Save</Text>
@@ -336,55 +336,49 @@ export default function RemindersScreen() {
         <View style={styles.formContainer}>
           <View style={styles.inputGroup}>
             <View style={styles.inputHeader}>
-              <Text style={[styles.label, { color: professionConfig.colors.text }]}>
-                Title *
-              </Text>
+              <Text style={styles.label}>Title *</Text>
               <TouchableOpacity
                 style={styles.voiceButton}
                 onPress={() => handleVoiceInput('title')}
               >
-                <Text style={styles.voiceButtonText}>🎤</Text>
+                <Text style={styles.voiceButtonText}>Voice</Text>
               </TouchableOpacity>
             </View>
             <TextInput
-              style={[styles.input, { borderColor: professionConfig.colors.secondary }]}
+              style={styles.input}
               value={newTitle}
               onChangeText={setNewTitle}
               placeholder="Enter reminder title"
-              placeholderTextColor="#999"
+              placeholderTextColor="#6B7280"
             />
           </View>
 
           <View style={styles.inputGroup}>
             <View style={styles.inputHeader}>
-              <Text style={[styles.label, { color: professionConfig.colors.text }]}>
-                Description
-              </Text>
+              <Text style={styles.label}>Description</Text>
               <TouchableOpacity
                 style={styles.voiceButton}
                 onPress={() => handleVoiceInput('description')}
               >
-                <Text style={styles.voiceButtonText}>🎤</Text>
+                <Text style={styles.voiceButtonText}>Voice</Text>
               </TouchableOpacity>
             </View>
             <TextInput
-              style={[styles.textArea, { borderColor: professionConfig.colors.secondary }]}
+              style={styles.textArea}
               value={newDescription}
               onChangeText={setNewDescription}
               placeholder="Enter description (optional)"
-              placeholderTextColor="#999"
+              placeholderTextColor="#6B7280"
               multiline
               numberOfLines={3}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: professionConfig.colors.text }]}>
-              Date & Time
-            </Text>
+            <Text style={styles.label}>Date & Time</Text>
             <View style={styles.dateTimeContainer}>
               <TouchableOpacity
-                style={[styles.dateTimeButton, { borderColor: professionConfig.colors.secondary }]}
+                style={styles.dateTimeButton}
                 onPress={() => setShowDatePicker(true)}
               >
                 <Text style={styles.dateTimeText}>
@@ -393,7 +387,7 @@ export default function RemindersScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.dateTimeButton, { borderColor: professionConfig.colors.secondary }]}
+                style={styles.dateTimeButton}
                 onPress={() => setShowTimePicker(true)}
               >
                 <Text style={styles.dateTimeText}>
@@ -422,28 +416,26 @@ export default function RemindersScreen() {
             />
           )}
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
-      <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
-        <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
-          Reminders ⏰
-        </Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Reminders</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.searchButton}
             onPress={() => setIsSearchVisible(!isSearchVisible)}
           >
-            <Text style={styles.searchButtonText}>🔍</Text>
+            <Text style={styles.searchButtonText}>Search</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: professionConfig.colors.secondary }]}
+            style={styles.addButton}
             onPress={() => setIsCreating(true)}
           >
-            <Text style={styles.addButtonText}>+</Text>
+            <Text style={styles.addButtonText}>New Reminder</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -455,7 +447,7 @@ export default function RemindersScreen() {
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Search reminders..."
-            placeholderTextColor="#999"
+            placeholderTextColor="#6B7280"
           />
         </View>
       )}
@@ -468,20 +460,20 @@ export default function RemindersScreen() {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={[styles.emptyText, { color: professionConfig.colors.text }]}>
-              {searchQuery.trim() ? 'No reminders found for your search.' : 'No reminders yet. Tap "+" to create your first reminder.'}
+            <Text style={styles.emptyText}>
+              {searchQuery.trim() ? 'No reminders found for your search.' : 'No reminders yet. Tap "New Reminder" to create your first reminder.'}
             </Text>
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
@@ -489,40 +481,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 32,
+    paddingTop: Platform.OS === 'ios' ? 60 : 24,
     backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
+    fontWeight: 'bold',
+    color: '#000000',
     fontFamily: 'Inter',
   },
   headerActions: {
     flexDirection: 'row',
     gap: 8,
   },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   searchButton: {
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     borderRadius: 8,
-    backgroundColor: 'rgba(59, 130, 246, 0.08)',
-    minWidth: 44,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
   searchButtonText: {
-    fontSize: 16,
+    fontSize: 13,
+    color: '#000000',
+    fontFamily: 'Inter',
+    fontWeight: '500',
   },
   addButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#000000',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
@@ -532,9 +528,41 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontWeight: '500',
     fontFamily: 'Inter',
-    fontSize: 16,
+    fontSize: 13,
+  },
+  saveButton: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+    fontSize: 13,
+    fontFamily: 'Inter',
+  },
+  cancelButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    color: '#000000',
+    fontWeight: '500',
+    fontSize: 13,
+    fontFamily: 'Inter',
   },
   searchContainer: {
     paddingHorizontal: 16,
@@ -552,56 +580,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     fontSize: 16,
     fontFamily: 'Inter',
-    color: '#111827',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  saveButton: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  saveButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 16,
-    fontFamily: 'Inter',
-  },
-  cancelButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelButtonText: {
-    color: '#6B7280',
-    fontWeight: '600',
-    fontSize: 16,
-    fontFamily: 'Inter',
+    color: '#000000',
   },
   formContainer: {
     padding: 16,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFFFFF',
   },
   inputGroup: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   inputHeader: {
     flexDirection: 'row',
@@ -611,21 +597,22 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
+    fontWeight: '500',
+    color: '#000000',
     fontFamily: 'Inter',
   },
   voiceButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    minWidth: 36,
-    minHeight: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   voiceButtonText: {
-    fontSize: 18,
+    fontSize: 13,
+    color: '#000000',
+    fontFamily: 'Inter',
   },
   input: {
     borderWidth: 1,
@@ -635,7 +622,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#FFFFFF',
     fontFamily: 'Inter',
-    color: '#111827',
+    color: '#000000',
     minHeight: 44,
   },
   textArea: {
@@ -646,7 +633,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#FFFFFF',
     fontFamily: 'Inter',
-    color: '#111827',
+    color: '#000000',
     minHeight: 80,
     textAlignVertical: 'top',
   },
@@ -667,7 +654,7 @@ const styles = StyleSheet.create({
   },
   dateTimeText: {
     fontSize: 16,
-    color: '#111827',
+    color: '#000000',
     fontFamily: 'Inter',
   },
   remindersList: {
@@ -678,13 +665,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#3B82F6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
@@ -692,7 +672,8 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   overdueReminder: {
-    borderLeftColor: '#DC2626',
+    borderLeftWidth: 4,
+    borderLeftColor: '#000000',
   },
   reminderHeader: {
     flexDirection: 'row',
@@ -710,18 +691,18 @@ const styles = StyleSheet.create({
   },
   reminderTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
+    fontWeight: '500',
+    color: '#000000',
     fontFamily: 'Inter',
     marginBottom: 8,
-    lineHeight: 24,
+    lineHeight: 25.6,
   },
   reminderDescription: {
     fontSize: 16,
     color: '#6B7280',
     fontFamily: 'Inter',
     marginBottom: 8,
-    lineHeight: 24,
+    lineHeight: 25.6,
   },
   reminderDateTime: {
     fontSize: 13,
@@ -730,22 +711,20 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   overdueText: {
-    color: '#DC2626',
-    fontWeight: '600',
+    color: '#000000',
+    fontWeight: '500',
   },
   completedText: {
     textDecorationLine: 'line-through',
     opacity: 0.6,
   },
   deleteButton: {
-    fontSize: 18,
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#FEE2E2',
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+    fontSize: 13,
+    color: '#000000',
+    fontFamily: 'Inter',
+    fontWeight: '500',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   emptyState: {
     alignItems: 'center',

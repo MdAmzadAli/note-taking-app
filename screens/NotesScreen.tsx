@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -264,7 +265,7 @@ export default function NotesScreen() {
           {new Date(item.createdAt).toLocaleDateString()} {new Date(item.createdAt).toLocaleTimeString()}
         </Text>
         <TouchableOpacity onPress={() => deleteNoteHandler(item.id)} style={styles.deleteButton}>
-          <Text style={styles.deleteButtonText}>🗑️</Text>
+          <Text style={styles.deleteButtonText}>Delete</Text>
         </TouchableOpacity>
       </View>
       <Text style={styles.noteContent} numberOfLines={3}>
@@ -326,7 +327,7 @@ export default function NotesScreen() {
           <Text style={styles.headerTitle}>Fill {selectedTemplate.name}</Text>
           <View style={styles.headerButtons}>
             <TouchableOpacity style={styles.iconButton} onPress={saveTemplateEntryHandler}>
-              <Text style={styles.iconButtonText}>✓</Text>
+              <Text style={styles.iconButtonText}>Save</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconButton}
@@ -336,7 +337,7 @@ export default function NotesScreen() {
                 setTemplateValues({});
               }}
             >
-              <Text style={styles.iconButtonText}>✕</Text>
+              <Text style={styles.iconButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -355,16 +356,16 @@ export default function NotesScreen() {
           <Text style={styles.headerTitle}>{isEditing ? 'Edit Note' : 'New Note'}</Text>
           <View style={styles.headerButtons}>
             <TouchableOpacity
-              style={[styles.iconButton, isListening && styles.voiceButtonActive]}
+              style={styles.iconButton}
               onPress={handleVoiceInput}
               disabled={isListening}
             >
               <Text style={styles.iconButtonText}>
-                {isListening ? '🔴' : '🎤'}
+                {isListening ? 'Listening...' : 'Voice'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton} onPress={saveCurrentNote}>
-              <Text style={styles.iconButtonText}>✓</Text>
+              <Text style={styles.iconButtonText}>Save</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconButton}
@@ -375,7 +376,7 @@ export default function NotesScreen() {
                 setCurrentNoteText('');
               }}
             >
-              <Text style={styles.iconButtonText}>✕</Text>
+              <Text style={styles.iconButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -401,13 +402,13 @@ export default function NotesScreen() {
         <Text style={styles.headerTitle}>My Notes</Text>
         <View style={styles.headerButtons}>
           <TouchableOpacity style={styles.iconButton} onPress={() => setIsSearchVisible(!isSearchVisible)}>
-            <Text style={styles.iconButtonText}>🔍</Text>
+            <Text style={styles.iconButtonText}>Search</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton} onPress={openMenu}>
-            <Text style={styles.iconButtonText}>☰</Text>
+            <Text style={styles.iconButtonText}>Menu</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton} onPress={() => setIsCreating(true)}>
-            <Text style={styles.iconButtonText}>+</Text>
+            <Text style={styles.iconButtonText}>New Note</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -428,14 +429,13 @@ export default function NotesScreen() {
               setSearchQuery('');
             }}
           >
-            <Text style={styles.searchCloseText}>✕</Text>
+            <Text style={styles.searchCloseText}>Close</Text>
           </TouchableOpacity>
         </View>
       )}
 
       {notes.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>📝</Text>
           <Text style={styles.emptyText}>No notes yet.</Text>
           <Text style={styles.emptySubtext}>Tap "New Note" to get started!</Text>
         </View>
@@ -456,7 +456,7 @@ export default function NotesScreen() {
                 <View style={styles.menuHeader}>
                   <Text style={styles.menuTitle}>Templates</Text>
                   <TouchableOpacity style={styles.menuCloseButton} onPress={closeMenu}>
-                    <Text style={styles.menuCloseText}>×</Text>
+                    <Text style={styles.menuCloseText}>Close</Text>
                   </TouchableOpacity>
                 </View>
                 <View style={styles.menuSearchContainer}>
@@ -500,7 +500,7 @@ export default function NotesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
@@ -508,20 +508,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 32,
+    paddingTop: Platform.OS === 'ios' ? 60 : 24,
     backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
+    fontWeight: 'bold',
+    color: '#000000',
     fontFamily: 'Inter',
   },
   headerButtons: {
@@ -529,22 +524,21 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   iconButton: {
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     borderRadius: 8,
-    backgroundColor: 'rgba(59, 130, 246, 0.08)',
-    minWidth: 44,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 1,
   },
   iconButtonText: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '500',
+    color: '#000000',
+    fontFamily: 'Inter',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -566,26 +560,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     fontSize: 16,
     fontFamily: 'Inter',
-    color: '#111827',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 1,
+    color: '#000000',
   },
   searchCloseButton: {
-    padding: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#F3F4F6',
-    minWidth: 36,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     minHeight: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
   searchCloseText: {
-    fontSize: 16,
+    fontSize: 13,
     color: '#6B7280',
-    fontWeight: '600',
+    fontWeight: '500',
+    fontFamily: 'Inter',
   },
   notesList: {
     padding: 16,
@@ -595,29 +587,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    transform: [{ scale: 1 }],
   },
   noteHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
-  },
-  noteTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    fontFamily: 'Inter',
-    flex: 1,
-    marginRight: 12,
-    lineHeight: 24,
   },
   noteDate: {
     fontSize: 13,
@@ -626,22 +603,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   deleteButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#FEE2E2',
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: '#E5E7EB',
   },
   deleteButtonText: {
-    fontSize: 16,
+    fontSize: 13,
+    color: '#000000',
+    fontFamily: 'Inter',
   },
   noteContent: {
     fontSize: 16,
-    color: '#111827',
+    color: '#000000',
     lineHeight: 25.6,
     fontFamily: 'Inter',
   },
@@ -649,59 +625,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#E5E7EB',
   },
   menuSearchInput: {
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: '#E5E7EB',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 16,
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
+    fontFamily: 'Inter',
   },
   voiceButton: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  voiceButtonActive: {
-    backgroundColor: '#f44336',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   voiceButtonText: {
-    fontSize: 16,
-  },
-  saveButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  saveButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  cancelButton: {
-    backgroundColor: '#ccc',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  cancelButtonText: {
-    color: '#333',
-    fontWeight: 'bold',
+    fontSize: 13,
+    color: '#000000',
+    fontFamily: 'Inter',
   },
   editorContainer: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFFFFF',
   },
   noteEditor: {
     flex: 1,
     fontSize: 16,
     lineHeight: 25.6,
-    color: '#111827',
+    color: '#000000',
     textAlignVertical: 'top',
     fontFamily: 'Inter',
     borderWidth: 1,
@@ -709,13 +667,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 16,
     backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 1,
   },
-  
   emptyState: {
     flex: 1,
     justifyContent: 'center',
@@ -724,9 +676,9 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 20,
-    color: '#111827',
+    color: '#000000',
     fontFamily: 'Inter',
-    fontWeight: '600',
+    fontWeight: 'bold',
     marginBottom: 8,
     textAlign: 'center',
   },
@@ -737,25 +689,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     lineHeight: 25.6,
   },
-  menuButton: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  menuButtonText: {
-    fontSize: 20,
-    color: 'white',
-    fontWeight: 'bold',
-  },
   menuOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
     zIndex: 1000,
   },
   slidingMenu: {
@@ -764,12 +704,7 @@ const styles = StyleSheet.create({
     left: 0,
     bottom: 0,
     width: '80%',
-    backgroundColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    backgroundColor: '#FFFFFF',
   },
   menuHeader: {
     flexDirection: 'row',
@@ -777,21 +712,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    backgroundColor: '#007AFF',
+    borderBottomColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
   },
   menuTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
+    color: '#000000',
+    fontFamily: 'Inter',
   },
   menuCloseButton: {
     padding: 4,
   },
   menuCloseText: {
-    fontSize: 24,
-    color: 'white',
-    fontWeight: 'bold',
+    fontSize: 13,
+    color: '#000000',
+    fontWeight: '500',
+    fontFamily: 'Inter',
   },
   menuList: {
     flex: 1,
@@ -800,17 +737,19 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#E5E7EB',
   },
   menuItemTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#000000',
     marginBottom: 4,
+    fontFamily: 'Inter',
   },
   menuItemSubtitle: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 13,
+    color: '#6B7280',
+    fontFamily: 'Inter',
   },
   emptyMenuContainer: {
     alignItems: 'center',
@@ -820,21 +759,23 @@ const styles = StyleSheet.create({
   emptyMenuText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#000000',
     marginBottom: 8,
+    fontFamily: 'Inter',
   },
   emptyMenuSubtext: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 13,
+    color: '#6B7280',
     textAlign: 'center',
+    fontFamily: 'Inter',
   },
   fieldContainer: {
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#E5E7EB',
   },
   fieldInputHeader: {
     flexDirection: 'row',
@@ -845,15 +786,18 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#000000',
+    fontFamily: 'Inter',
   },
   fieldInput: {
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#E5E7EB',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
+    fontFamily: 'Inter',
+    color: '#000000',
   },
   longTextInput: {
     height: 80,

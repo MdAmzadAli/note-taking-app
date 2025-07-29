@@ -1,3 +1,7 @@
+` tags. I will pay close attention to indentation, structure, and completeness, and avoid using any forbidden words.
+
+```
+<replit_final_file>
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -8,6 +12,7 @@ import {
   ScrollView,
   Switch,
   Platform,
+  SafeAreaView,
 } from 'react-native';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 import { UserSettings } from '@/types';
@@ -100,23 +105,19 @@ export default function SettingsScreen() {
   const professionConfig = PROFESSIONS[currentProfession];
 
   return (
-    <View style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
-      <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
-        <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
-          Settings ⚙️
-        </Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Settings</Text>
       </View>
 
       <ScrollView style={styles.content}>
         {/* Current Profession */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: professionConfig.colors.text }]}>
-            Current Profession
-          </Text>
-          <View style={[styles.currentProfessionCard, { borderColor: professionConfig.colors.secondary }]}>
+          <Text style={styles.sectionTitle}>Current Profession</Text>
+          <View style={styles.currentProfessionCard}>
             <Text style={styles.currentProfessionIcon}>{professionConfig.icon}</Text>
             <View style={styles.currentProfessionInfo}>
-              <Text style={[styles.currentProfessionName, { color: professionConfig.colors.text }]}>
+              <Text style={styles.currentProfessionName}>
                 {professionConfig.name}
               </Text>
               <Text style={styles.currentProfessionHeader}>
@@ -128,34 +129,23 @@ export default function SettingsScreen() {
 
         {/* Change Profession */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: professionConfig.colors.text }]}>
-            Change Profession
-          </Text>
+          <Text style={styles.sectionTitle}>Change Profession</Text>
           {Object.entries(PROFESSIONS).map(([key, config]) => (
             <TouchableOpacity
               key={key}
               style={[
                 styles.professionOption,
-                currentProfession === key && {
-                  backgroundColor: professionConfig.colors.primary,
-                  borderColor: professionConfig.colors.secondary,
-                },
+                currentProfession === key && styles.professionOptionActive,
               ]}
               onPress={() => changeProfession(key as ProfessionType)}
               disabled={currentProfession === key}
             >
               <Text style={styles.professionIcon}>{config.icon}</Text>
               <View style={styles.professionInfo}>
-                <Text style={[
-                  styles.professionName,
-                  currentProfession === key && { color: professionConfig.colors.text }
-                ]}>
+                <Text style={styles.professionName}>
                   {config.name}
                 </Text>
-                <Text style={[
-                  styles.professionHeader,
-                  currentProfession === key && { color: professionConfig.colors.text }
-                ]}>
+                <Text style={styles.professionHeader}>
                   {config.header}
                 </Text>
               </View>
@@ -168,14 +158,10 @@ export default function SettingsScreen() {
 
         {/* View Mode */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: professionConfig.colors.text }]}>
-            Display Preferences
-          </Text>
+          <Text style={styles.sectionTitle}>Display Preferences</Text>
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingName, { color: professionConfig.colors.text }]}>
-                View Mode
-              </Text>
+              <Text style={styles.settingName}>View Mode</Text>
               <Text style={styles.settingDescription}>
                 {settings.viewMode === 'paragraph' ? 'Paragraph format' : 'Bullet point format'}
               </Text>
@@ -184,55 +170,41 @@ export default function SettingsScreen() {
               value={settings.viewMode === 'bullet'}
               onValueChange={toggleViewMode}
               trackColor={{
-                false: '#ccc',
-                true: professionConfig.colors.secondary,
+                false: '#E5E7EB',
+                true: '#000000',
               }}
-              thumbColor={settings.viewMode === 'bullet' ? '#fff' : '#f4f3f4'}
+              thumbColor={settings.viewMode === 'bullet' ? '#FFFFFF' : '#6B7280'}
             />
           </View>
         </View>
 
         {/* App Info */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: professionConfig.colors.text }]}>
-            App Information
-          </Text>
+          <Text style={styles.sectionTitle}>App Information</Text>
           <View style={styles.infoCard}>
-            <Text style={styles.infoText}>
-              📱 Professional Note-Taking App
-            </Text>
-            <Text style={styles.infoText}>
-              📝 Offline storage with AsyncStorage
-            </Text>
-            <Text style={styles.infoText}>
-              🎤 Voice input support (simulated)
-            </Text>
-            <Text style={styles.infoText}>
-              🔔 Local notifications
-            </Text>
+            <Text style={styles.infoText}>📱 Professional Note-Taking App</Text>
+            <Text style={styles.infoText}>📝 Offline storage with AsyncStorage</Text>
+            <Text style={styles.infoText}>🎤 Voice input support (simulated)</Text>
+            <Text style={styles.infoText}>🔔 Local notifications</Text>
           </View>
         </View>
 
         {/* Danger Zone */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: '#e74c3c' }]}>
-            Danger Zone
-          </Text>
+          <Text style={[styles.sectionTitle, { color: '#000000' }]}>Danger Zone</Text>
           <TouchableOpacity style={styles.dangerButton} onPress={resetAllData}>
-            <Text style={styles.dangerButtonText}>
-              🗑️ Reset All Data
-            </Text>
+            <Text style={styles.dangerButtonText}>Reset All Data</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
@@ -240,20 +212,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 32,
+    paddingTop: Platform.OS === 'ios' ? 60 : 24,
     backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
+    fontWeight: 'bold',
+    color: '#000000',
     fontFamily: 'Inter',
   },
   content: {
@@ -265,9 +232,9 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: 'bold',
     marginBottom: 16,
-    color: '#111827',
+    color: '#000000',
     fontFamily: 'Inter',
   },
   currentProfessionCard: {
@@ -278,11 +245,6 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
   },
   currentProfessionIcon: {
     fontSize: 40,
@@ -292,9 +254,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   currentProfessionName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000000',
     fontFamily: 'Inter',
   },
   currentProfessionHeader: {
@@ -312,12 +274,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
     minHeight: 72,
+  },
+  professionOptionActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
   },
   professionIcon: {
     fontSize: 32,
@@ -328,8 +289,8 @@ const styles = StyleSheet.create({
   },
   professionName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
+    fontWeight: '500',
+    color: '#000000',
     fontFamily: 'Inter',
   },
   professionHeader: {
@@ -340,7 +301,7 @@ const styles = StyleSheet.create({
   },
   currentBadge: {
     fontSize: 20,
-    color: '#10B981',
+    color: '#FFFFFF',
   },
   settingRow: {
     backgroundColor: '#FFFFFF',
@@ -351,19 +312,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
   },
   settingInfo: {
     flex: 1,
   },
   settingName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
+    fontWeight: '500',
+    color: '#000000',
     fontFamily: 'Inter',
   },
   settingDescription: {
@@ -378,32 +334,27 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
   },
   infoText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#6B7280',
     marginBottom: 8,
     fontFamily: 'Inter',
   },
   dangerButton: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#FFFFFF',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: '#E5E7EB',
     minHeight: 52,
     justifyContent: 'center',
   },
   dangerButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#DC2626',
+    fontWeight: '500',
+    color: '#000000',
     fontFamily: 'Inter',
   },
 });
