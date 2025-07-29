@@ -1,0 +1,98 @@
+You are a senior React Native + Expo developer. Build an MVP offline-first mobile note-taking app with the following core functionality, implemented progressively with verification at each step.
+
+---
+
+🔸 OVERVIEW:
+
+This is a mobile note-taking app where users can:
+- Write free-form notes with text and voice input
+- Add reminders and tomorrow’s tasks
+- Create **custom structured note templates (note skeletons)** based on their profession or personal workflow
+
+---
+
+🔸 CORE FEATURES:
+
+1. **Onboarding**:
+   - Ask the user to select their profession (Doctor, Lawyer, Developer).
+   - Store this locally using AsyncStorage.
+   - This selection may pre-fill template suggestions, but **users can define their own custom note skeletons**.
+
+2. **Main Interface Tabs**:
+   - **Notes Tab**:
+     - Free-form notepad (TextInput area)
+     - Mic button for multilingual speech-to-text
+     - Save note locally with timestamp
+   - **Custom Section Tab**:
+     - Dynamic form builder
+     - Users can:
+       - Create new templates (give a name like “Patient Note”)
+       - Add custom fields (e.g., “Patient Name”, “Age”, “Symptoms”)
+       - Choose field types (e.g., Text, Number, Dropdown — basic types only for MVP)
+     - After creation, allow user to fill out these custom forms like structured notes
+     - Save each entry (template + filled values) locally
+   - **Reminders Tab**:
+     - Add a reminder via text or voice
+     - Set time/date
+     - Trigger local push notification (using Expo Notifications)
+   - **Tomorrow’s Tasks Tab**:
+     - Add next-day tasks with optional reminder
+     - Simple list or checkbox interface
+
+---
+
+🔸 DYNAMIC CUSTOM SECTION (IMPORTANT):
+
+- Users can create as many custom note skeletons as they want.
+- Each skeleton should:
+  - Have a title (e.g., “Client Brief”, “Project Log”)
+  - Contain user-defined fields (with field label + type)
+- For MVP, support the following field types:
+  - Text
+  - Number
+  - Long text (multiline)
+  - Date (optional)
+- Save each template locally and allow users to reuse them when creating structured notes.
+
+- All filled notes from custom skeletons should be stored locally alongside normal notes, with a reference to the template they came from.
+
+---
+
+🔸 DATA STORAGE:
+
+- Use AsyncStorage or SQLite for:
+  - Free-form notes
+  - Custom templates (skeletons)
+  - Structured form entries
+  - Reminders
+  - Tomorrow’s tasks
+
+---
+
+🔸 UI/UX REQUIREMENTS:
+
+- Use clean, mobile-first UI with native React Native components:
+  - TextInput, FlatList, Button, Picker, View, Modal, etc.
+- Tab/Segmented navigation between: Notes, Custom Section, Reminders, Tomorrow’s Tasks
+- No unnecessary libraries unless essential (e.g., for speech-to-text or local notifications)
+- Dynamic form builder UI should be simple: Add Field → Select Field Type → Name it
+
+---
+
+🔸 IMPLEMENTATION RULES:
+
+- Build in steps. Do NOT implement unless you've verified that the previous part works as required.
+- Keep code modular and organized (screens, components, utils, storage logic separated)
+- Comment complex logic
+- Avoid backend or auth — this is 100% offline
+- Validate input where needed (e.g., field names not empty)
+
+---
+
+Start by planning the folder structure. Then implement the onboarding + navigation first, followed by:
+- Notes Tab (with voice input)
+- Custom Section Builder and Form
+- Reminders
+- Tomorrow’s Tasks
+
+Take your time and ensure everything works with precision before moving to the next.
