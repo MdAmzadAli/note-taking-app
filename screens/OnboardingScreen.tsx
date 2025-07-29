@@ -1,102 +1,157 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  Alert
+  Alert,
 } from 'react-native';
-import { Profession } from '../types';
-import { PROFESSION_CONFIGS } from '../constants/professions';
-import { StorageService } from '../utils/storage';
+import { router } from 'expo-router';
+import { saveSelectedProfession } from '@/utils/storage';
+import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 
-interface OnboardingScreenProps {
-  onComplete: (profession: Profession) => void;
-}
+export default function OnboardingScreen() {
+  const [selectedProfession, setSelectedProfession] = useState<ProfessionType | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
-  const handleProfessionSelect = async (profession: Profession) => {
+  const handleProfessionSelect = (profession: ProfessionType) => {
+    setSelectedProfession(profession);
+  };
+
+  const handleContinue = async () => {
+    if (!selectedProfession) {
+      Alert.alert('Please select a profession', 'Choose your profession to continue');
+      return;
+    }
+
+    setIsLoading(true);
     try {
-      const settings = await StorageService.getSettings();
-      const updatedSettings = {
-        ...settings,
-        profession,
-        hasCompletedOnboarding: true
-      };
-      await StorageService.saveSettings(updatedSettings);
-      onComplete(profession);
+      await saveSelectedProfession(selectedProfession);
+      router.replace('/(tabs)');
     } catch (error) {
-      Alert.alert('Error', 'Failed to save profession selection');
+      console.error('Error saving profession:', error);
+      Alert.alert('Error', 'Failed to save your selection. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Welcome to ProfNotes</Text>
+        <Text style={styles.title}>Welcome to NotePro</Text>
         <Text style={styles.subtitle}>Choose your profession to get started</Text>
         
         <View style={styles.professionsContainer}>
-          {Object.entries(PROFESSION_CONFIGS).map(([key, config]) => (
+          {Object.entries(PROFESSIONS).map(([key, profession]) => (
             <TouchableOpacity
               key={key}
-              style={[styles.professionButton, { backgroundColor: config.colors.primary }]}
-              onPress={() => handleProfessionSelect(key as Profession)}
+              style={[
+                styles.professionCard,
+                { backgroundColor: profession.colors.primary },
+                selectedProfession === key && styles.selectedCard,
+              ]}
+              onPress={() => handleProfessionSelect(key as ProfessionType)}
+              activeOpacity={0.7}
             >
-              <Text style={[styles.professionText, { color: config.colors.text }]}>
-                {config.header}
+              <Text style={styles.professionIcon}>{profession.icon}</Text>
+              <Text style={[styles.professionTitle, { color: profession.colors.text }]}>
+                {profession.name}
               </Text>
-              <Text style={[styles.professionSubtext, { color: config.colors.text }]}>
-                {config.fields.join(' • ')}
+              <Text style={[styles.professionDescription, { color: profession.colors.text }]}>
+                {profession.description}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
+
+        <TouchableOpacity
+          style={[
+            styles.continueButton,
+            !selectedProfession && styles.disabledButton,
+          ]}
+          onPress={handleContinue}
+          disabled={!selectedProfession || isLoading}
+        >
+          <Text style={styles.continueButtonText}>
+            {isLoading ? 'Setting up...' : 'Continue'}
+          </Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA'
+    backgroundColor: '#f8f9fa',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
-    justifyContent: 'center'
+    padding: 20,
+    justifyContent: 'center',
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 10,
-    color: '#2C3E50'
+    color: '#333',
   },
   subtitle: {
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 40,
-    color: '#7F8C8D'
+    color: '#666',
   },
   professionsContainer: {
-    gap: 16
+    gap: 16,
+    marginBottom: 40,
   },
-  professionButton: {
+  professionCard: {
     padding: 20,
     borderRadius: 12,
-    alignItems: 'center'
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  professionText: {
+  selectedCard: {
+    transform: [{ scale: 1.02 }],
+    shadowOpacity: 0.2,
+    elevation: 5,
+  },
+  professionIcon: {
+    fontSize: 40,
+    marginBottom: 8,
+  },
+  professionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 8
+    marginBottom: 4,
   },
-  professionSubtext: {
+  professionDescription: {
     fontSize: 14,
-    opacity: 0.8
-  }
+    textAlign: 'center',
+    opacity: 0.8,
+  },
+  continueButton: {
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+  },
+  continueButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
 });

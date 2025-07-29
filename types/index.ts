@@ -1,45 +1,44 @@
 
-export type Profession = 'doctor' | 'lawyer' | 'developer';
+import { ProfessionType } from '@/constants/professions';
 
 export interface Note {
   id: string;
-  profession: Profession;
   title: string;
+  content: string;
+  profession: ProfessionType;
   fields: Record<string, string>;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface Reminder {
-  id: string;
-  title: string;
-  time: Date;
-  completed: boolean;
-  profession: Profession;
+  createdAt: string;
+  updatedAt: string;
+  tags?: string[];
 }
 
 export interface Task {
   id: string;
   title: string;
-  reminderTime?: Date;
+  description?: string;
   completed: boolean;
-  profession: Profession;
+  dueDate?: string;
+  reminderTime?: string;
+  createdAt: string;
+  profession: ProfessionType;
+}
+
+export interface Reminder {
+  id: string;
+  title: string;
+  description?: string;
+  dateTime: string;
+  isCompleted: boolean;
+  notificationId?: string;
+  createdAt: string;
+  profession: ProfessionType;
 }
 
 export interface UserSettings {
-  profession: Profession | null;
+  selectedProfession: ProfessionType;
   viewMode: 'paragraph' | 'bullet';
-  hasCompletedOnboarding: boolean;
+  notifications: boolean;
+  speechEnabled: boolean;
 }
 
-export interface ProfessionConfig {
-  header: string;
-  fields: string[];
-  colors: {
-    primary: string;
-    secondary: string;
-    background: string;
-    text: string;
-  };
-  icon: string;
-}
+export { ProfessionType };
