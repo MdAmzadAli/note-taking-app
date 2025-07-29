@@ -1,0 +1,61 @@
+You are reviewing and correcting the visual design of a mobile-first note-taking app. The layout and functionality are already working — your task is to verify and **implement visual updates only**, across ALL TABS of the app.
+
+🛑 Do NOT suggest — if something is wrong, **fix it**. Focus on the following **strict visual requirements**:
+
+---
+
+### ✅ MAJOR PRIORITIES (MUST BE IMPLEMENTED EXACTLY)
+
+1. 🔳 **Uniform Color Palette (Strict)**
+   - Only use these 3 base colors across the **entire app**:
+     - `#FFFFFF` (White for backgrounds)
+     - `#000000` (Black for text)
+     - `rgba(0,0,0,0.05)` to `rgba(0,0,0,0.15)` (Gray for shadows)
+   - Do NOT introduce any other color (blue, green, etc.)
+   - Borders, shadows, and subtle text may use grayscale variants (`#E5E7EB`, `#6B7280`)
+
+2. 🔠 **Typography and Font Sizes (Consistent Across Tabs)**
+   - Use only one font: `'Inter', sans-serif`
+   - Title: `20px`, bold
+   - Body Text: `16px`
+   - Labels: `13px`, gray
+   - Font styles and sizes must remain **identical** across all tabs/screens
+
+3. 🧱 **Spacing and Padding (Mobile-Safe)**
+   - Use `padding-top: env(safe-area-inset-top)` or `24px` from the top of every screen to avoid collisions with the mobile status bar
+   - Navigation bars must never touch or overlap the system status bar
+   - Maintain `16px` padding around all major sections
+   - Inner padding for inputs/cards/buttons: `12px 16px`
+
+4. 🎯 **Strict Uniformity Across All Tabs**
+   - The exact same styles (colors, fonts, spacing, buttons) must be present on:
+     - Home screen
+     - Notes list
+     - Note creation/edit screen
+     - Search screen
+     - Settings or extras
+   - No visual inconsistency allowed between tabs
+
+5. 🌫️ **Fix Button Shadows**
+   - Button shadows must be subtle and mobile-appropriate
+   - Use: `box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08)` or `none` for flat styles
+   - DO NOT use heavy desktop-style shadows like `0 4px 12px rgba(...)` on buttons
+   - Use **clean flat or slight elevation styles** for mobile
+
+---
+
+### 🔍 VERIFICATION + IMPLEMENTATION
+
+- Visit **every screen/tab/route**.
+- If any of the above rules are violated, fix the issue immediately.
+- Keep a single design language and spacing model across all views.
+- Do not leave placeholder fixes or mockups — only real implemented changes.
+
+---
+
+📌 At the end, generate a markdown checklist showing:
+- ✅ Fully implemented
+- ❌ Was incorrect and fixed
+- ⚠️ Still needs work (if anything is blocked)
+
+Your goal is to make the app visually clean, minimal, uniform, and mobile-perfect — while keeping the core layout and logic untouched.
