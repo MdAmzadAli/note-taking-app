@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    paddingTop: Platform.OS === 'ios' ? 52 : 16,
+    paddingTop: Platform.OS === 'ios' ? 52 : 24,
     backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 32,
   },
   sectionTitle: {
     fontSize: 20,
@@ -317,6 +317,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 6,
     elevation: 2,
+    minHeight: 72,
   },
   professionIcon: {
     fontSize: 32,
@@ -391,11 +392,13 @@ const styles = StyleSheet.create({
   },
   dangerButton: {
     backgroundColor: '#FEE2E2',
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 16,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#FECACA',
+    minHeight: 52,
+    justifyContent: 'center',
   },
   dangerButtonText: {
     fontSize: 16,

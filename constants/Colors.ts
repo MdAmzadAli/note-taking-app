@@ -1,6 +1,6 @@
+
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Color palette for the note-taking app redesign
  */
 
 const tintColorLight = '#3B82F6';
@@ -36,13 +36,13 @@ export const Colors = {
 // Typography scale
 export const Typography = {
   fontFamily: {
-    regular: 'Inter-Regular',
-    medium: 'Inter-Medium',
-    semiBold: 'Inter-SemiBold',
-    bold: 'Inter-Bold',
+    regular: 'Inter',
+    medium: 'Inter',
+    semiBold: 'Inter',
+    bold: 'Inter',
   },
   fontSize: {
-    xs: 12,
+    xs: 13,
     sm: 14,
     base: 16,
     lg: 18,
@@ -53,7 +53,7 @@ export const Typography = {
   },
   lineHeight: {
     tight: 1.25,
-    normal: 1.5,
+    normal: 1.6,
     relaxed: 1.75,
   },
 };
@@ -62,11 +62,11 @@ export const Typography = {
 export const Spacing = {
   xs: 4,
   sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
-  '2xl': 48,
-  '3xl': 64,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  '2xl': 32,
+  '3xl': 48,
 };
 
 // Border radius scale
@@ -84,21 +84,21 @@ export const Shadows = {
   sm: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
     elevation: 1,
   },
   md: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
   lg: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
   },

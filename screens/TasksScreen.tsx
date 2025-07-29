@@ -592,21 +592,36 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.5,
   },
-  headerButtons: {
+  headerActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
   },
-  iconButton: {
+  searchButton: {
     padding: 12,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: 'rgba(59, 130, 246, 0.08)',
     minWidth: 44,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconButtonText: {
-    fontSize: 18,
-    fontWeight: '500',
+  searchButtonText: {
+    fontSize: 16,
+  },
+  addButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontFamily: 'Inter',
+    fontSize: 16,
   },
   searchContainer: {
     paddingHorizontal: 16,
@@ -619,7 +634,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 12,
     backgroundColor: '#FFFFFF',
     fontSize: 16,
