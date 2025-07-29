@@ -155,3 +155,40 @@ export const mockSpeechToText = (profession: string): string => {
   };
   return mockTexts[profession as keyof typeof mockTexts] || "Sample voice input text";
 };
+// Mock speech-to-text implementation for MVP
+// In production, you would integrate with expo-speech or react-native-voice
+
+export const mockSpeechToText = async (): Promise<string> => {
+  return new Promise((resolve) => {
+    // Simulate speech recognition delay
+    setTimeout(() => {
+      const sampleTexts = [
+        "This is a sample voice input text",
+        "Patient complains of headache and fatigue",
+        "Meeting scheduled for tomorrow at 2 PM",
+        "Remember to review the contract details",
+        "Code review needed for the new feature",
+        "Follow up with client regarding requirements"
+      ];
+      
+      const randomText = sampleTexts[Math.floor(Math.random() * sampleTexts.length)];
+      resolve(randomText);
+    }, 1500);
+  });
+};
+
+export const startListening = async (): Promise<void> => {
+  // Mock start listening
+  console.log('Started listening for speech input...');
+};
+
+export const stopListening = async (): Promise<void> => {
+  // Mock stop listening
+  console.log('Stopped listening for speech input...');
+};
+
+// Check if speech recognition is available
+export const isSpeechRecognitionAvailable = (): boolean => {
+  // For MVP, always return true since we're using mock
+  return true;
+};

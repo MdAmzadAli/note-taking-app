@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Text } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View } from 'react-native';
+import { Redirect } from 'expo-router';
 import { getUserSettings } from '@/utils/storage';
 import OnboardingScreen from '@/screens/OnboardingScreen';
 
 export default function Index() {
-  const [isOnboardingComplete, setIsOnboardingComplete] = useState<boolean | null>(null);
-  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
 
   useEffect(() => {
     checkOnboardingStatus();
@@ -15,42 +15,22 @@ export default function Index() {
   const checkOnboardingStatus = async () => {
     try {
       const settings = await getUserSettings();
-      setIsOnboardingComplete(settings.isOnboardingComplete === true);
+      setIsOnboardingComplete(settings.isOnboardingComplete || false);
     } catch (error) {
       console.error('Error checking onboarding status:', error);
       setIsOnboardingComplete(false);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (isOnboardingComplete === true) {
-      router.replace('/(tabs)');
-    }
-  }, [isOnboardingComplete, router]);
-
-  if (isOnboardingComplete === null) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    );
+  if (isLoading) {
+    return <View style={{ flex: 1, backgroundColor: '#fff' }} />;
   }
 
-  if (isOnboardingComplete === false) {
+  if (!isOnboardingComplete) {
     return <OnboardingScreen />;
   }
 
-  // This should not be reached due to the redirect above
-  return <OnboardingScreen />;
+  return <Redirect href="/(tabs)" />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-  },
-});
