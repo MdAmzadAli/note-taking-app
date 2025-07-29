@@ -2,16 +2,6 @@
 import React from 'react';
 import { Platform } from 'react-native';
 
-// Import iOS component if available
-let IOSIconSymbol: any = null;
-try {
-  if (Platform.OS === 'ios') {
-    IOSIconSymbol = require('./IconSymbol.ios').IconSymbol;
-  }
-} catch (error) {
-  // iOS component not available, use fallback
-}
-
 // Fallback for using react-native-vector-icons on Android and web.
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { SymbolWeight, SymbolViewProps } from 'expo-symbols';
@@ -75,19 +65,13 @@ export function IconSymbol({
   style?: StyleProp<TextStyle>;
   weight?: SymbolWeight;
 }) {
-  // Use iOS native symbols if available and on iOS platform
-  if (Platform.OS === 'ios' && IOSIconSymbol) {
-    return (
-      <IOSIconSymbol
-        name={name}
-        size={size}
-        color={color}
-        style={style}
-        weight={weight}
-      />
-    );
+  // For now, always use Ionicons until we fix the iOS integration properly
+  const ioniconsName = MAPPING[name];
+  
+  if (!ioniconsName) {
+    console.warn(`IconSymbol: No mapping found for "${name}"`);
+    return <Ionicons color={color} size={size} name="help-outline" style={style} />;
   }
 
-  // Fallback to Ionicons for other platforms
-  return <Ionicons color={color} size={size} name={MAPPING[name]} style={style} />;
+  return <Ionicons color={color} size={size} name={ioniconsName} style={style} />;
 }

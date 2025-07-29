@@ -403,10 +403,10 @@ export default function NotesScreen() {
         <Text style={styles.headerTitle}>My Notes</Text>
         <View style={styles.headerButtons}>
           <TouchableOpacity style={styles.iconButton} onPress={() => setIsSearchVisible(!isSearchVisible)}>
-            <IconSymbol size={20} name="magnifyingglass" color="#FFFFFF" />
+            <IconSymbol size={24} name="magnifyingglass" color="#FFFFFF" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton} onPress={openMenu}>
-            <IconSymbol size={20} name="line.horizontal.3" color="#FFFFFF" />
+            <IconSymbol size={24} name="line.horizontal.3" color="#FFFFFF" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton} onPress={() => setIsCreating(true)}>
             <Text style={styles.iconButtonText}>New Note</Text>
