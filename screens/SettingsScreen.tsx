@@ -7,6 +7,7 @@ import {
   Alert,
   ScrollView,
   Switch,
+  Platform,
 } from 'react-native';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 import { UserSettings } from '@/types';

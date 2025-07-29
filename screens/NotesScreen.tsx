@@ -13,6 +13,7 @@ import {
   Animated,
   Dimensions,
   TouchableWithoutFeedback,
+  Platform,
 } from 'react-native';
 import { Note, CustomTemplate, TemplateEntry, FieldType } from '@/types';
 import { getNotes, saveNote, deleteNote, getUserSettings, getCustomTemplates, saveTemplateEntry, getTemplateEntries } from '@/utils/storage';
