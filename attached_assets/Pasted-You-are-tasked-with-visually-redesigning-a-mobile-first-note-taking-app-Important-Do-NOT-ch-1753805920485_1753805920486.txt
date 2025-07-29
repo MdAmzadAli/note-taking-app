@@ -1,0 +1,113 @@
+You are tasked with visually redesigning a mobile-first note-taking app.
+
+❗Important:
+- Do NOT change the existing layout, component structure, or any functionality.
+- Only update **styling**: colors, fonts, sizes, spacing, shadows, transitions.
+- Implement actual CSS or Tailwind changes, not mockups or suggestions.
+
+🎯 GOAL:
+Make the app visually modern, clean, elegant—similar to Notion, Craft, or Bear. Optimize for readability, usability, and professional appearance.
+
+---
+
+🎨 1. COLOR PALETTE (Light Theme Only for Now):
+Implement the following:
+
+- `--color-bg`: `#F9FAFB` (light gray background)
+- `--color-surface`: `#FFFFFF` (card/note background)
+- `--color-primary`: `#3B82F6` (blue)
+- `--color-accent`: `#10B981` (emerald)
+- `--color-border`: `#E5E7EB` (light gray border)
+- `--color-text`: `#111827` (dark slate text)
+- `--color-subtle-text`: `#6B7280` (gray for descriptions/labels)
+
+Use CSS variables or Tailwind config to define these globally.
+
+---
+
+✍️ 2. TYPOGRAPHY:
+
+- **Font family**: `'Inter', sans-serif`
+- **Title (note title / app title)**: `font-size: 20px`, `font-weight: 600`
+- **Body text (note content)**: `font-size: 16px`, `line-height: 1.6`
+- **Labels and secondary text**: `font-size: 13px`, `color: var(--color-subtle-text)`
+- Ensure no text uses default browser fonts
+
+---
+
+📐 3. SPACING & LAYOUT:
+
+- Global padding: `16px`
+- Section gaps: `24px`
+- Input + button padding: `12px 16px`
+- Use consistent spacing scale: `4px`, `8px`, `12px`, `16px`, `24px`, `32px`
+
+---
+
+🧾 4. COMPONENT STYLES:
+
+🔹 **Cards (Note Preview Boxes)**:
+- `border-radius: 12px`
+- `box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05)`
+- Background: `var(--color-surface)`
+- Border: `1px solid var(--color-border)`
+
+🔹 **Buttons**:
+- Primary: Blue background (`--color-primary`), white text
+- Secondary: Transparent background, bordered (`--color-border`), text color `--color-primary`
+- `border-radius: 8px`
+- On hover: slightly darken background
+- `transition: all 0.2s ease-in-out`
+
+🔹 **Inputs & Textareas**:
+- Border: `1px solid var(--color-border)`
+- Padding: `12px`
+- `border-radius: 8px`
+- On focus: border color `--color-primary`, subtle shadow
+
+🔹 **Search Bar**:
+- Sticky top if possible (mobile)
+- Padding inside: `12px`
+- Left icon (magnifier), placeholder text in `--color-subtle-text`
+- Rounded border: `12px`
+
+---
+
+🌗 5. OPTIONAL THEMING:
+Prepare for Dark Mode (but don’t implement it yet):
+- Use CSS variables or `dark:` variants in Tailwind.
+
+---
+
+🔄 6. MICROINTERACTIONS:
+
+- Add transitions (`transition: all 0.2s ease-in-out`) to:
+  - Buttons
+  - Inputs
+  - Notes on hover
+- Use subtle scaling or shadow for hover on cards:  
+  `transform: scale(1.01)`, `box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06)`
+
+---
+
+✅ 7. ACCESSIBILITY:
+- Text contrast must meet WCAG AA
+- Font sizes never below 13px
+- Focus outline visible
+- Placeholder text with sufficient contrast
+
+---
+
+📱 8. RESPONSIVENESS:
+- Mobile-first styling
+- Ensure tap targets are at least `44x44px`
+- Use `flex` or `grid` layout to ensure dynamic wrapping of note cards
+
+---
+
+🧪 9. TEST & VERIFY:
+- After changes, run app and verify:
+  - Layout untouched
+  - All components styled with above rules
+  - Notes readable and visually attractive
+  - Smooth transitions and consistent spacing
