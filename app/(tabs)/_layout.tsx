@@ -22,16 +22,20 @@ export default function TabLayout() {
         tabBarStyle: Platform.select({
           ios: {
             position: 'absolute',
-            backgroundColor: 'rgba(255, 255, 255, 0.85)',
-            borderTopWidth: 0,
+            backgroundColor: Colors[colorScheme ?? 'light'].background,
+            borderTopWidth: 1,
+            borderTopColor: Colors[colorScheme ?? 'light'].border,
             elevation: 0,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: -2 },
             shadowOpacity: 0.04,
             shadowRadius: 8,
+            paddingTop: 8,
+            paddingBottom: 8,
+            height: 64,
           },
           default: {
-            backgroundColor: Colors[colorScheme ?? 'light'].backgroundSecondary,
+            backgroundColor: Colors[colorScheme ?? 'light'].background,
             borderTopWidth: 1,
             borderTopColor: Colors[colorScheme ?? 'light'].border,
             elevation: 8,
