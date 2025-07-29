@@ -346,15 +346,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    paddingTop: Platform.OS === 'ios' ? 70 : 40,
-    backgroundColor: '#FFFFFF',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    backgroundColor: '#000000',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#333333',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#FFFFFF',
     fontFamily: 'Inter',
   },
   headerActions: {
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
   },
   searchButtonText: {
     fontSize: 13,
-    color: '#000000',
+    color: '#FFFFFF',
     fontFamily: 'Inter',
     fontWeight: '500',
   },
