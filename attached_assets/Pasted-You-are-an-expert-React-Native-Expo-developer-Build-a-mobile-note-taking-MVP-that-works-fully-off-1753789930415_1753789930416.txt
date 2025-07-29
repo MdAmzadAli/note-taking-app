@@ -1,0 +1,127 @@
+You are an expert React Native + Expo developer. Build a mobile note-taking MVP that works fully offline, has a clean modular codebase, and fulfills the features described below with clarity and precision.
+
+---
+
+🔸 OVERVIEW:
+
+Build a mobile note-taking app using **React Native + Expo** that supports:
+
+- A free-form notepad with voice input
+- Profession-based onboarding
+- A dynamic **custom note section** builder per profession
+- Reminders and tomorrow’s tasks
+- Powerful text + voice-based search
+- All data stored offline
+
+---
+
+🔸 CORE FEATURES:
+
+1. **Onboarding**:
+   - Let the user choose a profession: **Doctor**, **Lawyer**, or **Developer**
+   - Store this choice locally (AsyncStorage)
+   - Based on this, show relevant starter templates for custom note skeletons (optional)
+   - User can later modify or add their own templates
+
+---
+
+2. **Main Tabs (Navigation)**:
+Use tab or segmented navigation between these four screens:
+
+| Tab | Features |
+|-----|----------|
+| **Notes** | - Text editor for free-form notes<br>- Voice-to-text using mic button<br>- Save notes locally with timestamp |
+| **Custom Section** | - Dynamic note skeleton builder<br>- Users can create templates with custom fields<br>- Supported field types: text, number, multiline<br>- Fill structured notes using selected template<br>- Save entries locally |
+| **Reminders** | - Add reminders via text or voice<br>- Set time/date<br>- Use Expo Notifications for local push alerts |
+| **Tomorrow’s Tasks** | - Add tasks for the next day<br>- Optional reminders<br>- Mark as complete |
+
+---
+
+3. **Custom Note Skeletons (Dynamic Form Builder)**:
+- Let user define their own structured note formats:
+  - Give it a title (e.g., “Patient Note”, “Client Brief”)
+  - Add multiple custom fields (Label + Field Type)
+  - For MVP, support these field types:
+    - Text (single line)
+    - Number
+    - Long Text (multiline)
+    - Date Picker (optional)
+- Save these skeleton templates locally
+- Users can reuse these templates to fill and save structured notes
+
+---
+
+4. **Search Functionality**:
+- Add a **global search** bar available on Notes and Custom Section screens
+- Support:
+  - Text-based keyword search (case-insensitive, partial match)
+  - Optional: Voice-based search input (convert voice to text)
+- Search through:
+  - Note title and body
+  - Custom section field values
+- Use a lightweight fuzzy search like Fuse.js or implement simple includes() logic
+
+---
+
+5. **Voice Input Integration**:
+- Voice-to-text on:
+  - Notes editor
+  - Reminder input
+  - (Optional) Search input
+- Use Expo-compatible speech-to-text plugin or Web Speech API fallback
+- Show real-time transcription in text fields
+
+---
+
+6. **Storage & Offline Capability**:
+- Use AsyncStorage or SQLite to store:
+  - Free-form notes
+  - Custom note skeleton templates
+  - Custom structured note entries
+  - Reminders
+  - Tomorrow’s tasks
+- All features must be usable offline
+
+---
+
+🔸 UI/UX Guidelines:
+
+- Clean, mobile-friendly, and distraction-free UI
+- Use native components only:
+  - `TextInput`, `FlatList`, `Button`, `Modal`, `Switch`, `Picker`, `ScrollView`
+- Avoid unnecessary libraries
+- Use consistent spacing, color theming, and icons where applicable
+- Custom section should have a simple form-builder UI:
+  - “+ Add Field” button → input field label + dropdown for type → repeat
+  - Save template button
+  - Show list of saved templates with “Use Template” button
+
+---
+
+🔸 Code Organization Rules:
+
+- Modularize each screen (`/screens`), component (`/components`), utility (`/utils`), and storage layer (`/storage`)
+- Use React Context or props drilling for profession state and navigation
+- Validate inputs, especially for form builder (no empty field names)
+- Comment wherever logic is non-obvious
+- Don’t implement backend or authentication
+
+---
+
+🔸 Implementation Order:
+
+1. Set up folder structure and base app with Expo
+2. Implement onboarding screen (profession selection)
+3. Set up tab navigation
+4. Build free-form Notes tab (with voice-to-text)
+5. Build Custom Section tab:
+   - Form builder for templates
+   - Form entry and saving
+6. Build Reminders tab (with voice + local notifications)
+7. Build Tomorrow’s Tasks
+8. Add Search functionality across notes and custom entries
+9. Polish UI and test offline functionality
+
+---
+
+Only move to the next section after validating the previous one. Maintain a clean and working state throughout the project.
