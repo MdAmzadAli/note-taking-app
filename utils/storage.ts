@@ -184,13 +184,13 @@ export const saveUserSettings = async (settings: UserSettings): Promise<void> =>
   }
 };
 
-// Custom Templates Storage
+// Custom Templates
 export const getCustomTemplates = async (): Promise<CustomTemplate[]> => {
   try {
-    const data = await AsyncStorage.getItem('custom_templates');
-    return data ? JSON.parse(data) : [];
+    const templates = await AsyncStorage.getItem('custom_templates');
+    return templates ? JSON.parse(templates) : [];
   } catch (error) {
-    console.error('Error getting custom templates:', error);
+    console.error('Error loading custom templates:', error);
     return [];
   }
 };
@@ -216,10 +216,10 @@ export const saveCustomTemplate = async (template: CustomTemplate): Promise<void
 export const deleteCustomTemplate = async (templateId: string): Promise<void> => {
   try {
     const templates = await getCustomTemplates();
-    const filteredTemplates = templates.filter(t => t.id !== templateId);
-    await AsyncStorage.setItem('custom_templates', JSON.stringify(filteredTemplates));
+    const filtered = templates.filter(t => t.id !== templateId);
+    await AsyncStorage.setItem('custom_templates', JSON.stringify(filtered));
 
-    // Also delete all entries for this template
+    // Also delete all entries created from this template
     const entries = await getTemplateEntries();
     const filteredEntries = entries.filter(e => e.templateId !== templateId);
     await AsyncStorage.setItem('template_entries', JSON.stringify(filteredEntries));
@@ -229,13 +229,13 @@ export const deleteCustomTemplate = async (templateId: string): Promise<void> =>
   }
 };
 
-// Template Entries Storage
+// Template Entries
 export const getTemplateEntries = async (): Promise<TemplateEntry[]> => {
   try {
-    const data = await AsyncStorage.getItem('template_entries');
-    return data ? JSON.parse(data) : [];
+    const entries = await AsyncStorage.getItem('template_entries');
+    return entries ? JSON.parse(entries) : [];
   } catch (error) {
-    console.error('Error getting template entries:', error);
+    console.error('Error loading template entries:', error);
     return [];
   }
 };
@@ -261,8 +261,8 @@ export const saveTemplateEntry = async (entry: TemplateEntry): Promise<void> => 
 export const deleteTemplateEntry = async (entryId: string): Promise<void> => {
   try {
     const entries = await getTemplateEntries();
-    const filteredEntries = entries.filter(e => e.id !== entryId);
-    await AsyncStorage.setItem('template_entries', JSON.stringify(filteredEntries));
+    const filtered = entries.filter(e => e.id !== entryId);
+    await AsyncStorage.setItem('template_entries', JSON.stringify(filtered));
   } catch (error) {
     console.error('Error deleting template entry:', error);
     throw error;

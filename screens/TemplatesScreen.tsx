@@ -8,11 +8,11 @@ import {
   ScrollView,
   StyleSheet,
   Alert,
+  Modal,
   FlatList,
   SafeAreaView,
-  Modal,
 } from 'react-native';
-import { CustomTemplate, FieldType, TemplateEntry } from '@/types';
+import { CustomTemplate, FieldType, TemplateEntry, UserSettings } from '@/types';
 import {
   getCustomTemplates,
   saveCustomTemplate,
@@ -20,25 +20,22 @@ import {
   getTemplateEntries,
   saveTemplateEntry,
   deleteTemplateEntry,
+  getUserSettings,
 } from '@/utils/storage';
-
-type ScreenMode = 'templates' | 'create-template' | 'entries' | 'create-entry';
+import { PROFESSIONS } from '@/constants/professions';
+import { mockSpeechToText } from '@/utils/speech';
 
 export default function TemplatesScreen() {
-  const [screenMode, setScreenMode] = useState<ScreenMode>('templates');
   const [templates, setTemplates] = useState<CustomTemplate[]>([]);
   const [entries, setEntries] = useState<TemplateEntry[]>([]);
+  const [settings, setSettings] = useState<UserSettings>({ profession: 'doctor', viewMode: 'paragraph' });
+  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
+  const [isFillingTemplate, setIsFillingTemplate] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<CustomTemplate | null>(null);
-  
-  // Template creation state
-  const [templateName, setTemplateName] = useState('');
-  const [templateFields, setTemplateFields] = useState<FieldType[]>([]);
-  const [newFieldName, setNewFieldName] = useState('');
-  const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'longtext' | 'date'>('text');
-  const [showFieldTypeModal, setShowFieldTypeModal] = useState(false);
-
-  // Entry creation state
-  const [entryValues, setEntryValues] = useState<Record<string, string>>({});
+  const [newTemplate, setNewTemplate] = useState({ name: '', fields: [] as FieldType[] });
+  const [templateValues, setTemplateValues] = useState<Record<string, string>>({});
+  const [editingEntry, setEditingEntry] = useState<TemplateEntry | null>(null);
+  const [viewMode, setViewMode] = useState<'templates' | 'entries'>('templates');
 
   useEffect(() => {
     loadData();
@@ -46,65 +43,82 @@ export default function TemplatesScreen() {
 
   const loadData = async () => {
     try {
-      const [templatesData, entriesData] = await Promise.all([
+      const [templatesData, entriesData, userSettings] = await Promise.all([
         getCustomTemplates(),
         getTemplateEntries(),
+        getUserSettings(),
       ]);
       setTemplates(templatesData);
-      setEntries(entriesData);
+      setEntries(entriesData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      setSettings(userSettings);
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('Error loading templates data:', error);
     }
   };
 
   const addField = () => {
-    if (!newFieldName.trim()) {
-      Alert.alert('Error', 'Please enter a field name');
-      return;
-    }
-
-    const field: FieldType = {
+    const newField: FieldType = {
       id: Date.now().toString(),
-      label: newFieldName.trim(),
-      type: newFieldType,
+      label: '',
+      type: 'text',
+      required: false,
     };
+    setNewTemplate(prev => ({
+      ...prev,
+      fields: [...prev.fields, newField],
+    }));
+  };
 
-    setTemplateFields([...templateFields, field]);
-    setNewFieldName('');
-    setNewFieldType('text');
+  const updateField = (fieldId: string, updates: Partial<FieldType>) => {
+    setNewTemplate(prev => ({
+      ...prev,
+      fields: prev.fields.map(field =>
+        field.id === fieldId ? { ...field, ...updates } : field
+      ),
+    }));
   };
 
   const removeField = (fieldId: string) => {
-    setTemplateFields(templateFields.filter(f => f.id !== fieldId));
+    setNewTemplate(prev => ({
+      ...prev,
+      fields: prev.fields.filter(field => field.id !== fieldId),
+    }));
   };
 
   const saveTemplate = async () => {
-    if (!templateName.trim()) {
+    if (!newTemplate.name.trim()) {
       Alert.alert('Error', 'Please enter a template name');
       return;
     }
 
-    if (templateFields.length === 0) {
+    if (newTemplate.fields.length === 0) {
       Alert.alert('Error', 'Please add at least one field');
       return;
+    }
+
+    for (const field of newTemplate.fields) {
+      if (!field.label.trim()) {
+        Alert.alert('Error', 'All fields must have a label');
+        return;
+      }
     }
 
     try {
       const template: CustomTemplate = {
         id: Date.now().toString(),
-        name: templateName.trim(),
-        fields: templateFields,
+        name: newTemplate.name.trim(),
+        fields: newTemplate.fields,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
       await saveCustomTemplate(template);
-      setTemplateName('');
-      setTemplateFields([]);
-      setScreenMode('templates');
-      loadData();
+      await loadData();
+      setIsCreatingTemplate(false);
+      setNewTemplate({ name: '', fields: [] });
       Alert.alert('Success', 'Template created successfully!');
     } catch (error) {
+      console.error('Error saving template:', error);
       Alert.alert('Error', 'Failed to save template');
     }
   };
@@ -112,7 +126,7 @@ export default function TemplatesScreen() {
   const deleteTemplate = async (templateId: string) => {
     Alert.alert(
       'Delete Template',
-      'Are you sure? This will also delete all entries created from this template.',
+      'This will also delete all entries created from this template. Are you sure?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -121,8 +135,10 @@ export default function TemplatesScreen() {
           onPress: async () => {
             try {
               await deleteCustomTemplate(templateId);
-              loadData();
+              await loadData();
+              Alert.alert('Success', 'Template deleted successfully');
             } catch (error) {
+              console.error('Error deleting template:', error);
               Alert.alert('Error', 'Failed to delete template');
             }
           },
@@ -131,66 +147,179 @@ export default function TemplatesScreen() {
     );
   };
 
-  const openTemplate = (template: CustomTemplate) => {
+  const startFillingTemplate = (template: CustomTemplate) => {
     setSelectedTemplate(template);
-    setScreenMode('entries');
+    setTemplateValues({});
+    setEditingEntry(null);
+    setIsFillingTemplate(true);
   };
 
-  const createEntry = (template: CustomTemplate) => {
-    setSelectedTemplate(template);
-    const initialValues: Record<string, string> = {};
-    template.fields.forEach(field => {
-      initialValues[field.id] = '';
-    });
-    setEntryValues(initialValues);
-    setScreenMode('create-entry');
+  const editEntry = (entry: TemplateEntry) => {
+    const template = templates.find(t => t.id === entry.templateId);
+    if (template) {
+      setSelectedTemplate(template);
+      setTemplateValues(entry.values);
+      setEditingEntry(entry);
+      setIsFillingTemplate(true);
+    }
   };
 
   const saveEntry = async () => {
     if (!selectedTemplate) return;
 
-    // Check if required fields are filled
-    const missingFields = selectedTemplate.fields.filter(
-      field => field.required && !entryValues[field.id]?.trim()
-    );
-
-    if (missingFields.length > 0) {
-      Alert.alert('Error', 'Please fill all required fields');
-      return;
-    }
-
     try {
       const entry: TemplateEntry = {
-        id: Date.now().toString(),
+        id: editingEntry?.id || Date.now().toString(),
         templateId: selectedTemplate.id,
         templateName: selectedTemplate.name,
-        values: entryValues,
-        createdAt: new Date().toISOString(),
+        values: templateValues,
+        createdAt: editingEntry?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
       await saveTemplateEntry(entry);
-      setEntryValues({});
-      setScreenMode('entries');
-      loadData();
-      Alert.alert('Success', 'Entry saved successfully!');
+      await loadData();
+      setIsFillingTemplate(false);
+      setSelectedTemplate(null);
+      setTemplateValues({});
+      setEditingEntry(null);
+      Alert.alert('Success', `Entry ${editingEntry ? 'updated' : 'saved'} successfully!`);
     } catch (error) {
+      console.error('Error saving entry:', error);
       Alert.alert('Error', 'Failed to save entry');
     }
   };
+
+  const deleteEntry = async (entryId: string) => {
+    Alert.alert(
+      'Delete Entry',
+      'Are you sure you want to delete this entry?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteTemplateEntry(entryId);
+              await loadData();
+              Alert.alert('Success', 'Entry deleted successfully');
+            } catch (error) {
+              console.error('Error deleting entry:', error);
+              Alert.alert('Error', 'Failed to delete entry');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleVoiceInput = async (fieldId: string) => {
+    try {
+      const speechText = await mockSpeechToText();
+      setTemplateValues(prev => ({
+        ...prev,
+        [fieldId]: (prev[fieldId] || '') + (prev[fieldId] ? '\n' : '') + speechText,
+      }));
+    } catch (error) {
+      Alert.alert('Error', 'Failed to convert speech to text');
+    }
+  };
+
+  const professionConfig = PROFESSIONS[settings.profession];
+
+  const renderField = (field: FieldType, isEditing = false) => (
+    <View key={field.id} style={styles.fieldContainer}>
+      {isEditing ? (
+        <>
+          <View style={styles.fieldHeader}>
+            <TextInput
+              style={styles.fieldLabelInput}
+              value={field.label}
+              onChangeText={(text) => updateField(field.id, { label: text })}
+              placeholder="Field label"
+            />
+            <TouchableOpacity
+              style={styles.removeFieldButton}
+              onPress={() => removeField(field.id)}
+            >
+              <Text style={styles.removeFieldText}>×</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.fieldTypeContainer}>
+            <Text style={styles.fieldTypeLabel}>Type:</Text>
+            {['text', 'number', 'longtext', 'date'].map((type) => (
+              <TouchableOpacity
+                key={type}
+                style={[
+                  styles.fieldTypeButton,
+                  field.type === type && styles.fieldTypeButtonActive,
+                ]}
+                onPress={() => updateField(field.id, { type: type as any })}
+              >
+                <Text
+                  style={[
+                    styles.fieldTypeButtonText,
+                    field.type === type && styles.fieldTypeButtonTextActive,
+                  ]}
+                >
+                  {type}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      ) : (
+        <>
+          <View style={styles.fieldInputHeader}>
+            <Text style={styles.fieldLabel}>{field.label}</Text>
+            {(field.type === 'text' || field.type === 'longtext') && (
+              <TouchableOpacity
+                style={styles.voiceButton}
+                onPress={() => handleVoiceInput(field.id)}
+              >
+                <Text style={styles.voiceButtonText}>🎤</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {field.type === 'longtext' ? (
+            <TextInput
+              style={[styles.fieldInput, styles.longTextInput]}
+              value={templateValues[field.id] || ''}
+              onChangeText={(text) => setTemplateValues(prev => ({ ...prev, [field.id]: text }))}
+              placeholder={`Enter ${field.label.toLowerCase()}`}
+              multiline
+              textAlignVertical="top"
+            />
+          ) : (
+            <TextInput
+              style={styles.fieldInput}
+              value={templateValues[field.id] || ''}
+              onChangeText={(text) => setTemplateValues(prev => ({ ...prev, [field.id]: text }))}
+              placeholder={`Enter ${field.label.toLowerCase()}`}
+              keyboardType={field.type === 'number' ? 'numeric' : 'default'}
+            />
+          )}
+        </>
+      )}
+    </View>
+  );
 
   const renderTemplate = ({ item }: { item: CustomTemplate }) => (
     <View style={styles.templateCard}>
       <View style={styles.templateHeader}>
         <Text style={styles.templateName}>{item.name}</Text>
         <View style={styles.templateActions}>
-          <TouchableOpacity onPress={() => createEntry(item)} style={styles.actionButton}>
-            <Text style={styles.actionButtonText}>+ New</Text>
+          <TouchableOpacity
+            style={styles.useButton}
+            onPress={() => startFillingTemplate(item)}
+          >
+            <Text style={styles.useButtonText}>Use</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => openTemplate(item)} style={styles.viewButton}>
-            <Text style={styles.viewButtonText}>View</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => deleteTemplate(item.id)} style={styles.deleteButton}>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => deleteTemplate(item.id)}
+          >
             <Text style={styles.deleteButtonText}>🗑️</Text>
           </TouchableOpacity>
         </View>
@@ -204,235 +333,178 @@ export default function TemplatesScreen() {
   const renderEntry = ({ item }: { item: TemplateEntry }) => (
     <View style={styles.entryCard}>
       <View style={styles.entryHeader}>
-        <Text style={styles.entryDate}>
-          {new Date(item.createdAt).toLocaleDateString()} {new Date(item.createdAt).toLocaleTimeString()}
-        </Text>
-        <TouchableOpacity onPress={() => deleteTemplateEntry(item.id).then(loadData)} style={styles.deleteButton}>
-          <Text style={styles.deleteButtonText}>🗑️</Text>
-        </TouchableOpacity>
+        <Text style={styles.entryTitle}>{item.templateName}</Text>
+        <View style={styles.entryActions}>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => editEntry(item)}
+          >
+            <Text style={styles.editButtonText}>✏️</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => deleteEntry(item.id)}
+          >
+            <Text style={styles.deleteButtonText}>🗑️</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      {Object.entries(item.values).map(([fieldId, value]) => {
-        const field = selectedTemplate?.fields.find(f => f.id === fieldId);
-        if (!field || !value) return null;
-        return (
-          <View key={fieldId} style={styles.entryField}>
-            <Text style={styles.entryFieldLabel}>{field.label}:</Text>
-            <Text style={styles.entryFieldValue}>{value}</Text>
-          </View>
-        );
-      })}
+      <Text style={styles.entryMeta}>
+        {new Date(item.createdAt).toLocaleDateString()}
+      </Text>
+      <View style={styles.entryContent}>
+        {Object.entries(item.values).slice(0, 2).map(([key, value]) => (
+          <Text key={key} style={styles.entryField} numberOfLines={1}>
+            {value}
+          </Text>
+        ))}
+      </View>
     </View>
   );
 
-  const renderFieldTypeModal = () => (
-    <Modal visible={showFieldTypeModal} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Select Field Type</Text>
-          {['text', 'number', 'longtext', 'date'].map(type => (
+  if (isCreatingTemplate) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
+        <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
+          <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
+            Create Template
+          </Text>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity style={styles.saveButton} onPress={saveTemplate}>
+              <Text style={styles.saveButtonText}>Save</Text>
+            </TouchableOpacity>
             <TouchableOpacity
-              key={type}
-              style={[styles.fieldTypeOption, newFieldType === type && styles.fieldTypeSelected]}
+              style={styles.cancelButton}
               onPress={() => {
-                setNewFieldType(type as any);
-                setShowFieldTypeModal(false);
+                setIsCreatingTemplate(false);
+                setNewTemplate({ name: '', fields: [] });
               }}
             >
-              <Text style={styles.fieldTypeText}>
-                {type === 'text' && '📝 Text'}
-                {type === 'number' && '🔢 Number'}
-                {type === 'longtext' && '📄 Long Text'}
-                {type === 'date' && '📅 Date'}
-              </Text>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
-          ))}
-          <TouchableOpacity
-            style={styles.modalCancelButton}
-            onPress={() => setShowFieldTypeModal(false)}
-          >
-            <Text style={styles.modalCancelText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-
-  if (screenMode === 'create-template') {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => setScreenMode('templates')}>
-            <Text style={styles.backButton}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Create Template</Text>
-          <TouchableOpacity onPress={saveTemplate} style={styles.saveButton}>
-            <Text style={styles.saveButtonText}>Save</Text>
-          </TouchableOpacity>
+          </View>
         </View>
 
-        <ScrollView style={styles.content}>
+        <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Template Name</Text>
             <TextInput
-              style={styles.textInput}
-              value={templateName}
-              onChangeText={setTemplateName}
-              placeholder="e.g., Patient Note, Meeting Minutes"
+              style={styles.templateNameInput}
+              value={newTemplate.name}
+              onChangeText={(text) => setNewTemplate(prev => ({ ...prev, name: text }))}
+              placeholder="e.g., Patient Note, Case Brief"
             />
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Fields ({templateFields.length})</Text>
-            
-            <View style={styles.addFieldSection}>
-              <TextInput
-                style={[styles.textInput, { flex: 1 }]}
-                value={newFieldName}
-                onChangeText={setNewFieldName}
-                placeholder="Field name"
-              />
-              <TouchableOpacity
-                style={styles.fieldTypeButton}
-                onPress={() => setShowFieldTypeModal(true)}
-              >
-                <Text style={styles.fieldTypeButtonText}>
-                  {newFieldType === 'text' && '📝'}
-                  {newFieldType === 'number' && '🔢'}
-                  {newFieldType === 'longtext' && '📄'}
-                  {newFieldType === 'date' && '📅'}
-                </Text>
-              </TouchableOpacity>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Fields</Text>
               <TouchableOpacity style={styles.addFieldButton} onPress={addField}>
-                <Text style={styles.addFieldButtonText}>Add</Text>
+                <Text style={styles.addFieldButtonText}>+ Add Field</Text>
               </TouchableOpacity>
             </View>
-
-            {templateFields.map(field => (
-              <View key={field.id} style={styles.fieldItem}>
-                <View style={styles.fieldInfo}>
-                  <Text style={styles.fieldName}>{field.label}</Text>
-                  <Text style={styles.fieldType}>
-                    {field.type === 'text' && '📝 Text'}
-                    {field.type === 'number' && '🔢 Number'}
-                    {field.type === 'longtext' && '📄 Long Text'}
-                    {field.type === 'date' && '📅 Date'}
-                  </Text>
-                </View>
-                <TouchableOpacity onPress={() => removeField(field.id)} style={styles.removeFieldButton}>
-                  <Text style={styles.removeFieldButtonText}>Remove</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
+            {newTemplate.fields.map(field => renderField(field, true))}
           </View>
-        </ScrollView>
-
-        {renderFieldTypeModal()}
-      </SafeAreaView>
-    );
-  }
-
-  if (screenMode === 'create-entry' && selectedTemplate) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => setScreenMode('entries')}>
-            <Text style={styles.backButton}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{selectedTemplate.name}</Text>
-          <TouchableOpacity onPress={saveEntry} style={styles.saveButton}>
-            <Text style={styles.saveButtonText}>Save</Text>
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView style={styles.content}>
-          {selectedTemplate.fields.map(field => (
-            <View key={field.id} style={styles.section}>
-              <Text style={styles.sectionTitle}>
-                {field.label} {field.required && '*'}
-              </Text>
-              {field.type === 'longtext' ? (
-                <TextInput
-                  style={[styles.textInput, styles.textArea]}
-                  value={entryValues[field.id] || ''}
-                  onChangeText={(text) => setEntryValues(prev => ({ ...prev, [field.id]: text }))}
-                  placeholder={`Enter ${field.label.toLowerCase()}`}
-                  multiline
-                  textAlignVertical="top"
-                />
-              ) : (
-                <TextInput
-                  style={styles.textInput}
-                  value={entryValues[field.id] || ''}
-                  onChangeText={(text) => setEntryValues(prev => ({ ...prev, [field.id]: text }))}
-                  placeholder={`Enter ${field.label.toLowerCase()}`}
-                  keyboardType={field.type === 'number' ? 'numeric' : 'default'}
-                />
-              )}
-            </View>
-          ))}
         </ScrollView>
       </SafeAreaView>
     );
   }
 
-  if (screenMode === 'entries' && selectedTemplate) {
-    const templateEntries = entries.filter(e => e.templateId === selectedTemplate.id);
-    
+  if (isFillingTemplate && selectedTemplate) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => setScreenMode('templates')}>
-            <Text style={styles.backButton}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{selectedTemplate.name}</Text>
-          <TouchableOpacity onPress={() => createEntry(selectedTemplate)} style={styles.addButton}>
-            <Text style={styles.addButtonText}>+ New</Text>
-          </TouchableOpacity>
+      <SafeAreaView style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
+        <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
+          <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
+            {editingEntry ? 'Edit' : 'Fill'} {selectedTemplate.name}
+          </Text>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity style={styles.saveButton} onPress={saveEntry}>
+              <Text style={styles.saveButtonText}>Save</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => {
+                setIsFillingTemplate(false);
+                setSelectedTemplate(null);
+                setTemplateValues({});
+                setEditingEntry(null);
+              }}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {templateEntries.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>📝</Text>
-            <Text style={styles.emptyText}>No entries yet</Text>
-            <Text style={styles.emptySubtext}>Tap "New" to create an entry</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={templateEntries}
-            renderItem={renderEntry}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.entriesList}
-          />
-        )}
+        <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+          {selectedTemplate.fields.map(field => renderField(field, false))}
+        </ScrollView>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Custom Templates</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: professionConfig.colors.background }]}>
+      <View style={[styles.header, { backgroundColor: professionConfig.colors.primary }]}>
+        <Text style={[styles.headerTitle, { color: professionConfig.colors.text }]}>
+          Custom Templates
+        </Text>
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => setScreenMode('create-template')}
+          onPress={() => setIsCreatingTemplate(true)}
         >
-          <Text style={styles.addButtonText}>+ Create</Text>
+          <Text style={styles.addButtonText}>+ New</Text>
         </TouchableOpacity>
       </View>
 
-      {templates.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>📋</Text>
-          <Text style={styles.emptyText}>No templates yet</Text>
-          <Text style={styles.emptySubtext}>Create custom forms for your structured notes</Text>
-        </View>
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, viewMode === 'templates' && styles.activeTab]}
+          onPress={() => setViewMode('templates')}
+        >
+          <Text style={[styles.tabText, viewMode === 'templates' && styles.activeTabText]}>
+            Templates ({templates.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, viewMode === 'entries' && styles.activeTab]}
+          onPress={() => setViewMode('entries')}
+        >
+          <Text style={[styles.tabText, viewMode === 'entries' && styles.activeTabText]}>
+            Entries ({entries.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {viewMode === 'templates' ? (
+        templates.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>📋</Text>
+            <Text style={styles.emptyTitle}>No templates yet</Text>
+            <Text style={styles.emptySubtext}>Create your first custom template</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={templates}
+            renderItem={renderTemplate}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.list}
+          />
+        )
       ) : (
-        <FlatList
-          data={templates}
-          renderItem={renderTemplate}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.templatesList}
-        />
+        entries.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>📝</Text>
+            <Text style={styles.emptyTitle}>No entries yet</Text>
+            <Text style={styles.emptySubtext}>Fill a template to create your first entry</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={entries}
+            renderItem={renderEntry}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.list}
+          />
+        )
       )}
     </SafeAreaView>
   );
@@ -441,25 +513,22 @@ export default function TemplatesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
   },
-  backButton: {
-    fontSize: 16,
-    color: '#007AFF',
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 8,
   },
   addButton: {
     backgroundColor: '#007AFF',
@@ -472,7 +541,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   saveButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#007AFF',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
@@ -481,92 +550,173 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
+  cancelButton: {
+    backgroundColor: '#ccc',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  cancelButtonText: {
+    color: '#333',
+    fontWeight: 'bold',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  activeTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#007AFF',
+  },
+  tabText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  activeTabText: {
+    color: '#007AFF',
+    fontWeight: 'bold',
+  },
   content: {
     flex: 1,
+  },
+  contentContainer: {
     padding: 16,
   },
   section: {
     marginBottom: 24,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 8,
     color: '#333',
   },
-  textInput: {
-    backgroundColor: 'white',
+  templateNameInput: {
     borderWidth: 1,
     borderColor: '#e0e0e0',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-  },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  addFieldSection: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  fieldTypeButton: {
-    backgroundColor: '#f0f0f0',
-    padding: 12,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 50,
-  },
-  fieldTypeButtonText: {
-    fontSize: 18,
+    backgroundColor: 'white',
   },
   addFieldButton: {
     backgroundColor: '#4CAF50',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
   },
   addFieldButtonText: {
     color: 'white',
     fontWeight: 'bold',
   },
-  fieldItem: {
+  fieldContainer: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  fieldHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  fieldLabelInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 4,
+    padding: 8,
+    fontSize: 14,
+    marginRight: 8,
+  },
+  removeFieldButton: {
+    backgroundColor: '#f44336',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeFieldText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  fieldTypeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  fieldTypeLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 8,
+  },
+  fieldTypeButton: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginRight: 4,
+    marginBottom: 4,
+  },
+  fieldTypeButtonActive: {
+    backgroundColor: '#007AFF',
+  },
+  fieldTypeButtonText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  fieldTypeButtonTextActive: {
+    color: 'white',
+  },
+  fieldInputHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'white',
-    padding: 12,
-    borderRadius: 8,
     marginBottom: 8,
   },
-  fieldInfo: {
-    flex: 1,
-  },
-  fieldName: {
+  fieldLabel: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: 'bold',
     color: '#333',
   },
-  fieldType: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
+  voiceButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
   },
-  removeFieldButton: {
-    backgroundColor: '#ff4444',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  removeFieldButtonText: {
-    color: 'white',
+  voiceButtonText: {
     fontSize: 12,
-    fontWeight: 'bold',
   },
-  templatesList: {
+  fieldInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: 'white',
+  },
+  longTextInput: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  list: {
     padding: 16,
   },
   templateCard: {
@@ -596,30 +746,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  actionButton: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  actionButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  viewButton: {
+  useButton: {
     backgroundColor: '#007AFF',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
   },
-  viewButtonText: {
+  useButtonText: {
     color: 'white',
     fontSize: 12,
     fontWeight: 'bold',
   },
   deleteButton: {
-    padding: 6,
+    padding: 4,
   },
   deleteButtonText: {
     fontSize: 16,
@@ -627,9 +766,6 @@ const styles = StyleSheet.create({
   templateMeta: {
     fontSize: 12,
     color: '#666',
-  },
-  entriesList: {
-    padding: 16,
   },
   entryCard: {
     backgroundColor: 'white',
@@ -646,24 +782,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  entryDate: {
-    fontSize: 12,
-    color: '#666',
-  },
-  entryField: {
     marginBottom: 8,
   },
-  entryFieldLabel: {
-    fontSize: 14,
-    fontWeight: '500',
+  entryTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
     color: '#333',
-    marginBottom: 2,
+    flex: 1,
   },
-  entryFieldValue: {
-    fontSize: 14,
+  entryActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  editButton: {
+    padding: 4,
+  },
+  editButtonText: {
+    fontSize: 16,
+  },
+  entryMeta: {
+    fontSize: 12,
     color: '#666',
+    marginBottom: 8,
+  },
+  entryContent: {
+    gap: 4,
+  },
+  entryField: {
+    fontSize: 14,
+    color: '#333',
   },
   emptyState: {
     flex: 1,
@@ -675,53 +822,15 @@ const styles = StyleSheet.create({
     fontSize: 48,
     marginBottom: 16,
   },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
   emptySubtext: {
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    width: '80%',
-    maxWidth: 300,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  fieldTypeOption: {
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-    backgroundColor: '#f0f0f0',
-  },
-  fieldTypeSelected: {
-    backgroundColor: '#007AFF',
-  },
-  fieldTypeText: {
-    fontSize: 16,
-    textAlign: 'center',
-    color: '#333',
-  },
-  modalCancelButton: {
-    padding: 16,
-    borderRadius: 8,
-    backgroundColor: '#ccc',
-    marginTop: 8,
-  },
-  modalCancelText: {
-    fontSize: 16,
-    textAlign: 'center',
-    color: '#333',
   },
 });

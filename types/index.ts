@@ -37,6 +37,7 @@ export interface FieldType {
   label: string;
   type: 'text' | 'number' | 'longtext' | 'date';
   required?: boolean;
+  placeholder?: string;
 }
 
 export interface CustomTemplate {
