@@ -1,0 +1,57 @@
+Build a mobile note-taking app using React Native (Expo) that supports profession-based templates and MVP features only. The app must focus on three professions: Doctor, Lawyer, and Developer. It should provide a clean, minimal mobile UI and work offline using AsyncStorage or SQLite. Target platform is Android and iOS via Expo.
+
+🔹 Key Requirements:
+
+1. **Onboarding Screen**:
+   - Let user choose from: Doctor, Lawyer, Developer
+   - Save selected profession locally
+   - Based on selection, load a profession-specific note template and UI theme
+
+2. **Profession-Specific Templates**:
+   - Each profession has its own note template and layout
+   - Use separate colors, icons, and headers per profession
+     - Doctor:
+       - Header: "Patient Notes"
+       - Template fields: Symptoms, Diagnosis, Prescription
+       - Color theme: Light blue / white
+     - Lawyer:
+       - Header: "Case Notes"
+       - Template fields: Client Name, Case Summary, Action Items
+       - Color theme: Dark grey / cream
+     - Developer:
+       - Header: "Dev Notes"
+       - Template fields: Feature, Code Snippet, To-Do
+       - Color theme: Purple / black
+
+3. **Voice-to-Text Note Creation**:
+   - Use mic button to convert speech to structured text
+   - Use expo-speech or integrate Google/Whisper-compatible API
+   - Auto-fill relevant fields from speech when possible
+
+4. **Reminders with Voice Input**:
+   - User can add a reminder via voice or text
+   - Reminder includes title and time
+   - Local push notification support via Expo Notifications
+
+5. **Simple Search**:
+   - Search notes by keyword or via voice
+   - Use basic string matching or Fuse.js
+   - Show results grouped by profession
+
+6. **Tomorrow’s Tasks Section**:
+   - Let users add a list of tasks for tomorrow with optional reminder times
+   - Show as a separate tab or section
+
+7. **Settings Page**:
+   - Allow user to change profession
+   - Toggle between paragraph view and bullet view
+
+🔹 UI/UX Guidelines:
+- Use only basic native components (Text, TextInput, FlatList, Button)
+- Clean, minimal design with mobile-first layout
+- Avoid unnecessary libraries unless essential
+- Responsive to small screens
+- Focus on clarity and speed of use
+
+All data must be stored offline only (no backend for now). Use React Native with Expo for quick development and deployment.
+
