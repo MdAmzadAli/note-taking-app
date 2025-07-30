@@ -23,15 +23,6 @@ export const startSpeechRecognition = async (options?: {
   continuous?: boolean;
 }): Promise<SpeechResult> => {
   try {
-    // Check if the native module is available
-    if (!ExpoSpeechRecognitionModule || !ExpoSpeechRecognitionModule.getStateAsync) {
-      return {
-        text: "",
-        success: false,
-        error: "Speech recognition native module not available (likely running in Expo Go)"
-      };
-    }
-
     // Check if speech recognition is available
     const state = await ExpoSpeechRecognitionModule.getStateAsync();
     
@@ -66,9 +57,7 @@ export const startSpeechRecognition = async (options?: {
 
 export const stopSpeechRecognition = async (): Promise<void> => {
   try {
-    if (ExpoSpeechRecognitionModule && ExpoSpeechRecognitionModule.stop) {
-      await ExpoSpeechRecognitionModule.stop();
-    }
+    await ExpoSpeechRecognitionModule.stop();
   } catch (error) {
     console.error('Error stopping speech recognition:', error);
   }
@@ -76,9 +65,7 @@ export const stopSpeechRecognition = async (): Promise<void> => {
 
 export const abortSpeechRecognition = async (): Promise<void> => {
   try {
-    if (ExpoSpeechRecognitionModule && ExpoSpeechRecognitionModule.abort) {
-      await ExpoSpeechRecognitionModule.abort();
-    }
+    await ExpoSpeechRecognitionModule.abort();
   } catch (error) {
     console.error('Error aborting speech recognition:', error);
   }
@@ -88,9 +75,6 @@ export const getSpeechRecognitionState = async (): Promise<{
   state: 'available' | 'unavailable' | 'denied';
 }> => {
   try {
-    if (!ExpoSpeechRecognitionModule || !ExpoSpeechRecognitionModule.getStateAsync) {
-      return { state: 'unavailable' };
-    }
     return await ExpoSpeechRecognitionModule.getStateAsync();
   } catch (error) {
     console.error('Error getting speech recognition state:', error);
