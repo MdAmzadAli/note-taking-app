@@ -54,51 +54,55 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     }
   }, [isListening]);
 
-  // Listen to speech recognition events
-  useSpeechRecognitionEvent('start', () => {
-    console.log('[VOICE] Speech recognition started');
-    setIsListening(true);
-    setPartialResults([]);
-    setFinalResult('');
-  });
-
-  useSpeechRecognitionEvent('end', () => {
-    console.log('[VOICE] Speech recognition ended');
-    setIsListening(false);
-  });
-
-  useSpeechRecognitionEvent('result', (event) => {
-    console.log('[VOICE] Speech recognition result:', event);
-    if (event.isFinal && event.results[0]) {
-      const result = event.results[0].transcript;
-      setFinalResult(result);
+  // Listen to speech recognition events (only if module is available)
+  try {
+    useSpeechRecognitionEvent('start', () => {
+      console.log('[VOICE] Speech recognition started');
+      setIsListening(true);
       setPartialResults([]);
-      setIsProcessing(true);
-      processVoiceCommand(result);
-    } else if (event.results[0]) {
-      setPartialResults([event.results[0].transcript]);
-    }
-  });
+      setFinalResult('');
+    });
 
-  useSpeechRecognitionEvent('error', (event) => {
-    console.log('[VOICE] Speech recognition error:', event);
-    setIsListening(false);
-    setIsProcessing(false);
+    useSpeechRecognitionEvent('end', () => {
+      console.log('[VOICE] Speech recognition ended');
+      setIsListening(false);
+    });
 
-    const errorMessages: { [key: string]: string } = {
-      'no-speech': 'No speech was detected. Please try again.',
-      'aborted': 'Speech recognition was aborted.',
-      'audio-capture': 'Audio capture failed. Check microphone availability.',
-      'network': 'Network error. Please check your internet connection.',
-      'not-allowed': 'Microphone permission denied. Please enable in settings.',
-      'service-not-allowed': 'Speech recognition service not allowed.',
-      'bad-grammar': 'Grammar error in speech recognition.',
-      'language-not-supported': 'Language not supported.',
-    };
+    useSpeechRecognitionEvent('result', (event) => {
+      console.log('[VOICE] Speech recognition result:', event);
+      if (event.isFinal && event.results[0]) {
+        const result = event.results[0].transcript;
+        setFinalResult(result);
+        setPartialResults([]);
+        setIsProcessing(true);
+        processVoiceCommand(result);
+      } else if (event.results[0]) {
+        setPartialResults([event.results[0].transcript]);
+      }
+    });
 
-    const message = errorMessages[event.error] || `Speech recognition error: ${event.error}`;
-    Alert.alert('Voice Recognition Error', message);
-  });
+    useSpeechRecognitionEvent('error', (event) => {
+      console.log('[VOICE] Speech recognition error:', event);
+      setIsListening(false);
+      setIsProcessing(false);
+
+      const errorMessages: { [key: string]: string } = {
+        'no-speech': 'No speech was detected. Please try again.',
+        'aborted': 'Speech recognition was aborted.',
+        'audio-capture': 'Audio capture failed. Check microphone availability.',
+        'network': 'Network error. Please check your internet connection.',
+        'not-allowed': 'Microphone permission denied. Please enable in settings.',
+        'service-not-allowed': 'Speech recognition service not allowed.',
+        'bad-grammar': 'Grammar error in speech recognition.',
+        'language-not-supported': 'Language not supported.',
+      };
+
+      const message = errorMessages[event.error] || `Speech recognition error: ${event.error}`;
+      Alert.alert('Voice Recognition Error', message);
+    });
+  } catch (error) {
+    console.log('[VOICE] Unable to set up speech recognition event listeners:', error);
+  }
 
   const loadUserSettings = async () => {
     try {
@@ -111,6 +115,13 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
   const initializeVoice = async () => {
     try {
+      // Check if the native module is available
+      if (!ExpoSpeechRecognitionModule || !ExpoSpeechRecognitionModule.getStateAsync) {
+        console.log('[VOICE] ExpoSpeechRecognition native module not available');
+        setVoiceSupported(false);
+        return;
+      }
+
       // Check if speech recognition is available
       const available = await ExpoSpeechRecognitionModule.getStateAsync();
       console.log('[VOICE] Speech recognition state:', available);
@@ -123,7 +134,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
         console.log('[VOICE] Speech recognition not available:', available.state);
       }
     } catch (error) {
-      console.log('[VOICE] Speech recognition not available:', error);
+      console.log('[VOICE] Speech recognition not available (native module error):', error);
       setVoiceSupported(false);
     }
   };
@@ -266,7 +277,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
         }),
       ]).start();
 
-      if (voiceSupported) {
+      if (voiceSupported && ExpoSpeechRecognitionModule && ExpoSpeechRecognitionModule.start) {
         // Production: Use real voice recognition
         console.log('[VOICE] Starting speech recognition...');
 
@@ -323,7 +334,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
   const stopListening = async () => {
     try {
-      if (voiceSupported) {
+      if (voiceSupported && ExpoSpeechRecognitionModule && ExpoSpeechRecognitionModule.stop) {
         await ExpoSpeechRecognitionModule.stop();
       }
       setIsListening(false);
@@ -334,7 +345,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
   const cancelListening = async () => {
     try {
-      if (voiceSupported) {
+      if (voiceSupported && ExpoSpeechRecognitionModule && ExpoSpeechRecognitionModule.abort) {
         await ExpoSpeechRecognitionModule.abort();
       }
       setIsListening(false);
