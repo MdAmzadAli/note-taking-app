@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Platform } from 'react-native';
 
@@ -30,22 +29,18 @@ type IconSymbolName =
  * - see Ionicons in the [Icons Directory](https://ionic.io/ionicons).
  * - see SF Symbols in the [SF Symbols](https://developer.apple.com/sf-symbols/) app.
  */
-const MAPPING = {
+const MAPPING: IconMapping = {
+  // Add more mappings as needed
   'house.fill': 'home',
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code-slash',
   'chevron.right': 'chevron-forward',
-  'doc.text': 'document-text',
-  'note.text': 'document-text',
   'magnifyingglass': 'search',
-  'bell': 'notifications',
-  'checklist': 'checkmark-circle',
-  'checkmark.square': 'checkbox',
-  'gearshape': 'settings',
-  'gear': 'settings',
-  'document.badge.plus': 'add-circle',
   'line.horizontal.3': 'menu',
-} as IconMapping;
+  'note.text': 'document-text',
+  'mic': 'mic',
+  'mic.fill': 'mic',
+} as const;
 
 /**
  * An icon component that uses native SF Symbols on iOS, and Ionicons on Android and web.
@@ -67,7 +62,7 @@ export function IconSymbol({
 }) {
   // For now, always use Ionicons until we fix the iOS integration properly
   const ioniconsName = MAPPING[name];
-  
+
   if (!ioniconsName) {
     console.warn(`IconSymbol: No mapping found for "${name}"`);
     return <Ionicons color={color} size={size} name="help-outline" style={style} />;

@@ -18,6 +18,7 @@ import { Task } from '@/types';
 import { getTasks, saveTask, deleteTask, getUserSettings } from '@/utils/storage';
 import { scheduleNotification, cancelNotification } from '@/utils/notifications';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
+import VoiceInput from '@/components/VoiceInput';
 
 export default function TasksScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -510,6 +511,18 @@ export default function TasksScreen() {
           >
             <IconSymbol size={20} name="magnifyingglass" color="#FFFFFF" />
           </TouchableOpacity>
+          <VoiceInput
+            onCommandExecuted={(result) => {
+              if (result.data && result.data.id) {
+                loadTasksAndSettings(); // Refresh tasks list
+              }
+            }}
+            onSearchRequested={(query, results) => {
+              setSearchQuery(query);
+              setIsSearchVisible(true);
+            }}
+            style={styles.voiceInputButton}
+          />
           <TouchableOpacity
             style={styles.addButton}
             onPress={() => setIsCreating(true)}
@@ -873,5 +886,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'Inter',
     lineHeight: 25.6,
+  },
+  voiceInputButton: {
+    marginHorizontal: 4,
   },
 });

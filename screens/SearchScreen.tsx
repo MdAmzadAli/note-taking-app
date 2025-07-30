@@ -13,6 +13,7 @@ import { Note, Task, Reminder } from '@/types';
 import { getNotes, getTasks, getReminders, getUserSettings } from '@/utils/storage';
 import { searchContent } from '@/utils/search';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
+import VoiceInput from '@/components/VoiceInput';
 
 export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -98,6 +99,16 @@ export default function SearchScreen() {
           placeholder="Search notes, tasks, and reminders..."
           placeholderTextColor="#6B7280"
           autoFocus
+        />
+        <VoiceInput
+          onCommandExecuted={(result) => {
+            console.log('Voice command executed:', result);
+          }}
+          onSearchRequested={(query, results) => {
+            setSearchQuery(query);
+            setSearchResults(results);
+          }}
+          style={styles.voiceInputButton}
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity
@@ -256,5 +267,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'Inter',
     lineHeight: 25.6,
+  },
+  voiceInputButton: {
+    marginHorizontal: 4,
   },
 });

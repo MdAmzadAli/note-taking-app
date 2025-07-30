@@ -21,6 +21,7 @@ import { Note, CustomTemplate, TemplateEntry, FieldType } from '@/types';
 import { getNotes, saveNote, deleteNote, getUserSettings, getCustomTemplates, saveTemplateEntry, getTemplateEntries } from '@/utils/storage';
 import { mockSpeechToText } from '@/utils/speech';
 import TemplateEntriesScreen from './TemplateEntriesScreen';
+import VoiceInput from '@/components/VoiceInput';
 
 interface SimpleNote {
   id: string;
@@ -405,6 +406,18 @@ export default function NotesScreen() {
           <TouchableOpacity style={styles.iconButton} onPress={() => setIsSearchVisible(!isSearchVisible)}>
             <IconSymbol size={24} name="magnifyingglass" color="#FFFFFF" />
           </TouchableOpacity>
+          <VoiceInput
+            onCommandExecuted={(result) => {
+              if (result.data && result.data.id) {
+                loadNotes(); // Refresh notes list
+              }
+            }}
+            onSearchRequested={(query, results) => {
+              setSearchQuery(query);
+              setIsSearchVisible(true);
+            }}
+            style={styles.voiceInputButton}
+          />
           <TouchableOpacity style={styles.iconButton} onPress={openMenu}>
             <IconSymbol size={24} name="line.horizontal.3" color="#FFFFFF" />
           </TouchableOpacity>
@@ -804,5 +817,8 @@ const styles = StyleSheet.create({
   },
   templateContentContainer: {
     padding: 16,
+  },
+  voiceInputButton: {
+    marginHorizontal: 4,
   },
 });

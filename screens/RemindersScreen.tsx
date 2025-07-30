@@ -19,6 +19,7 @@ import { getReminders, saveReminder, deleteReminder, getUserSettings } from '@/u
 import { scheduleNotification, cancelNotification } from '@/utils/notifications';
 import { mockSpeechToText } from '@/utils/speech';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
+import VoiceInput from '@/components/VoiceInput';
 
 export default function RemindersScreen() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
@@ -433,6 +434,18 @@ export default function RemindersScreen() {
           >
             <IconSymbol size={20} name="magnifyingglass" color="#FFFFFF" />
           </TouchableOpacity>
+          <VoiceInput
+            onCommandExecuted={(result) => {
+              if (result.data && result.data.id) {
+                loadRemindersAndSettings(); // Refresh reminders list
+              }
+            }}
+            onSearchRequested={(query, results) => {
+              setSearchQuery(query);
+              setIsSearchVisible(true);
+            }}
+            style={styles.voiceInputButton}
+          />
           <TouchableOpacity
             style={styles.addButton}
             onPress={() => setIsCreating(true)}
@@ -736,5 +749,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'Inter',
     lineHeight: 25.6,
+  },
+  voiceInputButton: {
+    marginHorizontal: 4,
   },
 });

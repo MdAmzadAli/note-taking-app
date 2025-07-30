@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -11,9 +10,9 @@ import {
   Platform,
   SafeAreaView,
 } from 'react-native';
-import { PROFESSIONS, ProfessionType } from '@/constants/professions';
-import { UserSettings } from '@/types';
 import { getUserSettings, saveUserSettings, clearAllData } from '@/utils/storage';
+import { PROFESSIONS, ProfessionType } from '@/constants/professions';
+import VoiceCommandsScreen from './VoiceCommandsScreen';
 
 export default function SettingsScreen() {
   const [settings, setSettings] = useState<UserSettings>({
@@ -22,6 +21,7 @@ export default function SettingsScreen() {
     isOnboardingComplete: true,
   });
   const [currentProfession, setCurrentProfession] = useState<ProfessionType>('doctor');
+  const [showVoiceCommands, setShowVoiceCommands] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -101,11 +101,19 @@ export default function SettingsScreen() {
 
   const professionConfig = PROFESSIONS[currentProfession];
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Settings</Text>
-      </View>
+  if (showVoiceCommands) {
+      return (
+        <VoiceCommandsScreen
+          onBack={() => setShowVoiceCommands(false)}
+        />
+      );
+    }
+
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Settings</Text>
+        </View>
 
       <ScrollView style={styles.content}>
         {/* Current Profession */}
@@ -189,7 +197,14 @@ export default function SettingsScreen() {
         {/* Danger Zone */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: '#000000' }]}>Danger Zone</Text>
-          <TouchableOpacity style={styles.dangerButton} onPress={resetAllData}>
+           <TouchableOpacity 
+              style={styles.helpButton} 
+              onPress={() => setShowVoiceCommands(true)}
+            >
+              <Text style={styles.helpButtonText}>Voice Commands Help</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.dangerButton} onPress={resetAllData}>
             <Text style={styles.dangerButtonText}>Reset All Data</Text>
           </TouchableOpacity>
         </View>
@@ -352,6 +367,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#000000',
+    fontFamily: 'Inter',
+  },
+  helpButton: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  helpButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
     fontFamily: 'Inter',
   },
 });
