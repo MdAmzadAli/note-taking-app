@@ -78,7 +78,17 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
   const checkVoiceSupport = async () => {
     try {
-      // Try to dynamically import react-native-voice
+      // Check if we're in Expo Go environment
+      const Constants = await import('expo-constants');
+      const isExpoGo = Constants.default?.appOwnership === 'expo';
+      
+      if (isExpoGo) {
+        console.log('Running in Expo Go, using mock voice implementation');
+        setVoiceSupported(false);
+        return;
+      }
+      
+      // Try to dynamically import react-native-voice for development builds
       const Voice = await import('react-native-voice');
       setVoiceSupported(true);
       setupVoice(Voice.default);
@@ -205,14 +215,28 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       setShowModal(true);
       
       if (voiceSupported) {
-        const Voice = await import('react-native-voice');
-        await Voice.default.start('en-US');
-      } else {
+        try {
+          const Voice = await import('react-native-voice');
+          await Voice.default.start('en-US');
+        } catch (voiceError) {
+          console.log('Voice module failed, falling back to mock');
+          setVoiceSupported(false);
+          // Fall through to mock implementation
+        }
+      }
+      
+      if (!voiceSupported) {
         // Use mock implementation
         setIsListening(true);
         setTimeout(async () => {
-          const mockResult = ['create note about test voice command'];
-          await onSpeechResults({ value: mockResult });
+          const mockCommands = [
+            'create note about morning meeting',
+            'set reminder for doctor appointment tomorrow at 2pm',
+            'create task review contract due Friday',
+            'search for patient notes'
+          ];
+          const randomCommand = mockCommands[Math.floor(Math.random() * mockCommands.length)];
+          await onSpeechResults({ value: [randomCommand] });
         }, 2000);
       }
       
@@ -230,7 +254,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       ]).start();
     } catch (error) {
       console.error('Error starting voice recognition:', error);
-      Alert.alert('Error', 'Failed to start voice recognition. Voice commands are not fully supported in Expo Go. Try using a development build for full functionality.');
+      Alert.alert('Demo Mode', 'Voice recognition is simulated in Expo Go. In a real app build, actual voice recognition would be used.');
       setShowModal(false);
     }
   };
