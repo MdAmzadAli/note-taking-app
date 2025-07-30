@@ -11,10 +11,21 @@ const KEYS = {
 };
 
 // Notes
+// Get all notes
 export const getNotes = async (): Promise<Note[]> => {
   try {
     const notesData = await AsyncStorage.getItem(KEYS.NOTES);
-    return notesData ? JSON.parse(notesData) : [];
+    if (notesData) {
+      const notes = JSON.parse(notesData);
+      // Ensure backward compatibility by adding missing fields
+      return notes.map((note: any) => ({
+        ...note,
+        writingStyle: note.writingStyle || 'mind_dump',
+        sections: note.sections || undefined,
+        checkedItems: note.checkedItems || undefined,
+      }));
+    }
+    return [];
   } catch (error) {
     console.error('Error getting notes:', error);
     return [];

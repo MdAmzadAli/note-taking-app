@@ -17,11 +17,13 @@ import {
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { Note, CustomTemplate, TemplateEntry, FieldType } from '@/types';
+import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSection } from '@/types';
 import { getNotes, saveNote, deleteNote, getUserSettings, getCustomTemplates, saveTemplateEntry, getTemplateEntries } from '@/utils/storage';
 import { mockSpeechToText } from '@/utils/speech';
 import TemplateEntriesScreen from './TemplateEntriesScreen';
 import VoiceInput from '@/components/VoiceInput';
+import WritingStyleSelector from '@/components/WritingStyleSelector';
+import WritingStyleEditor from '@/components/WritingStyleEditor';
 
 interface SimpleNote {
   id: string;
@@ -49,6 +51,9 @@ export default function NotesScreen() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [selectedWritingStyle, setSelectedWritingStyle] = useState<WritingStyle>('mind_dump');
+  const [noteSections, setNoteSections] = useState<NoteSection[]>([]);
+  const [checkedItems, setCheckedItems] = useState<boolean[]>([]);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
 
   useEffect(() => {
@@ -114,14 +119,44 @@ export default function NotesScreen() {
     }
   };
 
+  const handleContentChange = (content: string, sections?: NoteSection[], checkedItems?: boolean[]) => {
+    setCurrentNoteText(content);
+    if (sections) setNoteSections(sections);
+    if (checkedItems) setCheckedItems(checkedItems);
+  };
+
+  const handleWritingStyleChange = (style: WritingStyle) => {
+    setSelectedWritingStyle(style);
+    // Reset content when changing styles to avoid conflicts
+    if (style !== selectedWritingStyle) {
+      setNoteSections([]);
+      setCheckedItems([]);
+    }
+  };
+
   const saveCurrentNote = async () => {
-    if (!currentNoteText.trim()) {
+    if (!currentNoteText.trim() && noteSections.length === 0) {
       Alert.alert('Error', 'Please enter some content for your note');
       return;
     }
 
     try {
       const now = new Date().toISOString();
+      
+      // Generate title based on writing style and content
+      let title = '';
+      if (selectedWritingStyle === 'cornell' && noteSections.length > 0) {
+        const notesSection = noteSections.find(s => s.type === 'notes');
+        title = (notesSection?.content || currentNoteText).substring(0, 50);
+      } else if (selectedWritingStyle === 'checklist') {
+        const lines = currentNoteText.split('\n').filter(line => line.trim());
+        title = lines.length > 0 ? `Checklist: ${lines[0]}` : 'New Checklist';
+      } else {
+        title = currentNoteText.substring(0, 50);
+      }
+      
+      if (title.length > 50) title += '...';
+      if (!title.trim()) title = `${selectedWritingStyle} note`;
 
       if (isEditing && editingNoteId) {
         // Update existing note
@@ -129,10 +164,13 @@ export default function NotesScreen() {
         if (existingNote) {
           const updatedNote: Note = {
             id: existingNote.id,
-            title: currentNoteText.substring(0, 50) + (currentNoteText.length > 50 ? '...' : ''),
+            title,
             content: currentNoteText,
             profession: 'general',
             fields: {},
+            writingStyle: selectedWritingStyle,
+            sections: noteSections.length > 0 ? noteSections : undefined,
+            checkedItems: checkedItems.length > 0 ? checkedItems : undefined,
             createdAt: existingNote.createdAt,
             updatedAt: now,
           };
@@ -142,31 +180,65 @@ export default function NotesScreen() {
         // Create new note
         const newNote: Note = {
           id: Date.now().toString(),
-          title: currentNoteText.substring(0, 50) + (currentNoteText.length > 50 ? '...' : ''),
+          title,
           content: currentNoteText,
           profession: 'general',
           fields: {},
+          writingStyle: selectedWritingStyle,
+          sections: noteSections.length > 0 ? noteSections : undefined,
+          checkedItems: checkedItems.length > 0 ? checkedItems : undefined,
           createdAt: now,
           updatedAt: now,
         };
         await saveNote(newNote);
       }
 
+      // Reset all state
       setCurrentNoteText('');
+      setSelectedWritingStyle('mind_dump');
+      setNoteSections([]);
+      setCheckedItems([]);
       setIsCreating(false);
       setIsEditing(false);
       setEditingNoteId(null);
       loadNotes();
     } catch (error) {
+      console.error('Error saving note:', error);
       Alert.alert('Error', 'Failed to save note');
     }
   };
 
-  const editNote = (note: SimpleNote) => {
-    setCurrentNoteText(note.content);
-    setEditingNoteId(note.id);
-    setIsEditing(true);
-    setIsCreating(true);
+  const editNote = async (note: SimpleNote) => {
+    try {
+      // Load the full note data to get writing style info
+      const fullNotes = await getNotes();
+      const fullNote = fullNotes.find(n => n.id === note.id);
+      
+      if (fullNote) {
+        setCurrentNoteText(fullNote.content);
+        setSelectedWritingStyle(fullNote.writingStyle || 'mind_dump');
+        setNoteSections(fullNote.sections || []);
+        setCheckedItems(fullNote.checkedItems || []);
+      } else {
+        setCurrentNoteText(note.content);
+        setSelectedWritingStyle('mind_dump');
+        setNoteSections([]);
+        setCheckedItems([]);
+      }
+      
+      setEditingNoteId(note.id);
+      setIsEditing(true);
+      setIsCreating(true);
+    } catch (error) {
+      console.error('Error loading note for editing:', error);
+      setCurrentNoteText(note.content);
+      setSelectedWritingStyle('mind_dump');
+      setNoteSections([]);
+      setCheckedItems([]);
+      setEditingNoteId(note.id);
+      setIsEditing(true);
+      setIsCreating(true);
+    }
   };
 
   const deleteNoteHandler = async (noteId: string) => {
@@ -376,6 +448,9 @@ export default function NotesScreen() {
                 setIsEditing(false);
                 setEditingNoteId(null);
                 setCurrentNoteText('');
+                setSelectedWritingStyle('mind_dump');
+                setNoteSections([]);
+                setCheckedItems([]);
               }}
             >
               <Text style={styles.iconButtonText}>Cancel</Text>
@@ -384,14 +459,17 @@ export default function NotesScreen() {
         </View>
 
         <View style={styles.editorContainer}>
-          <TextInput
-            style={styles.noteEditor}
-            value={currentNoteText}
-            onChangeText={setCurrentNoteText}
-            placeholder="Start typing your note..."
-            multiline
-            textAlignVertical="top"
-            autoFocus
+          <WritingStyleSelector
+            selectedStyle={selectedWritingStyle}
+            onStyleChange={handleWritingStyleChange}
+          />
+          <WritingStyleEditor
+            style={selectedWritingStyle}
+            content={currentNoteText}
+            sections={noteSections}
+            checkedItems={checkedItems}
+            onContentChange={handleContentChange}
+            onVoiceInput={handleVoiceInput}
           />
         </View>
       </SafeAreaView>

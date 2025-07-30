@@ -12,7 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { IconSymbol } from './ui/IconSymbol';
-import { parseVoiceCommand, executeVoiceCommand, getExampleCommands, VoiceCommand } from '@/utils/voiceCommands';
+import { parseVoiceCommand, executeVoiceCommand, getExampleCommands, processFuzzyThought, VoiceCommand, FuzzyProcessingResult } from '@/utils/voiceCommands';
 import { getUserSettings } from '@/utils/storage';
 import { requestMicrophonePermission } from '@/utils/permissions';
 
@@ -29,6 +29,8 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
   const [isProcessing, setIsProcessing] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [lastCommand, setLastCommand] = useState<VoiceCommand | null>(null);
+  const [fuzzyResult, setFuzzyResult] = useState<FuzzyProcessingResult | null>(null);
+  const [showFuzzyComparison, setShowFuzzyComparison] = useState(false);
   const [profession, setProfession] = useState('doctor');
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [Voice, setVoice] = useState<any>(null);
@@ -193,12 +195,62 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
   const processVoiceCommand = async (speechText: string) => {
     try {
-      // Parse and execute command
-      const command = parseVoiceCommand(speechText);
+      // First, process fuzzy thoughts
+      const fuzzyProcessing = processFuzzyThought(speechText);
+      setFuzzyResult(fuzzyProcessing);
+      
+      // Show comparison if the text was significantly cleaned
+      if (fuzzyProcessing.confidence > 0.6 && fuzzyProcessing.cleanedText !== fuzzyProcessing.originalText) {
+        setShowFuzzyComparison(true);
+        return; // Wait for user confirmation
+      }
+      
+      // Parse and execute command using cleaned text
+      const textToProcess = fuzzyProcessing.cleanedText || speechText;
+      const command = parseVoiceCommand(textToProcess);
+      command.cleanedText = fuzzyProcessing.cleanedText;
+      command.confidence = fuzzyProcessing.confidence;
       setLastCommand(command);
       
       console.log('[VOICE] Parsed command:', command);
+      console.log('[VOICE] Fuzzy processing result:', fuzzyProcessing);
       
+      const executionResult = await executeVoiceCommand(command, profession);
+      
+      if (executionResult.success) {
+        if (command.intent === 'search' && executionResult.data) {
+          onSearchRequested?.(command.parameters.query, executionResult.data);
+        } else {
+          onCommandExecuted?.(executionResult);
+        }
+        
+        Alert.alert('Voice Command Executed', executionResult.message);
+      } else {
+        Alert.alert('Command Not Understood', executionResult.message);
+      }
+    } catch (error) {
+      console.error('[VOICE] Error executing command:', error);
+      Alert.alert('Error', 'Failed to execute voice command');
+    } finally {
+      setIsProcessing(false);
+      setTimeout(() => {
+        resetState();
+        setShowModal(false);
+      }, 2000);
+    }
+  };
+
+  const confirmFuzzyProcessing = async (useCleanedVersion: boolean) => {
+    setShowFuzzyComparison(false);
+    if (!fuzzyResult) return;
+    
+    const textToUse = useCleanedVersion ? fuzzyResult.cleanedText : fuzzyResult.originalText;
+    const command = parseVoiceCommand(textToUse);
+    command.cleanedText = useCleanedVersion ? fuzzyResult.cleanedText : undefined;
+    command.confidence = fuzzyResult.confidence;
+    setLastCommand(command);
+    
+    try {
       const executionResult = await executeVoiceCommand(command, profession);
       
       if (executionResult.success) {
@@ -345,6 +397,8 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     setPartialResults([]);
     setFinalResult('');
     setLastCommand(null);
+    setFuzzyResult(null);
+    setShowFuzzyComparison(false);
     setIsProcessing(false);
   };
 
@@ -443,10 +497,53 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
               </View>
             ) : null}
 
-            {lastCommand && (
+            {showFuzzyComparison && fuzzyResult && (
+              <View style={styles.fuzzyComparisonContainer}>
+                <Text style={styles.fuzzyComparisonLabel}>AI cleaned up your speech:</Text>
+                
+                <View style={styles.comparisonSection}>
+                  <Text style={styles.comparisonSectionLabel}>Original:</Text>
+                  <Text style={styles.originalText}>{fuzzyResult.originalText}</Text>
+                </View>
+                
+                <View style={styles.comparisonSection}>
+                  <Text style={styles.comparisonSectionLabel}>Cleaned:</Text>
+                  <Text style={styles.cleanedText}>{fuzzyResult.cleanedText}</Text>
+                </View>
+                
+                {fuzzyResult.suggestedChanges.length > 0 && (
+                  <View style={styles.changesContainer}>
+                    <Text style={styles.changesLabel}>Changes made:</Text>
+                    {fuzzyResult.suggestedChanges.map((change, index) => (
+                      <Text key={index} style={styles.changeText}>• {change}</Text>
+                    ))}
+                  </View>
+                )}
+                
+                <View style={styles.fuzzyActions}>
+                  <TouchableOpacity 
+                    style={styles.fuzzyButton}
+                    onPress={() => confirmFuzzyProcessing(false)}
+                  >
+                    <Text style={styles.fuzzyButtonText}>Use Original</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.fuzzyButton, styles.fuzzyButtonPrimary]}
+                    onPress={() => confirmFuzzyProcessing(true)}
+                  >
+                    <Text style={[styles.fuzzyButtonText, styles.fuzzyButtonTextPrimary]}>Use Cleaned</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {lastCommand && !showFuzzyComparison && (
               <View style={styles.commandContainer}>
                 <Text style={styles.commandLabel}>Detected command:</Text>
                 <Text style={styles.commandIntent}>{lastCommand.intent.replace('_', ' ')}</Text>
+                {lastCommand.cleanedText && (
+                  <Text style={styles.cleanedIndicator}>✨ AI enhanced</Text>
+                )}
                 {Object.keys(lastCommand.parameters).length > 0 && (
                   <View style={styles.parametersContainer}>
                     {Object.entries(lastCommand.parameters).map(([key, value]) => (
@@ -472,7 +569,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
                   <Text style={styles.stopButtonText}>Stop Listening</Text>
                 </TouchableOpacity>
               )}
-              {!isListening && !isProcessing && (
+              {!isListening && !isProcessing && !showFuzzyComparison && (
                 <TouchableOpacity onPress={startListening} style={styles.startButton}>
                   <Text style={styles.startButtonText}>Start Again</Text>
                 </TouchableOpacity>
@@ -685,5 +782,98 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     fontFamily: 'Inter',
+  },
+  fuzzyComparisonContainer: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  fuzzyComparisonLabel: {
+    fontSize: 16,
+    color: '#92400E',
+    fontFamily: 'Inter',
+    fontWeight: 'bold',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  comparisonSection: {
+    marginBottom: 12,
+  },
+  comparisonSectionLabel: {
+    fontSize: 14,
+    color: '#92400E',
+    fontFamily: 'Inter',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  originalText: {
+    fontSize: 14,
+    color: '#7C2D12',
+    fontFamily: 'Inter',
+    backgroundColor: '#FED7AA',
+    padding: 8,
+    borderRadius: 6,
+    fontStyle: 'italic',
+  },
+  cleanedText: {
+    fontSize: 14,
+    color: '#14532D',
+    fontFamily: 'Inter',
+    backgroundColor: '#D1FAE5',
+    padding: 8,
+    borderRadius: 6,
+    fontWeight: '500',
+  },
+  changesContainer: {
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  changesLabel: {
+    fontSize: 12,
+    color: '#92400E',
+    fontFamily: 'Inter',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  changeText: {
+    fontSize: 11,
+    color: '#A16207',
+    fontFamily: 'Inter',
+    marginBottom: 2,
+  },
+  fuzzyActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  fuzzyButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D97706',
+    alignItems: 'center',
+  },
+  fuzzyButtonPrimary: {
+    backgroundColor: '#D97706',
+  },
+  fuzzyButtonText: {
+    color: '#D97706',
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: 'Inter',
+  },
+  fuzzyButtonTextPrimary: {
+    color: '#FFFFFF',
+  },
+  cleanedIndicator: {
+    fontSize: 12,
+    color: '#059669',
+    fontFamily: 'Inter',
+    fontWeight: '500',
+    fontStyle: 'italic',
   },
 });

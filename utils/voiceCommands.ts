@@ -8,6 +8,16 @@ export interface VoiceCommand {
   intent: 'search' | 'create_note' | 'set_reminder' | 'create_task' | 'unknown';
   parameters: Record<string, any>;
   originalText: string;
+  cleanedText?: string;
+  confidence?: number;
+}
+
+export interface FuzzyProcessingResult {
+  originalText: string;
+  cleanedText: string;
+  detectedIntent: string;
+  confidence: number;
+  suggestedChanges: string[];
 }
 
 export interface SearchResult {
@@ -15,6 +25,114 @@ export interface SearchResult {
   item: Note | Task | Reminder;
   relevance: number;
 }
+
+// Process fuzzy thoughts into clear, structured text
+export const processFuzzyThought = (text: string): FuzzyProcessingResult => {
+  const lowerText = text.toLowerCase().trim();
+  let cleanedText = text;
+  let detectedIntent = 'unknown';
+  let confidence = 0.5;
+  const suggestedChanges: string[] = [];
+
+  // Remove filler words and hesitations
+  const fillerWords = [
+    'uhh', 'umm', 'uh', 'um', 'like', 'you know', 'actually', 'basically',
+    'literally', 'sort of', 'kind of', 'i guess', 'maybe', 'probably',
+    'i think', 'i mean', 'well', 'so', 'anyway', 'or something', 'or whatever'
+  ];
+
+  let processedText = cleanedText;
+  fillerWords.forEach(filler => {
+    const regex = new RegExp(`\\b${filler}\\b`, 'gi');
+    if (regex.test(processedText)) {
+      processedText = processedText.replace(regex, '').replace(/\s+/g, ' ').trim();
+      suggestedChanges.push(`Removed filler word: "${filler}"`);
+    }
+  });
+
+  // Detect and restructure common fuzzy patterns
+  const patterns = [
+    // Reminder patterns
+    {
+      regex: /(?:remind me|remember|don't forget).+?(?:about|to).+?(tomorrow|today|next week|later|in \d+ hours?|at \d+)/i,
+      intent: 'set_reminder',
+      restructure: (match: string) => {
+        const timeMatch = match.match(/(tomorrow|today|next week|later|in \d+ hours?|at \d+.*?)$/i);
+        const taskMatch = match.match(/(?:about|to)\s+(.+?)(?:\s+(?:tomorrow|today|next week|later|in \d+|at \d+))/i);
+        const time = timeMatch ? timeMatch[1] : 'tomorrow';
+        const task = taskMatch ? taskMatch[1].trim() : 'follow up';
+        return `Set reminder: ${task} ${time}.`;
+      }
+    },
+    // Note creation patterns
+    {
+      regex: /(?:write down|note|jot down|remember).+?(?:about|that).+/i,
+      intent: 'create_note',
+      restructure: (match: string) => {
+        const contentMatch = match.match(/(?:about|that)\s+(.+)$/i);
+        const content = contentMatch ? contentMatch[1].trim() : match;
+        return `Create note: ${content}.`;
+      }
+    },
+    // Task creation patterns
+    {
+      regex: /(?:need to|have to|should|must).+?(?:do|finish|complete|work on).+/i,
+      intent: 'create_task',
+      restructure: (match: string) => {
+        const taskMatch = match.match(/(?:do|finish|complete|work on)\s+(.+?)(?:\s+(?:by|before|due).*)?$/i);
+        const dueMatch = match.match(/(?:by|before|due)\s+(.+)$/i);
+        const task = taskMatch ? taskMatch[1].trim() : match;
+        const due = dueMatch ? ` due ${dueMatch[1]}` : '';
+        return `Create task: ${task}${due}.`;
+      }
+    },
+    // Search patterns
+    {
+      regex: /(?:find|look for|search|where is|show me).+/i,
+      intent: 'search',
+      restructure: (match: string) => {
+        const queryMatch = match.match(/(?:find|look for|search|where is|show me)\s+(.+)$/i);
+        const query = queryMatch ? queryMatch[1].trim() : match;
+        return `Search for: ${query}.`;
+      }
+    }
+  ];
+
+  // Apply pattern matching and restructuring
+  for (const pattern of patterns) {
+    if (pattern.regex.test(lowerText)) {
+      try {
+        cleanedText = pattern.restructure(processedText);
+        detectedIntent = pattern.intent;
+        confidence = 0.8;
+        suggestedChanges.push(`Restructured as ${pattern.intent.replace('_', ' ')}`);
+        break;
+      } catch (error) {
+        console.error('Error applying pattern:', error);
+      }
+    }
+  }
+
+  // Clean up punctuation and capitalization
+  cleanedText = cleanedText
+    .replace(/\s+/g, ' ') // Multiple spaces to single
+    .replace(/([.!?])\s*([a-z])/g, (match, punct, letter) => `${punct} ${letter.toUpperCase()}`) // Capitalize after punctuation
+    .replace(/^[a-z]/, (match) => match.toUpperCase()) // Capitalize first letter
+    .trim();
+
+  // Ensure proper ending punctuation
+  if (!/[.!?]$/.test(cleanedText)) {
+    cleanedText += '.';
+  }
+
+  return {
+    originalText: text,
+    cleanedText,
+    detectedIntent,
+    confidence,
+    suggestedChanges
+  };
+};
 
 // Parse voice command using regex patterns
 export const parseVoiceCommand = (text: string): VoiceCommand => {
@@ -361,11 +479,16 @@ const handleCreateTaskCommand = async (title: string, dueDateStr: string, profes
 // Get example commands for help
 export const getExampleCommands = (): string[] => [
   "Search for patient notes",
-  "Create note about morning meeting",
+  "Create note about morning meeting", 
   "Set reminder for doctor appointment tomorrow at 2pm",
   "Create task review contract due Friday",
   "Find tasks about project",
   "New note called shopping list",
   "Remind me to call John in 2 hours",
-  "Add task finish presentation due tomorrow"
+  "Add task finish presentation due tomorrow",
+  // Fuzzy thought examples
+  "uhh... remind me about dentist or something tomorrow",
+  "I need to like... write down something about the meeting",
+  "maybe I should search for umm... project files",
+  "I think I have to finish that presentation by Friday"
 ];

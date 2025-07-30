@@ -1,10 +1,20 @@
+export type WritingStyle = 'bullet' | 'journal' | 'cornell' | 'mind_dump' | 'checklist';
+
+export interface NoteSection {
+  id: string;
+  type: 'cue' | 'notes' | 'summary' | 'content';
+  content: string;
+}
 
 export interface Note {
   id: string;
   title: string;
   content: string;
-  profession: string;
+  profession: 'doctor' | 'lawyer' | 'engineer' | 'teacher' | 'student' | 'general';
   fields: Record<string, string>;
+  writingStyle: WritingStyle;
+  sections?: NoteSection[]; // For Cornell notes
+  checkedItems?: boolean[]; // For checklist style
   createdAt: string;
   updatedAt: string;
 }
