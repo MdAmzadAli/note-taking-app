@@ -1,11 +1,9 @@
-
 import { Platform, Alert, Linking } from 'react-native';
-import { request, check, PERMISSIONS, RESULTS, PermissionStatus } from 'react-native-permissions';
 
 export const requestMicrophonePermission = async (): Promise<boolean> => {
   try {
     if (Platform.OS === 'web') {
-      // For web, we'll handle this differently
+      // For web, request microphone permission directly
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         stream.getTracks().forEach(track => track.stop());
@@ -20,53 +18,26 @@ export const requestMicrophonePermission = async (): Promise<boolean> => {
       }
     }
 
-    const permission = Platform.OS === 'ios' 
-      ? PERMISSIONS.IOS.MICROPHONE 
-      : PERMISSIONS.ANDROID.RECORD_AUDIO;
-
-    const result = await check(permission);
-    
-    if (result === RESULTS.GRANTED) {
-      return true;
-    }
-
-    if (result === RESULTS.DENIED) {
-      const requestResult = await request(permission);
-      return requestResult === RESULTS.GRANTED;
-    }
-
-    if (result === RESULTS.BLOCKED) {
-      Alert.alert(
-        'Microphone Permission Required',
-        'Voice commands require microphone access. Please enable it in your device settings.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => Linking.openSettings() }
-        ]
-      );
-      return false;
-    }
-
-    return false;
+    // For React Native (non-web), we'll handle this differently in Expo Go
+    // Since react-native-permissions doesn't work in Expo Go, we'll assume permission is granted
+    // and let the voice recognition library handle the permission request
+    return true;
   } catch (error) {
     console.error('Error requesting microphone permission:', error);
     return false;
   }
 };
 
-export const checkMicrophonePermission = async (): Promise<PermissionStatus> => {
+export const checkMicrophonePermission = async (): Promise<string> => {
   try {
     if (Platform.OS === 'web') {
-      return RESULTS.GRANTED; // Assume granted for web, will be checked when used
+      return 'granted'; // Will be checked when actually used
     }
 
-    const permission = Platform.OS === 'ios' 
-      ? PERMISSIONS.IOS.MICROPHONE 
-      : PERMISSIONS.ANDROID.RECORD_AUDIO;
-
-    return await check(permission);
+    // For React Native in Expo Go, assume granted
+    return 'granted';
   } catch (error) {
     console.error('Error checking microphone permission:', error);
-    return RESULTS.UNAVAILABLE;
+    return 'unavailable';
   }
 };

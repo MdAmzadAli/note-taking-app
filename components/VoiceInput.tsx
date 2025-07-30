@@ -11,15 +11,29 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
-import Voice, {
-  SpeechRecognizedEvent,
-  SpeechResultsEvent,
-  SpeechErrorEvent,
-} from 'react-native-voice';
 import { IconSymbol } from './ui/IconSymbol';
 import { parseVoiceCommand, executeVoiceCommand, getExampleCommands, VoiceCommand } from '@/utils/voiceCommands';
 import { getUserSettings } from '@/utils/storage';
 import { requestMicrophonePermission } from '@/utils/permissions';
+
+// Mock voice recognition for environments where it's not available
+const mockVoiceRecognition = {
+  start: async () => {
+    // Simulate voice recognition with a mock result after 2 seconds
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve(['create note about test voice command']);
+      }, 2000);
+    });
+  },
+  stop: async () => {},
+  onSpeechStart: null,
+  onSpeechRecognized: null,
+  onSpeechEnd: null,
+  onSpeechError: null,
+  onSpeechResults: null,
+  onSpeechPartialResults: null,
+};
 
 interface VoiceInputProps {
   onCommandExecuted?: (result: any) => void;
@@ -35,16 +49,14 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
   const [showModal, setShowModal] = useState(false);
   const [lastCommand, setLastCommand] = useState<VoiceCommand | null>(null);
   const [profession, setProfession] = useState('doctor');
+  const [voiceSupported, setVoiceSupported] = useState(false);
   
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     loadUserSettings();
-    setupVoice();
-    return () => {
-      Voice.destroy().then(Voice.removeAllListeners);
-    };
+    checkVoiceSupport();
   }, []);
 
   useEffect(() => {
@@ -64,7 +76,19 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     }
   };
 
-  const setupVoice = async () => {
+  const checkVoiceSupport = async () => {
+    try {
+      // Try to dynamically import react-native-voice
+      const Voice = await import('react-native-voice');
+      setVoiceSupported(true);
+      setupVoice(Voice.default);
+    } catch (error) {
+      console.log('Voice recognition not available, using mock implementation');
+      setVoiceSupported(false);
+    }
+  };
+
+  const setupVoice = async (Voice: any) => {
     try {
       Voice.onSpeechStart = onSpeechStart;
       Voice.onSpeechRecognized = onSpeechRecognized;
@@ -108,7 +132,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     setIsListening(true);
   };
 
-  const onSpeechRecognized = (e: SpeechRecognizedEvent) => {
+  const onSpeechRecognized = (e: any) => {
     console.log('Speech recognized');
   };
 
@@ -117,7 +141,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     setIsListening(false);
   };
 
-  const onSpeechError = (e: SpeechErrorEvent) => {
+  const onSpeechError = (e: any) => {
     console.log('Speech error:', e.error);
     setIsListening(false);
     setIsProcessing(false);
@@ -127,7 +151,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     }
   };
 
-  const onSpeechResults = async (e: SpeechResultsEvent) => {
+  const onSpeechResults = async (e: any) => {
     console.log('Speech results:', e.value);
     if (e.value && e.value.length > 0) {
       const result = e.value[0];
@@ -162,7 +186,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     }
   };
 
-  const onSpeechPartialResults = (e: SpeechResultsEvent) => {
+  const onSpeechPartialResults = (e: any) => {
     console.log('Partial results:', e.value);
     if (e.value) {
       setPartialResults(e.value);
@@ -180,7 +204,17 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       resetState();
       setShowModal(true);
       
-      await Voice.start('en-US');
+      if (voiceSupported) {
+        const Voice = await import('react-native-voice');
+        await Voice.default.start('en-US');
+      } else {
+        // Use mock implementation
+        setIsListening(true);
+        setTimeout(async () => {
+          const mockResult = ['create note about test voice command'];
+          await onSpeechResults({ value: mockResult });
+        }, 2000);
+      }
       
       Animated.sequence([
         Animated.timing(scaleAnim, {
@@ -196,14 +230,17 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       ]).start();
     } catch (error) {
       console.error('Error starting voice recognition:', error);
-      Alert.alert('Error', 'Failed to start voice recognition. Please check microphone permissions.');
+      Alert.alert('Error', 'Failed to start voice recognition. Voice commands are not fully supported in Expo Go. Try using a development build for full functionality.');
       setShowModal(false);
     }
   };
 
   const stopListening = async () => {
     try {
-      await Voice.stop();
+      if (voiceSupported) {
+        const Voice = await import('react-native-voice');
+        await Voice.default.stop();
+      }
       setIsListening(false);
       setShowModal(false);
     } catch (error) {
@@ -231,7 +268,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
   const getStatusText = () => {
     if (isProcessing) return 'Processing command...';
-    if (isListening) return 'Listening... Speak now';
+    if (isListening) return voiceSupported ? 'Listening... Speak now' : 'Simulating voice input...';
     if (finalResult) return 'Processing...';
     return 'Tap to start listening';
   };
@@ -276,6 +313,14 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
             </View>
+
+            {!voiceSupported && (
+              <View style={styles.warningContainer}>
+                <Text style={styles.warningText}>
+                  Voice recognition is not fully supported in Expo Go. This is a demo mode.
+                </Text>
+              </View>
+            )}
 
             <View style={styles.statusContainer}>
               <Animated.View
@@ -399,6 +444,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#6B7280',
     fontWeight: 'bold',
+  },
+  warningContainer: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  warningText: {
+    fontSize: 14,
+    color: '#92400E',
+    fontFamily: 'Inter',
+    textAlign: 'center',
   },
   statusContainer: {
     alignItems: 'center',
