@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -30,11 +29,11 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
   const [showModal, setShowModal] = useState(false);
   const [lastCommand, setLastCommand] = useState<VoiceCommand | null>(null);
   const [fuzzyResult, setFuzzyResult] = useState<FuzzyProcessingResult | null>(null);
-  const [showFuzzyComparison, setShowFuzzyComparison] = useState(false);
+  const [showFuzzyComparison, setShowFuzzyComparison] = useState(showFuzzyComparison);
   const [profession, setProfession] = useState('doctor');
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [Voice, setVoice] = useState<any>(null);
-  
+
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -65,18 +64,18 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       // Check if we're in a production build environment
       const Constants = await import('expo-constants');
       const isExpoGo = Constants.default?.appOwnership === 'expo';
-      
+
       if (isExpoGo) {
         console.log('[VOICE] Running in Expo Go - using mock voice implementation');
         console.log('[VOICE] For real voice recognition, use: npx eas build --platform ios/android --profile development');
         setVoiceSupported(false);
         return;
       }
-      
+
       // Try to import and initialize react-native-voice for production builds
       const VoiceModule = await import('react-native-voice');
       const voiceInstance = VoiceModule.default;
-      
+
       if (voiceInstance) {
         setVoice(voiceInstance);
         setupVoiceHandlers(voiceInstance);
@@ -148,7 +147,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     console.log('[VOICE] Speech recognition error:', e.error);
     setIsListening(false);
     setIsProcessing(false);
-    
+
     const errorMessages: { [key: string]: string } = {
       'permission_denied': 'Microphone permission denied. Please enable in settings.',
       'recognizer_busy': 'Voice recognition is busy. Please try again.',
@@ -164,7 +163,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       'language_unavailable': 'Language pack not available.',
       'insufficient_permissions': 'Insufficient permissions for microphone access.'
     };
-    
+
     const message = errorMessages[e.error?.message || e.error] || `Voice recognition error: ${e.error?.message || e.error}`;
     Alert.alert('Voice Recognition Error', message);
   };
@@ -176,7 +175,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       setFinalResult(result);
       setPartialResults([]);
       setIsProcessing(true);
-      
+
       await processVoiceCommand(result);
     }
   };
@@ -198,32 +197,32 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       // First, process fuzzy thoughts
       const fuzzyProcessing = processFuzzyThought(speechText);
       setFuzzyResult(fuzzyProcessing);
-      
+
       // Show comparison if the text was significantly cleaned
       if (fuzzyProcessing.confidence > 0.6 && fuzzyProcessing.cleanedText !== fuzzyProcessing.originalText) {
         setShowFuzzyComparison(true);
         return; // Wait for user confirmation
       }
-      
+
       // Parse and execute command using cleaned text
       const textToProcess = fuzzyProcessing.cleanedText || speechText;
       const command = parseVoiceCommand(textToProcess);
       command.cleanedText = fuzzyProcessing.cleanedText;
       command.confidence = fuzzyProcessing.confidence;
       setLastCommand(command);
-      
+
       console.log('[VOICE] Parsed command:', command);
       console.log('[VOICE] Fuzzy processing result:', fuzzyProcessing);
-      
+
       const executionResult = await executeVoiceCommand(command, profession);
-      
+
       if (executionResult.success) {
         if (command.intent === 'search' && executionResult.data) {
           onSearchRequested?.(command.parameters.query, executionResult.data);
         } else {
           onCommandExecuted?.(executionResult);
         }
-        
+
         Alert.alert('Voice Command Executed', executionResult.message);
       } else {
         Alert.alert('Command Not Understood', executionResult.message);
@@ -243,23 +242,23 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
   const confirmFuzzyProcessing = async (useCleanedVersion: boolean) => {
     setShowFuzzyComparison(false);
     if (!fuzzyResult) return;
-    
+
     const textToUse = useCleanedVersion ? fuzzyResult.cleanedText : fuzzyResult.originalText;
     const command = parseVoiceCommand(textToUse);
     command.cleanedText = useCleanedVersion ? fuzzyResult.cleanedText : undefined;
     command.confidence = fuzzyResult.confidence;
     setLastCommand(command);
-    
+
     try {
       const executionResult = await executeVoiceCommand(command, profession);
-      
+
       if (executionResult.success) {
         if (command.intent === 'search' && executionResult.data) {
           onSearchRequested?.(command.parameters.query, executionResult.data);
         } else {
           onCommandExecuted?.(executionResult);
         }
-        
+
         Alert.alert('Voice Command Executed', executionResult.message);
       } else {
         Alert.alert('Command Not Understood', executionResult.message);
@@ -290,7 +289,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
       resetState();
       setShowModal(true);
-      
+
       // Animate button press
       Animated.sequence([
         Animated.timing(scaleAnim, {
@@ -308,7 +307,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       if (voiceSupported && Voice) {
         // Production: Use real voice recognition
         console.log('[VOICE] Starting real voice recognition...');
-        
+
         // Stop any existing recognition session
         try {
           await Voice.stop();
@@ -316,7 +315,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
         } catch (e) {
           // Ignore errors from stopping non-existent sessions
         }
-        
+
         // Start new recognition session
         await Voice.start('en-US', {
           showPopup: false,
@@ -328,20 +327,20 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
         // Mock implementation for Expo Go
         console.log('[VOICE] Using mock voice recognition (Expo Go environment)');
         setIsListening(true);
-        
+
         // Simulate partial results
         setTimeout(() => {
           setPartialResults(['create note']);
         }, 500);
-        
+
         setTimeout(() => {
           setPartialResults(['create note about']);
         }, 1000);
-        
+
         setTimeout(() => {
           setPartialResults(['create note about meeting']);
         }, 1500);
-        
+
         // Simulate final result
         setTimeout(async () => {
           const mockCommands = [
@@ -355,16 +354,16 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
           await processVoiceCommand(randomCommand);
         }, 2500);
       }
-      
+
     } catch (error) {
       console.error('[VOICE] Error starting voice recognition:', error);
       setIsListening(false);
       setShowModal(false);
-      
+
       const errorMessage = voiceSupported 
         ? 'Failed to start voice recognition. Please check your microphone and try again.'
         : 'Voice recognition is simulated in Expo Go. Use "npx eas build" for real voice features.';
-        
+
       Alert.alert('Voice Recognition', errorMessage);
     }
   };
@@ -484,7 +483,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
                   size={32}
                   color={isListening ? "#FF0000" : "#6B7280"}
                 />
-              </View>
+              </Animated.View>
               <Text style={styles.statusText}>{getStatusText()}</Text>
             </View>
 
@@ -500,17 +499,17 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
             {showFuzzyComparison && fuzzyResult && (
               <View style={styles.fuzzyComparisonContainer}>
                 <Text style={styles.fuzzyComparisonLabel}>AI cleaned up your speech:</Text>
-                
+
                 <View style={styles.comparisonSection}>
                   <Text style={styles.comparisonSectionLabel}>Original:</Text>
                   <Text style={styles.originalText}>{fuzzyResult.originalText}</Text>
                 </View>
-                
+
                 <View style={styles.comparisonSection}>
                   <Text style={styles.comparisonSectionLabel}>Cleaned:</Text>
                   <Text style={styles.cleanedText}>{fuzzyResult.cleanedText}</Text>
                 </View>
-                
+
                 {fuzzyResult.suggestedChanges.length > 0 && (
                   <View style={styles.changesContainer}>
                     <Text style={styles.changesLabel}>Changes made:</Text>
@@ -519,7 +518,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
                     ))}
                   </View>
                 )}
-                
+
                 <View style={styles.fuzzyActions}>
                   <TouchableOpacity 
                     style={styles.fuzzyButton}
