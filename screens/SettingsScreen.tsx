@@ -9,17 +9,23 @@ import {
   Switch,
   Platform,
   SafeAreaView,
+  TextInput,
 } from 'react-native';
-import { getUserSettings, saveUserSettings, clearAllData } from '@/utils/storage';
+import { getUserSettings, saveUserSettings, UserSettings } from '@/utils/storage';
+import { clearAllData } from '@/utils/storage';
+import { initializeAssemblyAI } from '@/utils/speech';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 import VoiceCommandsScreen from './VoiceCommandsScreen';
 
 export default function SettingsScreen() {
   const [settings, setSettings] = useState<UserSettings>({
     profession: 'doctor',
-    viewMode: 'paragraph',
-    isOnboardingComplete: true,
+    notificationsEnabled: true,
+    theme: 'auto',
+    autoSync: true,
+    assemblyAIApiKey: undefined,
   });
+  const [apiKeyInput, setApiKeyInput] = useState('');
   const [currentProfession, setCurrentProfession] = useState<ProfessionType>('doctor');
   const [showVoiceCommands, setShowVoiceCommands] = useState(false);
 
@@ -29,11 +35,11 @@ export default function SettingsScreen() {
 
   const loadSettings = async () => {
     try {
-      const userSettings = await getUserSettings();
-      setSettings(userSettings);
-      setCurrentProfession(userSettings.profession);
+      const savedSettings = await getUserSettings();
+      setSettings(savedSettings);
+      setApiKeyInput(savedSettings.assemblyAIApiKey || '');
     } catch (error) {
-      console.error('Error loading settings:', error);
+      console.error('Failed to load settings:', error);
     }
   };
 
@@ -108,6 +114,26 @@ export default function SettingsScreen() {
         />
       );
     }
+  const handleSave = async () => {
+    try {
+      const updatedSettings = {
+        ...settings,
+        assemblyAIApiKey: apiKeyInput.trim() || undefined
+      };
+
+      await saveUserSettings(updatedSettings);
+
+      // Initialize AssemblyAI if API key is provided
+      if (apiKeyInput.trim()) {
+        initializeAssemblyAI(apiKeyInput.trim());
+      }
+
+      Alert.alert('Success', 'Settings saved successfully!');
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      Alert.alert('Error', 'Failed to save settings. Please try again.');
+    }
+  };
 
     return (
       <SafeAreaView style={styles.container}>
@@ -182,6 +208,33 @@ export default function SettingsScreen() {
             />
           </View>
         </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Voice Recognition</Text>
+
+          <View style={styles.settingItem}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>AssemblyAI API Key</Text>
+              <Text style={styles.settingDescription}>
+                Enter your AssemblyAI API key for enhanced voice recognition
+              </Text>
+            </View>
+          </View>
+
+          <TextInput
+            style={styles.apiKeyInput}
+            value={apiKeyInput}
+            onChangeText={setApiKeyInput}
+            placeholder="Enter AssemblyAI API key..."
+            secureTextEntry={true}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+
+          <Text style={styles.apiKeyHelp}>
+            Get your API key from{' '}
+            <Text style={styles.link}>https://app.assemblyai.com/</Text>
+          </Text>
+        </View>
 
         {/* App Info */}
         <View style={styles.section}>
@@ -191,6 +244,25 @@ export default function SettingsScreen() {
             <Text style={styles.infoText}>📝 Offline storage with AsyncStorage</Text>
             <Text style={styles.infoText}>🎤 Voice input support (simulated)</Text>
             <Text style={styles.infoText}>🔔 Local notifications</Text>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Sync Settings</Text>
+
+          <View style={styles.settingItem}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Auto-sync</Text>
+              <Text style={styles.settingDescription}>
+                Automatically sync your data across devices
+              </Text>
+            </View>
+            <Switch
+              value={settings.autoSync}
+              onValueChange={(value) => updateSettings({autoSync:value})}
+              trackColor={{ false: '#E5E7EB', true: '#3B82F6' }}
+              thumbColor={settings.autoSync ? '#FFFFFF' : '#F3F4F6'}
+            />
           </View>
         </View>
 
@@ -382,5 +454,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     fontFamily: 'Inter',
+  },
+  apiKeyInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    backgroundColor: '#FFFFFF',
+    marginTop: 8,
+    fontFamily: 'monospace',
+  },
+  apiKeyHelp: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  link: {
+    color: '#3B82F6',
+    textDecorationLine: 'underline',
+  },
+clearDataButton: {
+    backgroundColor: '#EF4444',
+    marginTop: 8,
+  },
+  clearDataButtonText: {
+    color: '#FFFFFF',
   },
 });

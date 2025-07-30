@@ -15,10 +15,12 @@ import { IconSymbol } from './ui/IconSymbol';
 import { parseVoiceCommand, executeVoiceCommand, getExampleCommands, processFuzzyThought, VoiceCommand, FuzzyProcessingResult } from '@/utils/voiceCommands';
 import { getUserSettings } from '@/utils/storage';
 import { requestMicrophonePermission } from '@/utils/permissions';
-import {
-  ExpoSpeechRecognitionModule,
-  useSpeechRecognitionEvent,
-} from 'expo-speech-recognition';
+import { 
+  initializeAssemblyAI, 
+  isAssemblyAIInitialized, 
+  startAssemblyAISpeechRecognition,
+  stopAssemblyAISpeechRecognition 
+} from '@/utils/speech';
 
 interface VoiceInputProps {
   onCommandExecuted?: (result: any) => void;
@@ -37,13 +39,14 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
   const [showFuzzyComparison, setShowFuzzyComparison] = useState(false);
   const [profession, setProfession] = useState('doctor');
   const [voiceSupported, setVoiceSupported] = useState(false);
+  const [assemblyAIError, setAssemblyAIError] = useState<string | null>(null);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     loadUserSettings();
-    initializeVoice();
+    initializeVoiceService();
   }, []);
 
   useEffect(() => {
@@ -54,77 +57,41 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     }
   }, [isListening]);
 
-  // Listen to speech recognition events
-  useSpeechRecognitionEvent('start', () => {
-    console.log('[VOICE] Speech recognition started');
-    setIsListening(true);
-    setPartialResults([]);
-    setFinalResult('');
-  });
-
-  useSpeechRecognitionEvent('end', () => {
-    console.log('[VOICE] Speech recognition ended');
-    setIsListening(false);
-  });
-
-  useSpeechRecognitionEvent('result', (event) => {
-    console.log('[VOICE] Speech recognition result:', event);
-    if (event.isFinal && event.results[0]) {
-      const result = event.results[0].transcript;
-      setFinalResult(result);
-      setPartialResults([]);
-      setIsProcessing(true);
-      processVoiceCommand(result);
-    } else if (event.results[0]) {
-      setPartialResults([event.results[0].transcript]);
-    }
-  });
-
-  useSpeechRecognitionEvent('error', (event) => {
-    console.log('[VOICE] Speech recognition error:', event);
-    setIsListening(false);
-    setIsProcessing(false);
-
-    const errorMessages: { [key: string]: string } = {
-      'no-speech': 'No speech was detected. Please try again.',
-      'aborted': 'Speech recognition was aborted.',
-      'audio-capture': 'Audio capture failed. Check microphone availability.',
-      'network': 'Network error. Please check your internet connection.',
-      'not-allowed': 'Microphone permission denied. Please enable in settings.',
-      'service-not-allowed': 'Speech recognition service not allowed.',
-      'bad-grammar': 'Grammar error in speech recognition.',
-      'language-not-supported': 'Language not supported.',
-    };
-
-    const message = errorMessages[event.error] || `Speech recognition error: ${event.error}`;
-    Alert.alert('Voice Recognition Error', message);
-  });
-
   const loadUserSettings = async () => {
     try {
       const settings = await getUserSettings();
       setProfession(settings.profession);
+      
+      // Initialize AssemblyAI if API key is available
+      if (settings.assemblyAIApiKey) {
+        initializeAssemblyAI(settings.assemblyAIApiKey);
+        setVoiceSupported(true);
+        setAssemblyAIError(null);
+      } else {
+        setVoiceSupported(false);
+        setAssemblyAIError('AssemblyAI API key not configured in settings');
+      }
     } catch (error) {
       console.error('Error loading user settings:', error);
     }
   };
 
-  const initializeVoice = async () => {
+  const initializeVoiceService = async () => {
     try {
-      // Check if speech recognition is available
-      const available = await ExpoSpeechRecognitionModule.getStateAsync();
-      console.log('[VOICE] Speech recognition state:', available);
+      const available = isAssemblyAIInitialized();
+      setVoiceSupported(available);
       
-      if (available.state === 'available') {
-        setVoiceSupported(true);
-        console.log('[VOICE] Speech recognition initialized successfully');
+      if (available) {
+        console.log('[VOICE] AssemblyAI initialized successfully');
+        setAssemblyAIError(null);
       } else {
-        setVoiceSupported(false);
-        console.log('[VOICE] Speech recognition not available:', available.state);
+        console.log('[VOICE] AssemblyAI not initialized - API key required');
+        setAssemblyAIError('AssemblyAI API key required. Please configure in settings.');
       }
     } catch (error) {
-      console.log('[VOICE] Speech recognition not available:', error);
+      console.log('[VOICE] AssemblyAI initialization error:', error);
       setVoiceSupported(false);
+      setAssemblyAIError('Failed to initialize AssemblyAI');
     }
   };
 
@@ -266,19 +233,42 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
         }),
       ]).start();
 
-      if (voiceSupported) {
-        // Production: Use real voice recognition
-        console.log('[VOICE] Starting speech recognition...');
+      if (voiceSupported && isAssemblyAIInitialized()) {
+        // Production: Use AssemblyAI
+        console.log('[VOICE] Starting AssemblyAI speech recognition...');
+        setIsListening(true);
 
-        await ExpoSpeechRecognitionModule.start({
-          lang: 'en-US',
-          interimResults: true,
-          maxAlternatives: 1,
-          continuous: false,
-        });
+        const result = await startAssemblyAISpeechRecognition(
+          // onPartialTranscript
+          (text: string) => {
+            console.log('[VOICE] Partial transcript:', text);
+            setPartialResults([text]);
+          },
+          // onFinalTranscript
+          (text: string) => {
+            console.log('[VOICE] Final transcript:', text);
+            setFinalResult(text);
+            setPartialResults([]);
+            setIsListening(false);
+            setIsProcessing(true);
+            processVoiceCommand(text);
+          },
+          // onError
+          (error: string) => {
+            console.log('[VOICE] AssemblyAI error:', error);
+            setIsListening(false);
+            setIsProcessing(false);
+            Alert.alert('Voice Recognition Error', `AssemblyAI error: ${error}`);
+          }
+        );
+
+        if (!result.success) {
+          setIsListening(false);
+          Alert.alert('Speech Recognition Error', result.error || 'Failed to start AssemblyAI');
+        }
       } else {
         // Mock implementation fallback
-        console.log('[VOICE] Using mock voice recognition (speech recognition not available)');
+        console.log('[VOICE] Using mock voice recognition (AssemblyAI not available)');
         setIsListening(true);
 
         // Simulate partial results
@@ -303,7 +293,10 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
             'search for patient consultation notes'
           ];
           const randomCommand = mockCommands[Math.floor(Math.random() * mockCommands.length)];
+          setFinalResult(randomCommand);
+          setPartialResults([]);
           setIsListening(false);
+          setIsProcessing(true);
           await processVoiceCommand(randomCommand);
         }, 2500);
       }
@@ -315,7 +308,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
       const errorMessage = voiceSupported 
         ? 'Failed to start speech recognition. Please check your microphone and try again.'
-        : 'Speech recognition is not available on this device/platform.';
+        : 'Speech recognition is not available. Please configure AssemblyAI API key in settings.';
 
       Alert.alert('Speech Recognition', errorMessage);
     }
@@ -323,8 +316,8 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
   const stopListening = async () => {
     try {
-      if (voiceSupported) {
-        await ExpoSpeechRecognitionModule.stop();
+      if (voiceSupported && isAssemblyAIInitialized()) {
+        await stopAssemblyAISpeechRecognition();
       }
       setIsListening(false);
     } catch (error) {
@@ -334,8 +327,8 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
   const cancelListening = async () => {
     try {
-      if (voiceSupported) {
-        await ExpoSpeechRecognitionModule.abort();
+      if (voiceSupported && isAssemblyAIInitialized()) {
+        await stopAssemblyAISpeechRecognition();
       }
       setIsListening(false);
       setShowModal(false);
@@ -363,8 +356,8 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
   const getStatusText = () => {
     if (isProcessing) return 'Processing command...';
     if (isListening) {
-      if (voiceSupported) {
-        return 'Listening... Speak now';
+      if (voiceSupported && isAssemblyAIInitialized()) {
+        return 'Listening with AssemblyAI... Speak now';
       } else {
         return 'Simulating voice input... (Demo Mode)';
       }
@@ -414,11 +407,13 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
               </TouchableOpacity>
             </View>
 
-            {!voiceSupported && (
+            {(!voiceSupported || assemblyAIError) && (
               <View style={styles.warningContainer}>
                 <Text style={styles.warningText}>
-                  🚧 Demo Mode: Speech recognition is not available on this platform.{'\n'}
-                  Voice commands are simulated for demonstration purposes.
+                  {assemblyAIError ? 
+                    `⚠️ ${assemblyAIError}\nVoice commands are simulated for demonstration.` :
+                    '🚧 Demo Mode: AssemblyAI is not configured.\nVoice commands are simulated for demonstration purposes.'
+                  }
                 </Text>
               </View>
             )}

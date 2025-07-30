@@ -167,8 +167,10 @@ export const getUserSettings = async (): Promise<UserSettings> => {
     const settingsData = await AsyncStorage.getItem(KEYS.USER_SETTINGS);
     const defaultSettings: UserSettings = {
       profession: 'doctor',
-      viewMode: 'paragraph',
-      isOnboardingComplete: false,
+      notificationsEnabled: true,
+      theme: 'auto',
+      autoSync: true,
+      assemblyAIApiKey: undefined,
     };
 
     if (settingsData) {
@@ -180,8 +182,10 @@ export const getUserSettings = async (): Promise<UserSettings> => {
     console.error('Error getting user settings:', error);
     return {
       profession: 'doctor',
-      viewMode: 'paragraph',
-      isOnboardingComplete: false,
+      notificationsEnabled: true,
+      theme: 'auto',
+      autoSync: true,
+      assemblyAIApiKey: undefined,
     };
   }
 };

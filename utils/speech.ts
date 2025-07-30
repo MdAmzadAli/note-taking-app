@@ -1,7 +1,7 @@
 
 import * as Speech from 'expo-speech';
 import { Alert } from 'react-native';
-import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
+import { AssemblyAI } from 'assemblyai';
 
 export interface SpeechResult {
   text: string;
@@ -15,71 +15,106 @@ export interface SpeechOptions {
   rate?: number;
 }
 
-// Speech recognition using expo-speech-recognition
+// AssemblyAI client - will be initialized with API key
+let assemblyAIClient: AssemblyAI | null = null;
+
+// Initialize AssemblyAI client
+export const initializeAssemblyAI = (apiKey: string) => {
+  assemblyAIClient = new AssemblyAI({
+    apiKey: apiKey
+  });
+};
+
+// Check if AssemblyAI is initialized
+export const isAssemblyAIInitialized = (): boolean => {
+  return assemblyAIClient !== null;
+};
+
+// Speech recognition using AssemblyAI Real-time API
+export const startAssemblyAISpeechRecognition = async (
+  onPartialTranscript?: (text: string) => void,
+  onFinalTranscript?: (text: string) => void,
+  onError?: (error: string) => void
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    if (!assemblyAIClient) {
+      return {
+        success: false,
+        error: "AssemblyAI not initialized. Please provide API key in settings."
+      };
+    }
+
+    // Create real-time transcriber
+    const rt = assemblyAIClient.realtime.transcriber({
+      sampleRate: 16000,
+    });
+
+    // Handle transcript events
+    rt.on('transcript', (transcript) => {
+      if (!transcript.text) return;
+      
+      if (transcript.message_type === 'PartialTranscript') {
+        onPartialTranscript?.(transcript.text);
+      } else if (transcript.message_type === 'FinalTranscript') {
+        onFinalTranscript?.(transcript.text);
+      }
+    });
+
+    rt.on('error', (error) => {
+      console.error('AssemblyAI error:', error);
+      onError?.(error.message || 'Unknown AssemblyAI error');
+    });
+
+    rt.on('close', (code, reason) => {
+      console.log('AssemblyAI connection closed:', code, reason);
+    });
+
+    // Connect to AssemblyAI
+    await rt.connect();
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return {
+      success: false,
+      error: errorMessage
+    };
+  }
+};
+
+// Stop AssemblyAI speech recognition
+export const stopAssemblyAISpeechRecognition = async (): Promise<void> => {
+  // The connection will be closed when the component unmounts or stops listening
+};
+
+// Legacy speech recognition functions for backward compatibility
 export const startSpeechRecognition = async (options?: {
   language?: string;
   interimResults?: boolean;
   maxAlternatives?: number;
   continuous?: boolean;
 }): Promise<SpeechResult> => {
-  try {
-    // Check if speech recognition is available
-    const state = await ExpoSpeechRecognitionModule.getStateAsync();
-    
-    if (state.state !== 'available') {
-      return {
-        text: "",
-        success: false,
-        error: `Speech recognition not available. State: ${state.state}`
-      };
-    }
-
-    // Start speech recognition with options
-    await ExpoSpeechRecognitionModule.start({
-      lang: options?.language || 'en-US',
-      interimResults: options?.interimResults ?? true,
-      maxAlternatives: options?.maxAlternatives ?? 1,
-      continuous: options?.continuous ?? false,
-    });
-
-    return {
-      text: "",
-      success: true
-    };
-  } catch (error) {
-    return {
-      text: "",
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error"
-    };
-  }
+  return {
+    text: "",
+    success: false,
+    error: "Please use AssemblyAI speech recognition instead"
+  };
 };
 
 export const stopSpeechRecognition = async (): Promise<void> => {
-  try {
-    await ExpoSpeechRecognitionModule.stop();
-  } catch (error) {
-    console.error('Error stopping speech recognition:', error);
-  }
+  await stopAssemblyAISpeechRecognition();
 };
 
 export const abortSpeechRecognition = async (): Promise<void> => {
-  try {
-    await ExpoSpeechRecognitionModule.abort();
-  } catch (error) {
-    console.error('Error aborting speech recognition:', error);
-  }
+  await stopAssemblyAISpeechRecognition();
 };
 
 export const getSpeechRecognitionState = async (): Promise<{
   state: 'available' | 'unavailable' | 'denied';
 }> => {
-  try {
-    return await ExpoSpeechRecognitionModule.getStateAsync();
-  } catch (error) {
-    console.error('Error getting speech recognition state:', error);
-    return { state: 'unavailable' };
-  }
+  return { 
+    state: isAssemblyAIInitialized() ? 'available' : 'unavailable' 
+  };
 };
 
 export const speakText = async (
@@ -115,11 +150,10 @@ export const isSpeaking = (): boolean => {
 // Simulated voice-to-text function for fallback
 export const simulateVoiceToText = (): Promise<string> => {
   return new Promise((resolve) => {
-    // Simulate voice recognition delay
     setTimeout(() => {
       const sampleTexts = [
         "Patient presents with fever and headache",
-        "Review contract terms with client tomorrow",
+        "Review contract terms with client tomorrow", 
         "Implement authentication feature with JWT tokens",
         "Meeting scheduled for 2 PM",
         "Follow up on test results",
@@ -181,7 +215,6 @@ export const extractFieldsFromSpeech = (
       break;
   }
 
-  // If no specific field matched, put it in a general field
   if (Object.keys(fields).length === 0) {
     fields['Notes'] = text;
   }
@@ -192,7 +225,6 @@ export const extractFieldsFromSpeech = (
 // Mock speech-to-text implementation for fallback
 export const mockSpeechToText = async (): Promise<string> => {
   return new Promise((resolve) => {
-    // Simulate speech recognition delay
     setTimeout(() => {
       const sampleTexts = [
         "This is a sample voice input text",
@@ -210,32 +242,29 @@ export const mockSpeechToText = async (): Promise<string> => {
 };
 
 export const startListening = async (): Promise<void> => {
-  // Start listening using the new speech recognition
-  const result = await startSpeechRecognition();
-  if (!result.success) {
-    console.error('Failed to start speech recognition:', result.error);
+  // Use AssemblyAI or fallback to mock
+  if (isAssemblyAIInitialized()) {
+    const result = await startAssemblyAISpeechRecognition();
+    if (!result.success) {
+      console.error('Failed to start AssemblyAI speech recognition:', result.error);
+    }
   }
 };
 
 export const stopListening = async (): Promise<void> => {
-  await stopSpeechRecognition();
+  await stopAssemblyAISpeechRecognition();
 };
 
 // Check if speech recognition is available
 export const isSpeechRecognitionAvailable = async (): Promise<boolean> => {
-  try {
-    const state = await getSpeechRecognitionState();
-    return state.state === 'available';
-  } catch (error) {
-    return false;
-  }
+  return isAssemblyAIInitialized();
 };
 
 // Profession-specific mock voice input
 export const mockSpeechByProfession = (profession: string): string => {
   const mockTexts = {
     doctor: "Patient complains of headache and fever symptoms lasting 3 days",
-    lawyer: "Client needs assistance with contract review and legal documentation",
+    lawyer: "Client needs assistance with contract review and legal documentation", 
     developer: "Implement user authentication system with JWT tokens"
   };
   return mockTexts[profession as keyof typeof mockTexts] || "Sample voice input text";
