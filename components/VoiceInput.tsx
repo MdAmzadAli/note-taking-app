@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -14,6 +15,10 @@ import { IconSymbol } from './ui/IconSymbol';
 import { parseVoiceCommand, executeVoiceCommand, getExampleCommands, processFuzzyThought, VoiceCommand, FuzzyProcessingResult } from '@/utils/voiceCommands';
 import { getUserSettings } from '@/utils/storage';
 import { requestMicrophonePermission } from '@/utils/permissions';
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from 'expo-speech-recognition';
 
 interface VoiceInputProps {
   onCommandExecuted?: (result: any) => void;
@@ -29,10 +34,9 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
   const [showModal, setShowModal] = useState(false);
   const [lastCommand, setLastCommand] = useState<VoiceCommand | null>(null);
   const [fuzzyResult, setFuzzyResult] = useState<FuzzyProcessingResult | null>(null);
-  const [showFuzzyComparison, setShowFuzzyComparison] = useState(showFuzzyComparison);
+  const [showFuzzyComparison, setShowFuzzyComparison] = useState(false);
   const [profession, setProfession] = useState('doctor');
   const [voiceSupported, setVoiceSupported] = useState(false);
-  const [Voice, setVoice] = useState<any>(null);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -50,6 +54,52 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     }
   }, [isListening]);
 
+  // Listen to speech recognition events
+  useSpeechRecognitionEvent('start', () => {
+    console.log('[VOICE] Speech recognition started');
+    setIsListening(true);
+    setPartialResults([]);
+    setFinalResult('');
+  });
+
+  useSpeechRecognitionEvent('end', () => {
+    console.log('[VOICE] Speech recognition ended');
+    setIsListening(false);
+  });
+
+  useSpeechRecognitionEvent('result', (event) => {
+    console.log('[VOICE] Speech recognition result:', event);
+    if (event.isFinal && event.results[0]) {
+      const result = event.results[0].transcript;
+      setFinalResult(result);
+      setPartialResults([]);
+      setIsProcessing(true);
+      processVoiceCommand(result);
+    } else if (event.results[0]) {
+      setPartialResults([event.results[0].transcript]);
+    }
+  });
+
+  useSpeechRecognitionEvent('error', (event) => {
+    console.log('[VOICE] Speech recognition error:', event);
+    setIsListening(false);
+    setIsProcessing(false);
+
+    const errorMessages: { [key: string]: string } = {
+      'no-speech': 'No speech was detected. Please try again.',
+      'aborted': 'Speech recognition was aborted.',
+      'audio-capture': 'Audio capture failed. Check microphone availability.',
+      'network': 'Network error. Please check your internet connection.',
+      'not-allowed': 'Microphone permission denied. Please enable in settings.',
+      'service-not-allowed': 'Speech recognition service not allowed.',
+      'bad-grammar': 'Grammar error in speech recognition.',
+      'language-not-supported': 'Language not supported.',
+    };
+
+    const message = errorMessages[event.error] || `Speech recognition error: ${event.error}`;
+    Alert.alert('Voice Recognition Error', message);
+  });
+
   const loadUserSettings = async () => {
     try {
       const settings = await getUserSettings();
@@ -61,43 +111,21 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
   const initializeVoice = async () => {
     try {
-      // Check if we're in a production build environment
-      const Constants = await import('expo-constants');
-      const isExpoGo = Constants.default?.appOwnership === 'expo';
-
-      if (isExpoGo) {
-        console.log('[VOICE] Running in Expo Go - using mock voice implementation');
-        console.log('[VOICE] For real voice recognition, use: npx eas build --platform ios/android --profile development');
-        setVoiceSupported(false);
-        return;
-      }
-
-      // Try to import and initialize react-native-voice for production builds
-      const VoiceModule = await import('react-native-voice');
-      const voiceInstance = VoiceModule.default;
-
-      if (voiceInstance) {
-        setVoice(voiceInstance);
-        setupVoiceHandlers(voiceInstance);
+      // Check if speech recognition is available
+      const available = await ExpoSpeechRecognitionModule.getStateAsync();
+      console.log('[VOICE] Speech recognition state:', available);
+      
+      if (available.state === 'available') {
         setVoiceSupported(true);
-        console.log('[VOICE] Real voice recognition initialized successfully');
+        console.log('[VOICE] Speech recognition initialized successfully');
+      } else {
+        setVoiceSupported(false);
+        console.log('[VOICE] Speech recognition not available:', available.state);
       }
     } catch (error) {
-      console.log('[VOICE] Voice recognition not available, using mock implementation');
-      console.log('[VOICE] Error:', error);
+      console.log('[VOICE] Speech recognition not available:', error);
       setVoiceSupported(false);
     }
-  };
-
-  const setupVoiceHandlers = (voiceInstance: any) => {
-    // Real-time voice event handlers
-    voiceInstance.onSpeechStart = onSpeechStart;
-    voiceInstance.onSpeechRecognized = onSpeechRecognized;
-    voiceInstance.onSpeechEnd = onSpeechEnd;
-    voiceInstance.onSpeechError = onSpeechError;
-    voiceInstance.onSpeechResults = onSpeechResults;
-    voiceInstance.onSpeechPartialResults = onSpeechPartialResults;
-    voiceInstance.onSpeechVolumeChanged = onSpeechVolumeChanged;
   };
 
   const startPulseAnimation = () => {
@@ -124,72 +152,6 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       duration: 200,
       useNativeDriver: true,
     }).start();
-  };
-
-  // Real voice recognition event handlers
-  const onSpeechStart = (e: any) => {
-    console.log('[VOICE] Speech recognition started');
-    setIsListening(true);
-    setPartialResults([]);
-    setFinalResult('');
-  };
-
-  const onSpeechRecognized = (e: any) => {
-    console.log('[VOICE] Speech recognized:', e);
-  };
-
-  const onSpeechEnd = (e: any) => {
-    console.log('[VOICE] Speech recognition ended');
-    setIsListening(false);
-  };
-
-  const onSpeechError = (e: any) => {
-    console.log('[VOICE] Speech recognition error:', e.error);
-    setIsListening(false);
-    setIsProcessing(false);
-
-    const errorMessages: { [key: string]: string } = {
-      'permission_denied': 'Microphone permission denied. Please enable in settings.',
-      'recognizer_busy': 'Voice recognition is busy. Please try again.',
-      'no_match': 'No speech was recognized. Please try again.',
-      'network_timeout': 'Network timeout. Check your connection.',
-      'network': 'Network error. Please check your internet connection.',
-      'audio': 'Audio recording error. Check microphone availability.',
-      'server': 'Speech recognition server error. Please try again.',
-      'client': 'Speech recognition client error.',
-      'speech_timeout': 'No speech detected. Please speak after the beep.',
-      'no_speech': 'No speech detected.',
-      'language_not_supported': 'Language not supported.',
-      'language_unavailable': 'Language pack not available.',
-      'insufficient_permissions': 'Insufficient permissions for microphone access.'
-    };
-
-    const message = errorMessages[e.error?.message || e.error] || `Voice recognition error: ${e.error?.message || e.error}`;
-    Alert.alert('Voice Recognition Error', message);
-  };
-
-  const onSpeechResults = async (e: any) => {
-    console.log('[VOICE] Final speech results:', e.value);
-    if (e.value && e.value.length > 0) {
-      const result = e.value[0];
-      setFinalResult(result);
-      setPartialResults([]);
-      setIsProcessing(true);
-
-      await processVoiceCommand(result);
-    }
-  };
-
-  const onSpeechPartialResults = (e: any) => {
-    console.log('[VOICE] Partial speech results:', e.value);
-    if (e.value && e.value.length > 0) {
-      setPartialResults(e.value);
-    }
-  };
-
-  const onSpeechVolumeChanged = (e: any) => {
-    // Optional: Use volume data for visual feedback
-    console.log('[VOICE] Volume changed:', e.value);
   };
 
   const processVoiceCommand = async (speechText: string) => {
@@ -304,28 +266,19 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
         }),
       ]).start();
 
-      if (voiceSupported && Voice) {
+      if (voiceSupported) {
         // Production: Use real voice recognition
-        console.log('[VOICE] Starting real voice recognition...');
+        console.log('[VOICE] Starting speech recognition...');
 
-        // Stop any existing recognition session
-        try {
-          await Voice.stop();
-          await Voice.cancel();
-        } catch (e) {
-          // Ignore errors from stopping non-existent sessions
-        }
-
-        // Start new recognition session
-        await Voice.start('en-US', {
-          showPopup: false,
-          showPartial: true,
-          timeout: 10000,
-          maxResults: 5,
+        await ExpoSpeechRecognitionModule.start({
+          lang: 'en-US',
+          interimResults: true,
+          maxAlternatives: 1,
+          continuous: false,
         });
       } else {
-        // Mock implementation for Expo Go
-        console.log('[VOICE] Using mock voice recognition (Expo Go environment)');
+        // Mock implementation fallback
+        console.log('[VOICE] Using mock voice recognition (speech recognition not available)');
         setIsListening(true);
 
         // Simulate partial results
@@ -356,39 +309,39 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       }
 
     } catch (error) {
-      console.error('[VOICE] Error starting voice recognition:', error);
+      console.error('[VOICE] Error starting speech recognition:', error);
       setIsListening(false);
       setShowModal(false);
 
       const errorMessage = voiceSupported 
-        ? 'Failed to start voice recognition. Please check your microphone and try again.'
-        : 'Voice recognition is simulated in Expo Go. Use "npx eas build" for real voice features.';
+        ? 'Failed to start speech recognition. Please check your microphone and try again.'
+        : 'Speech recognition is not available on this device/platform.';
 
-      Alert.alert('Voice Recognition', errorMessage);
+      Alert.alert('Speech Recognition', errorMessage);
     }
   };
 
   const stopListening = async () => {
     try {
-      if (voiceSupported && Voice) {
-        await Voice.stop();
+      if (voiceSupported) {
+        await ExpoSpeechRecognitionModule.stop();
       }
       setIsListening(false);
     } catch (error) {
-      console.error('[VOICE] Error stopping voice recognition:', error);
+      console.error('[VOICE] Error stopping speech recognition:', error);
     }
   };
 
   const cancelListening = async () => {
     try {
-      if (voiceSupported && Voice) {
-        await Voice.cancel();
+      if (voiceSupported) {
+        await ExpoSpeechRecognitionModule.abort();
       }
       setIsListening(false);
       setShowModal(false);
       resetState();
     } catch (error) {
-      console.error('[VOICE] Error canceling voice recognition:', error);
+      console.error('[VOICE] Error canceling speech recognition:', error);
     }
   };
 
@@ -413,7 +366,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       if (voiceSupported) {
         return 'Listening... Speak now';
       } else {
-        return 'Simulating voice input... (Expo Go Demo)';
+        return 'Simulating voice input... (Demo Mode)';
       }
     }
     if (finalResult) return 'Processing...';
@@ -464,8 +417,8 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
             {!voiceSupported && (
               <View style={styles.warningContainer}>
                 <Text style={styles.warningText}>
-                  🚧 Demo Mode: Voice recognition is simulated in Expo Go.{'\n'}
-                  For real voice features, build with: npx eas build
+                  🚧 Demo Mode: Speech recognition is not available on this platform.{'\n'}
+                  Voice commands are simulated for demonstration purposes.
                 </Text>
               </View>
             )}

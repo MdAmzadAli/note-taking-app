@@ -1,6 +1,7 @@
 
 import * as Speech from 'expo-speech';
 import { Alert } from 'react-native';
+import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 
 export interface SpeechResult {
   text: string;
@@ -14,28 +15,70 @@ export interface SpeechOptions {
   rate?: number;
 }
 
-// Note: Expo Speech is primarily for text-to-speech
-// For speech-to-text, we'll need to use a different approach
-// This is a placeholder for the speech recognition functionality
-export const startSpeechRecognition = async (): Promise<SpeechResult> => {
+// Speech recognition using expo-speech-recognition
+export const startSpeechRecognition = async (options?: {
+  language?: string;
+  interimResults?: boolean;
+  maxAlternatives?: number;
+  continuous?: boolean;
+}): Promise<SpeechResult> => {
   try {
-    // This would typically integrate with a speech recognition service
-    // For now, we'll return a mock implementation
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          text: "This is a placeholder for speech recognition",
-          success: false,
-          error: "Speech recognition not implemented yet - requires native module or external API"
-        });
-      }, 1000);
+    // Check if speech recognition is available
+    const state = await ExpoSpeechRecognitionModule.getStateAsync();
+    
+    if (state.state !== 'available') {
+      return {
+        text: "",
+        success: false,
+        error: `Speech recognition not available. State: ${state.state}`
+      };
+    }
+
+    // Start speech recognition with options
+    await ExpoSpeechRecognitionModule.start({
+      lang: options?.language || 'en-US',
+      interimResults: options?.interimResults ?? true,
+      maxAlternatives: options?.maxAlternatives ?? 1,
+      continuous: options?.continuous ?? false,
     });
+
+    return {
+      text: "",
+      success: true
+    };
   } catch (error) {
     return {
       text: "",
       success: false,
       error: error instanceof Error ? error.message : "Unknown error"
     };
+  }
+};
+
+export const stopSpeechRecognition = async (): Promise<void> => {
+  try {
+    await ExpoSpeechRecognitionModule.stop();
+  } catch (error) {
+    console.error('Error stopping speech recognition:', error);
+  }
+};
+
+export const abortSpeechRecognition = async (): Promise<void> => {
+  try {
+    await ExpoSpeechRecognitionModule.abort();
+  } catch (error) {
+    console.error('Error aborting speech recognition:', error);
+  }
+};
+
+export const getSpeechRecognitionState = async (): Promise<{
+  state: 'available' | 'unavailable' | 'denied';
+}> => {
+  try {
+    return await ExpoSpeechRecognitionModule.getStateAsync();
+  } catch (error) {
+    console.error('Error getting speech recognition state:', error);
+    return { state: 'unavailable' };
   }
 };
 
@@ -69,8 +112,7 @@ export const isSpeaking = (): boolean => {
   return Speech.isSpeakingAsync();
 };
 
-// Simulated voice-to-text function
-// In a real app, you would integrate with a service like Google Speech-to-Text
+// Simulated voice-to-text function for fallback
 export const simulateVoiceToText = (): Promise<string> => {
   return new Promise((resolve) => {
     // Simulate voice recognition delay
@@ -147,8 +189,7 @@ export const extractFieldsFromSpeech = (
   return fields;
 };
 
-// Mock speech-to-text implementation for MVP
-// In production, you would integrate with expo-speech or react-native-voice
+// Mock speech-to-text implementation for fallback
 export const mockSpeechToText = async (): Promise<string> => {
   return new Promise((resolve) => {
     // Simulate speech recognition delay
@@ -169,19 +210,25 @@ export const mockSpeechToText = async (): Promise<string> => {
 };
 
 export const startListening = async (): Promise<void> => {
-  // Mock start listening
-  console.log('Started listening for speech input...');
+  // Start listening using the new speech recognition
+  const result = await startSpeechRecognition();
+  if (!result.success) {
+    console.error('Failed to start speech recognition:', result.error);
+  }
 };
 
 export const stopListening = async (): Promise<void> => {
-  // Mock stop listening
-  console.log('Stopped listening for speech input...');
+  await stopSpeechRecognition();
 };
 
 // Check if speech recognition is available
-export const isSpeechRecognitionAvailable = (): boolean => {
-  // For MVP, always return true since we're using mock
-  return true;
+export const isSpeechRecognitionAvailable = async (): Promise<boolean> => {
+  try {
+    const state = await getSpeechRecognitionState();
+    return state.state === 'available';
+  } catch (error) {
+    return false;
+  }
 };
 
 // Profession-specific mock voice input
