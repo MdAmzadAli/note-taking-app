@@ -1,4 +1,3 @@
-
 import * as Speech from 'expo-speech';
 import { Alert } from 'react-native';
 import { AssemblyAI } from 'assemblyai';
@@ -19,10 +18,18 @@ export interface SpeechOptions {
 let assemblyAIClient: AssemblyAI | null = null;
 
 // Initialize AssemblyAI client
-export const initializeAssemblyAI = (apiKey: string) => {
-  assemblyAIClient = new AssemblyAI({
-    apiKey: apiKey
-  });
+export const initializeAssemblyAI = () => {
+  try {
+    const apiKey = process.env.ASSEMBLYAI_API_KEY;
+    if (!apiKey) {
+      console.warn('[SPEECH] ASSEMBLYAI_API_KEY not found in environment variables');
+      return;
+    }
+    assemblyAIClient = new AssemblyAI({ apiKey });
+    console.log('[SPEECH] AssemblyAI initialized successfully');
+  } catch (error) {
+    console.error('[SPEECH] Failed to initialize AssemblyAI:', error);
+  }
 };
 
 // Check if AssemblyAI is initialized
@@ -52,7 +59,7 @@ export const startAssemblyAISpeechRecognition = async (
     // Handle transcript events
     rt.on('transcript', (transcript) => {
       if (!transcript.text) return;
-      
+
       if (transcript.message_type === 'PartialTranscript') {
         onPartialTranscript?.(transcript.text);
       } else if (transcript.message_type === 'FinalTranscript') {
@@ -88,17 +95,21 @@ export const stopAssemblyAISpeechRecognition = async (): Promise<void> => {
 };
 
 // Legacy speech recognition functions for backward compatibility
-export const startSpeechRecognition = async (options?: {
-  language?: string;
-  interimResults?: boolean;
-  maxAlternatives?: number;
-  continuous?: boolean;
-}): Promise<SpeechResult> => {
-  return {
-    text: "",
-    success: false,
-    error: "Please use AssemblyAI speech recognition instead"
-  };
+export const startSpeechRecognition = async (
+  onResult: (transcript: string) => void,
+  onError: (error: string) => void
+): Promise<() => void> => {
+  try {
+    const client = assemblyAIClient;
+     if (!client) {
+      return () => {};
+    }
+    return () => {};
+  } catch (error) {
+    console.error('Error starting speech recognition:', error);
+    onError(error instanceof Error ? error.message : "Unknown error");
+    return () => {};
+  }
 };
 
 export const stopSpeechRecognition = async (): Promise<void> => {
@@ -234,7 +245,7 @@ export const mockSpeechToText = async (): Promise<string> => {
         "Code review needed for the new feature",
         "Follow up with client regarding requirements"
       ];
-      
+
       const randomText = sampleTexts[Math.floor(Math.random() * sampleTexts.length)];
       resolve(randomText);
     }, 1500);

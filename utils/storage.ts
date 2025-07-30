@@ -170,7 +170,6 @@ export const getUserSettings = async (): Promise<UserSettings> => {
       notificationsEnabled: true,
       theme: 'auto',
       autoSync: true,
-      assemblyAIApiKey: undefined,
     };
 
     if (settingsData) {
@@ -185,7 +184,6 @@ export const getUserSettings = async (): Promise<UserSettings> => {
       notificationsEnabled: true,
       theme: 'auto',
       autoSync: true,
-      assemblyAIApiKey: undefined,
     };
   }
 };

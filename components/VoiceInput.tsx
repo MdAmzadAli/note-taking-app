@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -61,7 +60,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     try {
       const settings = await getUserSettings();
       setProfession(settings.profession);
-      
+
       // Initialize AssemblyAI if API key is available
       if (settings.assemblyAIApiKey) {
         initializeAssemblyAI(settings.assemblyAIApiKey);
@@ -80,7 +79,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     try {
       const available = isAssemblyAIInitialized();
       setVoiceSupported(available);
-      
+
       if (available) {
         console.log('[VOICE] AssemblyAI initialized successfully');
         setAssemblyAIError(null);
@@ -365,6 +364,11 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     if (finalResult) return 'Processing...';
     return 'Tap to start listening';
   };
+
+  useEffect(() => {
+    // Initialize AssemblyAI from environment variables
+    initializeAssemblyAI();
+  }, []);
 
   return (
     <View style={[styles.container, style]}>
