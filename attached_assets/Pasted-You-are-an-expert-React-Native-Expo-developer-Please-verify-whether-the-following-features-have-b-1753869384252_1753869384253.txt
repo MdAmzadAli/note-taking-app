@@ -1,0 +1,44 @@
+You are an expert React Native (Expo) developer. Please verify whether the following features have been **completely implemented** in my project using `react-native-voice`. If any part is **missing, buggy, or mocked**, please finish the implementation with production-quality code.
+
+🎯 Features to Audit & Implement:
+
+1. **Real-Time Voice Commands**
+   - Check if `react-native-voice` is integrated properly.
+   - Should start listening when the user taps a mic icon.
+   - Must display live transcribed text on screen (both partial & final).
+
+2. **Command Parsing**
+   - Detect and parse commands like:
+     - “Search for [keyword]”
+     - “Create a note titled [title]”
+     - “Set a reminder for [time]”
+     - “Create task [task name] due [date/time]”
+   - Use regex or simple NLP to extract intent and parameters.
+
+3. **Trigger App Actions**
+   - For each intent, trigger the correct in-app action:
+     - `search`: filter/search notes/tasks/reminders
+     - `create note`: add new note with provided title/content
+     - `set reminder`: schedule a reminder
+     - `create task`: add to the task list
+   - Ensure these actually save data and update state (not mock data).
+
+4. **UI Feedback**
+   - Show visual indicator when listening (e.g., pulsing mic).
+   - Display partial and final transcript clearly.
+   - Allow user to cancel voice input anytime.
+
+5. **Permissions Handling**
+   - Ask for microphone permissions on first use.
+   - Gracefully handle rejection or revocation of permission.
+
+⚙️ Technical Specs:
+- Must use [`react-native-voice`](https://github.com/react-native-voice/voice)
+- Fully functional on both Android and iOS
+- Works with **Expo via EAS builds**
+- UI built using React Native core components (no bloated libraries)
+- Code must be clean, modular, and follow async error-handling best practices
+
+📌 If voice input is currently **mocked** due to Replit or Expo Go limitations, include comments in the code to highlight what needs to be changed for real-world use (e.g. in development builds with `eas build`).
+
+Let me know what parts are already done, what’s incomplete, and then finish the missing parts.
