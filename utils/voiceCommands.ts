@@ -167,6 +167,8 @@ export const executeVoiceCommand = async (
   command: VoiceCommand,
   profession: string = 'doctor'
 ): Promise<{ success: boolean; message: string; data?: any }> => {
+  console.log('[VOICE_COMMANDS] Executing command:', command);
+  
   try {
     switch (command.intent) {
       case 'search':
@@ -196,10 +198,24 @@ export const executeVoiceCommand = async (
         };
     }
   } catch (error) {
-    console.error('Error executing voice command:', error);
+    console.error('[VOICE_COMMANDS] Error executing voice command:', error);
+    
+    // Provide more specific error messages based on the error type
+    let errorMessage = 'Sorry, there was an error processing your command.';
+    
+    if (error instanceof Error) {
+      if (error.message.includes('storage')) {
+        errorMessage = 'Failed to save data. Please check your device storage.';
+      } else if (error.message.includes('network')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      } else if (error.message.includes('permission')) {
+        errorMessage = 'Permission error. Please check app permissions.';
+      }
+    }
+    
     return {
       success: false,
-      message: 'Sorry, there was an error processing your command.'
+      message: errorMessage
     };
   }
 };

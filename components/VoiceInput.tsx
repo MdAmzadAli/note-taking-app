@@ -16,25 +16,6 @@ import { parseVoiceCommand, executeVoiceCommand, getExampleCommands, VoiceComman
 import { getUserSettings } from '@/utils/storage';
 import { requestMicrophonePermission } from '@/utils/permissions';
 
-// Mock voice recognition for environments where it's not available
-const mockVoiceRecognition = {
-  start: async () => {
-    // Simulate voice recognition with a mock result after 2 seconds
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(['create note about test voice command']);
-      }, 2000);
-    });
-  },
-  stop: async () => {},
-  onSpeechStart: null,
-  onSpeechRecognized: null,
-  onSpeechEnd: null,
-  onSpeechError: null,
-  onSpeechResults: null,
-  onSpeechPartialResults: null,
-};
-
 interface VoiceInputProps {
   onCommandExecuted?: (result: any) => void;
   onSearchRequested?: (query: string, results: any[]) => void;
@@ -50,13 +31,14 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
   const [lastCommand, setLastCommand] = useState<VoiceCommand | null>(null);
   const [profession, setProfession] = useState('doctor');
   const [voiceSupported, setVoiceSupported] = useState(false);
+  const [Voice, setVoice] = useState<any>(null);
   
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     loadUserSettings();
-    checkVoiceSupport();
+    initializeVoice();
   }, []);
 
   useEffect(() => {
@@ -76,39 +58,45 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     }
   };
 
-  const checkVoiceSupport = async () => {
+  const initializeVoice = async () => {
     try {
-      // Check if we're in Expo Go environment
+      // Check if we're in a production build environment
       const Constants = await import('expo-constants');
       const isExpoGo = Constants.default?.appOwnership === 'expo';
       
       if (isExpoGo) {
-        console.log('Running in Expo Go, using mock voice implementation');
+        console.log('[VOICE] Running in Expo Go - using mock voice implementation');
+        console.log('[VOICE] For real voice recognition, use: npx eas build --platform ios/android --profile development');
         setVoiceSupported(false);
         return;
       }
       
-      // Try to dynamically import react-native-voice for development builds
-      const Voice = await import('react-native-voice');
-      setVoiceSupported(true);
-      setupVoice(Voice.default);
+      // Try to import and initialize react-native-voice for production builds
+      const VoiceModule = await import('react-native-voice');
+      const voiceInstance = VoiceModule.default;
+      
+      if (voiceInstance) {
+        setVoice(voiceInstance);
+        setupVoiceHandlers(voiceInstance);
+        setVoiceSupported(true);
+        console.log('[VOICE] Real voice recognition initialized successfully');
+      }
     } catch (error) {
-      console.log('Voice recognition not available, using mock implementation');
+      console.log('[VOICE] Voice recognition not available, using mock implementation');
+      console.log('[VOICE] Error:', error);
       setVoiceSupported(false);
     }
   };
 
-  const setupVoice = async (Voice: any) => {
-    try {
-      Voice.onSpeechStart = onSpeechStart;
-      Voice.onSpeechRecognized = onSpeechRecognized;
-      Voice.onSpeechEnd = onSpeechEnd;
-      Voice.onSpeechError = onSpeechError;
-      Voice.onSpeechResults = onSpeechResults;
-      Voice.onSpeechPartialResults = onSpeechPartialResults;
-    } catch (error) {
-      console.error('Error setting up voice:', error);
-    }
+  const setupVoiceHandlers = (voiceInstance: any) => {
+    // Real-time voice event handlers
+    voiceInstance.onSpeechStart = onSpeechStart;
+    voiceInstance.onSpeechRecognized = onSpeechRecognized;
+    voiceInstance.onSpeechEnd = onSpeechEnd;
+    voiceInstance.onSpeechError = onSpeechError;
+    voiceInstance.onSpeechResults = onSpeechResults;
+    voiceInstance.onSpeechPartialResults = onSpeechPartialResults;
+    voiceInstance.onSpeechVolumeChanged = onSpeechVolumeChanged;
   };
 
   const startPulseAnimation = () => {
@@ -137,69 +125,102 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     }).start();
   };
 
+  // Real voice recognition event handlers
   const onSpeechStart = (e: any) => {
-    console.log('Speech started');
+    console.log('[VOICE] Speech recognition started');
     setIsListening(true);
+    setPartialResults([]);
+    setFinalResult('');
   };
 
   const onSpeechRecognized = (e: any) => {
-    console.log('Speech recognized');
+    console.log('[VOICE] Speech recognized:', e);
   };
 
   const onSpeechEnd = (e: any) => {
-    console.log('Speech ended');
+    console.log('[VOICE] Speech recognition ended');
     setIsListening(false);
   };
 
   const onSpeechError = (e: any) => {
-    console.log('Speech error:', e.error);
+    console.log('[VOICE] Speech recognition error:', e.error);
     setIsListening(false);
     setIsProcessing(false);
     
-    if (e.error?.message) {
-      Alert.alert('Voice Error', e.error.message);
-    }
+    const errorMessages: { [key: string]: string } = {
+      'permission_denied': 'Microphone permission denied. Please enable in settings.',
+      'recognizer_busy': 'Voice recognition is busy. Please try again.',
+      'no_match': 'No speech was recognized. Please try again.',
+      'network_timeout': 'Network timeout. Check your connection.',
+      'network': 'Network error. Please check your internet connection.',
+      'audio': 'Audio recording error. Check microphone availability.',
+      'server': 'Speech recognition server error. Please try again.',
+      'client': 'Speech recognition client error.',
+      'speech_timeout': 'No speech detected. Please speak after the beep.',
+      'no_speech': 'No speech detected.',
+      'language_not_supported': 'Language not supported.',
+      'language_unavailable': 'Language pack not available.',
+      'insufficient_permissions': 'Insufficient permissions for microphone access.'
+    };
+    
+    const message = errorMessages[e.error?.message || e.error] || `Voice recognition error: ${e.error?.message || e.error}`;
+    Alert.alert('Voice Recognition Error', message);
   };
 
   const onSpeechResults = async (e: any) => {
-    console.log('Speech results:', e.value);
+    console.log('[VOICE] Final speech results:', e.value);
     if (e.value && e.value.length > 0) {
       const result = e.value[0];
       setFinalResult(result);
+      setPartialResults([]);
       setIsProcessing(true);
       
-      // Parse and execute command
-      const command = parseVoiceCommand(result);
-      setLastCommand(command);
-      
-      try {
-        const executionResult = await executeVoiceCommand(command, profession);
-        
-        if (executionResult.success) {
-          if (command.intent === 'search' && executionResult.data) {
-            onSearchRequested?.(command.parameters.query, executionResult.data);
-          } else {
-            onCommandExecuted?.(executionResult);
-          }
-          
-          Alert.alert('Voice Command Executed', executionResult.message);
-        } else {
-          Alert.alert('Command Not Understood', executionResult.message);
-        }
-      } catch (error) {
-        console.error('Error executing command:', error);
-        Alert.alert('Error', 'Failed to execute voice command');
-      } finally {
-        setIsProcessing(false);
-        resetState();
-      }
+      await processVoiceCommand(result);
     }
   };
 
   const onSpeechPartialResults = (e: any) => {
-    console.log('Partial results:', e.value);
-    if (e.value) {
+    console.log('[VOICE] Partial speech results:', e.value);
+    if (e.value && e.value.length > 0) {
       setPartialResults(e.value);
+    }
+  };
+
+  const onSpeechVolumeChanged = (e: any) => {
+    // Optional: Use volume data for visual feedback
+    console.log('[VOICE] Volume changed:', e.value);
+  };
+
+  const processVoiceCommand = async (speechText: string) => {
+    try {
+      // Parse and execute command
+      const command = parseVoiceCommand(speechText);
+      setLastCommand(command);
+      
+      console.log('[VOICE] Parsed command:', command);
+      
+      const executionResult = await executeVoiceCommand(command, profession);
+      
+      if (executionResult.success) {
+        if (command.intent === 'search' && executionResult.data) {
+          onSearchRequested?.(command.parameters.query, executionResult.data);
+        } else {
+          onCommandExecuted?.(executionResult);
+        }
+        
+        Alert.alert('Voice Command Executed', executionResult.message);
+      } else {
+        Alert.alert('Command Not Understood', executionResult.message);
+      }
+    } catch (error) {
+      console.error('[VOICE] Error executing command:', error);
+      Alert.alert('Error', 'Failed to execute voice command');
+    } finally {
+      setIsProcessing(false);
+      setTimeout(() => {
+        resetState();
+        setShowModal(false);
+      }, 2000);
     }
   };
 
@@ -208,38 +229,17 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       // Check and request microphone permission
       const hasPermission = await requestMicrophonePermission();
       if (!hasPermission) {
+        Alert.alert(
+          'Permission Required', 
+          'Microphone permission is required for voice commands. Please enable it in your device settings.'
+        );
         return;
       }
 
       resetState();
       setShowModal(true);
       
-      if (voiceSupported) {
-        try {
-          const Voice = await import('react-native-voice');
-          await Voice.default.start('en-US');
-        } catch (voiceError) {
-          console.log('Voice module failed, falling back to mock');
-          setVoiceSupported(false);
-          // Fall through to mock implementation
-        }
-      }
-      
-      if (!voiceSupported) {
-        // Use mock implementation
-        setIsListening(true);
-        setTimeout(async () => {
-          const mockCommands = [
-            'create note about morning meeting',
-            'set reminder for doctor appointment tomorrow at 2pm',
-            'create task review contract due Friday',
-            'search for patient notes'
-          ];
-          const randomCommand = mockCommands[Math.floor(Math.random() * mockCommands.length)];
-          await onSpeechResults({ value: [randomCommand] });
-        }, 2000);
-      }
-      
+      // Animate button press
       Animated.sequence([
         Animated.timing(scaleAnim, {
           toValue: 1.1,
@@ -252,23 +252,92 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
           useNativeDriver: true,
         }),
       ]).start();
+
+      if (voiceSupported && Voice) {
+        // Production: Use real voice recognition
+        console.log('[VOICE] Starting real voice recognition...');
+        
+        // Stop any existing recognition session
+        try {
+          await Voice.stop();
+          await Voice.cancel();
+        } catch (e) {
+          // Ignore errors from stopping non-existent sessions
+        }
+        
+        // Start new recognition session
+        await Voice.start('en-US', {
+          showPopup: false,
+          showPartial: true,
+          timeout: 10000,
+          maxResults: 5,
+        });
+      } else {
+        // Mock implementation for Expo Go
+        console.log('[VOICE] Using mock voice recognition (Expo Go environment)');
+        setIsListening(true);
+        
+        // Simulate partial results
+        setTimeout(() => {
+          setPartialResults(['create note']);
+        }, 500);
+        
+        setTimeout(() => {
+          setPartialResults(['create note about']);
+        }, 1000);
+        
+        setTimeout(() => {
+          setPartialResults(['create note about meeting']);
+        }, 1500);
+        
+        // Simulate final result
+        setTimeout(async () => {
+          const mockCommands = [
+            'create note about morning team meeting',
+            'set reminder for doctor appointment tomorrow at 2pm',
+            'create task finish project presentation due Friday',
+            'search for patient consultation notes'
+          ];
+          const randomCommand = mockCommands[Math.floor(Math.random() * mockCommands.length)];
+          setIsListening(false);
+          await processVoiceCommand(randomCommand);
+        }, 2500);
+      }
+      
     } catch (error) {
-      console.error('Error starting voice recognition:', error);
-      Alert.alert('Demo Mode', 'Voice recognition is simulated in Expo Go. In a real app build, actual voice recognition would be used.');
+      console.error('[VOICE] Error starting voice recognition:', error);
+      setIsListening(false);
       setShowModal(false);
+      
+      const errorMessage = voiceSupported 
+        ? 'Failed to start voice recognition. Please check your microphone and try again.'
+        : 'Voice recognition is simulated in Expo Go. Use "npx eas build" for real voice features.';
+        
+      Alert.alert('Voice Recognition', errorMessage);
     }
   };
 
   const stopListening = async () => {
     try {
-      if (voiceSupported) {
-        const Voice = await import('react-native-voice');
-        await Voice.default.stop();
+      if (voiceSupported && Voice) {
+        await Voice.stop();
+      }
+      setIsListening(false);
+    } catch (error) {
+      console.error('[VOICE] Error stopping voice recognition:', error);
+    }
+  };
+
+  const cancelListening = async () => {
+    try {
+      if (voiceSupported && Voice) {
+        await Voice.cancel();
       }
       setIsListening(false);
       setShowModal(false);
+      resetState();
     } catch (error) {
-      console.error('Error stopping voice recognition:', error);
+      console.error('[VOICE] Error canceling voice recognition:', error);
     }
   };
 
@@ -276,12 +345,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     setPartialResults([]);
     setFinalResult('');
     setLastCommand(null);
-  };
-
-  const closeModal = () => {
-    stopListening();
-    setShowModal(false);
-    resetState();
+    setIsProcessing(false);
   };
 
   const getCurrentText = () => {
@@ -292,7 +356,13 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
   const getStatusText = () => {
     if (isProcessing) return 'Processing command...';
-    if (isListening) return voiceSupported ? 'Listening... Speak now' : 'Simulating voice input...';
+    if (isListening) {
+      if (voiceSupported) {
+        return 'Listening... Speak now';
+      } else {
+        return 'Simulating voice input... (Expo Go Demo)';
+      }
+    }
     if (finalResult) return 'Processing...';
     return 'Tap to start listening';
   };
@@ -327,13 +397,13 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
         visible={showModal}
         transparent
         animationType="slide"
-        onRequestClose={closeModal}
+        onRequestClose={cancelListening}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Voice Command</Text>
-              <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
+              <TouchableOpacity onPress={cancelListening} style={styles.closeButton}>
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -341,7 +411,8 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
             {!voiceSupported && (
               <View style={styles.warningContainer}>
                 <Text style={styles.warningText}>
-                  Voice recognition is not fully supported in Expo Go. This is a demo mode.
+                  🚧 Demo Mode: Voice recognition is simulated in Expo Go.{'\n'}
+                  For real voice features, build with: npx eas build
                 </Text>
               </View>
             )}
@@ -359,14 +430,14 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
                   size={32}
                   color={isListening ? "#FF0000" : "#6B7280"}
                 />
-              </Animated.View>
+              </View>
               <Text style={styles.statusText}>{getStatusText()}</Text>
             </View>
 
             {getCurrentText() ? (
               <View style={styles.transcriptContainer}>
                 <Text style={styles.transcriptLabel}>
-                  {finalResult ? 'Final transcript:' : 'Partial transcript:'}
+                  {finalResult ? 'Final transcript:' : 'Live transcript:'}
                 </Text>
                 <Text style={styles.transcriptText}>{getCurrentText()}</Text>
               </View>
@@ -377,9 +448,13 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
                 <Text style={styles.commandLabel}>Detected command:</Text>
                 <Text style={styles.commandIntent}>{lastCommand.intent.replace('_', ' ')}</Text>
                 {Object.keys(lastCommand.parameters).length > 0 && (
-                  <Text style={styles.commandParams}>
-                    {JSON.stringify(lastCommand.parameters, null, 2)}
-                  </Text>
+                  <View style={styles.parametersContainer}>
+                    {Object.entries(lastCommand.parameters).map(([key, value]) => (
+                      <Text key={key} style={styles.parameterText}>
+                        {key}: {value}
+                      </Text>
+                    ))}
+                  </View>
                 )}
               </View>
             )}
@@ -395,6 +470,11 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
               {isListening && (
                 <TouchableOpacity onPress={stopListening} style={styles.stopButton}>
                   <Text style={styles.stopButtonText}>Stop Listening</Text>
+                </TouchableOpacity>
+              )}
+              {!isListening && !isProcessing && (
+                <TouchableOpacity onPress={startListening} style={styles.startButton}>
+                  <Text style={styles.startButtonText}>Start Again</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -480,6 +560,7 @@ const styles = StyleSheet.create({
     color: '#92400E',
     fontFamily: 'Inter',
     textAlign: 'center',
+    lineHeight: 20,
   },
   statusContainer: {
     alignItems: 'center',
@@ -521,6 +602,7 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontFamily: 'Inter',
     lineHeight: 24,
+    minHeight: 24,
   },
   commandContainer: {
     backgroundColor: '#EFF6FF',
@@ -541,12 +623,16 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontWeight: 'bold',
     textTransform: 'capitalize',
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  commandParams: {
+  parametersContainer: {
+    marginTop: 4,
+  },
+  parameterText: {
     fontSize: 14,
     color: '#1E40AF',
     fontFamily: 'Inter',
+    marginBottom: 2,
   },
   examplesContainer: {
     maxHeight: 200,
@@ -568,6 +654,9 @@ const styles = StyleSheet.create({
   },
   modalActions: {
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
   },
   stopButton: {
     backgroundColor: '#EF4444',
@@ -578,6 +667,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   stopButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    fontFamily: 'Inter',
+  },
+  startButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  startButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
