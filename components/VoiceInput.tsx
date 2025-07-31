@@ -65,6 +65,10 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       const envApiKey = process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY;
       const settingsApiKey = settings.assemblyAIApiKey;
       
+      console.log('[VOICE] Environment variables check:');
+      console.log('[VOICE] - EXPO_PUBLIC_ASSEMBLYAI_API_KEY:', envApiKey ? `Found (${envApiKey.substring(0, 10)}...)` : 'Not found');
+      console.log('[VOICE] - Settings API key:', settingsApiKey ? `Found (${settingsApiKey.substring(0, 10)}...)` : 'Not found');
+      
       if (envApiKey || settingsApiKey) {
         initializeAssemblyAI(settingsApiKey); // This will use env key first, then settings key
         setVoiceSupported(true);
@@ -73,6 +77,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       } else {
         setVoiceSupported(false);
         setAssemblyAIError('AssemblyAI API key not configured. Please add EXPO_PUBLIC_ASSEMBLYAI_API_KEY to secrets or configure in settings');
+        console.log('[VOICE] No API key found in environment or settings - using demo mode');
       }
     } catch (error) {
       console.error('Error loading user settings:', error);
@@ -274,34 +279,60 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
         console.log('[VOICE] Using mock voice recognition (AssemblyAI not available)');
         setIsListening(true);
 
+        // Show that we're in demo mode
+        Alert.alert(
+          'Demo Mode', 
+          'AssemblyAI is not configured. Using simulated voice input for demonstration.',
+          [{ text: 'OK' }]
+        );
+
+        // Simulate partial results with profession-specific commands
+        const professionCommands = {
+          doctor: [
+            'create note about patient consultation',
+            'set reminder for follow up appointment tomorrow',
+            'create task review lab results',
+            'search for patient medical history'
+          ],
+          lawyer: [
+            'create note about client meeting',
+            'set reminder for court hearing next week',
+            'create task draft contract amendment',
+            'search for case precedents'
+          ],
+          developer: [
+            'create note about code review',
+            'set reminder for team standup tomorrow',
+            'create task implement authentication feature',
+            'search for API documentation'
+          ]
+        };
+
+        const commands = professionCommands[profession as keyof typeof professionCommands] || professionCommands.developer;
+
         // Simulate partial results
         setTimeout(() => {
-          setPartialResults(['create note']);
+          setPartialResults(['create']);
         }, 500);
 
         setTimeout(() => {
-          setPartialResults(['create note about']);
+          setPartialResults(['create note']);
         }, 1000);
 
         setTimeout(() => {
-          setPartialResults(['create note about meeting']);
+          setPartialResults(['create note about']);
         }, 1500);
 
         // Simulate final result
         setTimeout(async () => {
-          const mockCommands = [
-            'create note about morning team meeting',
-            'set reminder for doctor appointment tomorrow at 2pm',
-            'create task finish project presentation due Friday',
-            'search for patient consultation notes'
-          ];
-          const randomCommand = mockCommands[Math.floor(Math.random() * mockCommands.length)];
+          const randomCommand = commands[Math.floor(Math.random() * commands.length)];
+          console.log('[VOICE] Mock command generated:', randomCommand);
           setFinalResult(randomCommand);
           setPartialResults([]);
           setIsListening(false);
           setIsProcessing(true);
           await processVoiceCommand(randomCommand);
-        }, 2500);
+        }, 3000);
       }
 
     } catch (error) {
@@ -360,13 +391,15 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     if (isProcessing) return 'Processing command...';
     if (isListening) {
       if (voiceSupported && isAssemblyAIInitialized()) {
-        return 'Listening with AssemblyAI... Speak now';
+        return 'Listening... Speak clearly and press "Stop Listening" when done';
       } else {
-        return 'Simulating voice input... (Demo Mode)';
+        return 'Demo Mode: Simulating voice input...';
       }
     }
-    if (finalResult) return 'Processing...';
-    return 'Tap to start listening';
+    if (finalResult) return 'Command received, processing...';
+    return voiceSupported && isAssemblyAIInitialized() ? 
+      'Tap to start voice recording' : 
+      'Tap to try demo voice commands';
   };
 
   

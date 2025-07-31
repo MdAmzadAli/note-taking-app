@@ -1,6 +1,7 @@
 
 import * as Speech from 'expo-speech';
 import { Alert } from 'react-native';
+import { Audio } from 'expo-av';
 
 export interface SpeechResult {
   text: string;
@@ -14,10 +15,15 @@ export interface SpeechOptions {
   rate?: number;
 }
 
-// AssemblyAI WebSocket connection
-let assemblyAIWebSocket: WebSocket | null = null;
-let isAssemblyAIConnected = false;
+// AssemblyAI configuration
 let assemblyAIApiKey: string | null = null;
+let audioRecording: Audio.Recording | null = null;
+let isRecording = false;
+
+// Callbacks for speech recognition
+let currentOnPartialTranscript: ((text: string) => void) | null = null;
+let currentOnFinalTranscript: ((text: string) => void) | null = null;
+let currentOnError: ((error: string) => void) | null = null;
 
 // Initialize AssemblyAI with API key
 export const initializeAssemblyAI = (apiKey?: string) => {
@@ -45,41 +51,89 @@ export const isAssemblyAIInitialized = (): boolean => {
   return assemblyAIApiKey !== null;
 };
 
-// Create AssemblyAI WebSocket connection
-const createAssemblyAIConnection = async (): Promise<WebSocket> => {
-  return new Promise((resolve, reject) => {
-    if (!assemblyAIApiKey) {
-      reject(new Error('AssemblyAI API key not available'));
-      return;
-    }
+// Upload audio to AssemblyAI and get transcript
+const uploadAudioToAssemblyAI = async (audioUri: string): Promise<string> => {
+  if (!assemblyAIApiKey) {
+    throw new Error('AssemblyAI API key not available');
+  }
 
-    const websocketUrl = 'wss://api.assemblyai.com/v2/realtime/ws';
-    const ws = new WebSocket(websocketUrl, [], {
+  console.log('[SPEECH] Uploading audio to AssemblyAI...');
+
+  // Read the audio file
+  const response = await fetch(audioUri);
+  const audioBlob = await response.blob();
+  
+  // Upload to AssemblyAI
+  const uploadResponse = await fetch('https://api.assemblyai.com/v2/upload', {
+    method: 'POST',
+    headers: {
+      'authorization': assemblyAIApiKey,
+      'content-type': 'application/octet-stream',
+    },
+    body: audioBlob,
+  });
+
+  if (!uploadResponse.ok) {
+    throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+  }
+
+  const uploadData = await uploadResponse.json();
+  console.log('[SPEECH] Audio uploaded, URL:', uploadData.upload_url);
+
+  // Request transcription
+  const transcriptResponse = await fetch('https://api.assemblyai.com/v2/transcript', {
+    method: 'POST',
+    headers: {
+      'authorization': assemblyAIApiKey,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      audio_url: uploadData.upload_url,
+      language_code: 'en_us',
+    }),
+  });
+
+  if (!transcriptResponse.ok) {
+    throw new Error(`Transcription request failed: ${transcriptResponse.statusText}`);
+  }
+
+  const transcriptData = await transcriptResponse.json();
+  const transcriptId = transcriptData.id;
+  console.log('[SPEECH] Transcription requested, ID:', transcriptId);
+
+  // Poll for completion
+  let attempts = 0;
+  const maxAttempts = 30; // 30 seconds maximum wait time
+  
+  while (attempts < maxAttempts) {
+    const statusResponse = await fetch(`https://api.assemblyai.com/v2/transcript/${transcriptId}`, {
       headers: {
-        authorization: assemblyAIApiKey,
+        'authorization': assemblyAIApiKey,
       },
     });
 
-    ws.onopen = () => {
-      console.log('[SPEECH] AssemblyAI WebSocket connected');
-      isAssemblyAIConnected = true;
-      resolve(ws);
-    };
+    if (!statusResponse.ok) {
+      throw new Error(`Status check failed: ${statusResponse.statusText}`);
+    }
 
-    ws.onerror = (error) => {
-      console.error('[SPEECH] AssemblyAI WebSocket error:', error);
-      isAssemblyAIConnected = false;
-      reject(error);
-    };
+    const statusData = await statusResponse.json();
+    console.log('[SPEECH] Transcription status:', statusData.status);
 
-    ws.onclose = () => {
-      console.log('[SPEECH] AssemblyAI WebSocket closed');
-      isAssemblyAIConnected = false;
-    };
-  });
+    if (statusData.status === 'completed') {
+      return statusData.text || '';
+    } else if (statusData.status === 'error') {
+      throw new Error(`Transcription failed: ${statusData.error}`);
+    }
+
+    // Wait 1 second before checking again
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    attempts++;
+  }
+
+  throw new Error('Transcription timeout - please try again');
 };
 
-// Speech recognition using AssemblyAI Real-time API
+// Start speech recognition using AssemblyAI
 export const startAssemblyAISpeechRecognition = async (
   onPartialTranscript?: (text: string) => void,
   onFinalTranscript?: (text: string) => void,
@@ -93,40 +147,71 @@ export const startAssemblyAISpeechRecognition = async (
       };
     }
 
-    // Create WebSocket connection
-    assemblyAIWebSocket = await createAssemblyAIConnection();
+    if (isRecording) {
+      return {
+        success: false,
+        error: "Recording already in progress"
+      };
+    }
 
-    // Handle messages from AssemblyAI
-    assemblyAIWebSocket.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        
-        if (message.message_type === 'PartialTranscript' && message.text) {
-          onPartialTranscript?.(message.text);
-        } else if (message.message_type === 'FinalTranscript' && message.text) {
-          onFinalTranscript?.(message.text);
-        } else if (message.message_type === 'SessionBegins') {
-          console.log('[SPEECH] AssemblyAI session started');
-        } else if (message.message_type === 'SessionTerminated') {
-          console.log('[SPEECH] AssemblyAI session terminated');
-        }
-      } catch (parseError) {
-        console.error('[SPEECH] Error parsing AssemblyAI message:', parseError);
-      }
-    };
+    // Store callbacks
+    currentOnPartialTranscript = onPartialTranscript;
+    currentOnFinalTranscript = onFinalTranscript;
+    currentOnError = onError;
 
-    assemblyAIWebSocket.onerror = (error) => {
-      console.error('[SPEECH] AssemblyAI WebSocket error:', error);
-      onError?.('AssemblyAI connection error');
-    };
+    console.log('[SPEECH] Starting audio recording...');
 
-    assemblyAIWebSocket.onclose = () => {
-      console.log('[SPEECH] AssemblyAI connection closed');
-      isAssemblyAIConnected = false;
-    };
+    // Request audio permissions
+    const { status } = await Audio.requestPermissionsAsync();
+    if (status !== 'granted') {
+      return {
+        success: false,
+        error: "Audio recording permission not granted"
+      };
+    }
 
+    // Configure audio recording
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: true,
+      playsInSilentModeIOS: true,
+    });
+
+    // Start recording
+    audioRecording = new Audio.Recording();
+    await audioRecording.prepareToRecordAsync({
+      android: {
+        extension: '.wav',
+        outputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_DEFAULT,
+        audioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_DEFAULT,
+        sampleRate: 16000,
+        numberOfChannels: 1,
+        bitRate: 128000,
+      },
+      ios: {
+        extension: '.wav',
+        outputFormat: Audio.RECORDING_OPTION_IOS_OUTPUT_FORMAT_LINEARPCM,
+        audioQuality: Audio.RECORDING_OPTION_IOS_AUDIO_QUALITY_HIGH,
+        sampleRate: 16000,
+        numberOfChannels: 1,
+        bitRate: 128000,
+        linearPCMBitDepth: 16,
+        linearPCMIsBigEndian: false,
+        linearPCMIsFloat: false,
+      },
+      web: {
+        mimeType: 'audio/wav',
+        bitsPerSecond: 128000,
+      },
+    });
+
+    await audioRecording.startAsync();
+    isRecording = true;
+
+    console.log('[SPEECH] Audio recording started');
     return { success: true };
+
   } catch (error) {
+    console.error('[SPEECH] Error starting AssemblyAI speech recognition:', error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return {
       success: false,
@@ -135,19 +220,69 @@ export const startAssemblyAISpeechRecognition = async (
   }
 };
 
-// Send audio data to AssemblyAI
-export const sendAudioToAssemblyAI = (audioData: ArrayBuffer): void => {
-  if (assemblyAIWebSocket && isAssemblyAIConnected) {
-    assemblyAIWebSocket.send(audioData);
-  }
-};
-
-// Stop AssemblyAI speech recognition
+// Stop AssemblyAI speech recognition and process audio
 export const stopAssemblyAISpeechRecognition = async (): Promise<void> => {
-  if (assemblyAIWebSocket) {
-    assemblyAIWebSocket.close();
-    assemblyAIWebSocket = null;
-    isAssemblyAIConnected = false;
+  try {
+    if (!isRecording || !audioRecording) {
+      console.log('[SPEECH] No recording in progress');
+      return;
+    }
+
+    console.log('[SPEECH] Stopping audio recording...');
+    
+    // Stop recording
+    await audioRecording.stopAndUnloadAsync();
+    const audioUri = audioRecording.getURI();
+    isRecording = false;
+
+    if (!audioUri) {
+      currentOnError?.('Failed to get audio recording');
+      return;
+    }
+
+    console.log('[SPEECH] Audio recorded at:', audioUri);
+
+    // Process with AssemblyAI if available
+    if (assemblyAIApiKey) {
+      try {
+        const transcript = await uploadAudioToAssemblyAI(audioUri);
+        console.log('[SPEECH] Transcript received:', transcript);
+        
+        if (transcript && transcript.trim()) {
+          currentOnFinalTranscript?.(transcript.trim());
+        } else {
+          currentOnError?.('No speech detected. Please try speaking more clearly.');
+        }
+      } catch (error) {
+        console.error('[SPEECH] AssemblyAI processing error:', error);
+        currentOnError?.(error instanceof Error ? error.message : 'Transcription failed');
+      }
+    } else {
+      // Fallback to mock
+      console.log('[SPEECH] Using mock transcription');
+      setTimeout(() => {
+        const mockTranscripts = [
+          'create note about team meeting',
+          'set reminder for doctor appointment tomorrow',
+          'create task finish project presentation',
+          'search for patient notes'
+        ];
+        const randomTranscript = mockTranscripts[Math.floor(Math.random() * mockTranscripts.length)];
+        currentOnFinalTranscript?.(randomTranscript);
+      }, 1000);
+    }
+
+    // Clean up
+    audioRecording = null;
+    currentOnPartialTranscript = null;
+    currentOnFinalTranscript = null;
+    currentOnError = null;
+
+  } catch (error) {
+    console.error('[SPEECH] Error stopping speech recognition:', error);
+    isRecording = false;
+    audioRecording = null;
+    currentOnError?.(error instanceof Error ? error.message : 'Failed to stop recording');
   }
 };
 
@@ -157,11 +292,6 @@ export const startSpeechRecognition = async (
   onError: (error: string) => void
 ): Promise<() => void> => {
   try {
-    if (!isAssemblyAIInitialized()) {
-      onError('AssemblyAI not initialized');
-      return () => {};
-    }
-
     const result = await startAssemblyAISpeechRecognition(
       undefined, // onPartialTranscript
       onResult,  // onFinalTranscript
