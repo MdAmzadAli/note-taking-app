@@ -241,7 +241,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
       // Determine processing method based on voice method and Gemini availability
       const isGeminiMethod = voiceMethod === 'assemblyai-gemini';
-      const isGeminiAvailable = geminiSupported && process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+      const isGeminiAvailable = geminiSupported && !!process.env.EXPO_PUBLIC_GEMINI_API_KEY;
       const processingMethod = isGeminiMethod && isGeminiAvailable ? 'gemini' : 'regex';
 
       console.log('[VOICE] Voice method setting:', voiceMethod);
