@@ -178,12 +178,17 @@ let voiceboxRecognizer: any = null;
 // Initialize Voicebox
 export const initializeVoicebox = () => {
   try {
-    // Note: react-native-voicebox-speech-rec requires platform-specific setup
-    // For now, we'll use Web Speech API as fallback for Expo environment
-    console.log('[SPEECH] Voicebox initialization - using Web Speech API fallback');
+    // Try to import react-native-voicebox-speech-rec
+    const VoiceBoxSpeechRec = require('react-native-voicebox-speech-rec');
+    console.log('[SPEECH] Voicebox library loaded successfully');
     return true;
   } catch (error) {
-    console.error('[SPEECH] Failed to initialize Voicebox:', error);
+    console.log('[SPEECH] Voicebox library not available, using Web Speech API fallback');
+    // Check if Web Speech API is available as fallback
+    if (typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)) {
+      return true;
+    }
+    console.error('[SPEECH] No speech recognition available');
     return false;
   }
 };
@@ -195,58 +200,94 @@ export const startVoiceboxSpeechRecognition = async (
   onError?: (error: string) => void
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    // Check if Web Speech API is available (Voicebox fallback)
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      return {
-        success: false,
-        error: "Speech recognition not supported on this device"
+    // Try to use actual Voicebox library first
+    try {
+      const VoiceBoxSpeechRec = require('react-native-voicebox-speech-rec');
+      
+      console.log('[SPEECH] Starting Voicebox Speech Recognition...');
+      
+      const options = {
+        language: currentLanguage,
+        continuous: true,
+        interimResults: true,
+        maxResults: 3,
       };
-    }
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = currentLanguage;
-    recognition.maxAlternatives = 3;
-
-    recognition.onstart = () => {
-      console.log('[SPEECH] Voicebox Speech Recognition started');
-    };
-
-    recognition.onresult = (event) => {
-      let interimTranscript = '';
-      let finalTranscript = '';
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalTranscript += transcript;
+      await VoiceBoxSpeechRec.start(options);
+      
+      VoiceBoxSpeechRec.onResult((result: any) => {
+        if (result.isFinal) {
+          console.log('[SPEECH] Voicebox final transcript:', result.transcript);
+          onFinalTranscript?.(result.transcript);
         } else {
-          interimTranscript += transcript;
+          onPartialTranscript?.(result.transcript);
         }
+      });
+
+      VoiceBoxSpeechRec.onError((error: any) => {
+        console.error('[SPEECH] Voicebox recognition error:', error);
+        onError?.(error.message || 'Recognition error');
+      });
+
+      voiceboxRecognizer = VoiceBoxSpeechRec;
+      return { success: true };
+
+    } catch (importError) {
+      console.log('[SPEECH] Voicebox library not available, falling back to Web Speech API');
+      
+      // Fallback to Web Speech API
+      if (typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = currentLanguage;
+        recognition.maxAlternatives = 3;
+
+        recognition.onstart = () => {
+          console.log('[SPEECH] Web Speech API started');
+        };
+
+        recognition.onresult = (event) => {
+          let interimTranscript = '';
+          let finalTranscript = '';
+
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript;
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+
+          if (interimTranscript) {
+            onPartialTranscript?.(interimTranscript);
+          }
+
+          if (finalTranscript) {
+            console.log('[SPEECH] Web Speech API final transcript:', finalTranscript);
+            onFinalTranscript?.(finalTranscript);
+            recognition.stop();
+          }
+        };
+
+        recognition.onerror = (event) => {
+          console.error('[SPEECH] Web Speech API error:', event.error);
+          onError?.(event.error);
+        };
+
+        recognition.start();
+        voiceboxRecognizer = recognition;
+        return { success: true };
+      } else {
+        return {
+          success: false,
+          error: "Speech recognition not supported on this device"
+        };
       }
-
-      if (interimTranscript) {
-        onPartialTranscript?.(interimTranscript);
-      }
-
-      if (finalTranscript) {
-        console.log('[SPEECH] Voicebox final transcript:', finalTranscript);
-        onFinalTranscript?.(finalTranscript);
-        recognition.stop();
-      }
-    };
-
-    recognition.onerror = (event) => {
-      console.error('[SPEECH] Voicebox recognition error:', event.error);
-      onError?.(event.error);
-    };
-
-    recognition.start();
-    voiceboxRecognizer = recognition;
-    return { success: true };
+    }
 
   } catch (error) {
     console.error('[SPEECH] Error starting Voicebox speech recognition:', error);
@@ -262,7 +303,17 @@ export const startVoiceboxSpeechRecognition = async (
 export const stopVoiceboxSpeechRecognition = async (): Promise<void> => {
   try {
     if (voiceboxRecognizer) {
-      voiceboxRecognizer.stop();
+      // Check if it's the actual Voicebox library or Web Speech API
+      if (voiceboxRecognizer.stop && typeof voiceboxRecognizer.stop === 'function') {
+        if (voiceboxRecognizer.constructor.name === 'SpeechRecognition' || 
+            voiceboxRecognizer.constructor.name === 'webkitSpeechRecognition') {
+          // Web Speech API
+          voiceboxRecognizer.stop();
+        } else {
+          // Actual Voicebox library
+          await voiceboxRecognizer.stop();
+        }
+      }
       voiceboxRecognizer = null;
       console.log('[SPEECH] Voicebox recognition stopped');
     }

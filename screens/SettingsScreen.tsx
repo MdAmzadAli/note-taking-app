@@ -9,6 +9,7 @@ import {
   Switch,
   Platform,
   SafeAreaView,
+  TextInput,
 } from 'react-native';
 import { getUserSettings, saveUserSettings, UserSettings } from '@/utils/storage';
 import { clearAllData } from '@/utils/storage';
@@ -226,6 +227,52 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+          </View>
+        </View>
+
+        {/* API Keys Configuration */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>API Configuration</Text>
+          
+          <View style={styles.apiKeySection}>
+            <Text style={styles.settingName}>AssemblyAI API Key</Text>
+            <Text style={styles.settingDescription}>
+              Required for AssemblyAI voice recognition. Get your key from assemblyai.com
+            </Text>
+            <TextInput
+              style={styles.apiKeyInput}
+              value={settings.assemblyAIApiKey || ''}
+              onChangeText={(value) => updateSettings({ assemblyAIApiKey: value })}
+              placeholder="Enter AssemblyAI API key..."
+              placeholderTextColor="#6B7280"
+              secureTextEntry
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+          </View>
+
+          <View style={styles.apiKeySection}>
+            <Text style={styles.settingName}>Google Gemini API Key</Text>
+            <Text style={styles.settingDescription}>
+              Required for AI-enhanced command understanding. Get your key from ai.google.dev
+            </Text>
+            <TextInput
+              style={styles.apiKeyInput}
+              value={settings.geminiApiKey || ''}
+              onChangeText={(value) => updateSettings({ geminiApiKey: value })}
+              placeholder="Enter Gemini API key..."
+              placeholderTextColor="#6B7280"
+              secureTextEntry
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+          </View>
+
+          <View style={styles.infoCard}>
+            <Text style={styles.infoText}>🔐 API keys are stored locally on your device</Text>
+            <Text style={styles.infoText}>🌐 Environment variables take precedence over manual entry</Text>
+            <Text style={styles.infoText}>🎤 Voicebox works without API keys but AssemblyAI requires one</Text>
+            <Text style={styles.infoText}>✨ Gemini enhances voice command understanding</Text>
           </View>
         </View>
 
@@ -516,5 +563,25 @@ clearDataButton: {
   languageTextActive: {
     color: '#FFFFFF',
     fontWeight: '500',
+  },
+  apiKeySection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 12,
+  },
+  apiKeyInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    fontFamily: 'Inter',
+    color: '#000000',
+    backgroundColor: '#F9FAFB',
+    marginTop: 8,
   },
 });
