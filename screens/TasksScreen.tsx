@@ -509,13 +509,21 @@ export default function TasksScreen() {
   };
 
   const handleVoiceSearch = (query: string, results: any[]) => {
-    console.log('[TASKS] Voice search requested:', query, results);
+    console.log('[TASKS] Voice search requested - Query:', query);
+    console.log('[TASKS] Voice search results:', results);
+    
     const taskResults = results.filter(item => item.type === 'task');
+    console.log('[TASKS] Filtered task results:', taskResults);
+    
     if (taskResults.length > 0) {
-      setTasks(taskResults.map(result => result.item));
+      const filteredTasks = taskResults.map(result => result.item);
+      console.log('[TASKS] Setting filtered tasks:', filteredTasks);
+      setTasks(filteredTasks);
       Alert.alert('Search Results', `Found ${taskResults.length} task(s) matching "${query}"`);
     } else {
+      console.log('[TASKS] No task results found');
       Alert.alert('No Results', `No tasks found matching "${query}"`);
+    }ching "${query}"`);
     }
   };
 

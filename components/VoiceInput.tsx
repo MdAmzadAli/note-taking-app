@@ -178,7 +178,12 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
   const processVoiceCommand = async (speechText: string) => {
     try {
+      console.log('[VOICE] ===== PROCESSING VOICE COMMAND =====');
       console.log('[VOICE] Processing speech text:', speechText);
+      console.log('[VOICE] Speech text length:', speechText.length);
+      console.log('[VOICE] Current profession:', profession);
+      console.log('[VOICE] Voice method:', voiceMethod);
+      console.log('[VOICE] Gemini supported:', geminiSupported);
       
       if (!speechText || speechText.trim().length === 0) {
         console.log('[VOICE] Empty speech text received');
@@ -216,20 +221,44 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       console.log('[VOICE] Voice method setting:', voiceMethod);
       console.log('[VOICE] Gemini supported:', geminiSupported);
       
+      console.log('[VOICE] About to execute command with processing method:', processingMethod);
       const executionResult = await executeVoiceCommand(command, profession, processingMethod);
 
-      console.log('[VOICE] Execution result:', executionResult);
+      console.log('[VOICE] ===== EXECUTION RESULT =====');
+      console.log('[VOICE] Execution result:', JSON.stringify(executionResult, null, 2));
+      console.log('[VOICE] Success:', executionResult.success);
+      console.log('[VOICE] Message:', executionResult.message);
+      console.log('[VOICE] Data:', executionResult.data);
 
       if (executionResult.success) {
         if (command.intent === 'search' && executionResult.data) {
-          console.log('[VOICE] Calling onSearchRequested with:', command.parameters.query, executionResult.data);
-          onSearchRequested?.(command.parameters.query, executionResult.data);
+          const searchQuery = command.parameters.query || command.parameters.content;
+          console.log('[VOICE] ===== SEARCH COMMAND SUCCESS =====');
+          console.log('[VOICE] Search query for callback:', searchQuery);
+          console.log('[VOICE] Search results for callback:', executionResult.data);
+          console.log('[VOICE] onSearchRequested callback available:', !!onSearchRequested);
+          
+          if (onSearchRequested) {
+            console.log('[VOICE] Calling onSearchRequested...');
+            onSearchRequested(searchQuery, executionResult.data);
+          } else {
+            console.log('[VOICE] WARNING: onSearchRequested callback not available');
+          }
           Alert.alert('Search Completed', executionResult.message);
         } else {
-          onCommandExecuted?.(executionResult);
+          console.log('[VOICE] ===== NON-SEARCH COMMAND SUCCESS =====');
+          console.log('[VOICE] onCommandExecuted callback available:', !!onCommandExecuted);
+          
+          if (onCommandExecuted) {
+            console.log('[VOICE] Calling onCommandExecuted...');
+            onCommandExecuted(executionResult);
+          } else {
+            console.log('[VOICE] WARNING: onCommandExecuted callback not available');
+          }
           Alert.alert('Voice Command Executed', executionResult.message);
         }
       } else {
+        console.log('[VOICE] ===== COMMAND EXECUTION FAILED =====');
         console.log('[VOICE] Command execution failed:', executionResult.message);
         Alert.alert('Command Not Understood', executionResult.message + '\n\nTry phrases like: "create note about meeting", "search for patient notes", "set reminder for tomorrow", or "create task review contract"');
       }

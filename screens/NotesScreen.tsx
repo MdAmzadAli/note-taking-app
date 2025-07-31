@@ -506,13 +506,33 @@ export default function NotesScreen() {
           </TouchableOpacity>
           <VoiceInput
             onCommandExecuted={(result) => {
+              console.log('[NOTES] Voice command executed:', result);
               if (result.data && result.data.id) {
+                console.log('[NOTES] Refreshing notes list after command');
                 loadNotes(); // Refresh notes list
               }
             }}
             onSearchRequested={(query, results) => {
-              setSearchQuery(query);
-              setIsSearchVisible(true);
+              console.log('[NOTES] Voice search requested - Query:', query);
+              console.log('[NOTES] Voice search results:', results);
+              
+              // Filter only note results
+              const noteResults = results.filter(item => item.type === 'note');
+              console.log('[NOTES] Filtered note results:', noteResults);
+              
+              if (noteResults.length > 0) {
+                // Set the filtered notes and show search
+                const filteredNotes = noteResults.map(result => result.item);
+                console.log('[NOTES] Setting filtered notes:', filteredNotes);
+                setNotes(filteredNotes);
+                setSearchQuery(query);
+                setIsSearchVisible(true);
+              } else {
+                // No note results found, but still show search with query
+                setSearchQuery(query);
+                setIsSearchVisible(true);
+                Alert.alert('No Results', `No notes found matching "${query}"`);
+              }
             }}
             style={styles.voiceInputButton}
           />

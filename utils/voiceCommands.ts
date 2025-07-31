@@ -145,10 +145,12 @@ export const parseVoiceCommand = (text: string): VoiceCommand => {
   
   // Search commands
   const searchPatterns = [
-    /search\s+for\s+(.+)/i,
+    /search\s+(?:for\s+)?(.+)/i,
     /find\s+(.+)/i,
-    /look\s+for\s+(.+)/i,
-    /show\s+me\s+(.+)/i
+    /look\s+(?:for\s+)?(.+)/i,
+    /show\s+(?:me\s+)?(.+)/i,
+    /where\s+(?:is\s+|are\s+)?(.+)/i,
+    /get\s+(?:me\s+)?(.+)/i
   ];
   
   for (const pattern of searchPatterns) {
@@ -164,10 +166,12 @@ export const parseVoiceCommand = (text: string): VoiceCommand => {
   
   // Create note commands
   const notePatterns = [
-    /create\s+(?:a\s+)?note\s+(?:titled\s+)?(.+)/i,
-    /new\s+note\s+(?:titled\s+)?(.+)/i,
-    /add\s+(?:a\s+)?note\s+(.+)/i,
-    /make\s+(?:a\s+)?note\s+(?:about\s+)?(.+)/i
+    /create\s+(?:a\s+)?note\s+(?:titled\s+|about\s+)?(.+)/i,
+    /new\s+note\s+(?:titled\s+|about\s+)?(.+)/i,
+    /add\s+(?:a\s+)?note\s+(?:about\s+)?(.+)/i,
+    /make\s+(?:a\s+)?note\s+(?:about\s+)?(.+)/i,
+    /note\s+(?:about\s+)?(.+)/i,
+    /write\s+(?:down\s+)?(?:a\s+)?note\s+(?:about\s+)?(.+)/i
   ];
   
   for (const pattern of notePatterns) {
@@ -338,8 +342,10 @@ export const executeVoiceCommand = async (
   profession: string = 'doctor',
   processingMethod: 'regex' | 'gemini' = 'regex'
 ): Promise<{ success: boolean; message: string; data?: any }> => {
-  console.log('[VOICE_COMMANDS] Executing command:', command);
+  console.log('[VOICE_COMMANDS] ===== STARTING COMMAND EXECUTION =====');
+  console.log('[VOICE_COMMANDS] Executing command:', JSON.stringify(command, null, 2));
   console.log('[VOICE_COMMANDS] Processing method:', processingMethod);
+  console.log('[VOICE_COMMANDS] Profession:', profession);
   
   try {
     let enhancedCommand = command;
@@ -390,31 +396,40 @@ export const executeVoiceCommand = async (
       }
     }
     
+    console.log('[VOICE_COMMANDS] Enhanced command intent:', enhancedCommand.intent);
+    console.log('[VOICE_COMMANDS] Enhanced command parameters:', JSON.stringify(enhancedCommand.parameters, null, 2));
+
     switch (enhancedCommand.intent) {
       case 'search':
-        return await handleSearchCommand(enhancedCommand.parameters.query || enhancedCommand.parameters.content);
+        console.log('[VOICE_COMMANDS] Executing SEARCH command');
+        const searchQuery = enhancedCommand.parameters.query || enhancedCommand.parameters.content;
+        console.log('[VOICE_COMMANDS] Search query:', searchQuery);
+        return await handleSearchCommand(searchQuery);
         
       case 'create_note':
-        return await handleCreateNoteCommand(
-          enhancedCommand.parameters.content || enhancedCommand.parameters.title, 
-          profession
-        );
+        console.log('[VOICE_COMMANDS] Executing CREATE_NOTE command');
+        const noteContent = enhancedCommand.parameters.content || enhancedCommand.parameters.title;
+        console.log('[VOICE_COMMANDS] Note content:', noteContent);
+        return await handleCreateNoteCommand(noteContent, profession);
         
       case 'set_reminder':
-        return await handleSetReminderCommand(
-          enhancedCommand.parameters.title || enhancedCommand.parameters.content,
-          enhancedCommand.parameters.time || 'tomorrow',
-          profession
-        );
+        console.log('[VOICE_COMMANDS] Executing SET_REMINDER command');
+        const reminderTitle = enhancedCommand.parameters.title || enhancedCommand.parameters.content;
+        const reminderTime = enhancedCommand.parameters.time || 'tomorrow';
+        console.log('[VOICE_COMMANDS] Reminder title:', reminderTitle);
+        console.log('[VOICE_COMMANDS] Reminder time:', reminderTime);
+        return await handleSetReminderCommand(reminderTitle, reminderTime, profession);
         
       case 'create_task':
-        return await handleCreateTaskCommand(
-          enhancedCommand.parameters.title || enhancedCommand.parameters.content,
-          enhancedCommand.parameters.dueDate || 'tomorrow',
-          profession
-        );
+        console.log('[VOICE_COMMANDS] Executing CREATE_TASK command');
+        const taskTitle = enhancedCommand.parameters.title || enhancedCommand.parameters.content;
+        const taskDueDate = enhancedCommand.parameters.dueDate || 'tomorrow';
+        console.log('[VOICE_COMMANDS] Task title:', taskTitle);
+        console.log('[VOICE_COMMANDS] Task due date:', taskDueDate);
+        return await handleCreateTaskCommand(taskTitle, taskDueDate, profession);
         
       default:
+        console.log('[VOICE_COMMANDS] UNKNOWN command intent:', enhancedCommand.intent);
         return {
           success: false,
           message: `I didn't understand the command: "${command.originalText}". Try saying "create note", "set reminder", "create task", or "search for".`
@@ -444,14 +459,20 @@ export const executeVoiceCommand = async (
 };
 
 const handleSearchCommand = async (query: string): Promise<{ success: boolean; message: string; data?: SearchResult[] }> => {
+  console.log('[VOICE_COMMANDS] ===== HANDLING SEARCH COMMAND =====');
+  console.log('[VOICE_COMMANDS] Search query:', query);
+  
   const [notes, tasks, reminders] = await Promise.all([
     getNotes(),
     getTasks(),
     getReminders()
   ]);
   
+  console.log('[VOICE_COMMANDS] Loaded data - Notes:', notes.length, 'Tasks:', tasks.length, 'Reminders:', reminders.length);
+  
   const results: SearchResult[] = [];
   const lowerQuery = query.toLowerCase();
+  console.log('[VOICE_COMMANDS] Searching for:', lowerQuery);
   
   // Search notes
   notes.forEach(note => {
@@ -495,14 +516,32 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
   // Sort by relevance
   results.sort((a, b) => b.relevance - a.relevance);
   
-  return {
+  console.log('[VOICE_COMMANDS] Search results found:', results.length);
+  console.log('[VOICE_COMMANDS] Search results:', JSON.stringify(results, null, 2));
+  
+  const searchResult = {
     success: true,
     message: `Found ${results.length} result${results.length !== 1 ? 's' : ''} for "${query}"`,
     data: results
   };
+  
+  console.log('[VOICE_COMMANDS] Returning search result:', JSON.stringify(searchResult, null, 2));
+  return searchResult;
 };
 
 const handleCreateNoteCommand = async (content: string, profession: string): Promise<{ success: boolean; message: string; data?: Note }> => {
+  console.log('[VOICE_COMMANDS] ===== HANDLING CREATE NOTE COMMAND =====');
+  console.log('[VOICE_COMMANDS] Note content:', content);
+  console.log('[VOICE_COMMANDS] Profession:', profession);
+  
+  if (!content || content.trim().length === 0) {
+    console.log('[VOICE_COMMANDS] ERROR: Empty note content');
+    return {
+      success: false,
+      message: 'Cannot create note with empty content'
+    };
+  }
+  
   const now = new Date().toISOString();
   
   const note: Note = {
@@ -515,13 +554,27 @@ const handleCreateNoteCommand = async (content: string, profession: string): Pro
     updatedAt: now,
   };
   
-  await saveNote(note);
+  console.log('[VOICE_COMMANDS] Creating note:', JSON.stringify(note, null, 2));
   
-  return {
-    success: true,
-    message: `Created note: "${note.title}"`,
-    data: note
-  };
+  try {
+    await saveNote(note);
+    console.log('[VOICE_COMMANDS] Note saved successfully');
+    
+    const result = {
+      success: true,
+      message: `Created note: "${note.title}"`,
+      data: note
+    };
+    
+    console.log('[VOICE_COMMANDS] Returning note creation result:', JSON.stringify(result, null, 2));
+    return result;
+  } catch (error) {
+    console.error('[VOICE_COMMANDS] Error saving note:', error);
+    return {
+      success: false,
+      message: 'Failed to save note'
+    };
+  }
 };
 
 const handleSetReminderCommand = async (title: string, timeStr: string, profession: string): Promise<{ success: boolean; message: string; data?: Reminder }> => {
