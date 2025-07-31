@@ -3,9 +3,12 @@ import { Platform, Alert, Linking } from 'react-native';
 
 export const requestMicrophonePermission = async (): Promise<boolean> => {
   try {
+    console.log('[PERMISSIONS] Starting microphone permission request...');
+    
     if (Platform.OS === 'web') {
       // For web platform
       try {
+        console.log('[PERMISSIONS] Requesting web microphone access...');
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         stream.getTracks().forEach(track => track.stop());
         console.log('[PERMISSIONS] Web microphone access granted');
@@ -31,6 +34,8 @@ export const requestMicrophonePermission = async (): Promise<boolean> => {
       
       if (isExpoGo) {
         console.log('[PERMISSIONS] Expo Go environment - assuming permission granted');
+        // Add a small delay to simulate permission flow
+        await new Promise(resolve => setTimeout(resolve, 100));
         return true;
       }
 

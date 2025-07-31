@@ -317,18 +317,17 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
   const startListening = async () => {
     try {
-      // Check and request microphone permission
-      const hasPermission = await requestMicrophonePermission();
-      if (!hasPermission) {
+      console.log('[VOICE] Starting voice input process...');
+      
+      // First check if voice is supported
+      if (!voiceSupported) {
         Alert.alert(
-          'Permission Required', 
-          'Microphone permission is required for voice commands. Please enable it in your device settings.'
+          'Voice Recognition Unavailable', 
+          'Voice commands require AssemblyAI API key configuration. Please set up your API key in Settings to use voice commands.',
+          [{ text: 'OK' }]
         );
         return;
       }
-
-      resetState();
-      setShowModal(true);
 
       // Animate button press
       Animated.sequence([
@@ -344,64 +343,78 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
         }),
       ]).start();
 
-      if (voiceSupported) {
-        // Use selected voice recognition method
-        console.log(`[VOICE] Starting ${voiceMethod} speech recognition in ${voiceLanguage}...`);
-        setIsListening(true);
+      // Check and request microphone permission FIRST
+      console.log('[VOICE] Requesting microphone permission...');
+      const hasPermission = await requestMicrophonePermission();
+      
+      if (!hasPermission) {
+        console.log('[VOICE] Microphone permission denied');
+        Alert.alert(
+          'Permission Required', 
+          'Microphone permission is required for voice commands. Please enable it in your device settings.'
+        );
+        return;
+      }
 
-        const result = await startSpeechRecognitionUnified(
-          voiceMethod,
-          // onPartialTranscript
-          (text: string) => {
-            console.log('[VOICE] Partial transcript:', text);
-            setPartialResults([text]);
-          },
-          // onFinalTranscript
-          (text: string) => {
-            console.log(`[VOICE] Final transcript received from ${voiceMethod}:`, text);
-            console.log('[VOICE] Text length:', text.length);
-            console.log('[VOICE] Text content:', JSON.stringify(text));
+      console.log('[VOICE] Microphone permission granted, proceeding with recording...');
 
-            if (text && text.trim().length > 0) {
-              setFinalResult(text);
-              setPartialResults([]);
-              setIsListening(false);
-              setIsProcessing(true);
+      // Only after permission is granted, reset state and show modal
+      resetState();
+      setShowModal(true);
 
-              // Add a small delay to ensure UI updates
-              setTimeout(() => {
-                processVoiceCommand(text);
-              }, 100);
-            } else {
-              console.log('[VOICE] Empty transcript received');
-              setIsListening(false);
-              setIsProcessing(false);
-              Alert.alert('No Speech Detected', 'Please try speaking more clearly.');
-            }
-          },
-          // onError
-          (error: string) => {
-            console.error(`[VOICE] ${voiceMethod} error:`, error);
+      // Add a small delay to ensure modal is fully rendered before starting recording
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Now start the speech recognition
+      console.log(`[VOICE] Starting ${voiceMethod} speech recognition in ${voiceLanguage}...`);
+      setIsListening(true);
+
+      const result = await startSpeechRecognitionUnified(
+        voiceMethod,
+        // onPartialTranscript
+        (text: string) => {
+          console.log('[VOICE] Partial transcript:', text);
+          setPartialResults([text]);
+        },
+        // onFinalTranscript
+        (text: string) => {
+          console.log(`[VOICE] Final transcript received from ${voiceMethod}:`, text);
+          console.log('[VOICE] Text length:', text.length);
+          console.log('[VOICE] Text content:', JSON.stringify(text));
+
+          if (text && text.trim().length > 0) {
+            setFinalResult(text);
+            setPartialResults([]);
+            setIsListening(false);
+            setIsProcessing(true);
+
+            // Add a small delay to ensure UI updates
+            setTimeout(() => {
+              processVoiceCommand(text);
+            }, 100);
+          } else {
+            console.log('[VOICE] Empty transcript received');
             setIsListening(false);
             setIsProcessing(false);
-            resetState();
-            Alert.alert('Voice Recognition Error', `Speech recognition failed: ${error}\n\nPlease check your microphone and internet connection.`);
+            Alert.alert('No Speech Detected', 'Please try speaking more clearly.');
           }
-        );
-
-        if (!result.success) {
+        },
+        // onError
+        (error: string) => {
+          console.error(`[VOICE] ${voiceMethod} error:`, error);
           setIsListening(false);
-          Alert.alert('Speech Recognition Error', result.error || `Failed to start ${voiceMethod}`);
+          setIsProcessing(false);
+          resetState();
+          setShowModal(false);
+          Alert.alert('Voice Recognition Error', `Speech recognition failed: ${error}\n\nPlease check your microphone and internet connection.`);
         }
-      } else {
-        // Voice recognition not available - require proper configuration
-        Alert.alert(
-          'Voice Recognition Unavailable', 
-          'Voice commands require AssemblyAI API key configuration. Please set up your API key in Settings to use voice commands.',
-          [{ text: 'OK' }]
-        );
+      );
+
+      if (!result.success) {
+        console.log('[VOICE] Failed to start speech recognition:', result.error);
+        setIsListening(false);
         setShowModal(false);
-        return;
+        Alert.alert('Speech Recognition Error', result.error || `Failed to start ${voiceMethod}`);
       }
 
     } catch (error) {
