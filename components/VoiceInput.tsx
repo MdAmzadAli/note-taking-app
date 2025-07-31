@@ -337,64 +337,14 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
           Alert.alert('Speech Recognition Error', result.error || `Failed to start ${voiceMethod}`);
         }
       } else {
-        // Mock implementation fallback
-        console.log('[VOICE] Using mock voice recognition (AssemblyAI not available)');
-        setIsListening(true);
-
-        // Show that we're in demo mode
+        // Voice recognition not available - require proper configuration
         Alert.alert(
-          'Demo Mode', 
-          'AssemblyAI is not configured. Using simulated voice input for demonstration.',
+          'Voice Recognition Unavailable', 
+          'Voice commands require AssemblyAI API key configuration. Please set up your API key in Settings to use voice commands.',
           [{ text: 'OK' }]
         );
-
-        // Simulate partial results with profession-specific commands
-        const professionCommands = {
-          doctor: [
-            'create note about patient consultation',
-            'set reminder for follow up appointment tomorrow',
-            'create task review lab results',
-            'search for patient medical history'
-          ],
-          lawyer: [
-            'create note about client meeting',
-            'set reminder for court hearing next week',
-            'create task draft contract amendment',
-            'search for case precedents'
-          ],
-          developer: [
-            'create note about code review',
-            'set reminder for team standup tomorrow',
-            'create task implement authentication feature',
-            'search for API documentation'
-          ]
-        };
-
-        const commands = professionCommands[profession as keyof typeof professionCommands] || professionCommands.developer;
-
-        // Simulate partial results
-        setTimeout(() => {
-          setPartialResults(['create']);
-        }, 500);
-
-        setTimeout(() => {
-          setPartialResults(['create note']);
-        }, 1000);
-
-        setTimeout(() => {
-          setPartialResults(['create note about']);
-        }, 1500);
-
-        // Simulate final result
-        setTimeout(async () => {
-          const randomCommand = commands[Math.floor(Math.random() * commands.length)];
-          console.log('[VOICE] Mock command generated:', randomCommand);
-          setFinalResult(randomCommand);
-          setPartialResults([]);
-          setIsListening(false);
-          setIsProcessing(true);
-          await processVoiceCommand(randomCommand);
-        }, 3000);
+        setShowModal(false);
+        return;
       }
 
     } catch (error) {
@@ -465,7 +415,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     if (finalResult) return 'Command received, processing...';
     return voiceSupported ? 
       `Tap to start ${voiceMethod.toUpperCase()} voice recording (${voiceLanguage})` : 
-      'Tap to try demo voice commands';
+      'Voice commands unavailable - configure API key in Settings';
   };
 
 
@@ -514,10 +464,10 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
             {(!voiceSupported || assemblyAIError) && (
               <View style={styles.warningContainer}>
                 <Text style={styles.warningText}>
-                  {assemblyAIError && voiceMethod === 'assemblyai-regex' ? 
-                    `⚠️ ${assemblyAIError}\nVoice commands are simulated for demonstration.` :
+                  {assemblyAIError ? 
+                    `⚠️ ${assemblyAIError}\nPlease configure your API key in Settings.` :
                     !voiceSupported ?
-                    `🚧 Demo Mode: ${voiceMethod.toUpperCase()} is not configured.\nVoice commands are simulated for demonstration purposes.` :
+                    `⚠️ Voice Recognition Unavailable\n${voiceMethod.toUpperCase()} API key required in Settings.` :
                     ''
                   }
                 </Text>

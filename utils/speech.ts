@@ -298,19 +298,9 @@ export const stopAssemblyAISpeechRecognition = async (): Promise<void> => {
         currentOnError?.(error instanceof Error ? error.message : 'Transcription failed');
       }
     } else {
-      // Fallback to mock
-      console.log('[SPEECH] Using mock transcription');
-      setTimeout(() => {
-        const mockTranscripts = [
-          'create note about team meeting',
-          'set reminder for doctor appointment tomorrow',
-          'create task finish project presentation',
-          'search for patient notes'
-        ];
-        const randomTranscript = mockTranscripts[Math.floor(Math.random() * mockTranscripts.length)];
-        currentOnFinalTranscript?.(randomTranscript);
-      }, 1000);
-    }
+        // No AssemblyAI configured - cannot proceed
+        currentOnError?.('AssemblyAI API key not configured. Please set up your API key in Settings.');
+      }
 
     // Clean up
     audioRecording = null;

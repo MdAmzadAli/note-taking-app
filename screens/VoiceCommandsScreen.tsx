@@ -87,7 +87,8 @@ export default function VoiceCommandsScreen({ onBack }: VoiceCommandsScreenProps
         <View style={styles.introSection}>
           <Text style={styles.introTitle}>How to Use Voice Commands</Text>
           <Text style={styles.introText}>
-            Tap the microphone icon in any screen to start voice recognition. 
+            Voice commands require AssemblyAI API key configuration in Settings. 
+            Once configured, tap the microphone icon to start voice recognition. 
             Speak clearly and include the action you want to perform along with the relevant details.
           </Text>
         </View>

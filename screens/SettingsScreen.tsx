@@ -17,6 +17,426 @@ import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 import { VoiceRecognitionMethod } from '@/utils/speech';
 import VoiceCommandsScreen from './VoiceCommandsScreen';
 
+interface SettingsScreenProps {
+  onBack: () => void;
+}
+
+export default function SettingsScreen({ onBack }: SettingsScreenProps) {
+  const [settings, setSettings] = useState<UserSettings>({
+    profession: 'doctor',
+    voiceLanguage: 'en-US',
+    voiceRecognitionMethod: 'assemblyai-regex',
+    assemblyAIApiKey: '',
+    geminiApiKey: '',
+    writingStyle: 'professional',
+    notifications: true,
+    darkMode: false,
+  });
+  const [showVoiceCommands, setShowVoiceCommands] = useState(false);
+  const [assemblyAIKey, setAssemblyAIKey] = useState('');
+  const [geminiKey, setGeminiKey] = useState('');
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const userSettings = await getUserSettings();
+      setSettings(userSettings);
+      setAssemblyAIKey(userSettings.assemblyAIApiKey || '');
+      setGeminiKey(userSettings.geminiApiKey || '');
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
+
+  const saveSettings = async (newSettings: Partial<UserSettings>) => {
+    try {
+      const updatedSettings = { ...settings, ...newSettings };
+      await saveUserSettings(updatedSettings);
+      setSettings(updatedSettings);
+      Alert.alert('Success', 'Settings saved successfully');
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      Alert.alert('Error', 'Failed to save settings');
+    }
+  };
+
+  const handleSaveApiKeys = async () => {
+    await saveSettings({
+      assemblyAIApiKey: assemblyAIKey,
+      geminiApiKey: geminiKey,
+    });
+  };
+
+  const handleClearData = () => {
+    Alert.alert(
+      'Clear All Data',
+      'This will permanently delete all your notes, tasks, and reminders. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete All',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await clearAllData();
+              Alert.alert('Success', 'All data has been cleared');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to clear data');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  if (showVoiceCommands) {
+    return <VoiceCommandsScreen onBack={() => setShowVoiceCommands(false)} />;
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={onBack}>
+          <Text style={styles.backButtonText}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Settings</Text>
+      </View>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>API Configuration</Text>
+          <Text style={styles.sectionDescription}>
+            Configure API keys for voice recognition and AI features
+          </Text>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>AssemblyAI API Key (Required for Voice Commands)</Text>
+            <TextInput
+              style={styles.input}
+              value={assemblyAIKey}
+              onChangeText={setAssemblyAIKey}
+              placeholder="Enter AssemblyAI API key"
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Gemini API Key (Optional - Enhanced AI Processing)</Text>
+            <TextInput
+              style={styles.input}
+              value={geminiKey}
+              onChangeText={setGeminiKey}
+              placeholder="Enter Gemini API key"
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+
+          <TouchableOpacity style={styles.button} onPress={handleSaveApiKeys}>
+            <Text style={styles.buttonText}>Save API Keys</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Profession</Text>
+          {PROFESSIONS.map((prof) => (
+            <TouchableOpacity
+              key={prof.id}
+              style={[
+                styles.professionOption,
+                settings.profession === prof.id && styles.professionOptionSelected,
+              ]}
+              onPress={() => saveSettings({ profession: prof.id })}
+            >
+              <Text
+                style={[
+                  styles.professionText,
+                  settings.profession === prof.id && styles.professionTextSelected,
+                ]}
+              >
+                {prof.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Voice Recognition</Text>
+          
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Recognition Method</Text>
+            <View style={styles.methodButtons}>
+              <TouchableOpacity
+                style={[
+                  styles.methodButton,
+                  settings.voiceRecognitionMethod === 'assemblyai-regex' && styles.methodButtonSelected,
+                ]}
+                onPress={() => saveSettings({ voiceRecognitionMethod: 'assemblyai-regex' })}
+              >
+                <Text style={[
+                  styles.methodButtonText,
+                  settings.voiceRecognitionMethod === 'assemblyai-regex' && styles.methodButtonTextSelected,
+                ]}>
+                  Regex
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.methodButton,
+                  settings.voiceRecognitionMethod === 'assemblyai-gemini' && styles.methodButtonSelected,
+                ]}
+                onPress={() => saveSettings({ voiceRecognitionMethod: 'assemblyai-gemini' })}
+              >
+                <Text style={[
+                  styles.methodButtonText,
+                  settings.voiceRecognitionMethod === 'assemblyai-gemini' && styles.methodButtonTextSelected,
+                ]}>
+                  AI Enhanced
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Language</Text>
+            <TouchableOpacity
+              style={styles.languageButton}
+              onPress={() => {
+                const languages = ['en-US', 'es-ES', 'fr-FR', 'de-DE', 'it-IT'];
+                const currentIndex = languages.indexOf(settings.voiceLanguage);
+                const nextIndex = (currentIndex + 1) % languages.length;
+                saveSettings({ voiceLanguage: languages[nextIndex] });
+              }}
+            >
+              <Text style={styles.languageButtonText}>{settings.voiceLanguage}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>App Preferences</Text>
+          
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Notifications</Text>
+            <Switch
+              value={settings.notifications}
+              onValueChange={(value) => saveSettings({ notifications: value })}
+            />
+          </View>
+
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Dark Mode</Text>
+            <Switch
+              value={settings.darkMode}
+              onValueChange={(value) => saveSettings({ darkMode: value })}
+            />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <TouchableOpacity 
+            style={styles.linkButton}
+            onPress={() => setShowVoiceCommands(true)}
+          >
+            <Text style={styles.linkButtonText}>Voice Commands Guide</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <TouchableOpacity style={styles.dangerButton} onPress={handleClearData}>
+            <Text style={styles.dangerButtonText}>Clear All Data</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    backgroundColor: '#000000',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  backButton: {
+    padding: 8,
+  },
+  backButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Inter',
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontFamily: 'Inter',
+    textAlign: 'center',
+    marginRight: 60,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  section: {
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000000',
+    fontFamily: 'Inter',
+    marginBottom: 8,
+  },
+  sectionDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontFamily: 'Inter',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    fontFamily: 'Inter',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    fontFamily: 'Inter',
+    backgroundColor: '#FFFFFF',
+  },
+  button: {
+    backgroundColor: '#000000',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter',
+  },
+  professionOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 8,
+  },
+  professionOptionSelected: {
+    borderColor: '#000000',
+    backgroundColor: '#F9FAFB',
+  },
+  professionText: {
+    fontSize: 16,
+    color: '#374151',
+    fontFamily: 'Inter',
+  },
+  professionTextSelected: {
+    color: '#000000',
+    fontWeight: '600',
+  },
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  settingLabel: {
+    fontSize: 16,
+    color: '#374151',
+    fontFamily: 'Inter',
+  },
+  methodButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  methodButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  methodButtonSelected: {
+    borderColor: '#000000',
+    backgroundColor: '#000000',
+  },
+  methodButtonText: {
+    fontSize: 14,
+    color: '#374151',
+    fontFamily: 'Inter',
+  },
+  methodButtonTextSelected: {
+    color: '#FFFFFF',
+  },
+  languageButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  languageButtonText: {
+    fontSize: 14,
+    color: '#374151',
+    fontFamily: 'Inter',
+  },
+  linkButton: {
+    paddingVertical: 12,
+  },
+  linkButtonText: {
+    fontSize: 16,
+    color: '#3B82F6',
+    fontFamily: 'Inter',
+    textDecorationLine: 'underline',
+  },
+  dangerButton: {
+    backgroundColor: '#EF4444',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  dangerButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter',
+  },
+});
+
 const VOICE_LANGUAGES = [
   { code: 'en-US', name: 'English (US)', flag: '🇺🇸' },
   { code: 'en-GB', name: 'English (UK)', flag: '🇬🇧' },
