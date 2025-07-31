@@ -251,28 +251,13 @@ export default function SettingsScreen() {
             />
           </View>
 
-          <View style={styles.apiKeySection}>
-            <Text style={styles.settingName}>Google Gemini API Key</Text>
-            <Text style={styles.settingDescription}>
-              Required for AI-enhanced command understanding. Get your key from ai.google.dev
-            </Text>
-            <TextInput
-              style={styles.apiKeyInput}
-              value={settings.geminiApiKey || ''}
-              onChangeText={(value) => updateSettings({ geminiApiKey: value })}
-              placeholder="Enter Gemini API key..."
-              placeholderTextColor="#6B7280"
-              secureTextEntry
-              autoCorrect={false}
-              autoCapitalize="none"
-            />
-          </View>
+          
 
           <View style={styles.infoCard}>
-            <Text style={styles.infoText}>🔐 API keys are stored locally on your device</Text>
-            <Text style={styles.infoText}>🌐 Environment variables take precedence over manual entry</Text>
+            <Text style={styles.infoText}>🔐 API keys are stored securely as environment variables</Text>
             <Text style={styles.infoText}>🎤 Voicebox works without API keys but AssemblyAI requires one</Text>
             <Text style={styles.infoText}>✨ Gemini enhances voice command understanding</Text>
+            <Text style={styles.infoText}>🔧 Add EXPO_PUBLIC_GEMINI_API_KEY in Secrets for Gemini integration</Text>
           </View>
         </View>
 
