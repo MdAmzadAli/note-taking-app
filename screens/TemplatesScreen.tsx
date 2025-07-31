@@ -23,7 +23,15 @@ export default function TemplatesScreen() {
   const [templates, setTemplates] = useState<CustomTemplate[]>([]);
   const [profession, setProfession] = useState<ProfessionType>('doctor');
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredTemplates, setFilteredTemplates] = useState<CustomTemplate[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateDescription, setTemplateDescription] = useState('');
+  const [fields, setFields] = useState<FieldType[]>([]);
+  const [newFieldName, setNewFieldName] = useState('');
+  const [newFieldType, setNewFieldType] = useState<'text' | 'longtext' | 'number'>('text');
+  const [editingTemplate, setEditingTemplate] = useState<CustomTemplate | null>(null);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
   const [voiceSearchResults, setVoiceSearchResults] = useState<any[]>([]);
@@ -135,12 +143,7 @@ export default function TemplatesScreen() {
     );
   };
 
-  const filteredTemplates = searchQuery.trim()
-    ? templates.filter(template =>
-        template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (template.description && template.description.toLowerCase().includes(searchQuery.toLowerCase()))
-      )
-    : templates;
+  
 
   const renderTemplateItem = ({ item }: { item: CustomTemplate }) => (
     <TouchableOpacity
@@ -340,7 +343,12 @@ export default function TemplatesScreen() {
       )}
 
       <FlatList
-        data={filteredTemplates}
+        data={searchQuery.trim()
+          ? templates.filter(template =>
+              template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              (template.description && template.description.toLowerCase().includes(searchQuery.toLowerCase()))
+            )
+          : templates}
         keyExtractor={(item) => item.id}
         renderItem={renderTemplateItem}
         contentContainerStyle={styles.templatesList}
