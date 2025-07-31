@@ -54,8 +54,6 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps = {}) {
   });
   const [currentProfession, setCurrentProfession] = useState<ProfessionType>('doctor');
   const [showVoiceCommands, setShowVoiceCommands] = useState(false);
-  const [assemblyAIKey, setAssemblyAIKey] = useState('');
-  const [geminiKey, setGeminiKey] = useState('');
 
   useEffect(() => {
     loadSettings();
@@ -66,8 +64,6 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps = {}) {
       const userSettings = await getUserSettings();
       setSettings(userSettings);
       setCurrentProfession(userSettings.profession);
-      setAssemblyAIKey(userSettings.assemblyAIApiKey || '');
-      setGeminiKey(userSettings.geminiApiKey || '');
     } catch (error) {
       console.error('Error loading settings:', error);
     }
@@ -90,12 +86,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps = {}) {
     }
   };
 
-  const handleSaveApiKeys = async () => {
-    await updateSettings({
-      assemblyAIApiKey: assemblyAIKey,
-      geminiApiKey: geminiKey,
-    });
-  };
+  
 
   const changeProfession = (profession: ProfessionType) => {
     Alert.alert(
@@ -161,42 +152,43 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps = {}) {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* API Configuration */}
+        {/* API Configuration Status */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>API Configuration</Text>
+          <Text style={styles.sectionTitle}>API Configuration Status</Text>
           <Text style={styles.sectionDescription}>
-            Configure API keys for voice recognition and AI features
+            API keys are configured through Replit Secrets for security
           </Text>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>AssemblyAI API Key (Required for Voice Commands)</Text>
-            <TextInput
-              style={styles.input}
-              value={assemblyAIKey}
-              onChangeText={setAssemblyAIKey}
-              placeholder="Enter AssemblyAI API key"
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+          <View style={styles.apiStatusContainer}>
+            <View style={styles.apiStatusItem}>
+              <Text style={styles.apiStatusLabel}>AssemblyAI API</Text>
+              <Text style={[
+                styles.apiStatusValue,
+                { color: process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY ? '#10B981' : '#EF4444' }
+              ]}>
+                {process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY ? '✓ Configured' : '✗ Not Configured'}
+              </Text>
+            </View>
+            
+            <View style={styles.apiStatusItem}>
+              <Text style={styles.apiStatusLabel}>Gemini AI API</Text>
+              <Text style={[
+                styles.apiStatusValue,
+                { color: process.env.EXPO_PUBLIC_GEMINI_API_KEY ? '#10B981' : '#F59E0B' }
+              ]}>
+                {process.env.EXPO_PUBLIC_GEMINI_API_KEY ? '✓ Configured' : '⚠ Optional'}
+              </Text>
+            </View>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Gemini API Key (Optional - Enhanced AI Processing)</Text>
-            <TextInput
-              style={styles.input}
-              value={geminiKey}
-              onChangeText={setGeminiKey}
-              placeholder="Enter Gemini API key"
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          <TouchableOpacity style={styles.button} onPress={handleSaveApiKeys}>
-            <Text style={styles.buttonText}>Save API Keys</Text>
-          </TouchableOpacity>
+          {!process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY && (
+            <View style={styles.warningContainer}>
+              <Text style={styles.warningText}>
+                ⚠️ AssemblyAI API key required for voice commands.{'\n'}
+                Add EXPO_PUBLIC_ASSEMBLYAI_API_KEY to Replit Secrets.
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Current Profession */}
@@ -250,16 +242,34 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps = {}) {
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingName}>Command Processing Method</Text>
+              <Text style={styles.settingName}>AI-Enhanced Processing</Text>
               <Text style={styles.settingDescription}>
-                {settings.voiceRecognitionMethod === 'assemblyai-regex' ? 'AssemblyAI + Regex (Fast)' : 'AssemblyAI + Gemini AI (Smart)'}
+                {settings.voiceRecognitionMethod === 'assemblyai-gemini' ? 
+                  'AssemblyAI + Gemini AI (Smart command understanding)' : 
+                  'AssemblyAI + Regex (Fast pattern matching - Default)'
+                }
               </Text>
+              {settings.voiceRecognitionMethod === 'assemblyai-gemini' && !process.env.EXPO_PUBLIC_GEMINI_API_KEY && (
+                <Text style={styles.settingWarning}>
+                  ⚠️ Gemini API key required for AI enhancement
+                </Text>
+              )}
             </View>
             <Switch
               value={settings.voiceRecognitionMethod === 'assemblyai-gemini'}
-              onValueChange={(value) => updateSettings({ 
-                voiceRecognitionMethod: value ? 'assemblyai-gemini' : 'assemblyai-regex' as VoiceRecognitionMethod 
-              })}
+              onValueChange={(value) => {
+                if (value && !process.env.EXPO_PUBLIC_GEMINI_API_KEY) {
+                  Alert.alert(
+                    'Gemini API Key Required',
+                    'AI-enhanced processing requires a Gemini API key. Please add EXPO_PUBLIC_GEMINI_API_KEY to your Replit Secrets.',
+                    [{ text: 'OK' }]
+                  );
+                  return;
+                }
+                updateSettings({ 
+                  voiceRecognitionMethod: value ? 'assemblyai-gemini' : 'assemblyai-regex' as VoiceRecognitionMethod 
+                });
+              }}
               trackColor={{
                 false: '#E5E7EB',
                 true: '#000000',
@@ -361,11 +371,12 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps = {}) {
           </TouchableOpacity>
 
           <View style={styles.infoCard}>
-            <Text style={styles.infoText}>🔐 API keys are stored securely as environment variables</Text>
-            <Text style={styles.infoText}>🎤 AssemblyAI API key required for speech recognition</Text>
-            <Text style={styles.infoText}>⚡ Regex method: Fast pattern matching for commands</Text>
-            <Text style={styles.infoText}>🧠 Gemini method: AI-powered command understanding</Text>
-            <Text style={styles.infoText}>🔧 Add EXPO_PUBLIC_GEMINI_API_KEY for Gemini integration</Text>
+            <Text style={styles.infoText}>🔐 API keys are stored securely in Replit Secrets</Text>
+            <Text style={styles.infoText}>🎤 EXPO_PUBLIC_ASSEMBLYAI_API_KEY required for voice recognition</Text>
+            <Text style={styles.infoText}>⚡ Default: AssemblyAI + Regex (Fast pattern matching)</Text>
+            <Text style={styles.infoText}>🧠 Optional: AssemblyAI + Gemini AI (Smart understanding)</Text>
+            <Text style={styles.infoText}>🔧 Add EXPO_PUBLIC_GEMINI_API_KEY for AI enhancement</Text>
+            <Text style={styles.infoText}>⚙️ Configure secrets in Tools → Secrets</Text>
           </View>
         </View>
 
@@ -637,6 +648,50 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: 'Inter',
+  },
+  apiStatusContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  apiStatusItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  apiStatusLabel: {
+    fontSize: 14,
+    color: '#374151',
+    fontFamily: 'Inter',
+    fontWeight: '500',
+  },
+  apiStatusValue: {
+    fontSize: 14,
+    fontFamily: 'Inter',
+    fontWeight: '600',
+  },
+  warningContainer: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#EF4444',
+  },
+  warningText: {
+    fontSize: 13,
+    color: '#DC2626',
+    fontFamily: 'Inter',
+    lineHeight: 18,
+  },
+  settingWarning: {
+    fontSize: 12,
+    color: '#EF4444',
+    marginTop: 4,
     fontFamily: 'Inter',
   },
 });

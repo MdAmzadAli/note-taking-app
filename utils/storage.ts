@@ -176,30 +176,14 @@ export const saveSelectedProfession = async (profession: ProfessionType): Promis
 export const getUserSettings = async (): Promise<UserSettings> => {
   try {
     const settingsData = await AsyncStorage.getItem(KEYS.USER_SETTINGS);
-    const defaultSettings: UserSettings = {
-      profession: 'doctor',
-      notificationsEnabled: true,
-      theme: 'auto',
-      autoSync: true,
-      voiceRecognitionMethod: 'assemblyai-regex',
-      voiceLanguage: 'en-US',
-    };
-
     if (settingsData) {
-      return { ...defaultSettings, ...JSON.parse(settingsData) };
+      const parsedSettings = JSON.parse(settingsData);
+      return { ...DEFAULT_SETTINGS, ...parsedSettings };
     }
-
-    return defaultSettings;
+    return DEFAULT_SETTINGS;
   } catch (error) {
     console.error('Error getting user settings:', error);
-    return {
-      profession: 'doctor',
-      notificationsEnabled: true,
-      theme: 'auto',
-      autoSync: true,
-      voiceRecognitionMethod: 'assemblyai-regex',
-      voiceLanguage: 'en-US',
-    };
+    return DEFAULT_SETTINGS;
   }
 };
 
@@ -331,8 +315,6 @@ export interface UserSettings {
   theme?: 'light' | 'dark' | 'auto';
   autoSync?: boolean;
   isOnboardingComplete?: boolean;
-  assemblyAIApiKey?: string;
-  geminiApiKey?: string;
   voiceRecognitionMethod?: 'assemblyai-regex' | 'assemblyai-gemini';
   voiceLanguage?: string;
 }
