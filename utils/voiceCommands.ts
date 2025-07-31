@@ -398,9 +398,9 @@ export const executeVoiceCommand = async (
         // Check if this is a multi-task command by analyzing the processed text
         const multiTaskResult = await processMultiTaskCommand(command.originalText, profession);
         
-        if (multiTaskResult.isMultiTask && multiTaskResult.tasks.length > 1) {
-          console.log('[VOICE_COMMANDS] Multi-task command detected:', multiTaskResult.tasks.length, 'tasks');
-          return await handleMultiTaskCommand(multiTaskResult.tasks, profession);
+        if (multiTaskResult.isMultiTask && multiTaskResult.items.length > 1) {
+          console.log('[VOICE_COMMANDS] Multi-item command detected:', multiTaskResult.items.length, 'items');
+          return await handleMultiItemCommand(multiTaskResult.items, profession);
         }
 
         // Map Gemini intent to our command intents for single items
@@ -777,7 +777,14 @@ const handleCreateTaskCommand = async (title: string, dueDateStr: string, profes
 // Process multi-task commands using Gemini AI
 const processMultiTaskCommand = async (text: string, profession: string): Promise<{
   isMultiTask: boolean;
-  tasks: Array<{ title: string; dueDate?: string; description?: string }>;
+  items: Array<{ 
+    type: 'task' | 'reminder' | 'note'; 
+    title: string; 
+    dueDate?: string; 
+    description?: string;
+    time?: string;
+    content?: string;
+  }>;
 }> => {
   console.log('[VOICE_COMMANDS] ===== PROCESSING MULTI-TASK COMMAND =====');
   console.log('[VOICE_COMMANDS] Raw text:', text);
@@ -785,7 +792,7 @@ const processMultiTaskCommand = async (text: string, profession: string): Promis
   try {
     if (!isGeminiInitialized()) {
       console.log('[VOICE_COMMANDS] Gemini not available for multi-task processing');
-      return { isMultiTask: false, tasks: [] };
+      return { isMultiTask: false, items: [] };
     }
 
     const { processWithGemini } = await import('./speech');
@@ -793,33 +800,53 @@ const processMultiTaskCommand = async (text: string, profession: string): Promis
     const model = new geminiAI(process.env.EXPO_PUBLIC_GEMINI_API_KEY!).getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const prompt = `
-You are an AI assistant that analyzes voice commands to identify and separate multiple tasks from a single utterance.
+You are an AI assistant that analyzes voice commands to identify and separate multiple items (tasks, reminders, notes) from a single utterance.
 
 Analyze this voice input: "${text}"
 
 Your job is to:
-1. Determine if this contains multiple tasks (look for indicators like "first task", "second task", "then", "also", "next", numbers, etc.)
-2. If multiple tasks are found, separate them into individual task items
-3. Extract relevant details for each task (title, due date, description)
+1. Determine if this contains multiple items (look for indicators like "first", "second", "then", "also", "next", numbers, "and", etc.)
+2. If multiple items are found, separate them into individual items with correct types
+3. Extract relevant details for each item
+
+ITEM TYPES:
+- "task": Things to do, complete, accomplish (use "dueDate")
+- "reminder": Things to remember, alerts, notifications (use "time") 
+- "note": Information to record, write down, remember (use "content")
 
 Return ONLY valid JSON in this exact format:
 {
   "isMultiTask": true/false,
-  "tasks": [
+  "items": [
     {
-      "title": "task description",
-      "dueDate": "extracted due date or 'tomorrow' as default",
+      "type": "task|reminder|note",
+      "title": "item title/description",
+      "dueDate": "for tasks - when to complete",
+      "time": "for reminders - when to be reminded", 
+      "content": "for notes - the content to save",
       "description": "additional details if any"
     }
   ]
 }
 
-Examples:
-- "Create two tasks: exercise in the morning and go to gym at 5pm" → isMultiTask: true, tasks: [{"title": "exercise in the morning", "dueDate": "tomorrow"}, {"title": "go to gym", "dueDate": "today at 5pm"}]
-- "Create task to finish report" → isMultiTask: false, tasks: [{"title": "finish report", "dueDate": "tomorrow"}]
-- "Add three tasks: call client, review budget, and submit proposal by Friday" → isMultiTask: true, tasks: [{"title": "call client", "dueDate": "tomorrow"}, {"title": "review budget", "dueDate": "tomorrow"}, {"title": "submit proposal", "dueDate": "Friday"}]
+EXAMPLES:
+- "Create two reminders: take medicine at 8am and call doctor at 2pm" → 
+  {"isMultiTask": true, "items": [{"type": "reminder", "title": "take medicine", "time": "8am"}, {"type": "reminder", "title": "call doctor", "time": "2pm"}]}
 
-Focus on identifying separate, distinct tasks within the utterance.
+- "Add task to finish report and create note about meeting" → 
+  {"isMultiTask": true, "items": [{"type": "task", "title": "finish report", "dueDate": "tomorrow"}, {"type": "note", "title": "meeting", "content": "meeting"}]}
+
+- "Set reminder for dentist at 3pm tomorrow and create task to buy groceries" → 
+  {"isMultiTask": true, "items": [{"type": "reminder", "title": "dentist", "time": "3pm tomorrow"}, {"type": "task", "title": "buy groceries", "dueDate": "tomorrow"}]}
+
+- "Create three items: reminder to take pills at 9am, task to exercise by evening, and note about new project ideas" → 
+  {"isMultiTask": true, "items": [{"type": "reminder", "title": "take pills", "time": "9am"}, {"type": "task", "title": "exercise", "dueDate": "evening"}, {"type": "note", "title": "new project ideas", "content": "new project ideas"}]}
+
+IMPORTANT:
+- Look for keywords: "reminder/remind" = reminder, "task/todo" = task, "note/write/record" = note
+- Extract time/date information precisely
+- If no specific type mentioned, infer from context
+- Always separate distinct items even if same type
 `;
 
     const result = await model.generateContent(prompt);
@@ -835,7 +862,7 @@ Focus on identifying separate, distinct tasks within the utterance.
       
       return {
         isMultiTask: parsed.isMultiTask || false,
-        tasks: parsed.tasks || []
+        items: parsed.items || []
       };
     }
 
@@ -843,87 +870,130 @@ Focus on identifying separate, distinct tasks within the utterance.
 
   } catch (error) {
     console.error('[VOICE_COMMANDS] Error in multi-task processing:', error);
-    return { isMultiTask: false, tasks: [] };
+    return { isMultiTask: false, items: [] };
   }
 };
 
-// Handle multi-task commands (only available in Gemini mode)
-const handleMultiTaskCommand = async (
-  tasks: Array<{ title: string; dueDate?: string; description?: string }>,
+// Handle multi-item commands (tasks, reminders, notes) - only available in Gemini mode
+const handleMultiItemCommand = async (
+  items: Array<{ 
+    type: 'task' | 'reminder' | 'note'; 
+    title: string; 
+    dueDate?: string; 
+    description?: string;
+    time?: string;
+    content?: string;
+  }>,
   profession: string
 ): Promise<{ success: boolean; message: string; data?: any }> => {
-  console.log('[VOICE_COMMANDS] ===== HANDLING MULTI-TASK COMMAND =====');
-  console.log('[VOICE_COMMANDS] Number of tasks:', tasks.length);
-  console.log('[VOICE_COMMANDS] Tasks:', JSON.stringify(tasks, null, 2));
+  console.log('[VOICE_COMMANDS] ===== HANDLING MULTI-ITEM COMMAND =====');
+  console.log('[VOICE_COMMANDS] Number of items:', items.length);
+  console.log('[VOICE_COMMANDS] Items:', JSON.stringify(items, null, 2));
 
-  const createdTasks: any[] = [];
+  const createdItems: any[] = [];
   const errors: string[] = [];
+  const counts = { tasks: 0, reminders: 0, notes: 0, total: 0, failed: 0 };
 
   try {
-    for (let i = 0; i < tasks.length; i++) {
-      const task = tasks[i];
-      console.log(`[VOICE_COMMANDS] Processing task ${i + 1}:`, task);
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      console.log(`[VOICE_COMMANDS] Processing item ${i + 1} (${item.type}):`, item);
 
       try {
-        const taskTitle = task.title;
-        const taskDueDate = task.dueDate || 'tomorrow';
-        
-        console.log(`[VOICE_COMMANDS] Creating task ${i + 1}: "${taskTitle}" due ${taskDueDate}`);
-        
-        const result = await handleCreateTaskCommand(taskTitle, taskDueDate, profession);
+        let result;
+
+        switch (item.type) {
+          case 'task':
+            console.log(`[VOICE_COMMANDS] Creating task ${i + 1}: "${item.title}" due ${item.dueDate || 'tomorrow'}`);
+            result = await handleCreateTaskCommand(item.title, item.dueDate || 'tomorrow', profession);
+            if (result.success) counts.tasks++;
+            break;
+
+          case 'reminder':
+            console.log(`[VOICE_COMMANDS] Creating reminder ${i + 1}: "${item.title}" at ${item.time || 'tomorrow'}`);
+            result = await handleSetReminderCommand(item.title, item.time || 'tomorrow', profession);
+            if (result.success) counts.reminders++;
+            break;
+
+          case 'note':
+            const noteContent = item.content || item.title;
+            console.log(`[VOICE_COMMANDS] Creating note ${i + 1}: "${noteContent}"`);
+            result = await handleCreateNoteCommand(noteContent, profession);
+            if (result.success) counts.notes++;
+            break;
+
+          default:
+            throw new Error(`Unknown item type: ${item.type}`);
+        }
 
         if (result.success) {
-          createdTasks.push(result.data);
-          console.log(`[VOICE_COMMANDS] Successfully created task ${i + 1}: "${taskTitle}"`);
+          createdItems.push({
+            type: item.type,
+            data: result.data
+          });
+          counts.total++;
+          console.log(`[VOICE_COMMANDS] Successfully created ${item.type} ${i + 1}: "${item.title}"`);
         } else {
-          errors.push(`Failed to create task ${i + 1} ("${taskTitle}"): ${result.message}`);
-          console.error(`[VOICE_COMMANDS] Failed to create task ${i + 1}:`, result.message);
+          errors.push(`Failed to create ${item.type} ${i + 1} ("${item.title}"): ${result.message}`);
+          counts.failed++;
+          console.error(`[VOICE_COMMANDS] Failed to create ${item.type} ${i + 1}:`, result.message);
         }
-      } catch (taskError) {
-        const errorMsg = `Error creating task ${i + 1}: ${taskError instanceof Error ? taskError.message : 'Unknown error'}`;
+      } catch (itemError) {
+        const errorMsg = `Error creating ${item.type} ${i + 1}: ${itemError instanceof Error ? itemError.message : 'Unknown error'}`;
         errors.push(errorMsg);
-        console.error(`[VOICE_COMMANDS] Error creating task ${i + 1}:`, taskError);
+        counts.failed++;
+        console.error(`[VOICE_COMMANDS] Error creating ${item.type} ${i + 1}:`, itemError);
       }
     }
 
-    const successCount = createdTasks.length;
-    const failureCount = errors.length;
+    const successCount = counts.total;
+    const failureCount = counts.failed;
 
     if (successCount > 0) {
-      let message = `Successfully created ${successCount} task${successCount !== 1 ? 's' : ''}`;
+      const itemTypes = [];
+      if (counts.tasks > 0) itemTypes.push(`${counts.tasks} task${counts.tasks !== 1 ? 's' : ''}`);
+      if (counts.reminders > 0) itemTypes.push(`${counts.reminders} reminder${counts.reminders !== 1 ? 's' : ''}`);
+      if (counts.notes > 0) itemTypes.push(`${counts.notes} note${counts.notes !== 1 ? 's' : ''}`);
+      
+      let message = `Successfully created ${itemTypes.join(', ')}`;
       
       if (failureCount > 0) {
-        message += `, but ${failureCount} failed to create`;
+        message += `, but ${failureCount} item${failureCount !== 1 ? 's' : ''} failed to create`;
       }
 
-      console.log('[VOICE_COMMANDS] Multi-task creation completed:', message);
+      console.log('[VOICE_COMMANDS] Multi-item creation completed:', message);
       
       return {
         success: true,
         message,
         data: {
-          created: createdTasks,
+          created: createdItems,
           errors: errors,
           counts: {
             successful: successCount,
             failed: failureCount,
-            total: tasks.length
+            total: items.length,
+            breakdown: {
+              tasks: counts.tasks,
+              reminders: counts.reminders,
+              notes: counts.notes
+            }
           }
         }
       };
     } else {
       return {
         success: false,
-        message: `Failed to create any tasks. Errors: ${errors.join('; ')}`,
+        message: `Failed to create any items. Errors: ${errors.join('; ')}`,
         data: { errors }
       };
     }
 
   } catch (error) {
-    console.error('[VOICE_COMMANDS] Error in multi-task command handler:', error);
+    console.error('[VOICE_COMMANDS] Error in multi-item command handler:', error);
     return {
       success: false,
-      message: `Failed to process multi-task command: ${error instanceof Error ? error.message : 'Unknown error'}`
+      message: `Failed to process multi-item command: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 };
@@ -940,9 +1010,10 @@ export const getExampleCommands = (): string[] => [
   "Add task finish presentation due tomorrow",
   // Multi-item examples (Gemini mode only)
   "Create two tasks: exercise tomorrow and gym at 5pm",
-  "Add three notes: meeting agenda, shopping list, and ideas",
-  "Set two reminders: dentist at 2pm and dinner at 7pm",
-  "Make four tasks: finish report, call client, review budget, submit proposal",
+  "Set two reminders: take medicine at 8am and call doctor at 2pm",
+  "Add task to finish report and create note about meeting ideas",
+  "Create reminder for dentist at 3pm and note about project timeline",
+  "Make three items: task to buy groceries, reminder to take pills at 9pm, and note about vacation plans",
   // Fuzzy thought examples
   "uhh... remind me about dentist or something tomorrow",
   "I need to like... write down something about the meeting",
