@@ -389,10 +389,20 @@ export const executeVoiceCommand = async (
     let enhancedCommand = command;
 
     if (processingMethod === 'gemini' && isGeminiInitialized()) {
-      console.log('[VOICE_COMMANDS] Using Gemini to process raw transcription directly');
-      const geminiResult = await processWithGemini(command.originalText, profession);
+      console.log('[VOICE_COMMANDS] Using Gemini AI Agent to process command');
+      
+      // First, try complex command processing for advanced AI agent functionality
+      const complexResult = await processComplexCommand(command.originalText, profession);
+      
+      if (complexResult.isComplexCommand && complexResult.executionPlan.length > 0) {
+        console.log('[VOICE_COMMANDS] Complex AI agent command detected with', complexResult.executionPlan.length, 'steps');
+        console.log('[VOICE_COMMANDS] AI reasoning:', complexResult.reasoning);
+        return await handleComplexCommand(complexResult.executionPlan, complexResult.reasoning, profession);
+      }
 
-      console.log('[VOICE_COMMANDS] Gemini result:', geminiResult);
+      // Fallback to original Gemini processing for simpler commands
+      const geminiResult = await processWithGemini(command.originalText, profession);
+      console.log('[VOICE_COMMANDS] Gemini simple result:', geminiResult);
 
       if (geminiResult.success && geminiResult.confidence > 0.6) {
         // Check if this is a multi-task command by analyzing the processed text
@@ -774,7 +784,165 @@ const handleCreateTaskCommand = async (title: string, dueDateStr: string, profes
   };
 };
 
-// Process multi-task commands using Gemini AI
+// Process complex multi-command using advanced AI agent
+const processComplexCommand = async (text: string, profession: string): Promise<{
+  isComplexCommand: boolean;
+  executionPlan: Array<{ 
+    step: number;
+    type: 'template' | 'task' | 'reminder' | 'note' | 'search'; 
+    action: string;
+    parameters: any;
+    priority: number;
+  }>;
+  reasoning: string;
+}> => {
+  console.log('[VOICE_COMMANDS] ===== PROCESSING COMPLEX AI AGENT COMMAND =====');
+  console.log('[VOICE_COMMANDS] Raw text:', text);
+
+  try {
+    if (!isGeminiInitialized()) {
+      console.log('[VOICE_COMMANDS] Gemini not available for complex command processing');
+      return { isComplexCommand: false, executionPlan: [], reasoning: '' };
+    }
+
+    const geminiAI = (await import('@google/generative-ai')).GoogleGenerativeAI;
+    const model = new geminiAI(process.env.EXPO_PUBLIC_GEMINI_API_KEY!).getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+    const prompt = `
+You are an advanced AI agent that processes complex voice commands and creates intelligent execution plans.
+
+Analyze this voice input: "${text}"
+
+AVAILABLE ACTIONS:
+1. "create_template" - Create profession-based templates with fields
+2. "create_task" - Create tasks with due dates
+3. "create_reminder" - Set reminders with times
+4. "create_note" - Create notes with content
+5. "search" - Search through existing data
+
+FIELD TYPES for templates:
+- "text" - Text input field
+- "number" - Numeric input field
+- "date" - Date picker field
+- "boolean" - Checkbox field
+- "select" - Dropdown with options
+
+EXECUTION STRATEGY:
+- Priority 1: Creation commands (templates, tasks, notes, reminders)
+- Priority 2: Search commands (always execute after creations to include newly created items)
+- Group similar actions together for efficiency
+- Execute in logical dependency order
+
+Return ONLY valid JSON in this exact format:
+{
+  "isComplexCommand": true/false,
+  "executionPlan": [
+    {
+      "step": 1,
+      "type": "template|task|reminder|note|search",
+      "action": "detailed description of what to do",
+      "parameters": {
+        // Specific parameters based on type
+        // For template: {"name": "template name", "fields": [{"name": "field name", "type": "text|number|date|boolean|select", "options": ["opt1", "opt2"] (for select only)}]}
+        // For task: {"title": "task title", "dueDate": "when due", "description": "optional details"}
+        // For reminder: {"title": "reminder title", "time": "when to remind", "description": "optional details"}
+        // For note: {"content": "note content", "title": "optional title"}
+        // For search: {"query": "search query", "filters": "optional filters"}
+      },
+      "priority": 1-2
+    }
+  ],
+  "reasoning": "Brief explanation of the execution plan strategy"
+}
+
+COMPLEX EXAMPLES:
+
+Input: "Create 2 templates, first template with name 'Patient Assessment' and text field, second with name 'Lab Results' and number field, then create two tasks to review files, and add reminder for meeting, then search for patient data"
+
+Output: {
+  "isComplexCommand": true,
+  "executionPlan": [
+    {
+      "step": 1,
+      "type": "template",
+      "action": "Create template 'Patient Assessment' with text field",
+      "parameters": {"name": "Patient Assessment", "fields": [{"name": "Assessment Notes", "type": "text"}]},
+      "priority": 1
+    },
+    {
+      "step": 2,
+      "type": "template", 
+      "action": "Create template 'Lab Results' with number field",
+      "parameters": {"name": "Lab Results", "fields": [{"name": "Test Value", "type": "number"}]},
+      "priority": 1
+    },
+    {
+      "step": 3,
+      "type": "task",
+      "action": "Create first task to review files",
+      "parameters": {"title": "review files (1)", "dueDate": "tomorrow"},
+      "priority": 1
+    },
+    {
+      "step": 4,
+      "type": "task",
+      "action": "Create second task to review files", 
+      "parameters": {"title": "review files (2)", "dueDate": "tomorrow"},
+      "priority": 1
+    },
+    {
+      "step": 5,
+      "type": "reminder",
+      "action": "Add reminder for meeting",
+      "parameters": {"title": "meeting", "time": "tomorrow 9am"},
+      "priority": 1
+    },
+    {
+      "step": 6,
+      "type": "search",
+      "action": "Search for patient data",
+      "parameters": {"query": "patient data"},
+      "priority": 2
+    }
+  ],
+  "reasoning": "Grouped all creation commands first (templates, tasks, reminder), then search command last to include newly created items in results"
+}
+
+IMPORTANT:
+- Break down complex commands into atomic steps
+- Use intelligent prioritization (creations before searches)
+- Extract precise parameters for each action
+- Infer missing details logically (default times, dates, field names)
+- Always provide clear reasoning for the execution strategy
+`;
+
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+    
+    console.log('[VOICE_COMMANDS] Gemini complex command response:', responseText);
+
+    // Parse JSON from Gemini response
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      console.log('[VOICE_COMMANDS] Parsed complex command result:', parsed);
+      
+      return {
+        isComplexCommand: parsed.isComplexCommand || false,
+        executionPlan: parsed.executionPlan || [],
+        reasoning: parsed.reasoning || ''
+      };
+    }
+
+    throw new Error('Failed to parse Gemini complex command response');
+
+  } catch (error) {
+    console.error('[VOICE_COMMANDS] Error in complex command processing:', error);
+    return { isComplexCommand: false, executionPlan: [], reasoning: '' };
+  }
+};
+
+// Process multi-task commands using Gemini AI (simplified version for backward compatibility)
 const processMultiTaskCommand = async (text: string, profession: string): Promise<{
   isMultiTask: boolean;
   items: Array<{ 
@@ -787,15 +955,44 @@ const processMultiTaskCommand = async (text: string, profession: string): Promis
   }>;
 }> => {
   console.log('[VOICE_COMMANDS] ===== PROCESSING MULTI-TASK COMMAND =====');
-  console.log('[VOICE_COMMANDS] Raw text:', text);
+  
+  // First try complex command processing
+  const complexResult = await processComplexCommand(text, profession);
+  
+  if (complexResult.isComplexCommand) {
+    // Convert complex execution plan to simple multi-task format for compatibility
+    const items = complexResult.executionPlan
+      .filter(step => ['task', 'reminder', 'note'].includes(step.type))
+      .map(step => {
+        const baseItem = {
+          type: step.type as 'task' | 'reminder' | 'note',
+          title: step.parameters.title || step.parameters.content || step.action,
+        };
+        
+        if (step.type === 'task') {
+          return { ...baseItem, dueDate: step.parameters.dueDate };
+        } else if (step.type === 'reminder') {
+          return { ...baseItem, time: step.parameters.time };
+        } else if (step.type === 'note') {
+          return { ...baseItem, content: step.parameters.content };
+        }
+        
+        return baseItem;
+      });
+    
+    return {
+      isMultiTask: items.length > 1,
+      items
+    };
+  }
 
+  // Fallback to original multi-task processing
   try {
     if (!isGeminiInitialized()) {
       console.log('[VOICE_COMMANDS] Gemini not available for multi-task processing');
       return { isMultiTask: false, items: [] };
     }
 
-    const { processWithGemini } = await import('./speech');
     const geminiAI = (await import('@google/generative-ai')).GoogleGenerativeAI;
     const model = new geminiAI(process.env.EXPO_PUBLIC_GEMINI_API_KEY!).getGenerativeModel({ model: 'gemini-1.5-flash' });
 
@@ -828,25 +1025,6 @@ Return ONLY valid JSON in this exact format:
     }
   ]
 }
-
-EXAMPLES:
-- "Create two reminders: take medicine at 8am and call doctor at 2pm" → 
-  {"isMultiTask": true, "items": [{"type": "reminder", "title": "take medicine", "time": "8am"}, {"type": "reminder", "title": "call doctor", "time": "2pm"}]}
-
-- "Add task to finish report and create note about meeting" → 
-  {"isMultiTask": true, "items": [{"type": "task", "title": "finish report", "dueDate": "tomorrow"}, {"type": "note", "title": "meeting", "content": "meeting"}]}
-
-- "Set reminder for dentist at 3pm tomorrow and create task to buy groceries" → 
-  {"isMultiTask": true, "items": [{"type": "reminder", "title": "dentist", "time": "3pm tomorrow"}, {"type": "task", "title": "buy groceries", "dueDate": "tomorrow"}]}
-
-- "Create three items: reminder to take pills at 9am, task to exercise by evening, and note about new project ideas" → 
-  {"isMultiTask": true, "items": [{"type": "reminder", "title": "take pills", "time": "9am"}, {"type": "task", "title": "exercise", "dueDate": "evening"}, {"type": "note", "title": "new project ideas", "content": "new project ideas"}]}
-
-IMPORTANT:
-- Look for keywords: "reminder/remind" = reminder, "task/todo" = task, "note/write/record" = note
-- Extract time/date information precisely
-- If no specific type mentioned, infer from context
-- Always separate distinct items even if same type
 `;
 
     const result = await model.generateContent(prompt);
@@ -871,6 +1049,238 @@ IMPORTANT:
   } catch (error) {
     console.error('[VOICE_COMMANDS] Error in multi-task processing:', error);
     return { isMultiTask: false, items: [] };
+  }
+};
+
+// Handle template creation
+const handleCreateTemplateCommand = async (
+  name: string,
+  fields: Array<{ name: string; type: string; options?: string[] }>,
+  profession: string
+): Promise<{ success: boolean; message: string; data?: any }> => {
+  console.log('[VOICE_COMMANDS] ===== HANDLING CREATE TEMPLATE COMMAND =====');
+  console.log('[VOICE_COMMANDS] Template name:', name);
+  console.log('[VOICE_COMMANDS] Fields:', JSON.stringify(fields, null, 2));
+  console.log('[VOICE_COMMANDS] Profession:', profession);
+
+  try {
+    const { saveTemplate, getTemplates } = await import('./storage');
+    
+    // Check if template with same name exists
+    const existingTemplates = await getTemplates();
+    const existingTemplate = existingTemplates.find(t => t.name.toLowerCase() === name.toLowerCase());
+    
+    if (existingTemplate) {
+      return {
+        success: false,
+        message: `Template "${name}" already exists`
+      };
+    }
+
+    const now = new Date().toISOString();
+    const template = {
+      id: Date.now().toString(),
+      name,
+      profession: profession as any,
+      fields: fields.map((field, index) => ({
+        id: `field_${index + 1}`,
+        name: field.name,
+        type: field.type as any,
+        required: false,
+        options: field.options || undefined
+      })),
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await saveTemplate(template);
+    console.log('[VOICE_COMMANDS] Template created successfully:', template.id);
+
+    return {
+      success: true,
+      message: `Created template "${name}" with ${fields.length} field${fields.length !== 1 ? 's' : ''}`,
+      data: template
+    };
+  } catch (error) {
+    console.error('[VOICE_COMMANDS] Error creating template:', error);
+    return {
+      success: false,
+      message: `Failed to create template: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Handle complex AI agent command execution
+const handleComplexCommand = async (
+  executionPlan: Array<{ 
+    step: number;
+    type: 'template' | 'task' | 'reminder' | 'note' | 'search'; 
+    action: string;
+    parameters: any;
+    priority: number;
+  }>,
+  reasoning: string,
+  profession: string
+): Promise<{ success: boolean; message: string; data?: any }> => {
+  console.log('[VOICE_COMMANDS] ===== HANDLING COMPLEX AI AGENT COMMAND =====');
+  console.log('[VOICE_COMMANDS] Execution plan steps:', executionPlan.length);
+  console.log('[VOICE_COMMANDS] Reasoning:', reasoning);
+  console.log('[VOICE_COMMANDS] Full execution plan:', JSON.stringify(executionPlan, null, 2));
+
+  const results: any[] = [];
+  const errors: string[] = [];
+  const counts = { templates: 0, tasks: 0, reminders: 0, notes: 0, searches: 0, total: 0, failed: 0 };
+  let searchResults: any[] = [];
+
+  try {
+    // Sort by priority (1 = creation commands, 2 = search commands)
+    const sortedPlan = [...executionPlan].sort((a, b) => a.priority - b.priority || a.step - b.step);
+    
+    console.log('[VOICE_COMMANDS] Executing steps in optimized order...');
+
+    for (let i = 0; i < sortedPlan.length; i++) {
+      const step = sortedPlan[i];
+      console.log(`[VOICE_COMMANDS] Executing step ${step.step} (${step.type}): ${step.action}`);
+
+      try {
+        let result;
+
+        switch (step.type) {
+          case 'template':
+            console.log(`[VOICE_COMMANDS] Creating template: "${step.parameters.name}"`);
+            result = await handleCreateTemplateCommand(
+              step.parameters.name,
+              step.parameters.fields || [],
+              profession
+            );
+            if (result.success) counts.templates++;
+            break;
+
+          case 'task':
+            console.log(`[VOICE_COMMANDS] Creating task: "${step.parameters.title}"`);
+            result = await handleCreateTaskCommand(
+              step.parameters.title,
+              step.parameters.dueDate || 'tomorrow',
+              profession
+            );
+            if (result.success) counts.tasks++;
+            break;
+
+          case 'reminder':
+            console.log(`[VOICE_COMMANDS] Creating reminder: "${step.parameters.title}"`);
+            result = await handleSetReminderCommand(
+              step.parameters.title,
+              step.parameters.time || 'tomorrow',
+              profession
+            );
+            if (result.success) counts.reminders++;
+            break;
+
+          case 'note':
+            console.log(`[VOICE_COMMANDS] Creating note: "${step.parameters.content || step.parameters.title}"`);
+            result = await handleCreateNoteCommand(
+              step.parameters.content || step.parameters.title,
+              profession
+            );
+            if (result.success) counts.notes++;
+            break;
+
+          case 'search':
+            console.log(`[VOICE_COMMANDS] Performing search: "${step.parameters.query}"`);
+            result = await handleSearchCommand(step.parameters.query);
+            if (result.success) {
+              counts.searches++;
+              searchResults = result.data || [];
+            }
+            break;
+
+          default:
+            throw new Error(`Unknown step type: ${step.type}`);
+        }
+
+        if (result.success) {
+          results.push({
+            step: step.step,
+            type: step.type,
+            action: step.action,
+            data: result.data,
+            message: result.message
+          });
+          counts.total++;
+          console.log(`[VOICE_COMMANDS] Step ${step.step} completed successfully`);
+        } else {
+          errors.push(`Step ${step.step} failed: ${result.message}`);
+          counts.failed++;
+          console.error(`[VOICE_COMMANDS] Step ${step.step} failed:`, result.message);
+        }
+      } catch (stepError) {
+        const errorMsg = `Step ${step.step} error: ${stepError instanceof Error ? stepError.message : 'Unknown error'}`;
+        errors.push(errorMsg);
+        counts.failed++;
+        console.error(`[VOICE_COMMANDS] Step ${step.step} error:`, stepError);
+      }
+    }
+
+    const successCount = counts.total;
+    const failureCount = counts.failed;
+
+    if (successCount > 0) {
+      const itemTypes = [];
+      if (counts.templates > 0) itemTypes.push(`${counts.templates} template${counts.templates !== 1 ? 's' : ''}`);
+      if (counts.tasks > 0) itemTypes.push(`${counts.tasks} task${counts.tasks !== 1 ? 's' : ''}`);
+      if (counts.reminders > 0) itemTypes.push(`${counts.reminders} reminder${counts.reminders !== 1 ? 's' : ''}`);
+      if (counts.notes > 0) itemTypes.push(`${counts.notes} note${counts.notes !== 1 ? 's' : ''}`);
+      if (counts.searches > 0) itemTypes.push(`${counts.searches} search${counts.searches !== 1 ? 'es' : ''}`);
+      
+      let message = `AI Agent executed ${executionPlan.length} commands: ${itemTypes.join(', ')}`;
+      
+      if (failureCount > 0) {
+        message += `, with ${failureCount} failure${failureCount !== 1 ? 's' : ''}`;
+      }
+
+      if (searchResults.length > 0) {
+        message += `\n\nSearch Results: Found ${searchResults.length} item${searchResults.length !== 1 ? 's' : ''}`;
+      }
+
+      console.log('[VOICE_COMMANDS] Complex command execution completed:', message);
+      
+      return {
+        success: true,
+        message,
+        data: {
+          executionPlan,
+          reasoning,
+          results,
+          errors,
+          searchResults,
+          counts: {
+            successful: successCount,
+            failed: failureCount,
+            total: executionPlan.length,
+            breakdown: {
+              templates: counts.templates,
+              tasks: counts.tasks,
+              reminders: counts.reminders,
+              notes: counts.notes,
+              searches: counts.searches
+            }
+          }
+        }
+      };
+    } else {
+      return {
+        success: false,
+        message: `AI Agent failed to execute any commands. Errors: ${errors.join('; ')}`,
+        data: { errors, executionPlan, reasoning }
+      };
+    }
+
+  } catch (error) {
+    console.error('[VOICE_COMMANDS] Error in complex command execution:', error);
+    return {
+      success: false,
+      message: `AI Agent execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
   }
 };
 
@@ -1000,6 +1410,7 @@ const handleMultiItemCommand = async (
 
 // Get example commands for help
 export const getExampleCommands = (): string[] => [
+  // Basic commands
   "Search for patient notes",
   "Create note about morning meeting", 
   "Set reminder for doctor appointment tomorrow at 2pm",
@@ -1008,12 +1419,20 @@ export const getExampleCommands = (): string[] => [
   "New note called shopping list",
   "Remind me to call John in 2 hours",
   "Add task finish presentation due tomorrow",
+  
   // Multi-item examples (Gemini mode only)
   "Create two tasks: exercise tomorrow and gym at 5pm",
   "Set two reminders: take medicine at 8am and call doctor at 2pm",
   "Add task to finish report and create note about meeting ideas",
   "Create reminder for dentist at 3pm and note about project timeline",
   "Make three items: task to buy groceries, reminder to take pills at 9pm, and note about vacation plans",
+  
+  // AI Agent complex commands (Gemini mode only)
+  "Create 2 templates, first template with name Patient Assessment and text field, second with name Lab Results and number field, then create two tasks to review files, add reminder for meeting, then search for patient data",
+  "Make template called Meeting Notes with text and date fields, create task to prepare presentation due tomorrow, set reminder for team call at 3pm, then search for previous meeting notes",
+  "Create template named Project Tracker with text, number, and boolean fields, add two tasks for code review and testing, create note about project requirements, then search for related projects",
+  "Make 3 templates: first with name Client Info and text field, second with name Budget and number field, third with name Status and select field with options active and inactive, then create reminder to follow up tomorrow",
+  
   // Fuzzy thought examples
   "uhh... remind me about dentist or something tomorrow",
   "I need to like... write down something about the meeting",

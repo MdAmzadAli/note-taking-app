@@ -210,6 +210,9 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
         return;
       }
 
+      // Set initial processing status
+      setProcessingStatus('Analyzing');
+
       // First, process fuzzy thoughts
       const fuzzyProcessing = processFuzzyThought(speechText);
       setFuzzyResult(fuzzyProcessing);
@@ -247,6 +250,14 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       console.log('[VOICE] Gemini API key available:', !!process.env.EXPO_PUBLIC_GEMINI_API_KEY);
       console.log('[VOICE] Is Gemini available overall:', isGeminiAvailable);
       console.log('[VOICE] Final processing method selected:', processingMethod);
+
+      // Update status based on processing method
+      if (processingMethod === 'gemini') {
+        setProcessingStatus('AI Planning');
+        setTimeout(() => setProcessingStatus('Executing'), 1000);
+      } else {
+        setProcessingStatus('Processing');
+      }
 
       console.log('[VOICE] About to execute command with processing method:', processingMethod);
       const executionResult = await executeVoiceCommand(command, profession, processingMethod);

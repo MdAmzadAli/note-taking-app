@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Note, Reminder, Task, UserSettings, CustomTemplate, TemplateEntry } from '@/types';
+import { Note, Task, Reminder, UserSettings, Template, TemplateEntry } from '@/types';
 import { ProfessionType } from '@/constants/professions';
 
 const KEYS = {
@@ -281,6 +281,35 @@ export const deleteTemplateEntry = async (entryId: string): Promise<void> => {
   }
 };
 
+// Templates
+export const getTemplates = async (): Promise<Template[]> => {
+  try {
+    const templatesJson = await AsyncStorage.getItem('templates');
+    return templatesJson ? JSON.parse(templatesJson) : [];
+  } catch (error) {
+    console.error('Error loading templates:', error);
+    return [];
+  }
+};
+
+export const saveTemplate = async (template: Template): Promise<void> => {
+  try {
+    const templates = await getTemplates();
+    const existingIndex = templates.findIndex(t => t.id === template.id);
+
+    if (existingIndex >= 0) {
+      templates[existingIndex] = template;
+    } else {
+      templates.push(template);
+    }
+
+    await AsyncStorage.setItem('templates', JSON.stringify(templates));
+  } catch (error) {
+    console.error('Error saving template:', error);
+    throw error;
+  }
+};
+
 export const clearAllData = async (): Promise<void> => {
   try {
     await AsyncStorage.multiRemove([
@@ -291,6 +320,7 @@ export const clearAllData = async (): Promise<void> => {
       KEYS.SELECTED_PROFESSION,
       'custom_templates',
       'template_entries',
+      'templates',
     ]);
   } catch (error) {
     console.error('Error clearing all data:', error);
