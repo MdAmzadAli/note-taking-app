@@ -61,14 +61,18 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       const settings = await getUserSettings();
       setProfession(settings.profession);
 
-      // Initialize AssemblyAI if API key is available
-      if (settings.assemblyAIApiKey) {
-        initializeAssemblyAI(settings.assemblyAIApiKey);
+      // Initialize AssemblyAI - first try environment variable, then settings
+      const envApiKey = process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY;
+      const settingsApiKey = settings.assemblyAIApiKey;
+      
+      if (envApiKey || settingsApiKey) {
+        initializeAssemblyAI(settingsApiKey); // This will use env key first, then settings key
         setVoiceSupported(true);
         setAssemblyAIError(null);
+        console.log('[VOICE] AssemblyAI initialized from:', envApiKey ? 'environment' : 'settings');
       } else {
         setVoiceSupported(false);
-        setAssemblyAIError('AssemblyAI API key not configured in settings');
+        setAssemblyAIError('AssemblyAI API key not configured. Please add EXPO_PUBLIC_ASSEMBLYAI_API_KEY to secrets or configure in settings');
       }
     } catch (error) {
       console.error('Error loading user settings:', error);

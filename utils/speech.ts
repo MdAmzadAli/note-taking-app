@@ -23,13 +23,18 @@ let assemblyAIApiKey: string | null = null;
 export const initializeAssemblyAI = (apiKey?: string) => {
   try {
     // Try to get API key from environment first, then parameter
-    const key = process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY || apiKey;
+    const envKey = process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY;
+    const key = envKey || apiKey;
+    
+    console.log('[SPEECH] Environment key check:', envKey ? 'Found' : 'Not found');
+    console.log('[SPEECH] Parameter key check:', apiKey ? 'Provided' : 'Not provided');
+    
     if (!key) {
       console.warn('[SPEECH] ASSEMBLYAI_API_KEY not found in environment variables or parameters');
       return;
     }
     assemblyAIApiKey = key;
-    console.log('[SPEECH] AssemblyAI initialized successfully');
+    console.log('[SPEECH] AssemblyAI initialized successfully with key:', key.substring(0, 10) + '...');
   } catch (error) {
     console.error('[SPEECH] Failed to initialize AssemblyAI:', error);
   }
