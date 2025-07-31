@@ -511,10 +511,10 @@ export default function TasksScreen() {
   const handleVoiceSearch = (query: string, results: any[]) => {
     console.log('[TASKS] Voice search requested - Query:', query);
     console.log('[TASKS] Voice search results:', results);
-    
+
     const taskResults = results.filter(item => item.type === 'task');
     console.log('[TASKS] Filtered task results:', taskResults);
-    
+
     if (taskResults.length > 0) {
       const filteredTasks = taskResults.map(result => result.item);
       console.log('[TASKS] Setting filtered tasks:', filteredTasks);
