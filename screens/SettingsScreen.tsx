@@ -188,21 +188,21 @@ export default function SettingsScreen() {
           
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingName}>Recognition Method</Text>
+              <Text style={styles.settingName}>Command Processing Method</Text>
               <Text style={styles.settingDescription}>
-                {settings.voiceRecognitionMethod === 'voicebox' ? 'Voicebox (Fast, Free)' : 'AssemblyAI (Accurate, Paid)'}
+                {settings.voiceRecognitionMethod === 'assemblyai-regex' ? 'AssemblyAI + Regex (Fast)' : 'AssemblyAI + Gemini AI (Smart)'}
               </Text>
             </View>
             <Switch
-              value={settings.voiceRecognitionMethod === 'assemblyai'}
+              value={settings.voiceRecognitionMethod === 'assemblyai-gemini'}
               onValueChange={(value) => updateSettings({ 
-                voiceRecognitionMethod: value ? 'assemblyai' : 'voicebox' as VoiceRecognitionMethod 
+                voiceRecognitionMethod: value ? 'assemblyai-gemini' : 'assemblyai-regex' as VoiceRecognitionMethod 
               })}
               trackColor={{
                 false: '#E5E7EB',
                 true: '#000000',
               }}
-              thumbColor={settings.voiceRecognitionMethod === 'assemblyai' ? '#FFFFFF' : '#6B7280'}
+              thumbColor={settings.voiceRecognitionMethod === 'assemblyai-gemini' ? '#FFFFFF' : '#6B7280'}
             />
           </View>
 
@@ -255,9 +255,10 @@ export default function SettingsScreen() {
 
           <View style={styles.infoCard}>
             <Text style={styles.infoText}>🔐 API keys are stored securely as environment variables</Text>
-            <Text style={styles.infoText}>🎤 Voicebox works without API keys but AssemblyAI requires one</Text>
-            <Text style={styles.infoText}>✨ Gemini enhances voice command understanding</Text>
-            <Text style={styles.infoText}>🔧 Add EXPO_PUBLIC_GEMINI_API_KEY in Secrets for Gemini integration</Text>
+            <Text style={styles.infoText}>🎤 AssemblyAI API key required for speech recognition</Text>
+            <Text style={styles.infoText}>⚡ Regex method: Fast pattern matching for commands</Text>
+            <Text style={styles.infoText}>🧠 Gemini method: AI-powered command understanding</Text>
+            <Text style={styles.infoText}>🔧 Add EXPO_PUBLIC_GEMINI_API_KEY for Gemini integration</Text>
           </View>
         </View>
 

@@ -17,7 +17,6 @@ import { requestMicrophonePermission } from '@/utils/permissions';
 import { 
   initializeAssemblyAI, 
   initializeGemini,
-  initializeVoicebox,
   isAssemblyAIInitialized,
   isGeminiInitialized,
   setVoiceLanguage,
@@ -46,7 +45,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
   const [profession, setProfession] = useState('doctor');
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [assemblyAIError, setAssemblyAIError] = useState<string | null>(null);
-  const [voiceMethod, setVoiceMethod] = useState<VoiceRecognitionMethod>('voicebox');
+  const [voiceMethod, setVoiceMethod] = useState<VoiceRecognitionMethod>('assemblyai-regex');
   const [voiceLanguage, setVoiceLanguageState] = useState('en-US');
   const [geminiSupported, setGeminiSupported] = useState(false);
 
@@ -70,9 +69,9 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     try {
       const settings = await getUserSettings();
       setProfession(settings.profession);
-      
+
       // Set voice recognition method and language
-      const method = (settings.voiceRecognitionMethod || 'voicebox') as VoiceRecognitionMethod;
+      const method = (settings.voiceRecognitionMethod || 'assemblyai-regex') as VoiceRecognitionMethod;
       const language = settings.voiceLanguage || 'en-US';
       setVoiceMethod(method);
       setVoiceLanguageState(language);
@@ -81,7 +80,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       // Initialize Gemini AI
       const envGeminiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
       const settingsGeminiKey = settings.geminiApiKey;
-      
+
       if (envGeminiKey || settingsGeminiKey) {
         initializeGemini(settingsGeminiKey);
         setGeminiSupported(true);
@@ -89,7 +88,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       }
 
       // Initialize AssemblyAI if needed
-      if (method === 'assemblyai') {
+      if (method === 'assemblyai-regex' || method === 'assemblyai-gemini') {
         const envApiKey = process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY;
         const settingsApiKey = settings.assemblyAIApiKey;
 
@@ -100,11 +99,6 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
         } else {
           setAssemblyAIError('AssemblyAI API key not configured');
         }
-      }
-
-      // Initialize Voicebox if needed
-      if (method === 'voicebox') {
-        initializeVoicebox();
       }
 
       // Check if voice recognition is available
@@ -118,20 +112,40 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
   const initializeVoiceService = async () => {
     try {
-      const available = isAssemblyAIInitialized();
-      setVoiceSupported(available);
+      const settings = await getUserSettings();
+      setVoiceMethod(settings.voiceRecognitionMethod || 'assemblyai-regex');
+      setVoiceLanguageState(settings.voiceLanguage || 'en-US');
 
-      if (available) {
+      // Set voice language
+      setVoiceLanguage(settings.voiceLanguage || 'en-US');
+
+      // Initialize Gemini
+      initializeGemini(settings.geminiApiKey);
+      setGeminiSupported(isGeminiInitialized());
+
+      if (isGeminiInitialized()) {
+        console.log('[VOICE] Gemini initialized from:', settings.geminiApiKey ? 'settings' : 'environment');
+      }
+
+      // Initialize AssemblyAI 
+      initializeAssemblyAI(settings.assemblyAIApiKey);
+
+      if (isAssemblyAIInitialized()) {
         console.log('[VOICE] AssemblyAI initialized successfully');
         setAssemblyAIError(null);
       } else {
         console.log('[VOICE] AssemblyAI not initialized - API key required');
-        setAssemblyAIError('AssemblyAI API key required. Please configure in settings.');
+        setAssemblyAIError('AssemblyAI API key required for voice recognition');
       }
+
+      // Check voice support
+      const voiceAvailable = await isSpeechRecognitionAvailable(settings.voiceRecognitionMethod || 'assemblyai-regex');
+      setVoiceSupported(voiceAvailable);
+
     } catch (error) {
-      console.log('[VOICE] AssemblyAI initialization error:', error);
+      console.error('[VOICE] Error initializing voice service:', error);
       setVoiceSupported(false);
-      setAssemblyAIError('Failed to initialize AssemblyAI');
+      setAssemblyAIError('Failed to initialize voice services');
     }
   };
 
@@ -192,7 +206,8 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       console.log('[VOICE] Command intent:', command.intent);
       console.log('[VOICE] Command parameters:', command.parameters);
 
-      const executionResult = await executeVoiceCommand(command, profession);
+      const processingMethod = voiceMethod === 'assemblyai-gemini' ? 'gemini' : 'regex';
+      const executionResult = await executeVoiceCommand(command, profession, processingMethod);
 
       if (executionResult.success) {
         if (command.intent === 'search' && executionResult.data) {
@@ -229,7 +244,8 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     setLastCommand(command);
 
     try {
-      const executionResult = await executeVoiceCommand(command, profession);
+      const processingMethod = voiceMethod === 'assemblyai-gemini' ? 'gemini' : 'regex';
+      const executionResult = await executeVoiceCommand(command, profession, processingMethod);
 
       if (executionResult.success) {
         if (command.intent === 'search' && executionResult.data) {
@@ -498,7 +514,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
             {(!voiceSupported || assemblyAIError) && (
               <View style={styles.warningContainer}>
                 <Text style={styles.warningText}>
-                  {assemblyAIError && voiceMethod === 'assemblyai' ? 
+                  {assemblyAIError && voiceMethod === 'assemblyai-regex' ? 
                     `⚠️ ${assemblyAIError}\nVoice commands are simulated for demonstration.` :
                     !voiceSupported ?
                     `🚧 Demo Mode: ${voiceMethod.toUpperCase()} is not configured.\nVoice commands are simulated for demonstration purposes.` :

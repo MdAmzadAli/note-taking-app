@@ -17,7 +17,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   theme: 'auto',
   autoSync: true,
   isOnboardingComplete: false,
-  voiceRecognitionMethod: 'voicebox',
+  voiceRecognitionMethod: 'assemblyai-regex',
   voiceLanguage: 'en-US',
 };
 
@@ -181,7 +181,7 @@ export const getUserSettings = async (): Promise<UserSettings> => {
       notificationsEnabled: true,
       theme: 'auto',
       autoSync: true,
-      voiceRecognitionMethod: 'voicebox',
+      voiceRecognitionMethod: 'assemblyai-regex',
       voiceLanguage: 'en-US',
     };
 
@@ -197,7 +197,7 @@ export const getUserSettings = async (): Promise<UserSettings> => {
       notificationsEnabled: true,
       theme: 'auto',
       autoSync: true,
-      voiceRecognitionMethod: 'voicebox',
+      voiceRecognitionMethod: 'assemblyai-regex',
       voiceLanguage: 'en-US',
     };
   }
@@ -333,6 +333,6 @@ export interface UserSettings {
   isOnboardingComplete?: boolean;
   assemblyAIApiKey?: string;
   geminiApiKey?: string;
-  voiceRecognitionMethod?: 'voicebox' | 'assemblyai';
+  voiceRecognitionMethod?: 'assemblyai-regex' | 'assemblyai-gemini';
   voiceLanguage?: string;
 }

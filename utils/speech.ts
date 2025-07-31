@@ -1,4 +1,3 @@
-
 import * as Speech from 'expo-speech';
 import { Alert } from 'react-native';
 import { Audio } from 'expo-av';
@@ -16,7 +15,7 @@ export interface SpeechOptions {
   rate?: number;
 }
 
-export type VoiceRecognitionMethod = 'voicebox' | 'assemblyai';
+export type VoiceRecognitionMethod = 'assemblyai-regex' | 'assemblyai-gemini';
 
 // Google Gemini configuration
 let geminiAI: GoogleGenerativeAI | null = null;
@@ -37,15 +36,15 @@ export const initializeGemini = (apiKey?: string) => {
   try {
     const envKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
     const key = envKey || apiKey;
-    
+
     console.log('[SPEECH] Gemini Environment key check:', envKey ? 'Found' : 'Not found');
     console.log('[SPEECH] Gemini Parameter key check:', apiKey ? 'Provided' : 'Not provided');
-    
+
     if (!key) {
       console.warn('[SPEECH] GEMINI_API_KEY not found in environment variables or parameters');
       return;
     }
-    
+
     geminiAI = new GoogleGenerativeAI(key);
     console.log('[SPEECH] Gemini AI initialized successfully');
   } catch (error) {
@@ -70,10 +69,10 @@ export const initializeAssemblyAI = (apiKey?: string) => {
     // Try to get API key from environment first, then parameter
     const envKey = process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY;
     const key = envKey || apiKey;
-    
+
     console.log('[SPEECH] Environment key check:', envKey ? 'Found' : 'Not found');
     console.log('[SPEECH] Parameter key check:', apiKey ? 'Provided' : 'Not provided');
-    
+
     if (!key) {
       console.warn('[SPEECH] ASSEMBLYAI_API_KEY not found in environment variables or parameters');
       return;
@@ -101,7 +100,7 @@ const uploadAudioToAssemblyAI = async (audioUri: string): Promise<string> => {
   // Read the audio file
   const response = await fetch(audioUri);
   const audioBlob = await response.blob();
-  
+
   // Upload to AssemblyAI
   const uploadResponse = await fetch('https://api.assemblyai.com/v2/upload', {
     method: 'POST',
@@ -119,7 +118,9 @@ const uploadAudioToAssemblyAI = async (audioUri: string): Promise<string> => {
   const uploadData = await uploadResponse.json();
   console.log('[SPEECH] Audio uploaded, URL:', uploadData.upload_url);
 
-  // Request transcription
+  // Request transcription with language support
+  const languageCode = currentLanguage.replace('-', '_').toLowerCase();
+
   const transcriptResponse = await fetch('https://api.assemblyai.com/v2/transcript', {
     method: 'POST',
     headers: {
@@ -128,7 +129,7 @@ const uploadAudioToAssemblyAI = async (audioUri: string): Promise<string> => {
     },
     body: JSON.stringify({
       audio_url: uploadData.upload_url,
-      language_code: 'en_us',
+      language_code: languageCode,
     }),
   });
 
@@ -143,7 +144,7 @@ const uploadAudioToAssemblyAI = async (audioUri: string): Promise<string> => {
   // Poll for completion
   let attempts = 0;
   const maxAttempts = 30; // 30 seconds maximum wait time
-  
+
   while (attempts < maxAttempts) {
     const statusResponse = await fetch(`https://api.assemblyai.com/v2/transcript/${transcriptId}`, {
       headers: {
@@ -170,156 +171,6 @@ const uploadAudioToAssemblyAI = async (audioUri: string): Promise<string> => {
   }
 
   throw new Error('Transcription timeout - please try again');
-};
-
-// Voicebox Speech Recognition (react-native-voicebox-speech-rec)
-let voiceboxRecognizer: any = null;
-
-// Initialize Voicebox
-export const initializeVoicebox = () => {
-  try {
-    // Try to import react-native-voicebox-speech-rec
-    const VoiceBoxSpeechRec = require('react-native-voicebox-speech-rec');
-    console.log('[SPEECH] Voicebox library loaded successfully');
-    return true;
-  } catch (error) {
-    console.log('[SPEECH] Voicebox library not available, using Web Speech API fallback');
-    // Check if Web Speech API is available as fallback
-    if (typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)) {
-      return true;
-    }
-    console.error('[SPEECH] No speech recognition available');
-    return false;
-  }
-};
-
-// Start Voicebox speech recognition
-export const startVoiceboxSpeechRecognition = async (
-  onPartialTranscript?: (text: string) => void,
-  onFinalTranscript?: (text: string) => void,
-  onError?: (error: string) => void
-): Promise<{ success: boolean; error?: string }> => {
-  try {
-    // Try to use actual Voicebox library first
-    try {
-      const VoiceBoxSpeechRec = require('react-native-voicebox-speech-rec');
-      
-      console.log('[SPEECH] Starting Voicebox Speech Recognition...');
-      
-      const options = {
-        language: currentLanguage,
-        continuous: true,
-        interimResults: true,
-        maxResults: 3,
-      };
-
-      await VoiceBoxSpeechRec.start(options);
-      
-      VoiceBoxSpeechRec.onResult((result: any) => {
-        if (result.isFinal) {
-          console.log('[SPEECH] Voicebox final transcript:', result.transcript);
-          onFinalTranscript?.(result.transcript);
-        } else {
-          onPartialTranscript?.(result.transcript);
-        }
-      });
-
-      VoiceBoxSpeechRec.onError((error: any) => {
-        console.error('[SPEECH] Voicebox recognition error:', error);
-        onError?.(error.message || 'Recognition error');
-      });
-
-      voiceboxRecognizer = VoiceBoxSpeechRec;
-      return { success: true };
-
-    } catch (importError) {
-      console.log('[SPEECH] Voicebox library not available, falling back to Web Speech API');
-      
-      // Fallback to Web Speech API
-      if (typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-        
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = currentLanguage;
-        recognition.maxAlternatives = 3;
-
-        recognition.onstart = () => {
-          console.log('[SPEECH] Web Speech API started');
-        };
-
-        recognition.onresult = (event) => {
-          let interimTranscript = '';
-          let finalTranscript = '';
-
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-              finalTranscript += transcript;
-            } else {
-              interimTranscript += transcript;
-            }
-          }
-
-          if (interimTranscript) {
-            onPartialTranscript?.(interimTranscript);
-          }
-
-          if (finalTranscript) {
-            console.log('[SPEECH] Web Speech API final transcript:', finalTranscript);
-            onFinalTranscript?.(finalTranscript);
-            recognition.stop();
-          }
-        };
-
-        recognition.onerror = (event) => {
-          console.error('[SPEECH] Web Speech API error:', event.error);
-          onError?.(event.error);
-        };
-
-        recognition.start();
-        voiceboxRecognizer = recognition;
-        return { success: true };
-      } else {
-        return {
-          success: false,
-          error: "Speech recognition not supported on this device"
-        };
-      }
-    }
-
-  } catch (error) {
-    console.error('[SPEECH] Error starting Voicebox speech recognition:', error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    return {
-      success: false,
-      error: errorMessage
-    };
-  }
-};
-
-// Stop Voicebox speech recognition
-export const stopVoiceboxSpeechRecognition = async (): Promise<void> => {
-  try {
-    if (voiceboxRecognizer) {
-      // Check if it's the actual Voicebox library or Web Speech API
-      if (voiceboxRecognizer.stop && typeof voiceboxRecognizer.stop === 'function') {
-        if (voiceboxRecognizer.constructor.name === 'SpeechRecognition' || 
-            voiceboxRecognizer.constructor.name === 'webkitSpeechRecognition') {
-          // Web Speech API
-          voiceboxRecognizer.stop();
-        } else {
-          // Actual Voicebox library
-          await voiceboxRecognizer.stop();
-        }
-      }
-      voiceboxRecognizer = null;
-      console.log('[SPEECH] Voicebox recognition stopped');
-    }
-  } catch (error) {
-    console.error('[SPEECH] Error stopping Voicebox recognition:', error);
-  }
 };
 
 // Start speech recognition using AssemblyAI
@@ -418,7 +269,7 @@ export const stopAssemblyAISpeechRecognition = async (): Promise<void> => {
     }
 
     console.log('[SPEECH] Stopping audio recording...');
-    
+
     // Stop recording
     await audioRecording.stopAndUnloadAsync();
     const audioUri = audioRecording.getURI();
@@ -436,7 +287,7 @@ export const stopAssemblyAISpeechRecognition = async (): Promise<void> => {
       try {
         const transcript = await uploadAudioToAssemblyAI(audioUri);
         console.log('[SPEECH] Transcript received:', transcript);
-        
+
         if (transcript && transcript.trim()) {
           currentOnFinalTranscript?.(transcript.trim());
         } else {
@@ -741,9 +592,8 @@ export const startSpeechRecognitionUnified = async (
   onError?: (error: string) => void
 ): Promise<{ success: boolean; error?: string }> => {
   switch (method) {
-    case 'voicebox':
-      return await startVoiceboxSpeechRecognition(onPartialTranscript, onFinalTranscript, onError);
-    case 'assemblyai':
+    case 'assemblyai-regex':
+    case 'assemblyai-gemini':
       return await startAssemblyAISpeechRecognition(onPartialTranscript, onFinalTranscript, onError);
     default:
       return {
@@ -756,10 +606,8 @@ export const startSpeechRecognitionUnified = async (
 // Unified speech recognition stop function
 export const stopSpeechRecognitionUnified = async (method: VoiceRecognitionMethod): Promise<void> => {
   switch (method) {
-    case 'voicebox':
-      await stopVoiceboxSpeechRecognition();
-      break;
-    case 'assemblyai':
+    case 'assemblyai-regex':
+    case 'assemblyai-gemini':
       await stopAssemblyAISpeechRecognition();
       break;
   }
@@ -768,13 +616,12 @@ export const stopSpeechRecognitionUnified = async (method: VoiceRecognitionMetho
 // Check if speech recognition is available
 export const isSpeechRecognitionAvailable = async (method?: VoiceRecognitionMethod): Promise<boolean> => {
   if (!method) {
-    return isAssemblyAIInitialized() || initializeVoicebox();
+    return isAssemblyAIInitialized();
   }
-  
+
   switch (method) {
-    case 'voicebox':
-      return initializeVoicebox();
-    case 'assemblyai':
+    case 'assemblyai-regex':
+    case 'assemblyai-gemini':
       return isAssemblyAIInitialized();
     default:
       return false;

@@ -317,18 +317,19 @@ const parseTime = (timeStr: string): Date => {
   return tomorrow;
 };
 
-// Execute voice commands with Gemini AI enhancement
+// Execute voice commands with different processing methods
 export const executeVoiceCommand = async (
   command: VoiceCommand,
-  profession: string = 'doctor'
+  profession: string = 'doctor',
+  processingMethod: 'regex' | 'gemini' = 'regex'
 ): Promise<{ success: boolean; message: string; data?: any }> => {
   console.log('[VOICE_COMMANDS] Executing command:', command);
+  console.log('[VOICE_COMMANDS] Processing method:', processingMethod);
   
   try {
-    // Try to enhance command understanding with Gemini if available
     let enhancedCommand = command;
     
-    if (isGeminiInitialized() && command.intent === 'unknown') {
+    if (processingMethod === 'gemini' && isGeminiInitialized()) {
       console.log('[VOICE_COMMANDS] Using Gemini to enhance command understanding');
       const geminiResult = await processWithGemini(command.originalText, profession);
       
@@ -341,6 +342,13 @@ export const executeVoiceCommand = async (
           confidence: geminiResult.confidence
         };
         console.log('[VOICE_COMMANDS] Enhanced command with Gemini:', enhancedCommand);
+      }
+    } else if (processingMethod === 'regex' || !isGeminiInitialized()) {
+      // Use regex-based parsing (existing implementation)
+      console.log('[VOICE_COMMANDS] Using regex-based command parsing');
+      if (command.intent === 'unknown') {
+        // Re-parse with more aggressive regex patterns for better matching
+        enhancedCommand = parseVoiceCommand(command.originalText);
       }
     }
     
