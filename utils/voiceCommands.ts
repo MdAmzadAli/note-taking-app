@@ -389,16 +389,18 @@ export const executeVoiceCommand = async (
     let enhancedCommand = command;
 
     if (processingMethod === 'gemini' && isGeminiInitialized()) {
-      console.log('[VOICE_COMMANDS] Using Gemini to enhance command understanding');
-      const geminiResult = await processWithGeminiAdvanced(command.originalText, profession);
+      console.log('[VOICE_COMMANDS] Using Gemini to process raw transcription directly');
+      const geminiResult = await processWithGemini(command.originalText, profession);
 
       console.log('[VOICE_COMMANDS] Gemini result:', geminiResult);
 
       if (geminiResult.success && geminiResult.confidence > 0.6) {
-        // Check if this is a multi-item command (only available in Gemini mode)
-        if (geminiResult.isMultiItem && geminiResult.items && geminiResult.items.length > 1) {
-          console.log('[VOICE_COMMANDS] Multi-item command detected:', geminiResult.items.length, 'items');
-          return await handleMultiItemCommand(geminiResult.items, profession, geminiResult.itemType);
+        // Check if this is a multi-task command by analyzing the processed text
+        const multiTaskResult = await processMultiTaskCommand(command.originalText, profession);
+        
+        if (multiTaskResult.isMultiTask && multiTaskResult.tasks.length > 1) {
+          console.log('[VOICE_COMMANDS] Multi-task command detected:', multiTaskResult.tasks.length, 'tasks');
+          return await handleMultiTaskCommand(multiTaskResult.tasks, profession);
         }
 
         // Map Gemini intent to our command intents for single items
@@ -772,108 +774,156 @@ const handleCreateTaskCommand = async (title: string, dueDateStr: string, profes
   };
 };
 
-// Handle multi-item commands (only available in Gemini mode)
-const handleMultiItemCommand = async (
-  items: any[],
-  profession: string,
-  itemType: 'task' | 'note' | 'reminder'
-): Promise<{ success: boolean; message: string; data?: any }> => {
-  console.log('[VOICE_COMMANDS] ===== HANDLING MULTI-ITEM COMMAND =====');
-  console.log('[VOICE_COMMANDS] Item type:', itemType);
-  console.log('[VOICE_COMMANDS] Number of items:', items.length);
-  console.log('[VOICE_COMMANDS] Items:', JSON.stringify(items, null, 2));
+// Process multi-task commands using Gemini AI
+const processMultiTaskCommand = async (text: string, profession: string): Promise<{
+  isMultiTask: boolean;
+  tasks: Array<{ title: string; dueDate?: string; description?: string }>;
+}> => {
+  console.log('[VOICE_COMMANDS] ===== PROCESSING MULTI-TASK COMMAND =====');
+  console.log('[VOICE_COMMANDS] Raw text:', text);
 
-  const createdItems: any[] = [];
+  try {
+    if (!isGeminiInitialized()) {
+      console.log('[VOICE_COMMANDS] Gemini not available for multi-task processing');
+      return { isMultiTask: false, tasks: [] };
+    }
+
+    const { processWithGemini } = await import('./speech');
+    const geminiAI = (await import('@google/generative-ai')).GoogleGenerativeAI;
+    const model = new geminiAI(process.env.EXPO_PUBLIC_GEMINI_API_KEY!).getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+    const prompt = `
+You are an AI assistant that analyzes voice commands to identify and separate multiple tasks from a single utterance.
+
+Analyze this voice input: "${text}"
+
+Your job is to:
+1. Determine if this contains multiple tasks (look for indicators like "first task", "second task", "then", "also", "next", numbers, etc.)
+2. If multiple tasks are found, separate them into individual task items
+3. Extract relevant details for each task (title, due date, description)
+
+Return ONLY valid JSON in this exact format:
+{
+  "isMultiTask": true/false,
+  "tasks": [
+    {
+      "title": "task description",
+      "dueDate": "extracted due date or 'tomorrow' as default",
+      "description": "additional details if any"
+    }
+  ]
+}
+
+Examples:
+- "Create two tasks: exercise in the morning and go to gym at 5pm" → isMultiTask: true, tasks: [{"title": "exercise in the morning", "dueDate": "tomorrow"}, {"title": "go to gym", "dueDate": "today at 5pm"}]
+- "Create task to finish report" → isMultiTask: false, tasks: [{"title": "finish report", "dueDate": "tomorrow"}]
+- "Add three tasks: call client, review budget, and submit proposal by Friday" → isMultiTask: true, tasks: [{"title": "call client", "dueDate": "tomorrow"}, {"title": "review budget", "dueDate": "tomorrow"}, {"title": "submit proposal", "dueDate": "Friday"}]
+
+Focus on identifying separate, distinct tasks within the utterance.
+`;
+
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+    
+    console.log('[VOICE_COMMANDS] Gemini multi-task response:', responseText);
+
+    // Parse JSON from Gemini response
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      console.log('[VOICE_COMMANDS] Parsed multi-task result:', parsed);
+      
+      return {
+        isMultiTask: parsed.isMultiTask || false,
+        tasks: parsed.tasks || []
+      };
+    }
+
+    throw new Error('Failed to parse Gemini multi-task response');
+
+  } catch (error) {
+    console.error('[VOICE_COMMANDS] Error in multi-task processing:', error);
+    return { isMultiTask: false, tasks: [] };
+  }
+};
+
+// Handle multi-task commands (only available in Gemini mode)
+const handleMultiTaskCommand = async (
+  tasks: Array<{ title: string; dueDate?: string; description?: string }>,
+  profession: string
+): Promise<{ success: boolean; message: string; data?: any }> => {
+  console.log('[VOICE_COMMANDS] ===== HANDLING MULTI-TASK COMMAND =====');
+  console.log('[VOICE_COMMANDS] Number of tasks:', tasks.length);
+  console.log('[VOICE_COMMANDS] Tasks:', JSON.stringify(tasks, null, 2));
+
+  const createdTasks: any[] = [];
   const errors: string[] = [];
 
   try {
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      console.log(`[VOICE_COMMANDS] Processing item ${i + 1}:`, item);
+    for (let i = 0; i < tasks.length; i++) {
+      const task = tasks[i];
+      console.log(`[VOICE_COMMANDS] Processing task ${i + 1}:`, task);
 
       try {
-        let result;
+        const taskTitle = task.title;
+        const taskDueDate = task.dueDate || 'tomorrow';
         
-        switch (itemType) {
-          case 'task':
-            result = await handleCreateTaskCommand(
-              item.title || item.content,
-              item.dueDate || 'tomorrow',
-              profession
-            );
-            break;
-
-          case 'note':
-            result = await handleCreateNoteCommand(
-              item.content || item.title,
-              profession
-            );
-            break;
-
-          case 'reminder':
-            result = await handleSetReminderCommand(
-              item.title || item.content,
-              item.time || 'tomorrow',
-              profession
-            );
-            break;
-
-          default:
-            throw new Error(`Unsupported item type: ${itemType}`);
-        }
+        console.log(`[VOICE_COMMANDS] Creating task ${i + 1}: "${taskTitle}" due ${taskDueDate}`);
+        
+        const result = await handleCreateTaskCommand(taskTitle, taskDueDate, profession);
 
         if (result.success) {
-          createdItems.push(result.data);
-          console.log(`[VOICE_COMMANDS] Successfully created item ${i + 1}`);
+          createdTasks.push(result.data);
+          console.log(`[VOICE_COMMANDS] Successfully created task ${i + 1}: "${taskTitle}"`);
         } else {
-          errors.push(`Failed to create item ${i + 1}: ${result.message}`);
-          console.error(`[VOICE_COMMANDS] Failed to create item ${i + 1}:`, result.message);
+          errors.push(`Failed to create task ${i + 1} ("${taskTitle}"): ${result.message}`);
+          console.error(`[VOICE_COMMANDS] Failed to create task ${i + 1}:`, result.message);
         }
-      } catch (itemError) {
-        const errorMsg = `Error creating item ${i + 1}: ${itemError instanceof Error ? itemError.message : 'Unknown error'}`;
+      } catch (taskError) {
+        const errorMsg = `Error creating task ${i + 1}: ${taskError instanceof Error ? taskError.message : 'Unknown error'}`;
         errors.push(errorMsg);
-        console.error(`[VOICE_COMMANDS] Error creating item ${i + 1}:`, itemError);
+        console.error(`[VOICE_COMMANDS] Error creating task ${i + 1}:`, taskError);
       }
     }
 
-    const successCount = createdItems.length;
+    const successCount = createdTasks.length;
     const failureCount = errors.length;
 
     if (successCount > 0) {
-      let message = `Successfully created ${successCount} ${itemType}${successCount !== 1 ? 's' : ''}`;
+      let message = `Successfully created ${successCount} task${successCount !== 1 ? 's' : ''}`;
       
       if (failureCount > 0) {
         message += `, but ${failureCount} failed to create`;
       }
 
-      console.log('[VOICE_COMMANDS] Multi-item creation completed:', message);
+      console.log('[VOICE_COMMANDS] Multi-task creation completed:', message);
       
       return {
         success: true,
         message,
         data: {
-          created: createdItems,
+          created: createdTasks,
           errors: errors,
           counts: {
             successful: successCount,
             failed: failureCount,
-            total: items.length
+            total: tasks.length
           }
         }
       };
     } else {
       return {
         success: false,
-        message: `Failed to create any ${itemType}s. Errors: ${errors.join('; ')}`,
+        message: `Failed to create any tasks. Errors: ${errors.join('; ')}`,
         data: { errors }
       };
     }
 
   } catch (error) {
-    console.error('[VOICE_COMMANDS] Error in multi-item command handler:', error);
+    console.error('[VOICE_COMMANDS] Error in multi-task command handler:', error);
     return {
       success: false,
-      message: `Failed to process multi-item command: ${error instanceof Error ? error.message : 'Unknown error'}`
+      message: `Failed to process multi-task command: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 };
