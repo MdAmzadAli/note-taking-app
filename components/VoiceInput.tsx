@@ -57,6 +57,20 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     initializeVoiceService();
   }, []);
 
+  // Reload settings when component becomes visible (to catch settings changes)
+  useEffect(() => {
+    const reloadSettings = async () => {
+      const settings = await getUserSettings();
+      const method = (settings.voiceRecognitionMethod || 'assemblyai-regex') as VoiceRecognitionMethod;
+      if (method !== voiceMethod) {
+        console.log('[VOICE] Voice method changed from', voiceMethod, 'to', method);
+        setVoiceMethod(method);
+      }
+    };
+    
+    reloadSettings();
+  }, [showModal]); // Reload when modal is shown (user might have changed settings)
+
   useEffect(() => {
     if (isListening) {
       startPulseAnimation();
@@ -76,6 +90,8 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       setVoiceMethod(method);
       setVoiceLanguageState(language);
       setVoiceLanguage(language);
+
+      console.log('[VOICE] Loaded voice method from settings:', method);
 
       // Initialize Gemini AI (use environment key first)
       const envGeminiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
@@ -105,6 +121,8 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       const available = await isSpeechRecognitionAvailable(method);
       setVoiceSupported(available);
       console.log('[VOICE] Voice recognition available:', available);
+      console.log('[VOICE] Voice method after loading:', method);
+      console.log('[VOICE] Gemini supported after loading:', envGeminiKey ? true : false);
 
     } catch (error) {
       console.error('Error loading user settings:', error);
@@ -218,10 +236,16 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       console.log('[VOICE] Final command to execute:', JSON.stringify(command, null, 2));
 
       // Determine processing method based on voice method and Gemini availability
-      const processingMethod = voiceMethod === 'assemblyai-gemini' && geminiSupported ? 'gemini' : 'regex';
-      console.log('[VOICE] Using processing method:', processingMethod);
+      const isGeminiMethod = voiceMethod === 'assemblyai-gemini';
+      const isGeminiAvailable = geminiSupported && process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+      const processingMethod = isGeminiMethod && isGeminiAvailable ? 'gemini' : 'regex';
+      
       console.log('[VOICE] Voice method setting:', voiceMethod);
+      console.log('[VOICE] Is Gemini method selected:', isGeminiMethod);
       console.log('[VOICE] Gemini supported:', geminiSupported);
+      console.log('[VOICE] Gemini API key available:', !!process.env.EXPO_PUBLIC_GEMINI_API_KEY);
+      console.log('[VOICE] Is Gemini available overall:', isGeminiAvailable);
+      console.log('[VOICE] Final processing method selected:', processingMethod);
 
       console.log('[VOICE] About to execute command with processing method:', processingMethod);
       const executionResult = await executeVoiceCommand(command, profession, processingMethod);
@@ -287,7 +311,11 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     setLastCommand(command);
 
     try {
-      const processingMethod = voiceMethod === 'assemblyai-gemini' && geminiSupported ? 'gemini' : 'regex';
+      const isGeminiMethod = voiceMethod === 'assemblyai-gemini';
+      const isGeminiAvailable = geminiSupported && process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+      const processingMethod = isGeminiMethod && isGeminiAvailable ? 'gemini' : 'regex';
+      console.log('[VOICE] Fuzzy confirmation - Voice method:', voiceMethod);
+      console.log('[VOICE] Fuzzy confirmation - Gemini available:', isGeminiAvailable);
       console.log('[VOICE] Fuzzy confirmation using processing method:', processingMethod);
       const executionResult = await executeVoiceCommand(command, profession, processingMethod);
 
@@ -470,21 +498,27 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
   };
 
   const getStatusText = () => {
+    const isGeminiMode = voiceMethod === 'assemblyai-gemini';
+    const geminiAvailable = geminiSupported && process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+    
     if (isProcessing) {
-      return geminiSupported ? 
+      return isGeminiMode && geminiAvailable ? 
         'Processing with AI enhancement...' : 
         'Processing command...';
     }
     if (isListening) {
       if (voiceSupported) {
-        return `Listening (${voiceMethod.toUpperCase()}, ${voiceLanguage})... Speak clearly and press "Stop Listening" when done`;
+        const methodDisplay = isGeminiMode ? 'ASSEMBLYAI + GEMINI AI' : 'ASSEMBLYAI + REGEX';
+        return `Listening (${methodDisplay}, ${voiceLanguage})... Speak clearly and press "Stop Listening" when done`;
       } else {
         return 'Demo Mode: Simulating voice input...';
       }
     }
     if (finalResult) return 'Command received, processing...';
+    
+    const methodDisplay = isGeminiMode ? 'AI-Enhanced' : 'Standard';
     return voiceSupported ? 
-      `Tap to start ${voiceMethod.toUpperCase()} voice recording (${voiceLanguage})` : 
+      `Tap to start ${methodDisplay} voice recording (${voiceLanguage})` : 
       'Voice commands unavailable - configure API key in Settings';
   };
 
