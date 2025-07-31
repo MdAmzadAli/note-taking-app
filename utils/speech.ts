@@ -525,6 +525,19 @@ You are an AI assistant that processes voice commands for a ${profession}'s note
 
 Analyze this voice input: "${text}"
 
+SPECIAL FOCUS FOR NOTE CREATION:
+When the intent is to create a note, you must transform fuzzy, unclear, or incomplete thoughts into clear, well-structured, and professional notes. This includes:
+- Removing filler words (um, uh, like, you know, etc.)
+- Correcting grammar and sentence structure
+- Organizing scattered thoughts into coherent paragraphs
+- Adding context and clarity where needed
+- Maintaining the original meaning while improving readability
+- Using professional language appropriate for a ${profession}
+
+For example:
+- "um, like, create note about that patient who came in today with, uh, headache and stuff" 
+  → "Patient consultation: Patient presented with headache symptoms during today's visit. Requires follow-up assessment."
+
 Understand the user's intent and extract relevant information. Focus on these command types:
 1. CREATE NOTE: "create note", "new note", "add note", "write note", "make note"
 2. SET REMINDER: "set reminder", "remind me", "create reminder", "schedule reminder"  
@@ -533,10 +546,10 @@ Understand the user's intent and extract relevant information. Focus on these co
 
 Return ONLY valid JSON in this exact format:
 {
-  "processedText": "cleaned and corrected version of the input",
+  "processedText": "cleaned and corrected version of the input - for notes, make this a clear, professional, well-structured note",
   "intent": "create_note, set_reminder, create_task, or search",
   "parameters": {
-    "content": "main content for notes/tasks/reminders",
+    "content": "main content for notes/tasks/reminders - for notes, this should be the clear, professional version",
     "title": "extracted title if specified", 
     "time": "extracted time/date for reminders (e.g., 'tomorrow', '2pm', 'next week')",
     "query": "search query if intent is search",
@@ -548,10 +561,10 @@ Return ONLY valid JSON in this exact format:
 Examples:
 - "Create a task for tomorrow to do exercise at 12pm" → intent: "create_task", content: "exercise at 12pm", dueDate: "tomorrow"
 - "Set reminder to call doctor tomorrow at 2pm" → intent: "set_reminder", content: "call doctor", time: "tomorrow at 2pm"
-- "Create note about meeting discussion" → intent: "create_note", content: "meeting discussion"
+- "uh, create note about, like, meeting discussion and stuff" → intent: "create_note", content: "Meeting discussion notes and key points covered during the session"
 - "Search for patient notes" → intent: "search", query: "patient notes"
 
-Clean up filler words, correct grammar, and be confident in your intent detection.
+Clean up filler words, correct grammar, and be confident in your intent detection. For notes specifically, prioritize clarity and professionalism.
 `;
 
     const result = await model.generateContent(prompt);
