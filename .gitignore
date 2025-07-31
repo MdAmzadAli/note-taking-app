@@ -36,4 +36,11 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# @generated expo modules
+expo-modules-autolinking/
+
+# Environment variables
+.env.local
+.env
+
 app-example
