@@ -390,12 +390,18 @@ export const executeVoiceCommand = async (
 
     if (processingMethod === 'gemini' && isGeminiInitialized()) {
       console.log('[VOICE_COMMANDS] Using Gemini to enhance command understanding');
-      const geminiResult = await processWithGemini(command.originalText, profession);
+      const geminiResult = await processWithGeminiAdvanced(command.originalText, profession);
 
       console.log('[VOICE_COMMANDS] Gemini result:', geminiResult);
 
       if (geminiResult.success && geminiResult.confidence > 0.6) {
-        // Map Gemini intent to our command intents
+        // Check if this is a multi-item command (only available in Gemini mode)
+        if (geminiResult.isMultiItem && geminiResult.items && geminiResult.items.length > 1) {
+          console.log('[VOICE_COMMANDS] Multi-item command detected:', geminiResult.items.length, 'items');
+          return await handleMultiItemCommand(geminiResult.items, profession, geminiResult.itemType);
+        }
+
+        // Map Gemini intent to our command intents for single items
         let mappedIntent = geminiResult.intent;
         if (mappedIntent === 'create_note' || mappedIntent === 'note') {
           mappedIntent = 'create_note';
@@ -766,6 +772,112 @@ const handleCreateTaskCommand = async (title: string, dueDateStr: string, profes
   };
 };
 
+// Handle multi-item commands (only available in Gemini mode)
+const handleMultiItemCommand = async (
+  items: any[],
+  profession: string,
+  itemType: 'task' | 'note' | 'reminder'
+): Promise<{ success: boolean; message: string; data?: any }> => {
+  console.log('[VOICE_COMMANDS] ===== HANDLING MULTI-ITEM COMMAND =====');
+  console.log('[VOICE_COMMANDS] Item type:', itemType);
+  console.log('[VOICE_COMMANDS] Number of items:', items.length);
+  console.log('[VOICE_COMMANDS] Items:', JSON.stringify(items, null, 2));
+
+  const createdItems: any[] = [];
+  const errors: string[] = [];
+
+  try {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      console.log(`[VOICE_COMMANDS] Processing item ${i + 1}:`, item);
+
+      try {
+        let result;
+        
+        switch (itemType) {
+          case 'task':
+            result = await handleCreateTaskCommand(
+              item.title || item.content,
+              item.dueDate || 'tomorrow',
+              profession
+            );
+            break;
+
+          case 'note':
+            result = await handleCreateNoteCommand(
+              item.content || item.title,
+              profession
+            );
+            break;
+
+          case 'reminder':
+            result = await handleSetReminderCommand(
+              item.title || item.content,
+              item.time || 'tomorrow',
+              profession
+            );
+            break;
+
+          default:
+            throw new Error(`Unsupported item type: ${itemType}`);
+        }
+
+        if (result.success) {
+          createdItems.push(result.data);
+          console.log(`[VOICE_COMMANDS] Successfully created item ${i + 1}`);
+        } else {
+          errors.push(`Failed to create item ${i + 1}: ${result.message}`);
+          console.error(`[VOICE_COMMANDS] Failed to create item ${i + 1}:`, result.message);
+        }
+      } catch (itemError) {
+        const errorMsg = `Error creating item ${i + 1}: ${itemError instanceof Error ? itemError.message : 'Unknown error'}`;
+        errors.push(errorMsg);
+        console.error(`[VOICE_COMMANDS] Error creating item ${i + 1}:`, itemError);
+      }
+    }
+
+    const successCount = createdItems.length;
+    const failureCount = errors.length;
+
+    if (successCount > 0) {
+      let message = `Successfully created ${successCount} ${itemType}${successCount !== 1 ? 's' : ''}`;
+      
+      if (failureCount > 0) {
+        message += `, but ${failureCount} failed to create`;
+      }
+
+      console.log('[VOICE_COMMANDS] Multi-item creation completed:', message);
+      
+      return {
+        success: true,
+        message,
+        data: {
+          created: createdItems,
+          errors: errors,
+          counts: {
+            successful: successCount,
+            failed: failureCount,
+            total: items.length
+          }
+        }
+      };
+    } else {
+      return {
+        success: false,
+        message: `Failed to create any ${itemType}s. Errors: ${errors.join('; ')}`,
+        data: { errors }
+      };
+    }
+
+  } catch (error) {
+    console.error('[VOICE_COMMANDS] Error in multi-item command handler:', error);
+    return {
+      success: false,
+      message: `Failed to process multi-item command: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
 // Get example commands for help
 export const getExampleCommands = (): string[] => [
   "Search for patient notes",
@@ -776,6 +888,11 @@ export const getExampleCommands = (): string[] => [
   "New note called shopping list",
   "Remind me to call John in 2 hours",
   "Add task finish presentation due tomorrow",
+  // Multi-item examples (Gemini mode only)
+  "Create two tasks: exercise tomorrow and gym at 5pm",
+  "Add three notes: meeting agenda, shopping list, and ideas",
+  "Set two reminders: dentist at 2pm and dinner at 7pm",
+  "Make four tasks: finish report, call client, review budget, submit proposal",
   // Fuzzy thought examples
   "uhh... remind me about dentist or something tomorrow",
   "I need to like... write down something about the meeting",

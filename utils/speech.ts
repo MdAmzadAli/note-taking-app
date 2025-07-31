@@ -555,8 +555,9 @@ Clean up filler words, correct grammar, and be confident in your intent detectio
 `;
 
     const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text_response = response.text();
+    const text_response = result.response.text();
+
+    console.log('[SPEECH] Gemini response:', text_response.substring(0, 500) + '...');
 
     // Parse JSON from Gemini response
     const jsonMatch = text_response.match(/\{[\s\S]*\}/);

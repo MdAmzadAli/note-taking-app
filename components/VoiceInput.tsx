@@ -281,7 +281,16 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
           } else {
             console.log('[VOICE] WARNING: onCommandExecuted callback not available');
           }
-          Alert.alert('Voice Command Executed', executionResult.message);
+
+          // Check if this was a multi-item command for a more detailed alert
+          if (executionResult.data && executionResult.data.counts) {
+            const { successful, failed, total } = executionResult.data.counts;
+            const alertTitle = processingMethod === 'gemini' ? 'AI-Enhanced Voice Command' : 'Voice Command Executed';
+            Alert.alert(alertTitle, executionResult.message + `\n\nProcessed ${total} items total.`);
+          } else {
+            const alertTitle = processingMethod === 'gemini' ? 'AI-Enhanced Voice Command' : 'Voice Command Executed';
+            Alert.alert(alertTitle, executionResult.message);
+          }
         }
       } else {
         console.log('[VOICE] ===== COMMAND EXECUTION FAILED =====');
