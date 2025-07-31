@@ -77,33 +77,34 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       setVoiceLanguageState(language);
       setVoiceLanguage(language);
 
-      // Initialize Gemini AI
+      // Initialize Gemini AI (use environment key first)
       const envGeminiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-      const settingsGeminiKey = settings.geminiApiKey;
-
-      if (envGeminiKey || settingsGeminiKey) {
-        initializeGemini(settingsGeminiKey);
+      
+      if (envGeminiKey) {
+        initializeGemini();
         setGeminiSupported(true);
-        console.log('[VOICE] Gemini initialized from:', envGeminiKey ? 'environment' : 'settings');
+        console.log('[VOICE] Gemini initialized from environment');
+      } else {
+        console.log('[VOICE] Gemini not available - no environment key');
+        setGeminiSupported(false);
       }
 
-      // Initialize AssemblyAI if needed
-      if (method === 'assemblyai-regex' || method === 'assemblyai-gemini') {
-        const envApiKey = process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY;
-        const settingsApiKey = settings.assemblyAIApiKey;
-
-        if (envApiKey || settingsApiKey) {
-          initializeAssemblyAI(settingsApiKey);
-          setAssemblyAIError(null);
-          console.log('[VOICE] AssemblyAI initialized from:', envApiKey ? 'environment' : 'settings');
-        } else {
-          setAssemblyAIError('AssemblyAI API key not configured');
-        }
+      // Initialize AssemblyAI (use environment key first)
+      const envApiKey = process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY;
+      
+      if (envApiKey) {
+        initializeAssemblyAI();
+        setAssemblyAIError(null);
+        console.log('[VOICE] AssemblyAI initialized from environment');
+      } else {
+        setAssemblyAIError('AssemblyAI API key not configured in environment');
+        console.error('[VOICE] AssemblyAI API key missing from environment');
       }
 
       // Check if voice recognition is available
       const available = await isSpeechRecognitionAvailable(method);
       setVoiceSupported(available);
+      console.log('[VOICE] Voice recognition available:', available);
 
     } catch (error) {
       console.error('Error loading user settings:', error);
@@ -178,8 +179,12 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
   const processVoiceCommand = async (speechText: string) => {
     try {
       console.log('[VOICE] Processing speech text:', speechText);
-      console.log('[VOICE] Speech text type:', typeof speechText);
-      console.log('[VOICE] Speech text JSON:', JSON.stringify(speechText));
+      
+      if (!speechText || speechText.trim().length === 0) {
+        console.log('[VOICE] Empty speech text received');
+        Alert.alert('No Speech Detected', 'Please try speaking more clearly or check your microphone.');
+        return;
+      }
 
       // First, process fuzzy thoughts
       const fuzzyProcessing = processFuzzyThought(speechText);
@@ -206,8 +211,12 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       console.log('[VOICE] Command intent:', command.intent);
       console.log('[VOICE] Command parameters:', command.parameters);
 
-      const processingMethod = voiceMethod === 'assemblyai-gemini' ? 'gemini' : 'regex';
+      const processingMethod = voiceMethod === 'assemblyai-gemini' && geminiSupported ? 'gemini' : 'regex';
+      console.log('[VOICE] Using processing method:', processingMethod);
+      
       const executionResult = await executeVoiceCommand(command, profession, processingMethod);
+
+      console.log('[VOICE] Execution result:', executionResult);
 
       if (executionResult.success) {
         if (command.intent === 'search' && executionResult.data) {
@@ -219,17 +228,18 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
           Alert.alert('Voice Command Executed', executionResult.message);
         }
       } else {
-        Alert.alert('Command Not Understood', executionResult.message + '\n\nTry phrases like: "create note", "search for", "set reminder", or "create task"');
+        console.log('[VOICE] Command execution failed:', executionResult.message);
+        Alert.alert('Command Not Understood', executionResult.message + '\n\nTry phrases like: "create note about meeting", "search for patient notes", "set reminder for tomorrow", or "create task review contract"');
       }
     } catch (error) {
       console.error('[VOICE] Error executing command:', error);
-      Alert.alert('Error', 'Failed to execute voice command');
+      Alert.alert('Error', 'Failed to execute voice command: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setIsProcessing(false);
       setTimeout(() => {
         resetState();
         setShowModal(false);
-      }, 2000);
+      }, 3000);
     }
   };
 
@@ -317,18 +327,31 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
             console.log(`[VOICE] Final transcript received from ${voiceMethod}:`, text);
             console.log('[VOICE] Text length:', text.length);
             console.log('[VOICE] Text content:', JSON.stringify(text));
-            setFinalResult(text);
-            setPartialResults([]);
-            setIsListening(false);
-            setIsProcessing(true);
-            processVoiceCommand(text);
+            
+            if (text && text.trim().length > 0) {
+              setFinalResult(text);
+              setPartialResults([]);
+              setIsListening(false);
+              setIsProcessing(true);
+              
+              // Add a small delay to ensure UI updates
+              setTimeout(() => {
+                processVoiceCommand(text);
+              }, 100);
+            } else {
+              console.log('[VOICE] Empty transcript received');
+              setIsListening(false);
+              setIsProcessing(false);
+              Alert.alert('No Speech Detected', 'Please try speaking more clearly.');
+            }
           },
           // onError
           (error: string) => {
-            console.log(`[VOICE] ${voiceMethod} error:`, error);
+            console.error(`[VOICE] ${voiceMethod} error:`, error);
             setIsListening(false);
             setIsProcessing(false);
-            Alert.alert('Voice Recognition Error', `${voiceMethod} error: ${error}`);
+            resetState();
+            Alert.alert('Voice Recognition Error', `Speech recognition failed: ${error}\n\nPlease check your microphone and internet connection.`);
           }
         );
 

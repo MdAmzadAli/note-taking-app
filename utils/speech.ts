@@ -42,6 +42,7 @@ export const initializeGemini = (apiKey?: string) => {
 
     if (!key) {
       console.warn('[SPEECH] GEMINI_API_KEY not found in environment variables or parameters');
+      geminiAI = null;
       return;
     }
 
@@ -49,6 +50,7 @@ export const initializeGemini = (apiKey?: string) => {
     console.log('[SPEECH] Gemini AI initialized successfully');
   } catch (error) {
     console.error('[SPEECH] Failed to initialize Gemini:', error);
+    geminiAI = null;
   }
 };
 
@@ -75,12 +77,14 @@ export const initializeAssemblyAI = (apiKey?: string) => {
 
     if (!key) {
       console.warn('[SPEECH] ASSEMBLYAI_API_KEY not found in environment variables or parameters');
+      assemblyAIApiKey = null;
       return;
     }
     assemblyAIApiKey = key;
     console.log('[SPEECH] AssemblyAI initialized successfully with key:', key.substring(0, 10) + '...');
   } catch (error) {
     console.error('[SPEECH] Failed to initialize AssemblyAI:', error);
+    assemblyAIApiKey = null;
   }
 };
 

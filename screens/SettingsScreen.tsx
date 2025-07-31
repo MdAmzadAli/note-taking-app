@@ -36,7 +36,7 @@ const VOICE_LANGUAGES = [
   { code: 'ar-SA', name: 'Arabic', flag: '🇸🇦' },
 ];
 
-export default function SettingsScreen({ onBack }: SettingsScreenProps = {}) {
+const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
   const [settings, setSettings] = useState<UserSettings>({
     profession: 'doctor',
     voiceLanguage: 'en-US',
@@ -86,7 +86,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps = {}) {
     }
   };
 
-  
+
 
   const changeProfession = (profession: ProfessionType) => {
     Alert.alert(
@@ -169,7 +169,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps = {}) {
                 {process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY ? '✓ Configured' : '✗ Not Configured'}
               </Text>
             </View>
-            
+
             <View style={styles.apiStatusItem}>
               <Text style={styles.apiStatusLabel}>Gemini AI API</Text>
               <Text style={[
@@ -391,6 +391,8 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps = {}) {
     </SafeAreaView>
   );
 }
+
+export default SettingsScreen;
 
 const styles = StyleSheet.create({
   container: {
