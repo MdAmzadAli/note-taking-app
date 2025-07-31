@@ -113,26 +113,18 @@ export default function SearchScreen() {
           autoFocus
         />
         <VoiceInput
-          onCommandExecuted={(result) => {
-            console.log('Voice command executed:', result);
-          }}
           onSearchRequested={(query, results) => {
-            console.log('[SEARCH_SCREEN] Voice search requested:', query, results);
+            console.log('[SEARCH] Voice search requested:', query, results);
             setSearchQuery(query);
-            
-            // Convert voice search results to proper format
             const formattedResults = results.map((result: any) => ({
-              id: result.item?.id || result.id,
-              title: result.item?.title || result.title,
-              content: result.item?.content || result.content || result.item?.description || '',
+              id: result.item.id,
+              title: result.item.title || result.item.content?.substring(0, 50) + '...',
+              content: result.item.content || result.item.description || '',
               type: result.type,
-              createdAt: result.item?.createdAt || result.createdAt,
-              profession: result.item?.profession || result.profession,
-              score: result.relevance || result.score
+              relevance: result.relevance,
             }));
-            
             setSearchResults(formattedResults);
-          }
+          }}
           style={styles.voiceInputButton}
         />
         {searchQuery.length > 0 && (

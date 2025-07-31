@@ -16,9 +16,16 @@ import { getUserSettings } from '@/utils/storage';
 import { requestMicrophonePermission } from '@/utils/permissions';
 import { 
   initializeAssemblyAI, 
-  isAssemblyAIInitialized, 
-  startAssemblyAISpeechRecognition,
-  stopAssemblyAISpeechRecognition 
+  initializeGemini,
+  initializeVoicebox,
+  isAssemblyAIInitialized,
+  isGeminiInitialized,
+  setVoiceLanguage,
+  getCurrentLanguage,
+  startSpeechRecognitionUnified,
+  stopSpeechRecognitionUnified,
+  isSpeechRecognitionAvailable,
+  VoiceRecognitionMethod
 } from '@/utils/speech';
 
 interface VoiceInputProps {
@@ -39,6 +46,9 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
   const [profession, setProfession] = useState('doctor');
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [assemblyAIError, setAssemblyAIError] = useState<string | null>(null);
+  const [voiceMethod, setVoiceMethod] = useState<VoiceRecognitionMethod>('voicebox');
+  const [voiceLanguage, setVoiceLanguageState] = useState('en-US');
+  const [geminiSupported, setGeminiSupported] = useState(false);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -60,25 +70,47 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     try {
       const settings = await getUserSettings();
       setProfession(settings.profession);
+      
+      // Set voice recognition method and language
+      const method = (settings.voiceRecognitionMethod || 'voicebox') as VoiceRecognitionMethod;
+      const language = settings.voiceLanguage || 'en-US';
+      setVoiceMethod(method);
+      setVoiceLanguageState(language);
+      setVoiceLanguage(language);
 
-      // Initialize AssemblyAI - first try environment variable, then settings
-      const envApiKey = process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY;
-      const settingsApiKey = settings.assemblyAIApiKey;
-
-      console.log('[VOICE] Environment variables check:');
-      console.log('[VOICE] - EXPO_PUBLIC_ASSEMBLYAI_API_KEY:', envApiKey ? `Found (${envApiKey.substring(0, 10)}...)` : 'Not found');
-      console.log('[VOICE] - Settings API key:', settingsApiKey ? `Found (${settingsApiKey.substring(0, 10)}...)` : 'Not found');
-
-      if (envApiKey || settingsApiKey) {
-        initializeAssemblyAI(settingsApiKey); // This will use env key first, then settings key
-        setVoiceSupported(true);
-        setAssemblyAIError(null);
-        console.log('[VOICE] AssemblyAI initialized from:', envApiKey ? 'environment' : 'settings');
-      } else {
-        setVoiceSupported(false);
-        setAssemblyAIError('AssemblyAI API key not configured. Please add EXPO_PUBLIC_ASSEMBLYAI_API_KEY to secrets or configure in settings');
-        console.log('[VOICE] No API key found in environment or settings - using demo mode');
+      // Initialize Gemini AI
+      const envGeminiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+      const settingsGeminiKey = settings.geminiApiKey;
+      
+      if (envGeminiKey || settingsGeminiKey) {
+        initializeGemini(settingsGeminiKey);
+        setGeminiSupported(true);
+        console.log('[VOICE] Gemini initialized from:', envGeminiKey ? 'environment' : 'settings');
       }
+
+      // Initialize AssemblyAI if needed
+      if (method === 'assemblyai') {
+        const envApiKey = process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY;
+        const settingsApiKey = settings.assemblyAIApiKey;
+
+        if (envApiKey || settingsApiKey) {
+          initializeAssemblyAI(settingsApiKey);
+          setAssemblyAIError(null);
+          console.log('[VOICE] AssemblyAI initialized from:', envApiKey ? 'environment' : 'settings');
+        } else {
+          setAssemblyAIError('AssemblyAI API key not configured');
+        }
+      }
+
+      // Initialize Voicebox if needed
+      if (method === 'voicebox') {
+        initializeVoicebox();
+      }
+
+      // Check if voice recognition is available
+      const available = await isSpeechRecognitionAvailable(method);
+      setVoiceSupported(available);
+
     } catch (error) {
       console.error('Error loading user settings:', error);
     }
@@ -252,12 +284,13 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
         }),
       ]).start();
 
-      if (voiceSupported && isAssemblyAIInitialized()) {
-        // Production: Use AssemblyAI
-        console.log('[VOICE] Starting AssemblyAI speech recognition...');
+      if (voiceSupported) {
+        // Use selected voice recognition method
+        console.log(`[VOICE] Starting ${voiceMethod} speech recognition in ${voiceLanguage}...`);
         setIsListening(true);
 
-        const result = await startAssemblyAISpeechRecognition(
+        const result = await startSpeechRecognitionUnified(
+          voiceMethod,
           // onPartialTranscript
           (text: string) => {
             console.log('[VOICE] Partial transcript:', text);
@@ -265,7 +298,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
           },
           // onFinalTranscript
           (text: string) => {
-            console.log('[VOICE] Final transcript received from AssemblyAI:', text);
+            console.log(`[VOICE] Final transcript received from ${voiceMethod}:`, text);
             console.log('[VOICE] Text length:', text.length);
             console.log('[VOICE] Text content:', JSON.stringify(text));
             setFinalResult(text);
@@ -276,16 +309,16 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
           },
           // onError
           (error: string) => {
-            console.log('[VOICE] AssemblyAI error:', error);
+            console.log(`[VOICE] ${voiceMethod} error:`, error);
             setIsListening(false);
             setIsProcessing(false);
-            Alert.alert('Voice Recognition Error', `AssemblyAI error: ${error}`);
+            Alert.alert('Voice Recognition Error', `${voiceMethod} error: ${error}`);
           }
         );
 
         if (!result.success) {
           setIsListening(false);
-          Alert.alert('Speech Recognition Error', result.error || 'Failed to start AssemblyAI');
+          Alert.alert('Speech Recognition Error', result.error || `Failed to start ${voiceMethod}`);
         }
       } else {
         // Mock implementation fallback
@@ -363,8 +396,8 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
   const stopListening = async () => {
     try {
-      if (voiceSupported && isAssemblyAIInitialized()) {
-        await stopAssemblyAISpeechRecognition();
+      if (voiceSupported) {
+        await stopSpeechRecognitionUnified(voiceMethod);
       }
       setIsListening(false);
     } catch (error) {
@@ -374,8 +407,8 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
   const cancelListening = async () => {
     try {
-      if (voiceSupported && isAssemblyAIInitialized()) {
-        await stopAssemblyAISpeechRecognition();
+      if (voiceSupported) {
+        await stopSpeechRecognitionUnified(voiceMethod);
       }
       setIsListening(false);
       setShowModal(false);
@@ -401,17 +434,21 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
   };
 
   const getStatusText = () => {
-    if (isProcessing) return 'Processing command...';
+    if (isProcessing) {
+      return geminiSupported ? 
+        'Processing with AI enhancement...' : 
+        'Processing command...';
+    }
     if (isListening) {
-      if (voiceSupported && isAssemblyAIInitialized()) {
-        return 'Listening... Speak clearly and press "Stop Listening" when done';
+      if (voiceSupported) {
+        return `Listening (${voiceMethod.toUpperCase()}, ${voiceLanguage})... Speak clearly and press "Stop Listening" when done`;
       } else {
         return 'Demo Mode: Simulating voice input...';
       }
     }
     if (finalResult) return 'Command received, processing...';
-    return voiceSupported && isAssemblyAIInitialized() ? 
-      'Tap to start voice recording' : 
+    return voiceSupported ? 
+      `Tap to start ${voiceMethod.toUpperCase()} voice recording (${voiceLanguage})` : 
       'Tap to try demo voice commands';
   };
 
@@ -461,10 +498,21 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
             {(!voiceSupported || assemblyAIError) && (
               <View style={styles.warningContainer}>
                 <Text style={styles.warningText}>
-                  {assemblyAIError ? 
+                  {assemblyAIError && voiceMethod === 'assemblyai' ? 
                     `⚠️ ${assemblyAIError}\nVoice commands are simulated for demonstration.` :
-                    '🚧 Demo Mode: AssemblyAI is not configured.\nVoice commands are simulated for demonstration purposes.'
+                    !voiceSupported ?
+                    `🚧 Demo Mode: ${voiceMethod.toUpperCase()} is not configured.\nVoice commands are simulated for demonstration purposes.` :
+                    ''
                   }
+                </Text>
+              </View>
+            )}
+
+            {voiceSupported && (
+              <View style={styles.infoContainer}>
+                <Text style={styles.infoText}>
+                  🎤 Using {voiceMethod.toUpperCase()} • Language: {voiceLanguage}
+                  {geminiSupported && ' • AI Enhanced ✨'}
                 </Text>
               </View>
             )}
@@ -873,5 +921,18 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontWeight: '500',
     fontStyle: 'italic',
+  },
+  infoContainer: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  infoText: {
+    fontSize: 12,
+    color: '#1E40AF',
+    fontFamily: 'Inter',
+    textAlign: 'center',
+    fontWeight: '500',
   },
 });

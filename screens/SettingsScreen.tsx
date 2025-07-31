@@ -13,7 +13,23 @@ import {
 import { getUserSettings, saveUserSettings, UserSettings } from '@/utils/storage';
 import { clearAllData } from '@/utils/storage';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
+import { VoiceRecognitionMethod } from '@/utils/speech';
 import VoiceCommandsScreen from './VoiceCommandsScreen';
+
+const VOICE_LANGUAGES = [
+  { code: 'en-US', name: 'English (US)', flag: '🇺🇸' },
+  { code: 'en-GB', name: 'English (UK)', flag: '🇬🇧' },
+  { code: 'es-ES', name: 'Spanish', flag: '🇪🇸' },
+  { code: 'fr-FR', name: 'French', flag: '🇫🇷' },
+  { code: 'de-DE', name: 'German', flag: '🇩🇪' },
+  { code: 'it-IT', name: 'Italian', flag: '🇮🇹' },
+  { code: 'pt-BR', name: 'Portuguese', flag: '🇧🇷' },
+  { code: 'zh-CN', name: 'Chinese', flag: '🇨🇳' },
+  { code: 'ja-JP', name: 'Japanese', flag: '🇯🇵' },
+  { code: 'ko-KR', name: 'Korean', flag: '🇰🇷' },
+  { code: 'hi-IN', name: 'Hindi', flag: '🇮🇳' },
+  { code: 'ar-SA', name: 'Arabic', flag: '🇸🇦' },
+];
 
 export default function SettingsScreen() {
   const [settings, setSettings] = useState<UserSettings>({
@@ -21,6 +37,8 @@ export default function SettingsScreen() {
     notificationsEnabled: true,
     theme: 'auto',
     autoSync: true,
+    voiceRecognitionMethod: 'voicebox',
+    voiceLanguage: 'en-US',
   });
   const [currentProfession, setCurrentProfession] = useState<ProfessionType>('doctor');
   const [showVoiceCommands, setShowVoiceCommands] = useState(false);
@@ -161,6 +179,54 @@ export default function SettingsScreen() {
               )}
             </TouchableOpacity>
           ))}
+        </View>
+
+        {/* Voice Recognition Settings */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Voice Recognition</Text>
+          
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingName}>Recognition Method</Text>
+              <Text style={styles.settingDescription}>
+                {settings.voiceRecognitionMethod === 'voicebox' ? 'Voicebox (Fast, Free)' : 'AssemblyAI (Accurate, Paid)'}
+              </Text>
+            </View>
+            <Switch
+              value={settings.voiceRecognitionMethod === 'assemblyai'}
+              onValueChange={(value) => updateSettings({ 
+                voiceRecognitionMethod: value ? 'assemblyai' : 'voicebox' as VoiceRecognitionMethod 
+              })}
+              trackColor={{
+                false: '#E5E7EB',
+                true: '#000000',
+              }}
+              thumbColor={settings.voiceRecognitionMethod === 'assemblyai' ? '#FFFFFF' : '#6B7280'}
+            />
+          </View>
+
+          <View style={styles.languageSection}>
+            <Text style={styles.settingName}>Voice Language</Text>
+            <View style={styles.languageGrid}>
+              {VOICE_LANGUAGES.map((lang) => (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={[
+                    styles.languageOption,
+                    settings.voiceLanguage === lang.code && styles.languageOptionActive,
+                  ]}
+                  onPress={() => updateSettings({ voiceLanguage: lang.code })}
+                >
+                  <Text style={[
+                    styles.languageText,
+                    settings.voiceLanguage === lang.code && styles.languageTextActive,
+                  ]}>
+                    {lang.flag} {lang.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
         </View>
 
         {/* View Mode */}
@@ -412,5 +478,43 @@ clearDataButton: {
   },
   clearDataButtonText: {
     color: '#FFFFFF',
+  },
+  languageSection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginTop: 12,
+  },
+  languageGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  languageOption: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  languageOptionActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  languageText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontFamily: 'Inter',
+    textAlign: 'center',
+  },
+  languageTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '500',
   },
 });

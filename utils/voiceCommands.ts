@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { saveNote, saveReminder, saveTask, getNotes, getTasks, getReminders } from './storage';
 import { Note, Task, Reminder } from '@/types';
 import { scheduleNotification } from './notifications';
+import { processWithGemini, isGeminiInitialized } from './speech';
 
 export interface VoiceCommand {
   intent: 'search' | 'create_note' | 'set_reminder' | 'create_task' | 'unknown';
@@ -316,7 +317,7 @@ const parseTime = (timeStr: string): Date => {
   return tomorrow;
 };
 
-// Execute voice commands
+// Execute voice commands with Gemini AI enhancement
 export const executeVoiceCommand = async (
   command: VoiceCommand,
   profession: string = 'doctor'
@@ -324,24 +325,46 @@ export const executeVoiceCommand = async (
   console.log('[VOICE_COMMANDS] Executing command:', command);
   
   try {
-    switch (command.intent) {
+    // Try to enhance command understanding with Gemini if available
+    let enhancedCommand = command;
+    
+    if (isGeminiInitialized() && command.intent === 'unknown') {
+      console.log('[VOICE_COMMANDS] Using Gemini to enhance command understanding');
+      const geminiResult = await processWithGemini(command.originalText, profession);
+      
+      if (geminiResult.success && geminiResult.confidence > 0.7) {
+        enhancedCommand = {
+          ...command,
+          intent: geminiResult.intent as any,
+          parameters: geminiResult.parameters,
+          cleanedText: geminiResult.processedText,
+          confidence: geminiResult.confidence
+        };
+        console.log('[VOICE_COMMANDS] Enhanced command with Gemini:', enhancedCommand);
+      }
+    }
+    
+    switch (enhancedCommand.intent) {
       case 'search':
-        return await handleSearchCommand(command.parameters.query);
+        return await handleSearchCommand(enhancedCommand.parameters.query || enhancedCommand.parameters.content);
         
       case 'create_note':
-        return await handleCreateNoteCommand(command.parameters.content, profession);
+        return await handleCreateNoteCommand(
+          enhancedCommand.parameters.content || enhancedCommand.parameters.title, 
+          profession
+        );
         
       case 'set_reminder':
         return await handleSetReminderCommand(
-          command.parameters.title,
-          command.parameters.time,
+          enhancedCommand.parameters.title || enhancedCommand.parameters.content,
+          enhancedCommand.parameters.time || 'tomorrow',
           profession
         );
         
       case 'create_task':
         return await handleCreateTaskCommand(
-          command.parameters.title,
-          command.parameters.dueDate,
+          enhancedCommand.parameters.title || enhancedCommand.parameters.content,
+          enhancedCommand.parameters.dueDate || 'tomorrow',
           profession
         );
         

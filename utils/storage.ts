@@ -10,6 +10,17 @@ const KEYS = {
   USER_SETTINGS: 'userSettings',
 };
 
+const DEFAULT_SETTINGS: UserSettings = {
+  profession: 'doctor',
+  viewMode: 'paragraph',
+  notificationsEnabled: true,
+  theme: 'auto',
+  autoSync: true,
+  isOnboardingComplete: false,
+  voiceRecognitionMethod: 'voicebox',
+  voiceLanguage: 'en-US',
+};
+
 // Notes
 // Get all notes
 export const getNotes = async (): Promise<Note[]> => {
@@ -170,6 +181,8 @@ export const getUserSettings = async (): Promise<UserSettings> => {
       notificationsEnabled: true,
       theme: 'auto',
       autoSync: true,
+      voiceRecognitionMethod: 'voicebox',
+      voiceLanguage: 'en-US',
     };
 
     if (settingsData) {
@@ -184,6 +197,8 @@ export const getUserSettings = async (): Promise<UserSettings> => {
       notificationsEnabled: true,
       theme: 'auto',
       autoSync: true,
+      voiceRecognitionMethod: 'voicebox',
+      voiceLanguage: 'en-US',
     };
   }
 };
@@ -308,4 +323,16 @@ export class StorageService {
   static async saveSettings(settings: UserSettings): Promise<void> {
     return saveUserSettings(settings);
   }
+}
+export interface UserSettings {
+  profession: ProfessionType;
+  viewMode?: 'paragraph' | 'bullet';
+  notificationsEnabled?: boolean;
+  theme?: 'light' | 'dark' | 'auto';
+  autoSync?: boolean;
+  isOnboardingComplete?: boolean;
+  assemblyAIApiKey?: string;
+  geminiApiKey?: string;
+  voiceRecognitionMethod?: 'voicebox' | 'assemblyai';
+  voiceLanguage?: string;
 }

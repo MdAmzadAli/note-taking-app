@@ -2,6 +2,7 @@
 import * as Speech from 'expo-speech';
 import { Alert } from 'react-native';
 import { Audio } from 'expo-av';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export interface SpeechResult {
   text: string;
@@ -15,6 +16,12 @@ export interface SpeechOptions {
   rate?: number;
 }
 
+export type VoiceRecognitionMethod = 'voicebox' | 'assemblyai';
+
+// Google Gemini configuration
+let geminiAI: GoogleGenerativeAI | null = null;
+let currentLanguage = 'en-US';
+
 // AssemblyAI configuration
 let assemblyAIApiKey: string | null = null;
 let audioRecording: Audio.Recording | null = null;
@@ -24,6 +31,38 @@ let isRecording = false;
 let currentOnPartialTranscript: ((text: string) => void) | null = null;
 let currentOnFinalTranscript: ((text: string) => void) | null = null;
 let currentOnError: ((error: string) => void) | null = null;
+
+// Initialize Gemini AI
+export const initializeGemini = (apiKey?: string) => {
+  try {
+    const envKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+    const key = envKey || apiKey;
+    
+    console.log('[SPEECH] Gemini Environment key check:', envKey ? 'Found' : 'Not found');
+    console.log('[SPEECH] Gemini Parameter key check:', apiKey ? 'Provided' : 'Not provided');
+    
+    if (!key) {
+      console.warn('[SPEECH] GEMINI_API_KEY not found in environment variables or parameters');
+      return;
+    }
+    
+    geminiAI = new GoogleGenerativeAI(key);
+    console.log('[SPEECH] Gemini AI initialized successfully');
+  } catch (error) {
+    console.error('[SPEECH] Failed to initialize Gemini:', error);
+  }
+};
+
+// Set language for voice recognition
+export const setVoiceLanguage = (language: string) => {
+  currentLanguage = language;
+  console.log('[SPEECH] Voice language set to:', language);
+};
+
+// Get current language
+export const getCurrentLanguage = (): string => {
+  return currentLanguage;
+};
 
 // Initialize AssemblyAI with API key
 export const initializeAssemblyAI = (apiKey?: string) => {
@@ -131,6 +170,105 @@ const uploadAudioToAssemblyAI = async (audioUri: string): Promise<string> => {
   }
 
   throw new Error('Transcription timeout - please try again');
+};
+
+// Voicebox Speech Recognition (react-native-voicebox-speech-rec)
+let voiceboxRecognizer: any = null;
+
+// Initialize Voicebox
+export const initializeVoicebox = () => {
+  try {
+    // Note: react-native-voicebox-speech-rec requires platform-specific setup
+    // For now, we'll use Web Speech API as fallback for Expo environment
+    console.log('[SPEECH] Voicebox initialization - using Web Speech API fallback');
+    return true;
+  } catch (error) {
+    console.error('[SPEECH] Failed to initialize Voicebox:', error);
+    return false;
+  }
+};
+
+// Start Voicebox speech recognition
+export const startVoiceboxSpeechRecognition = async (
+  onPartialTranscript?: (text: string) => void,
+  onFinalTranscript?: (text: string) => void,
+  onError?: (error: string) => void
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // Check if Web Speech API is available (Voicebox fallback)
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      return {
+        success: false,
+        error: "Speech recognition not supported on this device"
+      };
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = currentLanguage;
+    recognition.maxAlternatives = 3;
+
+    recognition.onstart = () => {
+      console.log('[SPEECH] Voicebox Speech Recognition started');
+    };
+
+    recognition.onresult = (event) => {
+      let interimTranscript = '';
+      let finalTranscript = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+
+      if (interimTranscript) {
+        onPartialTranscript?.(interimTranscript);
+      }
+
+      if (finalTranscript) {
+        console.log('[SPEECH] Voicebox final transcript:', finalTranscript);
+        onFinalTranscript?.(finalTranscript);
+        recognition.stop();
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error('[SPEECH] Voicebox recognition error:', event.error);
+      onError?.(event.error);
+    };
+
+    recognition.start();
+    voiceboxRecognizer = recognition;
+    return { success: true };
+
+  } catch (error) {
+    console.error('[SPEECH] Error starting Voicebox speech recognition:', error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return {
+      success: false,
+      error: errorMessage
+    };
+  }
+};
+
+// Stop Voicebox speech recognition
+export const stopVoiceboxSpeechRecognition = async (): Promise<void> => {
+  try {
+    if (voiceboxRecognizer) {
+      voiceboxRecognizer.stop();
+      voiceboxRecognizer = null;
+      console.log('[SPEECH] Voicebox recognition stopped');
+    }
+  } catch (error) {
+    console.error('[SPEECH] Error stopping Voicebox recognition:', error);
+  }
 };
 
 // Start speech recognition using AssemblyAI
@@ -464,9 +602,132 @@ export const stopListening = async (): Promise<void> => {
   await stopAssemblyAISpeechRecognition();
 };
 
+// Process text with Gemini AI for better command understanding
+export const processWithGemini = async (text: string, profession: string): Promise<{
+  success: boolean;
+  processedText: string;
+  intent: string;
+  parameters: Record<string, any>;
+  confidence: number;
+}> => {
+  try {
+    if (!geminiAI) {
+      console.log('[SPEECH] Gemini not initialized, using fallback processing');
+      return {
+        success: false,
+        processedText: text,
+        intent: 'unknown',
+        parameters: {},
+        confidence: 0.5
+      };
+    }
+
+    const model = geminiAI.getGenerativeModel({ model: 'gemini-pro' });
+
+    const prompt = `
+You are an AI assistant that processes voice commands for a ${profession}'s note-taking app. 
+
+Analyze this voice input: "${text}"
+
+Extract and return in JSON format:
+{
+  "processedText": "cleaned and corrected version of the input",
+  "intent": "one of: create_note, set_reminder, create_task, search, unknown",
+  "parameters": {
+    "content": "main content if creating note/task/reminder",
+    "title": "title if specified",
+    "time": "time/date if mentioned for reminders",
+    "query": "search query if intent is search",
+    "dueDate": "due date if mentioned for tasks"
+  },
+  "confidence": 0.95
+}
+
+Clean up filler words, correct grammar, and ensure the intent is clear. For ${profession} context, understand domain-specific terminology.
+`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text_response = response.text();
+
+    // Parse JSON from Gemini response
+    const jsonMatch = text_response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        success: true,
+        processedText: parsed.processedText || text,
+        intent: parsed.intent || 'unknown',
+        parameters: parsed.parameters || {},
+        confidence: parsed.confidence || 0.8
+      };
+    }
+
+    throw new Error('Failed to parse Gemini response');
+
+  } catch (error) {
+    console.error('[SPEECH] Gemini processing error:', error);
+    return {
+      success: false,
+      processedText: text,
+      intent: 'unknown',
+      parameters: {},
+      confidence: 0.5
+    };
+  }
+};
+
+// Check if Gemini is initialized
+export const isGeminiInitialized = (): boolean => {
+  return geminiAI !== null;
+};
+
+// Unified speech recognition start function
+export const startSpeechRecognitionUnified = async (
+  method: VoiceRecognitionMethod,
+  onPartialTranscript?: (text: string) => void,
+  onFinalTranscript?: (text: string) => void,
+  onError?: (error: string) => void
+): Promise<{ success: boolean; error?: string }> => {
+  switch (method) {
+    case 'voicebox':
+      return await startVoiceboxSpeechRecognition(onPartialTranscript, onFinalTranscript, onError);
+    case 'assemblyai':
+      return await startAssemblyAISpeechRecognition(onPartialTranscript, onFinalTranscript, onError);
+    default:
+      return {
+        success: false,
+        error: 'Unknown speech recognition method'
+      };
+  }
+};
+
+// Unified speech recognition stop function
+export const stopSpeechRecognitionUnified = async (method: VoiceRecognitionMethod): Promise<void> => {
+  switch (method) {
+    case 'voicebox':
+      await stopVoiceboxSpeechRecognition();
+      break;
+    case 'assemblyai':
+      await stopAssemblyAISpeechRecognition();
+      break;
+  }
+};
+
 // Check if speech recognition is available
-export const isSpeechRecognitionAvailable = async (): Promise<boolean> => {
-  return isAssemblyAIInitialized();
+export const isSpeechRecognitionAvailable = async (method?: VoiceRecognitionMethod): Promise<boolean> => {
+  if (!method) {
+    return isAssemblyAIInitialized() || initializeVoicebox();
+  }
+  
+  switch (method) {
+    case 'voicebox':
+      return initializeVoicebox();
+    case 'assemblyai':
+      return isAssemblyAIInitialized();
+    default:
+      return false;
+  }
 };
 
 // Profession-specific mock voice input
