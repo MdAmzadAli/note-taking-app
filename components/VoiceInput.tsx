@@ -64,11 +64,11 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       // Initialize AssemblyAI - first try environment variable, then settings
       const envApiKey = process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY;
       const settingsApiKey = settings.assemblyAIApiKey;
-      
+
       console.log('[VOICE] Environment variables check:');
       console.log('[VOICE] - EXPO_PUBLIC_ASSEMBLYAI_API_KEY:', envApiKey ? `Found (${envApiKey.substring(0, 10)}...)` : 'Not found');
       console.log('[VOICE] - Settings API key:', settingsApiKey ? `Found (${settingsApiKey.substring(0, 10)}...)` : 'Not found');
-      
+
       if (envApiKey || settingsApiKey) {
         initializeAssemblyAI(settingsApiKey); // This will use env key first, then settings key
         setVoiceSupported(true);
@@ -134,7 +134,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       console.log('[VOICE] Processing speech text:', speechText);
       console.log('[VOICE] Speech text type:', typeof speechText);
       console.log('[VOICE] Speech text JSON:', JSON.stringify(speechText));
-      
+
       // First, process fuzzy thoughts
       const fuzzyProcessing = processFuzzyThought(speechText);
       setFuzzyResult(fuzzyProcessing);
@@ -150,7 +150,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       // Parse and execute command using cleaned text
       const textToProcess = fuzzyProcessing.cleanedText || speechText;
       console.log('[VOICE] Text to process:', textToProcess);
-      
+
       const command = parseVoiceCommand(textToProcess);
       command.cleanedText = fuzzyProcessing.cleanedText;
       command.confidence = fuzzyProcessing.confidence;
@@ -164,14 +164,15 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
       if (executionResult.success) {
         if (command.intent === 'search' && executionResult.data) {
+          console.log('[VOICE] Calling onSearchRequested with:', command.parameters.query, executionResult.data);
           onSearchRequested?.(command.parameters.query, executionResult.data);
+          Alert.alert('Search Completed', executionResult.message);
         } else {
           onCommandExecuted?.(executionResult);
+          Alert.alert('Voice Command Executed', executionResult.message);
         }
-
-        Alert.alert('Voice Command Executed', executionResult.message);
       } else {
-        Alert.alert('Command Not Understood', executionResult.message);
+        Alert.alert('Command Not Understood', executionResult.message + '\n\nTry phrases like: "create note", "search for", "set reminder", or "create task"');
       }
     } catch (error) {
       console.error('[VOICE] Error executing command:', error);
@@ -200,14 +201,15 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
       if (executionResult.success) {
         if (command.intent === 'search' && executionResult.data) {
+          console.log('[VOICE] Calling onSearchRequested with:', command.parameters.query, executionResult.data);
           onSearchRequested?.(command.parameters.query, executionResult.data);
+          Alert.alert('Search Completed', executionResult.message);
         } else {
           onCommandExecuted?.(executionResult);
+          Alert.alert('Voice Command Executed', executionResult.message);
         }
-
-        Alert.alert('Voice Command Executed', executionResult.message);
       } else {
-        Alert.alert('Command Not Understood', executionResult.message);
+        Alert.alert('Command Not Understood', executionResult.message + '\n\nTry phrases like: "create note", "search for", "set reminder", or "create task"');
       }
     } catch (error) {
       console.error('[VOICE] Error executing command:', error);
@@ -413,7 +415,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       'Tap to try demo voice commands';
   };
 
-  
+
 
   return (
     <View style={[styles.container, style]}>

@@ -142,7 +142,7 @@ export default function NotesScreen() {
 
     try {
       const now = new Date().toISOString();
-      
+
       // Generate title based on writing style and content
       let title = '';
       if (selectedWritingStyle === 'cornell' && noteSections.length > 0) {
@@ -154,7 +154,7 @@ export default function NotesScreen() {
       } else {
         title = currentNoteText.substring(0, 50);
       }
-      
+
       if (title.length > 50) title += '...';
       if (!title.trim()) title = `${selectedWritingStyle} note`;
 
@@ -213,7 +213,7 @@ export default function NotesScreen() {
       // Load the full note data to get writing style info
       const fullNotes = await getNotes();
       const fullNote = fullNotes.find(n => n.id === note.id);
-      
+
       if (fullNote) {
         setCurrentNoteText(fullNote.content);
         setSelectedWritingStyle(fullNote.writingStyle || 'mind_dump');
@@ -225,7 +225,7 @@ export default function NotesScreen() {
         setNoteSections([]);
         setCheckedItems([]);
       }
-      
+
       setEditingNoteId(note.id);
       setIsEditing(true);
       setIsCreating(true);
@@ -475,6 +475,26 @@ export default function NotesScreen() {
       </SafeAreaView>
     );
   }
+
+  const handleVoiceCommand = async (result: any) => {
+    console.log('[NOTES] Voice command executed:', result);
+    if (result.success && result.data && result.data.id) {
+      // Refresh notes list to show the new note
+      await loadNotes();
+      Alert.alert('Success', result.message);
+    }
+  };
+
+  const handleVoiceSearch = (query: string, results: any[]) => {
+    console.log('[NOTES] Voice search requested:', query, results);
+    const noteResults = results.filter(item => item.type === 'note');
+    if (noteResults.length > 0) {
+      setNotes(noteResults.map(result => result.item));
+      Alert.alert('Search Results', `Found ${noteResults.length} note(s) matching "${query}"`);
+    } else {
+      Alert.alert('No Results', `No notes found matching "${query}"`);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -499,6 +498,26 @@ export default function TasksScreen() {
       </SafeAreaView>
     );
   }
+
+    const handleVoiceCommand = async (result: any) => {
+    console.log('[TASKS] Voice command executed:', result);
+    if (result.success && result.data && result.data.id) {
+      // Refresh tasks list to show the new task
+      await loadTasksAndSettings();
+      Alert.alert('Success', result.message);
+    }
+  };
+
+  const handleVoiceSearch = (query: string, results: any[]) => {
+    console.log('[TASKS] Voice search requested:', query, results);
+    const taskResults = results.filter(item => item.type === 'task');
+    if (taskResults.length > 0) {
+      setTasks(taskResults.map(result => result.item));
+      Alert.alert('Search Results', `Found ${taskResults.length} task(s) matching "${query}"`);
+    } else {
+      Alert.alert('No Results', `No tasks found matching "${query}"`);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>

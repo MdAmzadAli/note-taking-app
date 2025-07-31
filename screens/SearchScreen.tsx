@@ -56,7 +56,9 @@ export default function SearchScreen() {
         getReminders(),
       ]);
 
+      console.log('[SEARCH] Performing search for:', query);
       const results = searchContent(query, { notes, tasks, reminders }, profession);
+      console.log('[SEARCH] Results found:', results.length);
       setSearchResults(results);
     } catch (error) {
       console.error('Search error:', error);
@@ -73,13 +75,23 @@ export default function SearchScreen() {
         <Text style={styles.resultDate}>
           {new Date(item.createdAt || item.dateTime).toLocaleDateString()}
         </Text>
+        {item.score && (
+          <Text style={styles.resultScore}>
+            {Math.round((1 - item.score) * 100)}% match
+          </Text>
+        )}
       </View>
       <Text style={styles.resultTitle} numberOfLines={2}>
-        {item.title || item.content?.substring(0, 100) + '...'}
+        {item.title || (item.content ? item.content.substring(0, 100) + '...' : 'Untitled')}
       </Text>
-      {item.description && (
+      {(item.content || item.description) && (
         <Text style={styles.resultDescription} numberOfLines={2}>
-          {item.description}
+          {item.content || item.description}
+        </Text>
+      )}
+      {item.matchedFields && item.matchedFields.length > 0 && (
+        <Text style={styles.matchInfo}>
+          Matched: {item.matchedFields.join(', ')}
         </Text>
       )}
     </TouchableOpacity>
@@ -105,9 +117,22 @@ export default function SearchScreen() {
             console.log('Voice command executed:', result);
           }}
           onSearchRequested={(query, results) => {
+            console.log('[SEARCH_SCREEN] Voice search requested:', query, results);
             setSearchQuery(query);
-            setSearchResults(results);
-          }}
+            
+            // Convert voice search results to proper format
+            const formattedResults = results.map((result: any) => ({
+              id: result.item?.id || result.id,
+              title: result.item?.title || result.title,
+              content: result.item?.content || result.content || result.item?.description || '',
+              type: result.type,
+              createdAt: result.item?.createdAt || result.createdAt,
+              profession: result.item?.profession || result.profession,
+              score: result.relevance || result.score
+            }));
+            
+            setSearchResults(formattedResults);
+          }
           style={styles.voiceInputButton}
         />
         {searchQuery.length > 0 && (
@@ -246,6 +271,19 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     lineHeight: 25.6,
     fontFamily: 'Inter',
+  },
+  resultScore: {
+    fontSize: 12,
+    color: '#10B981',
+    fontFamily: 'Inter',
+    fontWeight: '500',
+  },
+  matchInfo: {
+    fontSize: 12,
+    color: '#8B5CF6',
+    fontFamily: 'Inter',
+    fontStyle: 'italic',
+    marginTop: 4,
   },
   emptyState: {
     flex: 1,
