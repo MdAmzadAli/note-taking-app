@@ -518,7 +518,7 @@ export const processWithGemini = async (text: string, profession: string): Promi
       };
     }
 
-    const model = geminiAI.getGenerativeModel({ model: 'gemini-pro' });
+    const model = geminiAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const prompt = `
 You are an AI assistant that processes voice commands for a ${profession}'s note-taking app. 
