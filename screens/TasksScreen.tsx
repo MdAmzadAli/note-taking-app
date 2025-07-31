@@ -501,8 +501,8 @@ export default function TasksScreen() {
 
     const handleVoiceCommand = async (result: any) => {
     console.log('[TASKS] Voice command executed:', result);
-    if (result.success && result.data && result.data.id) {
-      // Refresh tasks list to show the new task
+    if (result.success) {
+      // Refresh tasks list to show the new task(s)
       await loadTasksAndSettings();
       Alert.alert('Success', result.message);
     }
@@ -538,11 +538,7 @@ export default function TasksScreen() {
             <IconSymbol size={20} name="magnifyingglass" color="#FFFFFF" />
           </TouchableOpacity>
           <VoiceInput
-            onCommandExecuted={(result) => {
-              if (result.data && result.data.id) {
-                loadTasksAndSettings(); // Refresh tasks list
-              }
-            }}
+            onCommandExecuted={handleVoiceCommand}
             onSearchRequested={(query, results) => {
               setSearchQuery(query);
               setIsSearchVisible(true);
