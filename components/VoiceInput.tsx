@@ -199,16 +199,16 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
       // Create command using fuzzy processing result if it has good confidence
       let command;
-      if (fuzzyResult.confidence > 0.6) {
+      if (fuzzyProcessing && fuzzyProcessing.confidence > 0.6) {
         command = {
-          intent: fuzzyResult.detectedIntent as any,
-          parameters: fuzzyResult.detectedIntent === 'create_note' ? { content: fuzzyResult.cleanedText.replace('Create note: ', '').replace('.', '') } :
-                     fuzzyResult.detectedIntent === 'search' ? { query: fuzzyResult.cleanedText.replace('Search for: ', '').replace('.', '') } :
-                     fuzzyResult.detectedIntent === 'create_task' ? { title: fuzzyResult.cleanedText.replace('Create task: ', '').replace('.', '') } :
-                     fuzzyResult.detectedIntent === 'set_reminder' ? { title: fuzzyResult.cleanedText.replace('Set reminder: ', '').split(' due ')[0], time: fuzzyResult.cleanedText.includes(' due ') ? fuzzyResult.cleanedText.split(' due ')[1] : 'tomorrow' } : {},
+          intent: fuzzyProcessing.detectedIntent as any,
+          parameters: fuzzyProcessing.detectedIntent === 'create_note' ? { content: fuzzyProcessing.cleanedText.replace('Create note: ', '').replace('.', '') } :
+                     fuzzyProcessing.detectedIntent === 'search' ? { query: fuzzyProcessing.cleanedText.replace('Search for: ', '').replace('.', '') } :
+                     fuzzyProcessing.detectedIntent === 'create_task' ? { title: fuzzyProcessing.cleanedText.replace('Create task: ', '').replace('.', '') } :
+                     fuzzyProcessing.detectedIntent === 'set_reminder' ? { title: fuzzyProcessing.cleanedText.replace('Set reminder: ', '').split(' due ')[0], time: fuzzyProcessing.cleanedText.includes(' due ') ? fuzzyProcessing.cleanedText.split(' due ')[1] : 'tomorrow' } : {},
           originalText: speechText,
-          cleanedText: fuzzyResult.cleanedText,
-          confidence: fuzzyResult.confidence
+          cleanedText: fuzzyProcessing.cleanedText,
+          confidence: fuzzyProcessing.confidence
         };
       } else {
         // Fallback to regex parsing
@@ -283,7 +283,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     const textToUse = useCleanedVersion ? fuzzyResult.cleanedText : fuzzyResult.originalText;
     const command = parseVoiceCommand(textToUse);
     command.cleanedText = useCleanedVersion ? fuzzyResult.cleanedText : undefined;
-    command.confidence = fuzzyResult.confidence;
+    command.confidence = fuzzyResult.confidence || 0;
     setLastCommand(command);
 
     try {

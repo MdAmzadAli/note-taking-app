@@ -1,4 +1,3 @@
-
 import { Alert } from 'react-native';
 import { saveNote, saveReminder, saveTask, getNotes, getTasks, getReminders } from './storage';
 import { Note, Task, Reminder } from '@/types';
@@ -156,13 +155,53 @@ export const processFuzzyThought = (text: string): FuzzyProcessingResult => {
 };
 
 // Parse voice command using regex patterns
+const NOTE_PATTERNS = [
+  /(?:create|make|add|write|new)\s+(?:a\s+)?note\s+(?:about\s+|titled?\s+|title\s+|for\s+)?(.+)/i,
+  /(?:note|write)\s+(?:down\s+)?(.+)/i,
+  /(?:record|jot\s+down)\s+(.+)/i,
+  /(?:create|make|add)\s+(?:a\s+)?note\s+title\s+(.+?)(?:\s+and\s+(?:in\s+the\s+)?description\s+write\s+(.+))?/i,
+];
+
 export const parseVoiceCommand = (text: string): VoiceCommand => {
-  console.log('[VOICE_PARSER] Input text:', text);
-  console.log('[VOICE_PARSER] Input text length:', text.length);
-  
-  const lowerText = text.toLowerCase().trim();
-  console.log('[VOICE_PARSER] Lowercase text:', lowerText);
-  
+  const cleanText = text.trim().toLowerCase();
+
+  // Create Note with complex structure (title + description)
+  const complexNoteMatch = cleanText.match(/(?:create|make|add)\s+(?:a\s+)?note\s+title\s+(.+?)(?:\s+and\s+(?:in\s+the\s+)?description\s+write\s+(.+))?/i);
+  if (complexNoteMatch) {
+    const title = complexNoteMatch[1]?.trim();
+    const description = complexNoteMatch[2]?.trim();
+
+    if (title) {
+      let content = title;
+      if (description) {
+        content = `${title}\n\n${description}`;
+      }
+
+      return {
+        intent: 'create_note',
+        parameters: { content },
+        originalText: text,
+        confidence: 0.9
+      };
+    }
+  }
+
+  // Create Note (simple patterns)
+  for (const pattern of NOTE_PATTERNS.slice(0, 3)) { // Skip the complex pattern we handled above
+    const match = cleanText.match(pattern);
+    if (match) {
+      const content = match[1]?.trim();
+      if (content && content.length > 0) {
+        return {
+          intent: 'create_note',
+          parameters: { content },
+          originalText: text,
+          confidence: 0.8
+        };
+      }
+    }
+  }
+
   // Search commands
   const searchPatterns = [
     /search\s+(?:for\s+)?(.+)/i,
@@ -172,7 +211,7 @@ export const parseVoiceCommand = (text: string): VoiceCommand => {
     /where\s+(?:is\s+|are\s+)?(.+)/i,
     /get\s+(?:me\s+)?(.+)/i
   ];
-  
+
   for (const pattern of searchPatterns) {
     const match = text.match(pattern);
     if (match) {
@@ -183,51 +222,30 @@ export const parseVoiceCommand = (text: string): VoiceCommand => {
       };
     }
   }
-  
-  // Create note commands
-  const notePatterns = [
-    /create\s+(?:a\s+)?note\s+(?:titled\s+|about\s+)?(.+)/i,
-    /new\s+note\s+(?:titled\s+|about\s+)?(.+)/i,
-    /add\s+(?:a\s+)?note\s+(?:about\s+)?(.+)/i,
-    /make\s+(?:a\s+)?note\s+(?:about\s+)?(.+)/i,
-    /note\s+(?:about\s+)?(.+)/i,
-    /write\s+(?:down\s+)?(?:a\s+)?note\s+(?:about\s+)?(.+)/i
-  ];
-  
-  for (const pattern of notePatterns) {
-    const match = text.match(pattern);
-    if (match) {
-      return {
-        intent: 'create_note',
-        parameters: { content: match[1].trim() },
-        originalText: text
-      };
-    }
-  }
-  
+
   // Set reminder commands
   const reminderPatterns = [
     /set\s+(?:a\s+)?reminder\s+(?:for\s+)?(.+?)(?:\s+(?:at|for|tomorrow|today|next\s+week|\d+(?:am|pm)).*)?$/i,
     /remind\s+me\s+(?:to\s+)?(.+?)(?:\s+(?:at|for|tomorrow|today|next\s+week|\d+(?:am|pm)).*)?$/i,
     /create\s+(?:a\s+)?reminder\s+(?:for\s+)?(.+?)(?:\s+(?:at|for|tomorrow|today|next\s+week|\d+(?:am|pm)).*)?$/i
   ];
-  
+
   console.log('[VOICE_PARSER] Checking reminder patterns...');
   for (let i = 0; i < reminderPatterns.length; i++) {
     const pattern = reminderPatterns[i];
     const match = text.match(pattern);
     console.log(`[VOICE_PARSER] Reminder pattern ${i}:`, pattern);
     console.log(`[VOICE_PARSER] Reminder pattern ${i} match:`, match);
-    
+
     if (match) {
       const title = match[1].trim();
       console.log('[VOICE_PARSER] Extracted title:', title);
-      
+
       // Extract time from the original text
       const timeMatch = text.match(/(?:at|for|tomorrow|today|next\s+week|\d+(?:am|pm))[^.]*$/i);
       const time = timeMatch ? timeMatch[0].replace(/^(?:at|for)\s*/i, '') : 'tomorrow 9am';
       console.log('[VOICE_PARSER] Extracted time:', time);
-      
+
       const result = {
         intent: 'set_reminder',
         parameters: { 
@@ -236,12 +254,12 @@ export const parseVoiceCommand = (text: string): VoiceCommand => {
         },
         originalText: text
       };
-      
+
       console.log('[VOICE_PARSER] Reminder command result:', result);
       return result;
     }
   }
-  
+
   // Create task commands
   const taskPatterns = [
     /create\s+(?:a\s+)?task\s+(?:for\s+)?(.+?)(?:\s+(?:due|by)\s+(.+))?$/i,
@@ -250,18 +268,18 @@ export const parseVoiceCommand = (text: string): VoiceCommand => {
     /add\s+(?:a\s+)?task\s+(?:for\s+|to\s+)?(.+?)(?:\s+(?:due|by)\s+(.+))?$/i,
     /make\s+(?:a\s+)?task\s+(?:for\s+|to\s+)?(.+?)(?:\s+(?:due|by)\s+(.+))?$/i
   ];
-  
+
   console.log('[VOICE_PARSER] Checking task patterns...');
   for (let i = 0; i < taskPatterns.length; i++) {
     const pattern = taskPatterns[i];
     const match = text.match(pattern);
     console.log(`[VOICE_PARSER] Task pattern ${i}:`, pattern);
     console.log(`[VOICE_PARSER] Task pattern ${i} match:`, match);
-    
+
     if (match) {
       let title = match[1].trim();
       let dueDate = match[2] ? match[2].trim() : null;
-      
+
       // Clean up title by removing temporal words that should be in due date
       const temporalWords = /\b(tomorrow|today|next\s+week|at\s+\d+(?:am|pm)?|for\s+tomorrow)\b/gi;
       const temporalMatch = title.match(temporalWords);
@@ -269,18 +287,18 @@ export const parseVoiceCommand = (text: string): VoiceCommand => {
         dueDate = temporalMatch[0];
         title = title.replace(temporalWords, '').trim();
       }
-      
+
       // Remove redundant prepositions
       title = title.replace(/^(for\s+|to\s+)/, '').trim();
-      
+
       // Default due date
       if (!dueDate) {
         dueDate = 'tomorrow';
       }
-      
+
       console.log('[VOICE_PARSER] Extracted title:', title);
       console.log('[VOICE_PARSER] Extracted due date:', dueDate);
-      
+
       const result = {
         intent: 'create_task',
         parameters: { 
@@ -289,12 +307,12 @@ export const parseVoiceCommand = (text: string): VoiceCommand => {
         },
         originalText: text
       };
-      
+
       console.log('[VOICE_PARSER] Task command result:', result);
       return result;
     }
   }
-  
+
   return {
     intent: 'unknown',
     parameters: {},
@@ -306,49 +324,49 @@ export const parseVoiceCommand = (text: string): VoiceCommand => {
 const parseTime = (timeStr: string): Date => {
   const now = new Date();
   const lowerTime = timeStr.toLowerCase();
-  
+
   // Handle specific times
   if (lowerTime.includes('tomorrow')) {
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     // Extract time if specified
     const timeMatch = timeStr.match(/(\d{1,2}):?(\d{0,2})\s*(am|pm)?/i);
     if (timeMatch) {
       let hours = parseInt(timeMatch[1]);
       const minutes = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
       const ampm = timeMatch[3];
-      
+
       if (ampm && ampm.toLowerCase() === 'pm' && hours !== 12) {
         hours += 12;
       } else if (ampm && ampm.toLowerCase() === 'am' && hours === 12) {
         hours = 0;
       }
-      
+
       tomorrow.setHours(hours, minutes, 0, 0);
     } else {
       tomorrow.setHours(9, 0, 0, 0); // Default to 9 AM
     }
-    
+
     return tomorrow;
   }
-  
+
   // Handle "in X hours/minutes"
   const inMatch = timeStr.match(/in\s+(\d+)\s+(hour|minute)s?/i);
   if (inMatch) {
     const amount = parseInt(inMatch[1]);
     const unit = inMatch[2].toLowerCase();
     const futureTime = new Date(now);
-    
+
     if (unit === 'hour') {
       futureTime.setHours(futureTime.getHours() + amount);
     } else {
       futureTime.setMinutes(futureTime.getMinutes() + amount);
     }
-    
+
     return futureTime;
   }
-  
+
   // Default to tomorrow 9 AM
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -366,16 +384,16 @@ export const executeVoiceCommand = async (
   console.log('[VOICE_COMMANDS] Executing command:', JSON.stringify(command, null, 2));
   console.log('[VOICE_COMMANDS] Processing method:', processingMethod);
   console.log('[VOICE_COMMANDS] Profession:', profession);
-  
+
   try {
     let enhancedCommand = command;
-    
+
     if (processingMethod === 'gemini' && isGeminiInitialized()) {
       console.log('[VOICE_COMMANDS] Using Gemini to enhance command understanding');
       const geminiResult = await processWithGemini(command.originalText, profession);
-      
+
       console.log('[VOICE_COMMANDS] Gemini result:', geminiResult);
-      
+
       if (geminiResult.success && geminiResult.confidence > 0.6) {
         // Map Gemini intent to our command intents
         let mappedIntent = geminiResult.intent;
@@ -388,7 +406,7 @@ export const executeVoiceCommand = async (
         } else if (mappedIntent === 'search') {
           mappedIntent = 'search';
         }
-        
+
         enhancedCommand = {
           ...command,
           intent: mappedIntent as any,
@@ -415,7 +433,7 @@ export const executeVoiceCommand = async (
         enhancedCommand = parseVoiceCommand(command.originalText);
       }
     }
-    
+
     console.log('[VOICE_COMMANDS] Enhanced command intent:', enhancedCommand.intent);
     console.log('[VOICE_COMMANDS] Enhanced command parameters:', JSON.stringify(enhancedCommand.parameters, null, 2));
 
@@ -425,13 +443,13 @@ export const executeVoiceCommand = async (
         const searchQuery = enhancedCommand.parameters.query || enhancedCommand.parameters.content;
         console.log('[VOICE_COMMANDS] Search query:', searchQuery);
         return await handleSearchCommand(searchQuery);
-        
+
       case 'create_note':
         console.log('[VOICE_COMMANDS] Executing CREATE_NOTE command');
         const noteContent = enhancedCommand.parameters.content || enhancedCommand.parameters.title;
         console.log('[VOICE_COMMANDS] Note content:', noteContent);
         return await handleCreateNoteCommand(noteContent, profession);
-        
+
       case 'set_reminder':
         console.log('[VOICE_COMMANDS] Executing SET_REMINDER command');
         const reminderTitle = enhancedCommand.parameters.title || enhancedCommand.parameters.content;
@@ -439,7 +457,7 @@ export const executeVoiceCommand = async (
         console.log('[VOICE_COMMANDS] Reminder title:', reminderTitle);
         console.log('[VOICE_COMMANDS] Reminder time:', reminderTime);
         return await handleSetReminderCommand(reminderTitle, reminderTime, profession);
-        
+
       case 'create_task':
         console.log('[VOICE_COMMANDS] Executing CREATE_TASK command');
         const taskTitle = enhancedCommand.parameters.title || enhancedCommand.parameters.content;
@@ -447,7 +465,7 @@ export const executeVoiceCommand = async (
         console.log('[VOICE_COMMANDS] Task title:', taskTitle);
         console.log('[VOICE_COMMANDS] Task due date:', taskDueDate);
         return await handleCreateTaskCommand(taskTitle, taskDueDate, profession);
-        
+
       default:
         console.log('[VOICE_COMMANDS] UNKNOWN command intent:', enhancedCommand.intent);
         return {
@@ -457,10 +475,10 @@ export const executeVoiceCommand = async (
     }
   } catch (error) {
     console.error('[VOICE_COMMANDS] Error executing voice command:', error);
-    
+
     // Provide more specific error messages based on the error type
     let errorMessage = 'Sorry, there was an error processing your command.';
-    
+
     if (error instanceof Error) {
       if (error.message.includes('storage')) {
         errorMessage = 'Failed to save data. Please check your device storage.';
@@ -470,7 +488,7 @@ export const executeVoiceCommand = async (
         errorMessage = 'Permission error. Please check app permissions.';
       }
     }
-    
+
     return {
       success: false,
       message: errorMessage
@@ -481,7 +499,7 @@ export const executeVoiceCommand = async (
 const handleSearchCommand = async (query: string): Promise<{ success: boolean; message: string; data?: SearchResult[] }> => {
   console.log('[VOICE_COMMANDS] ===== HANDLING SEARCH COMMAND =====');
   console.log('[VOICE_COMMANDS] Search query:', query);
-  
+
   if (!query || query.trim().length === 0) {
     console.log('[VOICE_COMMANDS] ERROR: Empty search query');
     return {
@@ -489,38 +507,38 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
       message: 'Please provide a search query'
     };
   }
-  
+
   const [notes, tasks, reminders] = await Promise.all([
     getNotes(),
     getTasks(),
     getReminders()
   ]);
-  
+
   console.log('[VOICE_COMMANDS] Loaded data - Notes:', notes.length, 'Tasks:', tasks.length, 'Reminders:', reminders.length);
-  
+
   const results: SearchResult[] = [];
-  
+
   // Clean up the query - remove common search prefixes and task-related terms
   let cleanQuery = query.toLowerCase().trim();
   cleanQuery = cleanQuery.replace(/^(all|my|the)\s+/, '');
   cleanQuery = cleanQuery.replace(/\s+(which|that)\s+i\s+(have\s+to\s+do|need\s+to\s+do)\s*/, ' ');
   cleanQuery = cleanQuery.replace(/\s+(tomorrow|today|yesterday)\s*$/, '');
-  
+
   console.log('[VOICE_COMMANDS] Cleaned search query:', cleanQuery);
-  
+
   // Search with multiple strategies
   const searchTerms = cleanQuery.split(/\s+/).filter(term => term.length > 2);
   console.log('[VOICE_COMMANDS] Search terms:', searchTerms);
-  
+
   // Search notes
   notes.forEach(note => {
     const content = (note.content || '').toLowerCase();
     const title = (note.title || '').toLowerCase();
     const searchText = `${title} ${content}`;
-    
+
     let relevance = 0;
     let hasMatch = false;
-    
+
     // Exact phrase match (highest relevance)
     if (searchText.includes(cleanQuery)) {
       relevance = 3;
@@ -539,7 +557,7 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
         hasMatch = true;
       }
     }
-    
+
     if (hasMatch) {
       results.push({
         type: 'note',
@@ -548,20 +566,20 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
       });
     }
   });
-  
+
   // Search tasks
   tasks.forEach(task => {
     const title = task.title.toLowerCase();
     const description = (task.description || '').toLowerCase();
     const searchText = `${title} ${description}`;
-    
+
     let relevance = 0;
     let hasMatch = false;
-    
+
     // Check for "tasks" or "task" in query - if present, give higher relevance
     const isTaskQuery = /\btasks?\b/.test(query.toLowerCase());
     const baseRelevance = isTaskQuery ? 1 : 0.5;
-    
+
     // Exact phrase match
     if (searchText.includes(cleanQuery)) {
       relevance = 3 + baseRelevance;
@@ -580,7 +598,7 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
         hasMatch = true;
       }
     }
-    
+
     if (hasMatch) {
       results.push({
         type: 'task',
@@ -589,16 +607,16 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
       });
     }
   });
-  
+
   // Search reminders
   reminders.forEach(reminder => {
     const title = reminder.title.toLowerCase();
     const description = (reminder.description || '').toLowerCase();
     const searchText = `${title} ${description}`;
-    
+
     let relevance = 0;
     let hasMatch = false;
-    
+
     // Exact phrase match
     if (searchText.includes(cleanQuery)) {
       relevance = 3;
@@ -617,7 +635,7 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
         hasMatch = true;
       }
     }
-    
+
     if (hasMatch) {
       results.push({
         type: 'reminder',
@@ -626,19 +644,19 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
       });
     }
   });
-  
+
   // Sort by relevance (highest first)
   results.sort((a, b) => b.relevance - a.relevance);
-  
+
   console.log('[VOICE_COMMANDS] Search results found:', results.length);
   console.log('[VOICE_COMMANDS] Search results details:', results.map(r => ({ type: r.type, relevance: r.relevance, title: r.item.title || r.item.content?.substring(0, 30) })));
-  
+
   const searchResult = {
     success: true,
     message: `Found ${results.length} result${results.length !== 1 ? 's' : ''} for "${query}"`,
     data: results
   };
-  
+
   console.log('[VOICE_COMMANDS] Returning search result:', JSON.stringify(searchResult, null, 2));
   return searchResult;
 };
@@ -647,7 +665,7 @@ const handleCreateNoteCommand = async (content: string, profession: string): Pro
   console.log('[VOICE_COMMANDS] ===== HANDLING CREATE NOTE COMMAND =====');
   console.log('[VOICE_COMMANDS] Note content:', content);
   console.log('[VOICE_COMMANDS] Profession:', profession);
-  
+
   if (!content || content.trim().length === 0) {
     console.log('[VOICE_COMMANDS] ERROR: Empty note content');
     return {
@@ -655,9 +673,9 @@ const handleCreateNoteCommand = async (content: string, profession: string): Pro
       message: 'Cannot create note with empty content'
     };
   }
-  
+
   const now = new Date().toISOString();
-  
+
   const note: Note = {
     id: Date.now().toString(),
     title: content.substring(0, 50) + (content.length > 50 ? '...' : ''),
@@ -667,19 +685,19 @@ const handleCreateNoteCommand = async (content: string, profession: string): Pro
     createdAt: now,
     updatedAt: now,
   };
-  
+
   console.log('[VOICE_COMMANDS] Creating note:', JSON.stringify(note, null, 2));
-  
+
   try {
     await saveNote(note);
     console.log('[VOICE_COMMANDS] Note saved successfully');
-    
+
     const result = {
       success: true,
       message: `Created note: "${note.title}"`,
       data: note
     };
-    
+
     console.log('[VOICE_COMMANDS] Returning note creation result:', JSON.stringify(result, null, 2));
     return result;
   } catch (error) {
@@ -694,7 +712,7 @@ const handleCreateNoteCommand = async (content: string, profession: string): Pro
 const handleSetReminderCommand = async (title: string, timeStr: string, profession: string): Promise<{ success: boolean; message: string; data?: Reminder }> => {
   const dateTime = parseTime(timeStr);
   const now = new Date().toISOString();
-  
+
   const reminder: Reminder = {
     id: Date.now().toString(),
     title,
@@ -704,20 +722,20 @@ const handleSetReminderCommand = async (title: string, timeStr: string, professi
     createdAt: now,
     profession: profession as any,
   };
-  
+
   // Schedule notification
   const notificationId = await scheduleNotification(
     'Reminder',
     reminder.title,
     dateTime
   );
-  
+
   if (notificationId) {
     reminder.notificationId = notificationId;
   }
-  
+
   await saveReminder(reminder);
-  
+
   return {
     success: true,
     message: `Set reminder "${title}" for ${dateTime.toLocaleDateString()} at ${dateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
@@ -728,7 +746,7 @@ const handleSetReminderCommand = async (title: string, timeStr: string, professi
 const handleCreateTaskCommand = async (title: string, dueDateStr: string, profession: string): Promise<{ success: boolean; message: string; data?: Task }> => {
   const dueDate = parseTime(dueDateStr);
   const now = new Date().toISOString();
-  
+
   const task: Task = {
     id: Date.now().toString(),
     title,
@@ -738,9 +756,9 @@ const handleCreateTaskCommand = async (title: string, dueDateStr: string, profes
     createdAt: now,
     profession: profession as any,
   };
-  
+
   await saveTask(task);
-  
+
   return {
     success: true,
     message: `Created task "${title}" due ${dueDate.toLocaleDateString()}`,
