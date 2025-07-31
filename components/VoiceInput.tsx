@@ -35,9 +35,10 @@ interface VoiceInputProps {
 
 export default function VoiceInput({ onCommandExecuted, onSearchRequested, style }: VoiceInputProps) {
   const [isListening, setIsListening] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<string>('');
   const [partialResults, setPartialResults] = useState<string[]>([]);
   const [finalResult, setFinalResult] = useState<string>('');
-  const [isProcessing, setIsProcessing] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [lastCommand, setLastCommand] = useState<VoiceCommand | null>(null);
   const [fuzzyResult, setFuzzyResult] = useState<FuzzyProcessingResult | null>(null);
@@ -67,7 +68,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
         setVoiceMethod(method);
       }
     };
-    
+
     reloadSettings();
   }, [showModal]); // Reload when modal is shown (user might have changed settings)
 
@@ -239,7 +240,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       const isGeminiMethod = voiceMethod === 'assemblyai-gemini';
       const isGeminiAvailable = geminiSupported && process.env.EXPO_PUBLIC_GEMINI_API_KEY;
       const processingMethod = isGeminiMethod && isGeminiAvailable ? 'gemini' : 'regex';
-      
+
       console.log('[VOICE] Voice method setting:', voiceMethod);
       console.log('[VOICE] Is Gemini method selected:', isGeminiMethod);
       console.log('[VOICE] Gemini supported:', geminiSupported);
@@ -355,7 +356,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
   const startListening = async () => {
     try {
       console.log('[VOICE] Starting voice input process...');
-      
+
       // First check if voice is supported
       if (!voiceSupported) {
         Alert.alert(
@@ -383,7 +384,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       // Check and request microphone permission FIRST
       console.log('[VOICE] Requesting microphone permission...');
       const hasPermission = await requestMicrophonePermission();
-      
+
       if (!hasPermission) {
         console.log('[VOICE] Microphone permission denied');
         Alert.alert(
@@ -424,6 +425,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
             setPartialResults([]);
             setIsListening(false);
             setIsProcessing(true);
+            setProcessingStatus('Transcribing');
 
             // Add a small delay to ensure UI updates
             setTimeout(() => {
@@ -498,6 +500,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     setFuzzyResult(null);
     setShowFuzzyComparison(false);
     setIsProcessing(false);
+    setProcessingStatus('');
   };
 
   const getCurrentText = () => {
@@ -509,11 +512,11 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
   const getStatusText = () => {
     const isGeminiMode = voiceMethod === 'assemblyai-gemini';
     const geminiAvailable = geminiSupported && process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-    
+
     if (isProcessing) {
-      return isGeminiMode && geminiAvailable ? 
+      return processingStatus ? processingStatus : (isGeminiMode && geminiAvailable ? 
         'Processing with AI enhancement...' : 
-        'Processing command...';
+        'Processing command...');
     }
     if (isListening) {
       if (voiceSupported) {
@@ -524,7 +527,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       }
     }
     if (finalResult) return 'Command received, processing...';
-    
+
     const methodDisplay = isGeminiMode ? 'AI-Enhanced' : 'Standard';
     return voiceSupported ? 
       `Tap to start ${methodDisplay} voice recording (${voiceLanguage})` : 
@@ -558,6 +561,11 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
           />
         </Animated.View>
       </TouchableOpacity>
+        {processingStatus && (
+          <View style={styles.statusContainer}>
+            <Text style={styles.statusText}>{processingStatus}</Text>
+          </View>
+        )}
 
       <Modal
         visible={showModal}
@@ -897,7 +905,8 @@ const styles = StyleSheet.create({
   startButton: {
     backgroundColor: '#3B82F6',
     paddingHorizontal: 24,
-    paddingVertical: 12,
+```text
+paddingVertical: 12,
     borderRadius: 8,
     minWidth: 120,
     alignItems: 'center',

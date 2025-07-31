@@ -478,9 +478,17 @@ export default function NotesScreen() {
 
   const handleVoiceCommand = async (result: any) => {
     console.log('[NOTES] Voice command executed:', result);
-    if (result.success && result.data && result.data.id) {
-      // Refresh notes list to show the new note
-      await loadNotes();
+    if (result.success) {
+      // Check if it's a multi-task result or single result
+      const hasNoteCreated = result.data && (
+        result.data.id || // Single note creation
+        (result.data.created && result.data.created.some((item: any) => item.type === 'note')) // Multi-task with note
+      );
+      
+      if (hasNoteCreated) {
+        // Refresh notes list to show the new note(s)
+        await loadNotes();
+      }
       Alert.alert('Success', result.message);
     }
   };
@@ -505,13 +513,7 @@ export default function NotesScreen() {
             <IconSymbol size={24} name="magnifyingglass" color="#FFFFFF" />
           </TouchableOpacity>
           <VoiceInput
-            onCommandExecuted={(result) => {
-              console.log('[NOTES] Voice command executed:', result);
-              if (result.data && result.data.id) {
-                console.log('[NOTES] Refreshing notes list after command');
-                loadNotes(); // Refresh notes list
-              }
-            }}
+            onCommandExecuted={handleVoiceCommand}
             onSearchRequested={(query, results) => {
               console.log('[NOTES] Voice search requested - Query:', query);
               console.log('[NOTES] Voice search results:', results);
