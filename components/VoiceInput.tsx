@@ -269,18 +269,34 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       console.log('[VOICE] Data:', executionResult.data);
 
       if (executionResult.success) {
-        if (command.intent === 'search' && executionResult.data) {
-          const searchQuery = command.parameters.query || command.parameters.content;
+        // Check if this is a search command (either simple search or complex command with search)
+        const isSearchCommand = command.intent === 'search' || 
+          (executionResult.data && executionResult.data.searchResults && executionResult.data.searchResults.length > 0);
+
+        if (isSearchCommand) {
           console.log('[VOICE] ===== SEARCH COMMAND SUCCESS =====');
+          
+          let searchQuery, searchResults;
+          
+          if (command.intent === 'search') {
+            // Simple search command
+            searchQuery = command.parameters.query || command.parameters.content;
+            searchResults = executionResult.data || [];
+          } else if (executionResult.data && executionResult.data.searchResults) {
+            // Complex AI agent command with search results
+            searchQuery = executionResult.data.results.find(r => r.type === 'search')?.parameters?.query || 'search';
+            searchResults = executionResult.data.searchResults;
+          }
+
           console.log('[VOICE] Search query for callback:', searchQuery);
-          console.log('[VOICE] Search results for callback:', executionResult.data);
+          console.log('[VOICE] Search results for callback:', searchResults);
           console.log('[VOICE] onSearchRequested callback available:', !!onSearchRequested);
 
-          if (onSearchRequested) {
+          if (onSearchRequested && searchQuery && searchResults) {
             console.log('[VOICE] Calling onSearchRequested...');
-            onSearchRequested(searchQuery, executionResult.data);
+            onSearchRequested(searchQuery, searchResults);
           } else {
-            console.log('[VOICE] WARNING: onSearchRequested callback not available');
+            console.log('[VOICE] WARNING: onSearchRequested callback not available or missing data');
           }
           
           // Close modal quickly for search results
@@ -299,14 +315,13 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
             console.log('[VOICE] WARNING: onCommandExecuted callback not available');
           }
 
-          // Show success toast instead of modal
+          // Show success toast instead of modal - close modal immediately
           console.log('[VOICE] Showing success toast:', executionResult.message);
-          // Note: In a real app, you'd use a toast library like react-native-toast-message
-          // For now, we'll just log and close modal quickly
-          setTimeout(() => {
-            setShowModal(false);
-            resetState();
-          }, 1000);
+          setShowModal(false);
+          resetState();
+          
+          // Show a brief success message (simulated toast)
+          Alert.alert('Success', executionResult.message, [{ text: 'OK' }], { cancelable: true });
         }
       } else {
         console.log('[VOICE] ===== COMMAND EXECUTION FAILED =====');

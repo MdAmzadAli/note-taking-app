@@ -390,10 +390,10 @@ export const executeVoiceCommand = async (
 
     if (processingMethod === 'gemini' && isGeminiInitialized()) {
       console.log('[VOICE_COMMANDS] Using Gemini AI Agent to process command');
-      
+
       // First, try complex command processing for advanced AI agent functionality
       const complexResult = await processComplexCommand(command.originalText, profession);
-      
+
       if (complexResult.isComplexCommand && complexResult.executionPlan.length > 0) {
         console.log('[VOICE_COMMANDS] Complex AI agent command detected with', complexResult.executionPlan.length, 'steps');
         console.log('[VOICE_COMMANDS] AI reasoning:', complexResult.reasoning);
@@ -407,7 +407,7 @@ export const executeVoiceCommand = async (
       if (geminiResult.success && geminiResult.confidence > 0.6) {
         // Check if this is a multi-task command by analyzing the processed text
         const multiTaskResult = await processMultiTaskCommand(command.originalText, profession);
-        
+
         if (multiTaskResult.isMultiTask && multiTaskResult.items.length > 1) {
           console.log('[VOICE_COMMANDS] Multi-item command detected:', multiTaskResult.items.length, 'items');
           return await handleMultiItemCommand(multiTaskResult.items, profession);
@@ -544,11 +544,11 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
 
   console.log('[VOICE_COMMANDS] Cleaned search query:', cleanQuery);
 
-  // Search with multiple strategies - more strict matching
+  // Search with much stricter matching criteria
   const searchTerms = cleanQuery.split(/\s+/).filter(term => term.length > 2);
   console.log('[VOICE_COMMANDS] Search terms:', searchTerms);
 
-  // Search notes with stricter relevance requirements
+  // Search notes with very strict relevance requirements
   notes.forEach(note => {
     const content = (note.content || '').toLowerCase();
     const title = (note.title || '').toLowerCase();
@@ -562,22 +562,28 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
       relevance = 3;
       hasMatch = true;
     }
-    // Title match
+    // Title exact match
     else if (title.includes(cleanQuery)) {
       relevance = 2;
       hasMatch = true;
     }
-    // Individual term matches - require at least 60% of terms to match
-    else {
+    // Require ALL search terms to match for multi-term queries
+    else if (searchTerms.length > 1) {
       const matchedTerms = searchTerms.filter(term => searchText.includes(term));
       const matchRatio = matchedTerms.length / searchTerms.length;
-      if (matchedTerms.length >= 2 && matchRatio >= 0.6) {
-        relevance = matchRatio;
+      // Require 100% match for multi-term queries
+      if (matchRatio === 1.0) {
+        relevance = 1.5;
         hasMatch = true;
       }
-      // For single term searches, be more lenient
-      else if (searchTerms.length === 1 && matchedTerms.length > 0) {
-        relevance = 0.8;
+    }
+    // For single term searches, require exact word match
+    else if (searchTerms.length === 1) {
+      const searchTerm = searchTerms[0];
+      // Check for whole word match using word boundaries
+      const wordRegex = new RegExp(`\\b${searchTerm}\\b`, 'i');
+      if (wordRegex.test(searchText)) {
+        relevance = 1.0;
         hasMatch = true;
       }
     }
@@ -591,7 +597,7 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
     }
   });
 
-  // Search tasks with stricter matching
+  // Search tasks with very strict matching
   tasks.forEach(task => {
     const title = task.title.toLowerCase();
     const description = (task.description || '').toLowerCase();
@@ -602,29 +608,34 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
 
     // Check for "tasks" or "task" in query - if present, give higher relevance
     const isTaskQuery = /\btasks?\b/.test(query.toLowerCase());
-    const baseRelevance = isTaskQuery ? 1 : 0.5;
+    const baseRelevance = isTaskQuery ? 1 : 0;
 
     // Exact phrase match
     if (searchText.includes(cleanQuery)) {
       relevance = 3 + baseRelevance;
       hasMatch = true;
     }
-    // Title match
+    // Title exact match
     else if (title.includes(cleanQuery)) {
       relevance = 2 + baseRelevance;
       hasMatch = true;
     }
-    // Individual term matches - require at least 60% of terms to match
-    else {
+    // Require ALL search terms to match for multi-term queries
+    else if (searchTerms.length > 1) {
       const matchedTerms = searchTerms.filter(term => searchText.includes(term));
       const matchRatio = matchedTerms.length / searchTerms.length;
-      if (matchedTerms.length >= 2 && matchRatio >= 0.6) {
-        relevance = matchRatio + baseRelevance;
+      // Require 100% match for multi-term queries
+      if (matchRatio === 1.0) {
+        relevance = 1.5 + baseRelevance;
         hasMatch = true;
       }
-      // For single term searches, be more lenient
-      else if (searchTerms.length === 1 && matchedTerms.length > 0) {
-        relevance = 0.8 + baseRelevance;
+    }
+    // For single term searches, require exact word match
+    else if (searchTerms.length === 1) {
+      const searchTerm = searchTerms[0];
+      const wordRegex = new RegExp(`\\b${searchTerm}\\b`, 'i');
+      if (wordRegex.test(searchText)) {
+        relevance = 1.0 + baseRelevance;
         hasMatch = true;
       }
     }
@@ -638,7 +649,7 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
     }
   });
 
-  // Search reminders with stricter matching
+  // Search reminders with very strict matching
   reminders.forEach(reminder => {
     const title = reminder.title.toLowerCase();
     const description = (reminder.description || '').toLowerCase();
@@ -652,22 +663,27 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
       relevance = 3;
       hasMatch = true;
     }
-    // Title match
+    // Title exact match
     else if (title.includes(cleanQuery)) {
       relevance = 2;
       hasMatch = true;
     }
-    // Individual term matches - require at least 60% of terms to match
-    else {
+    // Require ALL search terms to match for multi-term queries
+    else if (searchTerms.length > 1) {
       const matchedTerms = searchTerms.filter(term => searchText.includes(term));
       const matchRatio = matchedTerms.length / searchTerms.length;
-      if (matchedTerms.length >= 2 && matchRatio >= 0.6) {
-        relevance = matchRatio;
+      // Require 100% match for multi-term queries
+      if (matchRatio === 1.0) {
+        relevance = 1.5;
         hasMatch = true;
       }
-      // For single term searches, be more lenient
-      else if (searchTerms.length === 1 && matchedTerms.length > 0) {
-        relevance = 0.8;
+    }
+    // For single term searches, require exact word match
+    else if (searchTerms.length === 1) {
+      const searchTerm = searchTerms[0];
+      const wordRegex = new RegExp(`\\b${searchTerm}\\b`, 'i');
+      if (wordRegex.test(searchText)) {
+        relevance = 1.0;
         hasMatch = true;
       }
     }
@@ -936,7 +952,7 @@ IMPORTANT:
 
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
-    
+
     console.log('[VOICE_COMMANDS] Gemini complex command response:', responseText);
 
     // Parse JSON from Gemini response
@@ -944,7 +960,7 @@ IMPORTANT:
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
       console.log('[VOICE_COMMANDS] Parsed complex command result:', parsed);
-      
+
       return {
         isComplexCommand: parsed.isComplexCommand || false,
         executionPlan: parsed.executionPlan || [],
@@ -973,10 +989,10 @@ const processMultiTaskCommand = async (text: string, profession: string): Promis
   }>;
 }> => {
   console.log('[VOICE_COMMANDS] ===== PROCESSING MULTI-TASK COMMAND =====');
-  
+
   // First try complex command processing
   const complexResult = await processComplexCommand(text, profession);
-  
+
   if (complexResult.isComplexCommand) {
     // Convert complex execution plan to simple multi-task format for compatibility
     const items = complexResult.executionPlan
@@ -986,7 +1002,7 @@ const processMultiTaskCommand = async (text: string, profession: string): Promis
           type: step.type as 'task' | 'reminder' | 'note',
           title: step.parameters.title || step.parameters.content || step.action,
         };
-        
+
         if (step.type === 'task') {
           return { ...baseItem, dueDate: step.parameters.dueDate };
         } else if (step.type === 'reminder') {
@@ -994,10 +1010,10 @@ const processMultiTaskCommand = async (text: string, profession: string): Promis
         } else if (step.type === 'note') {
           return { ...baseItem, content: step.parameters.content };
         }
-        
+
         return baseItem;
       });
-    
+
     return {
       isMultiTask: items.length > 1,
       items
@@ -1047,7 +1063,7 @@ Return ONLY valid JSON in this exact format:
 
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
-    
+
     console.log('[VOICE_COMMANDS] Gemini multi-task response:', responseText);
 
     // Parse JSON from Gemini response
@@ -1055,7 +1071,7 @@ Return ONLY valid JSON in this exact format:
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
       console.log('[VOICE_COMMANDS] Parsed multi-task result:', parsed);
-      
+
       return {
         isMultiTask: parsed.isMultiTask || false,
         items: parsed.items || []
@@ -1083,11 +1099,11 @@ const handleCreateTemplateCommand = async (
 
   try {
     const { saveTemplate, getTemplates } = await import('./storage');
-    
+
     // Check if template with same name exists
     const existingTemplates = await getTemplates();
     const existingTemplate = existingTemplates.find(t => t.name.toLowerCase() === name.toLowerCase());
-    
+
     if (existingTemplate) {
       return {
         success: false,
@@ -1153,7 +1169,7 @@ const handleComplexCommand = async (
   try {
     // Sort by priority (1 = creation commands, 2 = search commands)
     const sortedPlan = [...executionPlan].sort((a, b) => a.priority - b.priority || a.step - b.step);
-    
+
     console.log('[VOICE_COMMANDS] Executing steps in optimized order...');
 
     for (let i = 0; i < sortedPlan.length; i++) {
@@ -1249,9 +1265,9 @@ const handleComplexCommand = async (
       if (counts.reminders > 0) itemTypes.push(`${counts.reminders} reminder${counts.reminders !== 1 ? 's' : ''}`);
       if (counts.notes > 0) itemTypes.push(`${counts.notes} note${counts.notes !== 1 ? 's' : ''}`);
       if (counts.searches > 0) itemTypes.push(`${counts.searches} search${counts.searches !== 1 ? 'es' : ''}`);
-      
+
       let message = `AI Agent executed ${executionPlan.length} commands: ${itemTypes.join(', ')}`;
-      
+
       if (failureCount > 0) {
         message += `, with ${failureCount} failure${failureCount !== 1 ? 's' : ''}`;
       }
@@ -1261,7 +1277,7 @@ const handleComplexCommand = async (
       }
 
       console.log('[VOICE_COMMANDS] Complex command execution completed:', message);
-      
+
       return {
         success: true,
         message,
@@ -1382,15 +1398,15 @@ const handleMultiItemCommand = async (
       if (counts.tasks > 0) itemTypes.push(`${counts.tasks} task${counts.tasks !== 1 ? 's' : ''}`);
       if (counts.reminders > 0) itemTypes.push(`${counts.reminders} reminder${counts.reminders !== 1 ? 's' : ''}`);
       if (counts.notes > 0) itemTypes.push(`${counts.notes} note${counts.notes !== 1 ? 's' : ''}`);
-      
+
       let message = `Successfully created ${itemTypes.join(', ')}`;
-      
+
       if (failureCount > 0) {
         message += `, but ${failureCount} item${failureCount !== 1 ? 's' : ''} failed to create`;
       }
 
       console.log('[VOICE_COMMANDS] Multi-item creation completed:', message);
-      
+
       return {
         success: true,
         message,
@@ -1437,20 +1453,20 @@ export const getExampleCommands = (): string[] => [
   "New note called shopping list",
   "Remind me to call John in 2 hours",
   "Add task finish presentation due tomorrow",
-  
+
   // Multi-item examples (Gemini mode only)
   "Create two tasks: exercise tomorrow and gym at 5pm",
   "Set two reminders: take medicine at 8am and call doctor at 2pm",
   "Add task to finish report and create note about meeting ideas",
   "Create reminder for dentist at 3pm and note about project timeline",
   "Make three items: task to buy groceries, reminder to take pills at 9pm, and note about vacation plans",
-  
+
   // AI Agent complex commands (Gemini mode only)
   "Create 2 templates, first template with name Patient Assessment and text field, second with name Lab Results and number field, then create two tasks to review files, add reminder for meeting, then search for patient data",
   "Make template called Meeting Notes with text and date fields, create task to prepare presentation due tomorrow, set reminder for team call at 3pm, then search for previous meeting notes",
   "Create template named Project Tracker with text, number, and boolean fields, add two tasks for code review and testing, create note about project requirements, then search for related projects",
   "Make 3 templates: first with name Client Info and text field, second with name Budget and number field, third with name Status and select field with options active and inactive, then create reminder to follow up tomorrow",
-  
+
   // Fuzzy thought examples
   "uhh... remind me about dentist or something tomorrow",
   "I need to like... write down something about the meeting",

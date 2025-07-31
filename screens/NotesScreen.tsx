@@ -60,6 +60,7 @@ export default function NotesScreen() {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
   const [voiceSearchResults, setVoiceSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
 
   useEffect(() => {
     loadNotes();
@@ -504,19 +505,17 @@ export default function NotesScreen() {
         // Refresh notes list to show the new note(s)
         await loadNotes();
       }
-      Alert.alert('Success', result.message);
     }
   };
 
-  const handleVoiceSearch = (query: string, results: any[]) => {
-    console.log('[NOTES] Voice search requested:', query, results);
-    const noteResults = results.filter(item => item.type === 'note');
-    if (noteResults.length > 0) {
-      setNotes(noteResults.map(result => result.item));
-      Alert.alert('Search Results', `Found ${noteResults.length} note(s) matching "${query}"`);
-    } else {
-      Alert.alert('No Results', `No notes found matching "${query}"`);
-    }
+  const handleSearchRequested = (query: string, results: any[]) => {
+    console.log('[NOTES] Search requested with query:', query);
+    console.log('[NOTES] Search results received:', results.length, 'items');
+    console.log('[NOTES] Search results details:', results);
+
+    setSearchQuery(query);
+    setSearchResults(results);
+    setShowSearchModal(true);
   };
 
   return (
@@ -529,17 +528,7 @@ export default function NotesScreen() {
           </TouchableOpacity>
           <VoiceInput
             onCommandExecuted={handleVoiceCommand}
-            onSearchRequested={(query, results) => {
-              console.log('[NOTES] Voice search requested:', query, results);
-              setVoiceSearchQuery(query);
-              const formattedResults = results.map((result: any) => ({
-                type: result.type,
-                item: result.item,
-                relevance: result.relevance,
-              }));
-              setVoiceSearchResults(formattedResults);
-              setShowSearchModal(true);
-            }}
+            onSearchRequested={handleSearchRequested}
             style={styles.voiceInputButton}
           />
           <TouchableOpacity style={styles.iconButton} onPress={openMenu}>
