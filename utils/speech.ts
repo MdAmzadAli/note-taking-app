@@ -525,21 +525,33 @@ You are an AI assistant that processes voice commands for a ${profession}'s note
 
 Analyze this voice input: "${text}"
 
-Extract and return in JSON format:
+Understand the user's intent and extract relevant information. Focus on these command types:
+1. CREATE NOTE: "create note", "new note", "add note", "write note", "make note"
+2. SET REMINDER: "set reminder", "remind me", "create reminder", "schedule reminder"  
+3. CREATE TASK: "create task", "new task", "add task", "make task", "todo"
+4. SEARCH: "search for", "find", "look for", "show me"
+
+Return ONLY valid JSON in this exact format:
 {
   "processedText": "cleaned and corrected version of the input",
-  "intent": "one of: create_note, set_reminder, create_task, search, unknown",
+  "intent": "create_note, set_reminder, create_task, or search",
   "parameters": {
-    "content": "main content if creating note/task/reminder",
-    "title": "title if specified",
-    "time": "time/date if mentioned for reminders",
+    "content": "main content for notes/tasks/reminders",
+    "title": "extracted title if specified", 
+    "time": "extracted time/date for reminders (e.g., 'tomorrow', '2pm', 'next week')",
     "query": "search query if intent is search",
-    "dueDate": "due date if mentioned for tasks"
+    "dueDate": "due date for tasks (e.g., 'tomorrow', 'Friday', 'next week')"
   },
-  "confidence": 0.95
+  "confidence": 0.85
 }
 
-Clean up filler words, correct grammar, and ensure the intent is clear. For ${profession} context, understand domain-specific terminology.
+Examples:
+- "Create a task for tomorrow to do exercise at 12pm" → intent: "create_task", content: "exercise at 12pm", dueDate: "tomorrow"
+- "Set reminder to call doctor tomorrow at 2pm" → intent: "set_reminder", content: "call doctor", time: "tomorrow at 2pm"
+- "Create note about meeting discussion" → intent: "create_note", content: "meeting discussion"
+- "Search for patient notes" → intent: "search", query: "patient notes"
+
+Clean up filler words, correct grammar, and be confident in your intent detection.
 `;
 
     const result = await model.generateContent(prompt);

@@ -213,6 +213,8 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
       const processingMethod = voiceMethod === 'assemblyai-gemini' && geminiSupported ? 'gemini' : 'regex';
       console.log('[VOICE] Using processing method:', processingMethod);
+      console.log('[VOICE] Voice method setting:', voiceMethod);
+      console.log('[VOICE] Gemini supported:', geminiSupported);
       
       const executionResult = await executeVoiceCommand(command, profession, processingMethod);
 
@@ -254,7 +256,8 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     setLastCommand(command);
 
     try {
-      const processingMethod = voiceMethod === 'assemblyai-gemini' ? 'gemini' : 'regex';
+      const processingMethod = voiceMethod === 'assemblyai-gemini' && geminiSupported ? 'gemini' : 'regex';
+      console.log('[VOICE] Fuzzy confirmation using processing method:', processingMethod);
       const executionResult = await executeVoiceCommand(command, profession, processingMethod);
 
       if (executionResult.success) {

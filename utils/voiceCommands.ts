@@ -220,10 +220,11 @@ export const parseVoiceCommand = (text: string): VoiceCommand => {
   
   // Create task commands
   const taskPatterns = [
-    /create\s+(?:a\s+)?task\s+(?:for\s+)?(.+?)(?:\s+(?:due|by|tomorrow|today|next\s+week).*)?$/i,
-    /new\s+task\s+(?:for\s+)?(.+?)(?:\s+(?:due|by|tomorrow|today|next\s+week).*)?$/i,
-    /add\s+(?:a\s+)?task\s+(?:for\s+)?(.+?)(?:\s+(?:due|by|tomorrow|today|next\s+week).*)?$/i,
-    /make\s+(?:a\s+)?task\s+(?:for\s+)?(.+?)(?:\s+(?:due|by|tomorrow|today|next\s+week).*)?$/i
+    /create\s+(?:a\s+)?task\s+(?:for\s+)?(.+?)(?:\s+(?:due|by)\s+(.+))?$/i,
+    /create\s+(?:a\s+)?task\s+(?:to\s+)?(.+?)(?:\s+(?:due|by)\s+(.+))?$/i,
+    /new\s+task\s+(?:for\s+|to\s+)?(.+?)(?:\s+(?:due|by)\s+(.+))?$/i,
+    /add\s+(?:a\s+)?task\s+(?:for\s+|to\s+)?(.+?)(?:\s+(?:due|by)\s+(.+))?$/i,
+    /make\s+(?:a\s+)?task\s+(?:for\s+|to\s+)?(.+?)(?:\s+(?:due|by)\s+(.+))?$/i
   ];
   
   console.log('[VOICE_PARSER] Checking task patterns...');
@@ -234,12 +235,26 @@ export const parseVoiceCommand = (text: string): VoiceCommand => {
     console.log(`[VOICE_PARSER] Task pattern ${i} match:`, match);
     
     if (match) {
-      const title = match[1].trim();
-      console.log('[VOICE_PARSER] Extracted title:', title);
+      let title = match[1].trim();
+      let dueDate = match[2] ? match[2].trim() : null;
       
-      // Extract due date from the original text
-      const dueDateMatch = text.match(/(?:due|by|tomorrow|today|next\s+week|\d+(?:am|pm))/i);
-      const dueDate = dueDateMatch ? dueDateMatch[0] : 'tomorrow';
+      // Clean up title by removing temporal words that should be in due date
+      const temporalWords = /\b(tomorrow|today|next\s+week|at\s+\d+(?:am|pm)?|for\s+tomorrow)\b/gi;
+      const temporalMatch = title.match(temporalWords);
+      if (temporalMatch && !dueDate) {
+        dueDate = temporalMatch[0];
+        title = title.replace(temporalWords, '').trim();
+      }
+      
+      // Remove redundant prepositions
+      title = title.replace(/^(for\s+|to\s+)/, '').trim();
+      
+      // Default due date
+      if (!dueDate) {
+        dueDate = 'tomorrow';
+      }
+      
+      console.log('[VOICE_PARSER] Extracted title:', title);
       console.log('[VOICE_PARSER] Extracted due date:', dueDate);
       
       const result = {
@@ -333,15 +348,38 @@ export const executeVoiceCommand = async (
       console.log('[VOICE_COMMANDS] Using Gemini to enhance command understanding');
       const geminiResult = await processWithGemini(command.originalText, profession);
       
-      if (geminiResult.success && geminiResult.confidence > 0.7) {
+      console.log('[VOICE_COMMANDS] Gemini result:', geminiResult);
+      
+      if (geminiResult.success && geminiResult.confidence > 0.6) {
+        // Map Gemini intent to our command intents
+        let mappedIntent = geminiResult.intent;
+        if (mappedIntent === 'create_note' || mappedIntent === 'note') {
+          mappedIntent = 'create_note';
+        } else if (mappedIntent === 'set_reminder' || mappedIntent === 'reminder') {
+          mappedIntent = 'set_reminder';
+        } else if (mappedIntent === 'create_task' || mappedIntent === 'task') {
+          mappedIntent = 'create_task';
+        } else if (mappedIntent === 'search') {
+          mappedIntent = 'search';
+        }
+        
         enhancedCommand = {
           ...command,
-          intent: geminiResult.intent as any,
-          parameters: geminiResult.parameters,
+          intent: mappedIntent as any,
+          parameters: {
+            ...command.parameters,
+            ...geminiResult.parameters
+          },
           cleanedText: geminiResult.processedText,
           confidence: geminiResult.confidence
         };
         console.log('[VOICE_COMMANDS] Enhanced command with Gemini:', enhancedCommand);
+      } else {
+        console.log('[VOICE_COMMANDS] Gemini confidence too low, falling back to regex');
+        // Fallback to regex if Gemini confidence is low
+        if (command.intent === 'unknown') {
+          enhancedCommand = parseVoiceCommand(command.originalText);
+        }
       }
     } else if (processingMethod === 'regex' || !isGeminiInitialized()) {
       // Use regex-based parsing (existing implementation)
