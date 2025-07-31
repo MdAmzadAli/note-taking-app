@@ -523,7 +523,6 @@ export default function TasksScreen() {
     } else {
       console.log('[TASKS] No task results found');
       Alert.alert('No Results', `No tasks found matching "${query}"`);
-    }ching "${query}"`);
     }
   };
 
