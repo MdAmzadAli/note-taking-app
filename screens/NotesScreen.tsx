@@ -479,13 +479,16 @@ export default function NotesScreen() {
   const handleVoiceCommand = async (result: any) => {
     console.log('[NOTES] Voice command executed:', result);
     if (result.success) {
-      // Check if it's a multi-task result or single result
+      // Check if it's a multi-task result, single result, or complex AI agent result
       const hasNoteCreated = result.data && (
         result.data.id || // Single note creation
-        (result.data.created && result.data.created.some((item: any) => item.type === 'note')) // Multi-task with note
+        (result.data.created && result.data.created.some((item: any) => item.type === 'note')) || // Multi-task with note
+        (result.data.results && result.data.results.some((item: any) => item.type === 'note')) || // Complex AI agent with note
+        (result.data.counts && result.data.counts.breakdown && result.data.counts.breakdown.notes > 0) // Complex command note count
       );
       
       if (hasNoteCreated) {
+        console.log('[NOTES] Note creation detected, refreshing notes list...');
         // Refresh notes list to show the new note(s)
         await loadNotes();
       }
