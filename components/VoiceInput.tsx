@@ -282,7 +282,12 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
           } else {
             console.log('[VOICE] WARNING: onSearchRequested callback not available');
           }
-          Alert.alert('Search Completed', executionResult.message);
+          
+          // Close modal quickly for search results
+          setTimeout(() => {
+            setShowModal(false);
+            resetState();
+          }, 500);
         } else {
           console.log('[VOICE] ===== NON-SEARCH COMMAND SUCCESS =====');
           console.log('[VOICE] onCommandExecuted callback available:', !!onCommandExecuted);
@@ -294,15 +299,14 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
             console.log('[VOICE] WARNING: onCommandExecuted callback not available');
           }
 
-          // Check if this was a multi-item command for a more detailed alert
-          if (executionResult.data && executionResult.data.counts) {
-            const { successful, failed, total } = executionResult.data.counts;
-            const alertTitle = processingMethod === 'gemini' ? 'AI-Enhanced Voice Command' : 'Voice Command Executed';
-            Alert.alert(alertTitle, executionResult.message + `\n\nProcessed ${total} items total.`);
-          } else {
-            const alertTitle = processingMethod === 'gemini' ? 'AI-Enhanced Voice Command' : 'Voice Command Executed';
-            Alert.alert(alertTitle, executionResult.message);
-          }
+          // Show success toast instead of modal
+          console.log('[VOICE] Showing success toast:', executionResult.message);
+          // Note: In a real app, you'd use a toast library like react-native-toast-message
+          // For now, we'll just log and close modal quickly
+          setTimeout(() => {
+            setShowModal(false);
+            resetState();
+          }, 1000);
         }
       } else {
         console.log('[VOICE] ===== COMMAND EXECUTION FAILED =====');

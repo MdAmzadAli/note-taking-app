@@ -23,6 +23,7 @@ import { getNotes, saveNote, deleteNote, getUserSettings, getCustomTemplates, sa
 import { mockSpeechToText } from '@/utils/speech';
 import TemplateEntriesScreen from './TemplateEntriesScreen';
 import VoiceInput from '@/components/VoiceInput';
+import SearchResultsModal from '@/components/SearchResultsModal';
 import WritingStyleSelector from '@/components/WritingStyleSelector';
 import WritingStyleEditor from '@/components/WritingStyleEditor';
 
@@ -56,6 +57,9 @@ export default function NotesScreen() {
   const [noteSections, setNoteSections] = useState<NoteSection[]>([]);
   const [checkedItems, setCheckedItems] = useState<boolean[]>([]);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
+  const [voiceSearchResults, setVoiceSearchResults] = useState<any[]>([]);
 
   useEffect(() => {
     loadNotes();
@@ -494,7 +498,7 @@ export default function NotesScreen() {
         (result.data.results && result.data.results.some((item: any) => item.type === 'note')) || // Complex AI agent with note
         (result.data.counts && result.data.counts.breakdown && result.data.counts.breakdown.notes > 0) // Complex command note count
       );
-      
+
       if (hasNoteCreated) {
         console.log('[NOTES] Note creation detected, refreshing notes list...');
         // Refresh notes list to show the new note(s)
@@ -526,26 +530,15 @@ export default function NotesScreen() {
           <VoiceInput
             onCommandExecuted={handleVoiceCommand}
             onSearchRequested={(query, results) => {
-              console.log('[NOTES] Voice search requested - Query:', query);
-              console.log('[NOTES] Voice search results:', results);
-              
-              // Filter only note results
-              const noteResults = results.filter(item => item.type === 'note');
-              console.log('[NOTES] Filtered note results:', noteResults);
-              
-              if (noteResults.length > 0) {
-                // Set the filtered notes and show search
-                const filteredNotes = noteResults.map(result => result.item);
-                console.log('[NOTES] Setting filtered notes:', filteredNotes);
-                setNotes(filteredNotes);
-                setSearchQuery(query);
-                setIsSearchVisible(true);
-              } else {
-                // No note results found, but still show search with query
-                setSearchQuery(query);
-                setIsSearchVisible(true);
-                Alert.alert('No Results', `No notes found matching "${query}"`);
-              }
+              console.log('[NOTES] Voice search requested:', query, results);
+              setVoiceSearchQuery(query);
+              const formattedResults = results.map((result: any) => ({
+                type: result.type,
+                item: result.item,
+                relevance: result.relevance,
+              }));
+              setVoiceSearchResults(formattedResults);
+              setShowSearchModal(true);
             }}
             style={styles.voiceInputButton}
           />
@@ -638,6 +631,17 @@ export default function NotesScreen() {
           </View>
         </TouchableWithoutFeedback>
       )}
+
+      <SearchResultsModal
+        visible={showSearchModal}
+        onClose={() => setShowSearchModal(false)}
+        searchQuery={voiceSearchQuery}
+        results={voiceSearchResults}
+        onItemUpdated={() => {
+          // Reload notes when items are updated
+          loadNotes();
+        }}
+      />
     </SafeAreaView>
   );
 }

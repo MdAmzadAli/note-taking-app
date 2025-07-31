@@ -544,11 +544,11 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
 
   console.log('[VOICE_COMMANDS] Cleaned search query:', cleanQuery);
 
-  // Search with multiple strategies
+  // Search with multiple strategies - more strict matching
   const searchTerms = cleanQuery.split(/\s+/).filter(term => term.length > 2);
   console.log('[VOICE_COMMANDS] Search terms:', searchTerms);
 
-  // Search notes
+  // Search notes with stricter relevance requirements
   notes.forEach(note => {
     const content = (note.content || '').toLowerCase();
     const title = (note.title || '').toLowerCase();
@@ -567,11 +567,17 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
       relevance = 2;
       hasMatch = true;
     }
-    // Individual term matches
+    // Individual term matches - require at least 60% of terms to match
     else {
       const matchedTerms = searchTerms.filter(term => searchText.includes(term));
-      if (matchedTerms.length > 0) {
-        relevance = matchedTerms.length / searchTerms.length;
+      const matchRatio = matchedTerms.length / searchTerms.length;
+      if (matchedTerms.length >= 2 && matchRatio >= 0.6) {
+        relevance = matchRatio;
+        hasMatch = true;
+      }
+      // For single term searches, be more lenient
+      else if (searchTerms.length === 1 && matchedTerms.length > 0) {
+        relevance = 0.8;
         hasMatch = true;
       }
     }
@@ -585,7 +591,7 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
     }
   });
 
-  // Search tasks
+  // Search tasks with stricter matching
   tasks.forEach(task => {
     const title = task.title.toLowerCase();
     const description = (task.description || '').toLowerCase();
@@ -608,11 +614,17 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
       relevance = 2 + baseRelevance;
       hasMatch = true;
     }
-    // Individual term matches
+    // Individual term matches - require at least 60% of terms to match
     else {
       const matchedTerms = searchTerms.filter(term => searchText.includes(term));
-      if (matchedTerms.length > 0) {
-        relevance = (matchedTerms.length / searchTerms.length) + baseRelevance;
+      const matchRatio = matchedTerms.length / searchTerms.length;
+      if (matchedTerms.length >= 2 && matchRatio >= 0.6) {
+        relevance = matchRatio + baseRelevance;
+        hasMatch = true;
+      }
+      // For single term searches, be more lenient
+      else if (searchTerms.length === 1 && matchedTerms.length > 0) {
+        relevance = 0.8 + baseRelevance;
         hasMatch = true;
       }
     }
@@ -626,7 +638,7 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
     }
   });
 
-  // Search reminders
+  // Search reminders with stricter matching
   reminders.forEach(reminder => {
     const title = reminder.title.toLowerCase();
     const description = (reminder.description || '').toLowerCase();
@@ -645,11 +657,17 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
       relevance = 2;
       hasMatch = true;
     }
-    // Individual term matches
+    // Individual term matches - require at least 60% of terms to match
     else {
       const matchedTerms = searchTerms.filter(term => searchText.includes(term));
-      if (matchedTerms.length > 0) {
-        relevance = matchedTerms.length / searchTerms.length;
+      const matchRatio = matchedTerms.length / searchTerms.length;
+      if (matchedTerms.length >= 2 && matchRatio >= 0.6) {
+        relevance = matchRatio;
+        hasMatch = true;
+      }
+      // For single term searches, be more lenient
+      else if (searchTerms.length === 1 && matchedTerms.length > 0) {
+        relevance = 0.8;
         hasMatch = true;
       }
     }

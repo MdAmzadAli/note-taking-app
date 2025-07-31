@@ -14,12 +14,15 @@ import { getNotes, getTasks, getReminders, getUserSettings } from '@/utils/stora
 import { searchContent } from '@/utils/search';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 import VoiceInput from '@/components/VoiceInput';
+import SearchResultsModal from '@/components/SearchResultsModal';
 
 export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [profession, setProfession] = useState<ProfessionType>('doctor');
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
 
   useEffect(() => {
     loadUserSettings();
@@ -115,15 +118,14 @@ export default function SearchScreen() {
         <VoiceInput
           onSearchRequested={(query, results) => {
             console.log('[SEARCH] Voice search requested:', query, results);
-            setSearchQuery(query);
+            setVoiceSearchQuery(query);
             const formattedResults = results.map((result: any) => ({
-              id: result.item.id,
-              title: result.item.title || result.item.content?.substring(0, 50) + '...',
-              content: result.item.content || result.item.description || '',
               type: result.type,
+              item: result.item,
               relevance: result.relevance,
             }));
             setSearchResults(formattedResults);
+            setShowSearchModal(true);
           }}
           style={styles.voiceInputButton}
         />
@@ -156,6 +158,19 @@ export default function SearchScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      <SearchResultsModal
+        visible={showSearchModal}
+        onClose={() => setShowSearchModal(false)}
+        searchQuery={voiceSearchQuery}
+        results={searchResults}
+        onItemUpdated={() => {
+          // Reload data if needed
+          if (searchQuery.trim()) {
+            performSearch(searchQuery);
+          }
+        }}
+      />
     </SafeAreaView>
   );
 }
