@@ -131,9 +131,15 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
   const processVoiceCommand = async (speechText: string) => {
     try {
+      console.log('[VOICE] Processing speech text:', speechText);
+      console.log('[VOICE] Speech text type:', typeof speechText);
+      console.log('[VOICE] Speech text JSON:', JSON.stringify(speechText));
+      
       // First, process fuzzy thoughts
       const fuzzyProcessing = processFuzzyThought(speechText);
       setFuzzyResult(fuzzyProcessing);
+
+      console.log('[VOICE] Fuzzy processing completed:', fuzzyProcessing);
 
       // Show comparison if the text was significantly cleaned
       if (fuzzyProcessing.confidence > 0.6 && fuzzyProcessing.cleanedText !== fuzzyProcessing.originalText) {
@@ -143,13 +149,16 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
       // Parse and execute command using cleaned text
       const textToProcess = fuzzyProcessing.cleanedText || speechText;
+      console.log('[VOICE] Text to process:', textToProcess);
+      
       const command = parseVoiceCommand(textToProcess);
       command.cleanedText = fuzzyProcessing.cleanedText;
       command.confidence = fuzzyProcessing.confidence;
       setLastCommand(command);
 
-      console.log('[VOICE] Parsed command:', command);
-      console.log('[VOICE] Fuzzy processing result:', fuzzyProcessing);
+      console.log('[VOICE] Parsed command details:', JSON.stringify(command, null, 2));
+      console.log('[VOICE] Command intent:', command.intent);
+      console.log('[VOICE] Command parameters:', command.parameters);
 
       const executionResult = await executeVoiceCommand(command, profession);
 
@@ -254,7 +263,9 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
           },
           // onFinalTranscript
           (text: string) => {
-            console.log('[VOICE] Final transcript:', text);
+            console.log('[VOICE] Final transcript received from AssemblyAI:', text);
+            console.log('[VOICE] Text length:', text.length);
+            console.log('[VOICE] Text content:', JSON.stringify(text));
             setFinalResult(text);
             setPartialResults([]);
             setIsListening(false);

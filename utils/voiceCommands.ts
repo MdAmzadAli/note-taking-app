@@ -136,7 +136,11 @@ export const processFuzzyThought = (text: string): FuzzyProcessingResult => {
 
 // Parse voice command using regex patterns
 export const parseVoiceCommand = (text: string): VoiceCommand => {
+  console.log('[VOICE_PARSER] Input text:', text);
+  console.log('[VOICE_PARSER] Input text length:', text.length);
+  
   const lowerText = text.toLowerCase().trim();
+  console.log('[VOICE_PARSER] Lowercase text:', lowerText);
   
   // Search commands
   const searchPatterns = [
@@ -178,44 +182,76 @@ export const parseVoiceCommand = (text: string): VoiceCommand => {
   
   // Set reminder commands
   const reminderPatterns = [
-    /set\s+(?:a\s+)?reminder\s+(?:for\s+)?(.+?)(?:\s+(?:at|for)\s+(.+))?/i,
-    /remind\s+me\s+(?:to\s+)?(.+?)(?:\s+(?:at|for)\s+(.+))?/i,
-    /create\s+(?:a\s+)?reminder\s+(.+?)(?:\s+(?:at|for)\s+(.+))?/i
+    /set\s+(?:a\s+)?reminder\s+(?:for\s+)?(.+?)(?:\s+(?:at|for|tomorrow|today|next\s+week|\d+(?:am|pm)).*)?$/i,
+    /remind\s+me\s+(?:to\s+)?(.+?)(?:\s+(?:at|for|tomorrow|today|next\s+week|\d+(?:am|pm)).*)?$/i,
+    /create\s+(?:a\s+)?reminder\s+(?:for\s+)?(.+?)(?:\s+(?:at|for|tomorrow|today|next\s+week|\d+(?:am|pm)).*)?$/i
   ];
   
-  for (const pattern of reminderPatterns) {
+  console.log('[VOICE_PARSER] Checking reminder patterns...');
+  for (let i = 0; i < reminderPatterns.length; i++) {
+    const pattern = reminderPatterns[i];
     const match = text.match(pattern);
+    console.log(`[VOICE_PARSER] Reminder pattern ${i}:`, pattern);
+    console.log(`[VOICE_PARSER] Reminder pattern ${i} match:`, match);
+    
     if (match) {
-      return {
+      const title = match[1].trim();
+      console.log('[VOICE_PARSER] Extracted title:', title);
+      
+      // Extract time from the original text
+      const timeMatch = text.match(/(?:at|for|tomorrow|today|next\s+week|\d+(?:am|pm))[^.]*$/i);
+      const time = timeMatch ? timeMatch[0].replace(/^(?:at|for)\s*/i, '') : 'tomorrow 9am';
+      console.log('[VOICE_PARSER] Extracted time:', time);
+      
+      const result = {
         intent: 'set_reminder',
         parameters: { 
-          title: match[1].trim(),
-          time: match[2] ? match[2].trim() : 'tomorrow 9am'
+          title,
+          time
         },
         originalText: text
       };
+      
+      console.log('[VOICE_PARSER] Reminder command result:', result);
+      return result;
     }
   }
   
   // Create task commands
   const taskPatterns = [
-    /create\s+(?:a\s+)?task\s+(.+?)(?:\s+due\s+(.+))?/i,
-    /new\s+task\s+(.+?)(?:\s+due\s+(.+))?/i,
-    /add\s+(?:a\s+)?task\s+(.+?)(?:\s+due\s+(.+))?/i,
-    /make\s+(?:a\s+)?task\s+(.+?)(?:\s+due\s+(.+))?/i
+    /create\s+(?:a\s+)?task\s+(?:for\s+)?(.+?)(?:\s+(?:due|by|tomorrow|today|next\s+week).*)?$/i,
+    /new\s+task\s+(?:for\s+)?(.+?)(?:\s+(?:due|by|tomorrow|today|next\s+week).*)?$/i,
+    /add\s+(?:a\s+)?task\s+(?:for\s+)?(.+?)(?:\s+(?:due|by|tomorrow|today|next\s+week).*)?$/i,
+    /make\s+(?:a\s+)?task\s+(?:for\s+)?(.+?)(?:\s+(?:due|by|tomorrow|today|next\s+week).*)?$/i
   ];
   
-  for (const pattern of taskPatterns) {
+  console.log('[VOICE_PARSER] Checking task patterns...');
+  for (let i = 0; i < taskPatterns.length; i++) {
+    const pattern = taskPatterns[i];
     const match = text.match(pattern);
+    console.log(`[VOICE_PARSER] Task pattern ${i}:`, pattern);
+    console.log(`[VOICE_PARSER] Task pattern ${i} match:`, match);
+    
     if (match) {
-      return {
+      const title = match[1].trim();
+      console.log('[VOICE_PARSER] Extracted title:', title);
+      
+      // Extract due date from the original text
+      const dueDateMatch = text.match(/(?:due|by|tomorrow|today|next\s+week|\d+(?:am|pm))/i);
+      const dueDate = dueDateMatch ? dueDateMatch[0] : 'tomorrow';
+      console.log('[VOICE_PARSER] Extracted due date:', dueDate);
+      
+      const result = {
         intent: 'create_task',
         parameters: { 
-          title: match[1].trim(),
-          dueDate: match[2] ? match[2].trim() : 'tomorrow'
+          title,
+          dueDate
         },
         originalText: text
       };
+      
+      console.log('[VOICE_PARSER] Task command result:', result);
+      return result;
     }
   }
   
