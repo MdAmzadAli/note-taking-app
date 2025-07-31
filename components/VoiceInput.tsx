@@ -365,10 +365,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     return 'Tap to start listening';
   };
 
-  useEffect(() => {
-    // Initialize AssemblyAI from environment variables
-    initializeAssemblyAI();
-  }, []);
+  
 
   return (
     <View style={[styles.container, style]}>

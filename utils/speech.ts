@@ -1,6 +1,6 @@
+
 import * as Speech from 'expo-speech';
 import { Alert } from 'react-native';
-import { AssemblyAI } from 'assemblyai';
 
 export interface SpeechResult {
   text: string;
@@ -14,18 +14,21 @@ export interface SpeechOptions {
   rate?: number;
 }
 
-// AssemblyAI client - will be initialized with API key
-let assemblyAIClient: AssemblyAI | null = null;
+// AssemblyAI WebSocket connection
+let assemblyAIWebSocket: WebSocket | null = null;
+let isAssemblyAIConnected = false;
+let assemblyAIApiKey: string | null = null;
 
-// Initialize AssemblyAI client
-export const initializeAssemblyAI = () => {
+// Initialize AssemblyAI with API key
+export const initializeAssemblyAI = (apiKey?: string) => {
   try {
-    const apiKey = process.env.ASSEMBLYAI_API_KEY;
-    if (!apiKey) {
-      console.warn('[SPEECH] ASSEMBLYAI_API_KEY not found in environment variables');
+    // Try to get API key from environment first, then parameter
+    const key = process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY || apiKey;
+    if (!key) {
+      console.warn('[SPEECH] ASSEMBLYAI_API_KEY not found in environment variables or parameters');
       return;
     }
-    assemblyAIClient = new AssemblyAI({ apiKey });
+    assemblyAIApiKey = key;
     console.log('[SPEECH] AssemblyAI initialized successfully');
   } catch (error) {
     console.error('[SPEECH] Failed to initialize AssemblyAI:', error);
@@ -34,7 +37,41 @@ export const initializeAssemblyAI = () => {
 
 // Check if AssemblyAI is initialized
 export const isAssemblyAIInitialized = (): boolean => {
-  return assemblyAIClient !== null;
+  return assemblyAIApiKey !== null;
+};
+
+// Create AssemblyAI WebSocket connection
+const createAssemblyAIConnection = async (): Promise<WebSocket> => {
+  return new Promise((resolve, reject) => {
+    if (!assemblyAIApiKey) {
+      reject(new Error('AssemblyAI API key not available'));
+      return;
+    }
+
+    const websocketUrl = 'wss://api.assemblyai.com/v2/realtime/ws';
+    const ws = new WebSocket(websocketUrl, [], {
+      headers: {
+        authorization: assemblyAIApiKey,
+      },
+    });
+
+    ws.onopen = () => {
+      console.log('[SPEECH] AssemblyAI WebSocket connected');
+      isAssemblyAIConnected = true;
+      resolve(ws);
+    };
+
+    ws.onerror = (error) => {
+      console.error('[SPEECH] AssemblyAI WebSocket error:', error);
+      isAssemblyAIConnected = false;
+      reject(error);
+    };
+
+    ws.onclose = () => {
+      console.log('[SPEECH] AssemblyAI WebSocket closed');
+      isAssemblyAIConnected = false;
+    };
+  });
 };
 
 // Speech recognition using AssemblyAI Real-time API
@@ -44,40 +81,44 @@ export const startAssemblyAISpeechRecognition = async (
   onError?: (error: string) => void
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    if (!assemblyAIClient) {
+    if (!assemblyAIApiKey) {
       return {
         success: false,
         error: "AssemblyAI not initialized. Please provide API key in settings."
       };
     }
 
-    // Create real-time transcriber
-    const rt = assemblyAIClient.realtime.transcriber({
-      sampleRate: 16000,
-    });
+    // Create WebSocket connection
+    assemblyAIWebSocket = await createAssemblyAIConnection();
 
-    // Handle transcript events
-    rt.on('transcript', (transcript) => {
-      if (!transcript.text) return;
-
-      if (transcript.message_type === 'PartialTranscript') {
-        onPartialTranscript?.(transcript.text);
-      } else if (transcript.message_type === 'FinalTranscript') {
-        onFinalTranscript?.(transcript.text);
+    // Handle messages from AssemblyAI
+    assemblyAIWebSocket.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        
+        if (message.message_type === 'PartialTranscript' && message.text) {
+          onPartialTranscript?.(message.text);
+        } else if (message.message_type === 'FinalTranscript' && message.text) {
+          onFinalTranscript?.(message.text);
+        } else if (message.message_type === 'SessionBegins') {
+          console.log('[SPEECH] AssemblyAI session started');
+        } else if (message.message_type === 'SessionTerminated') {
+          console.log('[SPEECH] AssemblyAI session terminated');
+        }
+      } catch (parseError) {
+        console.error('[SPEECH] Error parsing AssemblyAI message:', parseError);
       }
-    });
+    };
 
-    rt.on('error', (error) => {
-      console.error('AssemblyAI error:', error);
-      onError?.(error.message || 'Unknown AssemblyAI error');
-    });
+    assemblyAIWebSocket.onerror = (error) => {
+      console.error('[SPEECH] AssemblyAI WebSocket error:', error);
+      onError?.('AssemblyAI connection error');
+    };
 
-    rt.on('close', (code, reason) => {
-      console.log('AssemblyAI connection closed:', code, reason);
-    });
-
-    // Connect to AssemblyAI
-    await rt.connect();
+    assemblyAIWebSocket.onclose = () => {
+      console.log('[SPEECH] AssemblyAI connection closed');
+      isAssemblyAIConnected = false;
+    };
 
     return { success: true };
   } catch (error) {
@@ -89,9 +130,20 @@ export const startAssemblyAISpeechRecognition = async (
   }
 };
 
+// Send audio data to AssemblyAI
+export const sendAudioToAssemblyAI = (audioData: ArrayBuffer): void => {
+  if (assemblyAIWebSocket && isAssemblyAIConnected) {
+    assemblyAIWebSocket.send(audioData);
+  }
+};
+
 // Stop AssemblyAI speech recognition
 export const stopAssemblyAISpeechRecognition = async (): Promise<void> => {
-  // The connection will be closed when the component unmounts or stops listening
+  if (assemblyAIWebSocket) {
+    assemblyAIWebSocket.close();
+    assemblyAIWebSocket = null;
+    isAssemblyAIConnected = false;
+  }
 };
 
 // Legacy speech recognition functions for backward compatibility
@@ -100,11 +152,22 @@ export const startSpeechRecognition = async (
   onError: (error: string) => void
 ): Promise<() => void> => {
   try {
-    const client = assemblyAIClient;
-     if (!client) {
+    if (!isAssemblyAIInitialized()) {
+      onError('AssemblyAI not initialized');
       return () => {};
     }
-    return () => {};
+
+    const result = await startAssemblyAISpeechRecognition(
+      undefined, // onPartialTranscript
+      onResult,  // onFinalTranscript
+      onError    // onError
+    );
+
+    if (!result.success) {
+      onError(result.error || 'Failed to start speech recognition');
+    }
+
+    return () => stopAssemblyAISpeechRecognition();
   } catch (error) {
     console.error('Error starting speech recognition:', error);
     onError(error instanceof Error ? error.message : "Unknown error");
