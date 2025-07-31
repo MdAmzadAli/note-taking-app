@@ -16,20 +16,17 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { CustomTemplate, FieldType } from '@/types';
 import { getCustomTemplates, saveCustomTemplate, deleteCustomTemplate, getUserSettings } from '@/utils/storage';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
+import VoiceInput from '@/components/VoiceInput';
+import SearchResultsModal from '@/components/SearchResultsModal';
 
 export default function TemplatesScreen() {
   const [templates, setTemplates] = useState<CustomTemplate[]>([]);
   const [profession, setProfession] = useState<ProfessionType>('doctor');
-  const [isCreating, setIsCreating] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<CustomTemplate | null>(null);
-  const [templateName, setTemplateName] = useState('');
-  const [templateDescription, setTemplateDescription] = useState('');
-  const [fields, setFields] = useState<FieldType[]>([]);
-  const [newFieldName, setNewFieldName] = useState('');
-  const [newFieldType, setNewFieldType] = useState<'text' | 'longtext' | 'number'>('text');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [filteredTemplates, setFilteredTemplates] = useState<CustomTemplate[]>([]);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
+  const [voiceSearchResults, setVoiceSearchResults] = useState<any[]>([]);
 
   useEffect(() => {
     loadTemplatesAndSettings();
@@ -183,6 +180,29 @@ export default function TemplatesScreen() {
     </View>
   );
 
+  const handleVoiceCommand = async (result: any) => {
+    console.log('[TEMPLATES] Voice command executed:', result);
+    if (result.success) {
+      loadTemplatesAndSettings();
+    }
+  };
+
+  const handleVoiceSearchRequested = (query: string, results: any[]) => {
+    console.log('[TEMPLATES] Search requested with query:', query);
+    console.log('[TEMPLATES] Search results received:', results.length, 'items');
+
+    // Format results for SearchResultsModal
+    const formattedResults = results.map(result => ({
+      type: result.type,
+      item: result.item,
+      relevance: result.relevance || 0
+    }));
+
+    setVoiceSearchQuery(query);
+    setVoiceSearchResults(formattedResults);
+    setShowSearchModal(true);
+  };
+
   if (isCreating || isEditing) {
     return (
       <SafeAreaView style={styles.container}>
@@ -301,6 +321,10 @@ export default function TemplatesScreen() {
             <Text style={styles.addButtonText}>New Template</Text>
           </TouchableOpacity>
         </View>
+        <VoiceInput 
+            onCommandExecuted={handleVoiceCommand}
+            onSearchRequested={handleVoiceSearchRequested}
+          />
       </View>
 
       {isSearchVisible && (
@@ -331,6 +355,17 @@ export default function TemplatesScreen() {
             </Text>
           </View>
         }
+      />
+
+      <SearchResultsModal
+        visible={showSearchModal}
+        onClose={() => setShowSearchModal(false)}
+        searchQuery={voiceSearchQuery}
+        results={voiceSearchResults}
+        onItemUpdated={() => {
+          // Reload templates when items are updated
+          loadTemplatesAndSettings();
+        }}
       />
     </SafeAreaView>
   );

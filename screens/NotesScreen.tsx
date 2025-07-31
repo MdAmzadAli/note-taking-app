@@ -518,6 +518,25 @@ export default function NotesScreen() {
     setShowSearchModal(true);
   };
 
+  const handleVoiceSearchRequested = (query: string, results: any[]) => {
+    console.log('[NOTES] Search requested with query:', query);
+    console.log('[NOTES] Search results received:', results.length, 'items');
+    console.log('[NOTES] Search results details:', results);
+
+    // Format results for SearchResultsModal
+    const formattedResults = results.map(result => ({
+      type: result.type,
+      item: result.item,
+      relevance: result.relevance || 0
+    }));
+
+    setVoiceSearchQuery(query);
+    setVoiceSearchResults(formattedResults);
+    setShowSearchModal(true);
+
+    console.log('[NOTES] Modal state set - Query:', query, 'Results:', formattedResults.length, 'Modal visible:', true);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>

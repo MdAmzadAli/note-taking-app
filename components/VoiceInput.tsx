@@ -288,13 +288,18 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
             searchResults = executionResult.data.searchResults;
           }
 
-          console.log('[VOICE] Search query for callback:', searchQuery);
+          // Extract the actual search query from execution result
+          const actualSearchQuery = executionResult.data?.results?.[0]?.action?.replace('Search for ', '') || 
+                                   executionResult.data?.executionPlan?.[0]?.parameters?.query || 
+                                   searchQuery;
+          
+          console.log('[VOICE] Search query for callback:', actualSearchQuery);
           console.log('[VOICE] Search results for callback:', searchResults);
           console.log('[VOICE] onSearchRequested callback available:', !!onSearchRequested);
 
-          if (onSearchRequested && searchQuery && searchResults) {
+          if (onSearchRequested && actualSearchQuery && searchResults) {
             console.log('[VOICE] Calling onSearchRequested...');
-            onSearchRequested(searchQuery, searchResults);
+            onSearchRequested(actualSearchQuery, searchResults);
           } else {
             console.log('[VOICE] WARNING: onSearchRequested callback not available or missing data');
           }

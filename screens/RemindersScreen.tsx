@@ -23,7 +23,11 @@ import VoiceInput from '@/components/VoiceInput';
 export default function RemindersScreen() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [filteredReminders, setFilteredReminders] = useState<Reminder[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [profession, setProfession] = useState<ProfessionType>('doctor');
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
+  const [voiceSearchResults, setVoiceSearchResults] = useState<any[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
@@ -32,7 +36,6 @@ export default function RemindersScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   useEffect(() => {
@@ -303,6 +306,29 @@ export default function RemindersScreen() {
         </View>
       </TouchableOpacity>
     );
+  };
+
+  const handleVoiceCommand = async (result: any) => {
+    console.log('[REMINDERS] Voice command executed:', result);
+    if (result.success) {
+      loadReminders();
+    }
+  };
+
+  const handleVoiceSearchRequested = (query: string, results: any[]) => {
+    console.log('[REMINDERS] Search requested with query:', query);
+    console.log('[REMINDERS] Search results received:', results.length, 'items');
+
+    // Format results for SearchResultsModal
+    const formattedResults = results.map(result => ({
+      type: result.type,
+      item: result.item,
+      relevance: result.relevance || 0
+    }));
+
+    setVoiceSearchQuery(query);
+    setVoiceSearchResults(formattedResults);
+    setShowSearchModal(true);
   };
 
   if (isCreating || isEditing) {

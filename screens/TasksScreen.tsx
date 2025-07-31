@@ -18,11 +18,17 @@ import { getTasks, saveTask, deleteTask, getUserSettings } from '@/utils/storage
 import { scheduleNotification, cancelNotification } from '@/utils/notifications';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 import VoiceInput from '@/components/VoiceInput';
+import SearchResultsModal from '@/components/SearchResultsModal';
 
 export default function TasksScreen() {
+  const [showProfessionModal, setShowProfessionModal] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [profession, setProfession] = useState<ProfessionType>('doctor');
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
+  const [voiceSearchResults, setVoiceSearchResults] = useState<any[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -34,7 +40,6 @@ export default function TasksScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [filter, setFilter] = useState<'all' | 'today' | 'tomorrow' | 'overdue'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   useEffect(() => {
@@ -499,31 +504,27 @@ export default function TasksScreen() {
     );
   }
 
-    const handleVoiceCommand = async (result: any) => {
+  const handleVoiceCommand = async (result: any) => {
     console.log('[TASKS] Voice command executed:', result);
     if (result.success) {
-      // Refresh tasks list to show the new task(s)
       await loadTasksAndSettings();
-      Alert.alert('Success', result.message);
     }
   };
 
-  const handleVoiceSearch = (query: string, results: any[]) => {
-    console.log('[TASKS] Voice search requested - Query:', query);
-    console.log('[TASKS] Voice search results:', results);
+  const handleVoiceSearchRequested = (query: string, results: any[]) => {
+    console.log('[TASKS] Search requested with query:', query);
+    console.log('[TASKS] Search results received:', results.length, 'items');
 
-    const taskResults = results.filter(item => item.type === 'task');
-    console.log('[TASKS] Filtered task results:', taskResults);
+    // Format results for SearchResultsModal
+    const formattedResults = results.map(result => ({
+      type: result.type,
+      item: result.item,
+      relevance: result.relevance || 0
+    }));
 
-    if (taskResults.length > 0) {
-      const filteredTasks = taskResults.map(result => result.item);
-      console.log('[TASKS] Setting filtered tasks:', filteredTasks);
-      setTasks(filteredTasks);
-      Alert.alert('Search Results', `Found ${taskResults.length} task(s) matching "${query}"`);
-    } else {
-      console.log('[TASKS] No task results found');
-      Alert.alert('No Results', `No tasks found matching "${query}"`);
-    }
+    setVoiceSearchQuery(query);
+    setVoiceSearchResults(formattedResults);
+    setShowSearchModal(true);
   };
 
   return (
@@ -537,12 +538,9 @@ export default function TasksScreen() {
           >
             <IconSymbol size={20} name="magnifyingglass" color="#FFFFFF" />
           </TouchableOpacity>
-          <VoiceInput
+          <VoiceInput 
             onCommandExecuted={handleVoiceCommand}
-            onSearchRequested={(query, results) => {
-              setSearchQuery(query);
-              setIsSearchVisible(true);
-            }}
+            onSearchRequested={handleVoiceSearchRequested}
             style={styles.voiceInputButton}
           />
           <TouchableOpacity
@@ -591,6 +589,14 @@ export default function TasksScreen() {
             </Text>
           </View>
         }
+      />
+
+      <SearchResultsModal
+        visible={showSearchModal}
+        onClose={() => setShowSearchModal(false)}
+        searchQuery={voiceSearchQuery}
+        results={voiceSearchResults}
+        onItemUpdated={loadTasksAndSettings}
       />
     </SafeAreaView>
   );
