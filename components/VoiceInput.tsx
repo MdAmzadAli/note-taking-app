@@ -79,7 +79,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
       // Initialize Gemini AI (use environment key first)
       const envGeminiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-      
+
       if (envGeminiKey) {
         initializeGemini();
         setGeminiSupported(true);
@@ -91,7 +91,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
       // Initialize AssemblyAI (use environment key first)
       const envApiKey = process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY;
-      
+
       if (envApiKey) {
         initializeAssemblyAI();
         setAssemblyAIError(null);
@@ -184,7 +184,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       console.log('[VOICE] Current profession:', profession);
       console.log('[VOICE] Voice method:', voiceMethod);
       console.log('[VOICE] Gemini supported:', geminiSupported);
-      
+
       if (!speechText || speechText.trim().length === 0) {
         console.log('[VOICE] Empty speech text received');
         Alert.alert('No Speech Detected', 'Please try speaking more clearly or check your microphone.');
@@ -197,30 +197,32 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
       console.log('[VOICE] Fuzzy processing completed:', fuzzyProcessing);
 
-      // Show comparison if the text was significantly cleaned
-      if (fuzzyProcessing.confidence > 0.6 && fuzzyProcessing.cleanedText !== fuzzyProcessing.originalText) {
-        setShowFuzzyComparison(true);
-        return; // Wait for user confirmation
+      // Create command using fuzzy processing result if it has good confidence
+      let command;
+      if (fuzzyResult.confidence > 0.6) {
+        command = {
+          intent: fuzzyResult.detectedIntent as any,
+          parameters: fuzzyResult.detectedIntent === 'create_note' ? { content: fuzzyResult.cleanedText.replace('Create note: ', '').replace('.', '') } :
+                     fuzzyResult.detectedIntent === 'search' ? { query: fuzzyResult.cleanedText.replace('Search for: ', '').replace('.', '') } :
+                     fuzzyResult.detectedIntent === 'create_task' ? { title: fuzzyResult.cleanedText.replace('Create task: ', '').replace('.', '') } :
+                     fuzzyResult.detectedIntent === 'set_reminder' ? { title: fuzzyResult.cleanedText.replace('Set reminder: ', '').split(' due ')[0], time: fuzzyResult.cleanedText.includes(' due ') ? fuzzyResult.cleanedText.split(' due ')[1] : 'tomorrow' } : {},
+          originalText: speechText,
+          cleanedText: fuzzyResult.cleanedText,
+          confidence: fuzzyResult.confidence
+        };
+      } else {
+        // Fallback to regex parsing
+        command = parseVoiceCommand(speechText);
       }
 
-      // Parse and execute command using cleaned text
-      const textToProcess = fuzzyProcessing.cleanedText || speechText;
-      console.log('[VOICE] Text to process:', textToProcess);
+      console.log('[VOICE] Final command to execute:', JSON.stringify(command, null, 2));
 
-      const command = parseVoiceCommand(textToProcess);
-      command.cleanedText = fuzzyProcessing.cleanedText;
-      command.confidence = fuzzyProcessing.confidence;
-      setLastCommand(command);
-
-      console.log('[VOICE] Parsed command details:', JSON.stringify(command, null, 2));
-      console.log('[VOICE] Command intent:', command.intent);
-      console.log('[VOICE] Command parameters:', command.parameters);
-
+      // Determine processing method based on voice method and Gemini availability
       const processingMethod = voiceMethod === 'assemblyai-gemini' && geminiSupported ? 'gemini' : 'regex';
       console.log('[VOICE] Using processing method:', processingMethod);
       console.log('[VOICE] Voice method setting:', voiceMethod);
       console.log('[VOICE] Gemini supported:', geminiSupported);
-      
+
       console.log('[VOICE] About to execute command with processing method:', processingMethod);
       const executionResult = await executeVoiceCommand(command, profession, processingMethod);
 
@@ -237,7 +239,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
           console.log('[VOICE] Search query for callback:', searchQuery);
           console.log('[VOICE] Search results for callback:', executionResult.data);
           console.log('[VOICE] onSearchRequested callback available:', !!onSearchRequested);
-          
+
           if (onSearchRequested) {
             console.log('[VOICE] Calling onSearchRequested...');
             onSearchRequested(searchQuery, executionResult.data);
@@ -248,7 +250,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
         } else {
           console.log('[VOICE] ===== NON-SEARCH COMMAND SUCCESS =====');
           console.log('[VOICE] onCommandExecuted callback available:', !!onCommandExecuted);
-          
+
           if (onCommandExecuted) {
             console.log('[VOICE] Calling onCommandExecuted...');
             onCommandExecuted(executionResult);
@@ -359,13 +361,13 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
             console.log(`[VOICE] Final transcript received from ${voiceMethod}:`, text);
             console.log('[VOICE] Text length:', text.length);
             console.log('[VOICE] Text content:', JSON.stringify(text));
-            
+
             if (text && text.trim().length > 0) {
               setFinalResult(text);
               setPartialResults([]);
               setIsListening(false);
               setIsProcessing(true);
-              
+
               // Add a small delay to ensure UI updates
               setTimeout(() => {
                 processVoiceCommand(text);

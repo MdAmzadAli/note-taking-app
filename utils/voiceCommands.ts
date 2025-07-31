@@ -53,6 +53,35 @@ export const processFuzzyThought = (text: string): FuzzyProcessingResult => {
 
   // Detect and restructure common fuzzy patterns
   const patterns = [
+    // Search patterns (check first - higher priority)
+    {
+      regex: /(?:can you|please)?\s*(?:find|look for|search|where is|show me|get me|display)\s+(?:all|my|the)?\s*(.+)/i,
+      intent: 'search',
+      restructure: (match: string) => {
+        const queryMatch = match.match(/(?:find|look for|search|where is|show me|get me|display)\s+(?:all|my|the)?\s*(.+)$/i);
+        const query = queryMatch ? queryMatch[1].trim() : match;
+        return `Search for: ${query}.`;
+      }
+    },
+    // Note creation patterns
+    {
+      regex: /(?:create|new|make|add)\s+(?:a\s+)?note.+?(?:titled|about|called)\s+(.+)/i,
+      intent: 'create_note',
+      restructure: (match: string) => {
+        const contentMatch = match.match(/(?:titled|about|called)\s+(.+)$/i);
+        const content = contentMatch ? contentMatch[1].trim() : match;
+        return `Create note: ${content}.`;
+      }
+    },
+    {
+      regex: /(?:write down|note|jot down|remember).+?(?:about|that).+/i,
+      intent: 'create_note',
+      restructure: (match: string) => {
+        const contentMatch = match.match(/(?:about|that)\s+(.+)$/i);
+        const content = contentMatch ? contentMatch[1].trim() : match;
+        return `Create note: ${content}.`;
+      }
+    },
     // Reminder patterns
     {
       regex: /(?:remind me|remember|don't forget).+?(?:about|to).+?(tomorrow|today|next week|later|in \d+ hours?|at \d+)/i,
@@ -65,17 +94,18 @@ export const processFuzzyThought = (text: string): FuzzyProcessingResult => {
         return `Set reminder: ${task} ${time}.`;
       }
     },
-    // Note creation patterns
+    // Task creation patterns
     {
-      regex: /(?:write down|note|jot down|remember).+?(?:about|that).+/i,
-      intent: 'create_note',
+      regex: /(?:create|new|make|add)\s+(?:a\s+)?task.+/i,
+      intent: 'create_task',
       restructure: (match: string) => {
-        const contentMatch = match.match(/(?:about|that)\s+(.+)$/i);
-        const content = contentMatch ? contentMatch[1].trim() : match;
-        return `Create note: ${content}.`;
+        const taskMatch = match.match(/(?:create|new|make|add)\s+(?:a\s+)?task\s+(?:for|to|about)?\s*(.+?)(?:\s+(?:by|before|due).*)?$/i);
+        const dueMatch = match.match(/(?:by|before|due)\s+(.+)$/i);
+        const task = taskMatch ? taskMatch[1].trim() : 'new task';
+        const due = dueMatch ? ` due ${dueMatch[1]}` : '';
+        return `Create task: ${task}${due}.`;
       }
     },
-    // Task creation patterns
     {
       regex: /(?:need to|have to|should|must).+?(?:do|finish|complete|work on).+/i,
       intent: 'create_task',
@@ -85,16 +115,6 @@ export const processFuzzyThought = (text: string): FuzzyProcessingResult => {
         const task = taskMatch ? taskMatch[1].trim() : match;
         const due = dueMatch ? ` due ${dueMatch[1]}` : '';
         return `Create task: ${task}${due}.`;
-      }
-    },
-    // Search patterns
-    {
-      regex: /(?:find|look for|search|where is|show me).+/i,
-      intent: 'search',
-      restructure: (match: string) => {
-        const queryMatch = match.match(/(?:find|look for|search|where is|show me)\s+(.+)$/i);
-        const query = queryMatch ? queryMatch[1].trim() : match;
-        return `Search for: ${query}.`;
       }
     }
   ];
@@ -462,6 +482,14 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
   console.log('[VOICE_COMMANDS] ===== HANDLING SEARCH COMMAND =====');
   console.log('[VOICE_COMMANDS] Search query:', query);
   
+  if (!query || query.trim().length === 0) {
+    console.log('[VOICE_COMMANDS] ERROR: Empty search query');
+    return {
+      success: false,
+      message: 'Please provide a search query'
+    };
+  }
+  
   const [notes, tasks, reminders] = await Promise.all([
     getNotes(),
     getTasks(),
@@ -471,18 +499,52 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
   console.log('[VOICE_COMMANDS] Loaded data - Notes:', notes.length, 'Tasks:', tasks.length, 'Reminders:', reminders.length);
   
   const results: SearchResult[] = [];
-  const lowerQuery = query.toLowerCase();
-  console.log('[VOICE_COMMANDS] Searching for:', lowerQuery);
+  
+  // Clean up the query - remove common search prefixes and task-related terms
+  let cleanQuery = query.toLowerCase().trim();
+  cleanQuery = cleanQuery.replace(/^(all|my|the)\s+/, '');
+  cleanQuery = cleanQuery.replace(/\s+(which|that)\s+i\s+(have\s+to\s+do|need\s+to\s+do)\s*/, ' ');
+  cleanQuery = cleanQuery.replace(/\s+(tomorrow|today|yesterday)\s*$/, '');
+  
+  console.log('[VOICE_COMMANDS] Cleaned search query:', cleanQuery);
+  
+  // Search with multiple strategies
+  const searchTerms = cleanQuery.split(/\s+/).filter(term => term.length > 2);
+  console.log('[VOICE_COMMANDS] Search terms:', searchTerms);
   
   // Search notes
   notes.forEach(note => {
     const content = (note.content || '').toLowerCase();
     const title = (note.title || '').toLowerCase();
-    if (content.includes(lowerQuery) || title.includes(lowerQuery)) {
+    const searchText = `${title} ${content}`;
+    
+    let relevance = 0;
+    let hasMatch = false;
+    
+    // Exact phrase match (highest relevance)
+    if (searchText.includes(cleanQuery)) {
+      relevance = 3;
+      hasMatch = true;
+    }
+    // Title match
+    else if (title.includes(cleanQuery)) {
+      relevance = 2;
+      hasMatch = true;
+    }
+    // Individual term matches
+    else {
+      const matchedTerms = searchTerms.filter(term => searchText.includes(term));
+      if (matchedTerms.length > 0) {
+        relevance = matchedTerms.length / searchTerms.length;
+        hasMatch = true;
+      }
+    }
+    
+    if (hasMatch) {
       results.push({
         type: 'note',
         item: note,
-        relevance: title.includes(lowerQuery) ? 2 : 1
+        relevance
       });
     }
   });
@@ -491,11 +553,39 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
   tasks.forEach(task => {
     const title = task.title.toLowerCase();
     const description = (task.description || '').toLowerCase();
-    if (title.includes(lowerQuery) || description.includes(lowerQuery)) {
+    const searchText = `${title} ${description}`;
+    
+    let relevance = 0;
+    let hasMatch = false;
+    
+    // Check for "tasks" or "task" in query - if present, give higher relevance
+    const isTaskQuery = /\btasks?\b/.test(query.toLowerCase());
+    const baseRelevance = isTaskQuery ? 1 : 0.5;
+    
+    // Exact phrase match
+    if (searchText.includes(cleanQuery)) {
+      relevance = 3 + baseRelevance;
+      hasMatch = true;
+    }
+    // Title match
+    else if (title.includes(cleanQuery)) {
+      relevance = 2 + baseRelevance;
+      hasMatch = true;
+    }
+    // Individual term matches
+    else {
+      const matchedTerms = searchTerms.filter(term => searchText.includes(term));
+      if (matchedTerms.length > 0) {
+        relevance = (matchedTerms.length / searchTerms.length) + baseRelevance;
+        hasMatch = true;
+      }
+    }
+    
+    if (hasMatch) {
       results.push({
         type: 'task',
         item: task,
-        relevance: title.includes(lowerQuery) ? 2 : 1
+        relevance
       });
     }
   });
@@ -504,20 +594,44 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
   reminders.forEach(reminder => {
     const title = reminder.title.toLowerCase();
     const description = (reminder.description || '').toLowerCase();
-    if (title.includes(lowerQuery) || description.includes(lowerQuery)) {
+    const searchText = `${title} ${description}`;
+    
+    let relevance = 0;
+    let hasMatch = false;
+    
+    // Exact phrase match
+    if (searchText.includes(cleanQuery)) {
+      relevance = 3;
+      hasMatch = true;
+    }
+    // Title match
+    else if (title.includes(cleanQuery)) {
+      relevance = 2;
+      hasMatch = true;
+    }
+    // Individual term matches
+    else {
+      const matchedTerms = searchTerms.filter(term => searchText.includes(term));
+      if (matchedTerms.length > 0) {
+        relevance = matchedTerms.length / searchTerms.length;
+        hasMatch = true;
+      }
+    }
+    
+    if (hasMatch) {
       results.push({
         type: 'reminder',
         item: reminder,
-        relevance: title.includes(lowerQuery) ? 2 : 1
+        relevance
       });
     }
   });
   
-  // Sort by relevance
+  // Sort by relevance (highest first)
   results.sort((a, b) => b.relevance - a.relevance);
   
   console.log('[VOICE_COMMANDS] Search results found:', results.length);
-  console.log('[VOICE_COMMANDS] Search results:', JSON.stringify(results, null, 2));
+  console.log('[VOICE_COMMANDS] Search results details:', results.map(r => ({ type: r.type, relevance: r.relevance, title: r.item.title || r.item.content?.substring(0, 30) })));
   
   const searchResult = {
     success: true,
