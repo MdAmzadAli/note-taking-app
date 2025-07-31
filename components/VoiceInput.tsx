@@ -275,9 +275,9 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
         if (isSearchCommand) {
           console.log('[VOICE] ===== SEARCH COMMAND SUCCESS =====');
-          
+
           let searchQuery, searchResults;
-          
+
           if (command.intent === 'search') {
             // Simple search command
             searchQuery = command.parameters.query || command.parameters.content;
@@ -292,18 +292,16 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
           const actualSearchQuery = executionResult.data?.results?.[0]?.action?.replace('Search for ', '') || 
                                    executionResult.data?.executionPlan?.[0]?.parameters?.query || 
                                    searchQuery;
-          
+
           console.log('[VOICE] Search query for callback:', actualSearchQuery);
           console.log('[VOICE] Search results for callback:', searchResults);
           console.log('[VOICE] onSearchRequested callback available:', !!onSearchRequested);
+          console.log('[VOICE] Search query being passed:', actualSearchQuery);
+          console.log('[VOICE] Search results being passed:', searchResults.length, 'items');
+          console.log('[VOICE] Search results details:', searchResults);
+          console.log('[VOICE] Calling onSearchRequested...');
+          onSearchRequested(actualSearchQuery, searchResults);
 
-          if (onSearchRequested && actualSearchQuery && searchResults) {
-            console.log('[VOICE] Calling onSearchRequested...');
-            onSearchRequested(actualSearchQuery, searchResults);
-          } else {
-            console.log('[VOICE] WARNING: onSearchRequested callback not available or missing data');
-          }
-          
           // Close modal quickly for search results
           setTimeout(() => {
             setShowModal(false);
@@ -324,7 +322,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
           console.log('[VOICE] Showing success toast:', executionResult.message);
           setShowModal(false);
           resetState();
-          
+
           // Show a brief success message (simulated toast)
           Alert.alert('Success', executionResult.message, [{ text: 'OK' }], { cancelable: true });
         }

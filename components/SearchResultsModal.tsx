@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -40,6 +40,16 @@ export default function SearchResultsModal({
   const [editingType, setEditingType] = useState<'note' | 'task' | 'reminder' | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
+
+  // Debug logging
+  React.useEffect(() => {
+    if (visible) {
+      console.log('[SEARCH_MODAL] Modal opened');
+      console.log('[SEARCH_MODAL] Search query:', searchQuery);
+      console.log('[SEARCH_MODAL] Results count:', results?.length || 0);
+      console.log('[SEARCH_MODAL] Results:', results);
+    }
+  }, [visible, searchQuery, results]);
 
   const startEditing = (item: any, type: 'note' | 'task' | 'reminder') => {
     setEditingItem(item);
@@ -145,12 +155,12 @@ export default function SearchResultsModal({
             onPress={() => startEditing(item, type)}
             style={styles.editIcon}
           >
-            <IconSymbol name="pencil" size={16} color="#6B7280" />
+            <IconSymbol name="pencil.circle" size={16} color="#6B7280" />
           </TouchableOpacity>
         </View>
         
         <Text style={styles.resultTitle} numberOfLines={2}>
-          {item.title || (item.content ? item.content.substring(0, 100) + '...' : 'Untitled')}
+          {item.title || ((item as Note).content ? (item as Note).content.substring(0, 100) + '...' : 'Untitled')}
         </Text>
         
         {((item as Note).content || (item as Task | Reminder).description) && (
@@ -180,7 +190,7 @@ export default function SearchResultsModal({
               Search Results for "{searchQuery}"
             </Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <IconSymbol name="xmark" size={20} color="#6B7280" />
+              <IconSymbol name="xmark.circle.fill" size={20} color="#6B7280" />
             </TouchableOpacity>
           </View>
 
