@@ -15,6 +15,7 @@ import {
   TouchableWithoutFeedback,
   Platform,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSection } from '@/types';
@@ -60,6 +61,13 @@ export default function NotesScreen() {
     loadNotes();
     loadTemplates();
   }, []);
+
+  // Refresh templates when screen gains focus (e.g., returning from Templates tab)
+  useFocusEffect(
+    React.useCallback(() => {
+      loadTemplates();
+    }, [])
+  );
 
   useEffect(() => {
     if (searchQuery.trim()) {
