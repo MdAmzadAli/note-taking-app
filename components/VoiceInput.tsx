@@ -916,8 +916,7 @@ const styles = StyleSheet.create({
   startButton: {
     backgroundColor: '#3B82F6',
     paddingHorizontal: 24,
-```text
-paddingVertical: 12,
+    paddingVertical: 12,
     borderRadius: 8,
     minWidth: 120,
     alignItems: 'center',
