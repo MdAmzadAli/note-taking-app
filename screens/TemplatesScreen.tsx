@@ -16,8 +16,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { CustomTemplate, FieldType } from '@/types';
 import { getCustomTemplates, saveCustomTemplate, deleteCustomTemplate, getUserSettings } from '@/utils/storage';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
-import VoiceInput from '@/components/VoiceInput';
-import SearchResultsModal from '@/components/SearchResultsModal';
+
 
 export default function TemplatesScreen() {
   const [templates, setTemplates] = useState<CustomTemplate[]>([]);
@@ -365,16 +364,7 @@ export default function TemplatesScreen() {
         }
       />
 
-      <SearchResultsModal
-        visible={showSearchModal}
-        onClose={() => setShowSearchModal(false)}
-        searchQuery={voiceSearchQuery}
-        results={voiceSearchResults}
-        onItemUpdated={() => {
-          // Reload templates when items are updated
-          loadTemplatesAndSettings();
-        }}
-      />
+      
     </SafeAreaView>
   );
 }

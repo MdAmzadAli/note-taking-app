@@ -18,7 +18,7 @@ import { getReminders, saveReminder, deleteReminder, getUserSettings } from '@/u
 import { scheduleNotification, cancelNotification } from '@/utils/notifications';
 import { mockSpeechToText } from '@/utils/speech';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
-import VoiceInput from '@/components/VoiceInput';
+
 
 export default function RemindersScreen() {
   const [reminders, setReminders] = useState<Reminder[]>([]);

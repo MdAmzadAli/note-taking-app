@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -14,15 +15,13 @@ import { getNotes, getTasks, getReminders, getUserSettings } from '@/utils/stora
 import { searchContent } from '@/utils/search';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 import VoiceInput from '@/components/VoiceInput';
-import SearchResultsModal from '@/components/SearchResultsModal';
+import { IconSymbol } from '@/components/ui/IconSymbol';
 
 export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [profession, setProfession] = useState<ProfessionType>('doctor');
-  const [showSearchModal, setShowSearchModal] = useState(false);
-  const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
 
   useEffect(() => {
     loadUserSettings();
@@ -71,6 +70,30 @@ export default function SearchScreen() {
     }
   };
 
+  const handleVoiceSearchRequested = (query: string, results: any[]) => {
+    console.log('[SEARCH] Voice search requested:', query, results);
+    setSearchQuery(query);
+    
+    // Format the voice search results for display
+    const formattedResults = results.map((result: any) => ({
+      id: result.item?.id || result.id,
+      type: result.type,
+      title: result.item?.title || result.item?.content?.substring(0, 50) || result.title || 'Untitled',
+      content: result.item?.content || result.item?.description || result.content || result.description,
+      createdAt: result.item?.createdAt || result.item?.dateTime || result.createdAt || result.dateTime,
+      relevance: result.relevance,
+      score: result.score,
+      matchedFields: result.matchedFields
+    }));
+
+    setSearchResults(formattedResults);
+  };
+
+  const handleVoiceCommand = async (result: any) => {
+    console.log('[SEARCH] Voice command executed:', result);
+    // Handle other voice commands if needed
+  };
+
   const renderSearchResult = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.resultItem}>
       <View style={styles.resultHeader}>
@@ -81,6 +104,11 @@ export default function SearchScreen() {
         {item.score && (
           <Text style={styles.resultScore}>
             {Math.round((1 - item.score) * 100)}% match
+          </Text>
+        )}
+        {item.relevance && (
+          <Text style={styles.resultScore}>
+            {Math.round(item.relevance * 100)}% match
           </Text>
         )}
       </View>
@@ -104,6 +132,13 @@ export default function SearchScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Search</Text>
+        <View style={styles.headerActions}>
+          <VoiceInput
+            onCommandExecuted={handleVoiceCommand}
+            onSearchRequested={handleVoiceSearchRequested}
+            style={styles.voiceInputButton}
+          />
+        </View>
       </View>
 
       <View style={styles.searchContainer}>
@@ -115,33 +150,28 @@ export default function SearchScreen() {
           placeholderTextColor="#6B7280"
           autoFocus
         />
-        <VoiceInput
-          onSearchRequested={(query, results) => {
-            console.log('[SEARCH] Voice search requested:', query, results);
-            setVoiceSearchQuery(query);
-            const formattedResults = results.map((result: any) => ({
-              type: result.type,
-              item: result.item,
-              relevance: result.relevance,
-            }));
-            setSearchResults(formattedResults);
-            setShowSearchModal(true);
-          }}
-          style={styles.voiceInputButton}
-        />
         {searchQuery.length > 0 && (
           <TouchableOpacity
             style={styles.clearButton}
-            onPress={() => setSearchQuery('')}
+            onPress={() => {
+              setSearchQuery('');
+              setSearchResults([]);
+            }}
           >
             <Text style={styles.clearButtonText}>Clear</Text>
           </TouchableOpacity>
         )}
       </View>
 
+      {isLoading && (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Searching...</Text>
+        </View>
+      )}
+
       {searchQuery.trim() === '' ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>Enter a search term to find your content</Text>
+          <Text style={styles.emptyText}>Enter a search term or use voice search</Text>
           <Text style={styles.emptySubtext}>Search across notes, tasks, and reminders</Text>
         </View>
       ) : searchResults.length === 0 && !isLoading ? (
@@ -152,25 +182,12 @@ export default function SearchScreen() {
       ) : (
         <FlatList
           data={searchResults}
-          keyExtractor={(item, index) => `${item.type}-${item.id}-${index}`}
+          keyExtractor={(item, index) => `${item.type}-${item.id || index}`}
           renderItem={renderSearchResult}
           contentContainerStyle={styles.resultsList}
           showsVerticalScrollIndicator={false}
         />
       )}
-
-      <SearchResultsModal
-        visible={showSearchModal}
-        onClose={() => setShowSearchModal(false)}
-        searchQuery={voiceSearchQuery}
-        results={searchResults}
-        onItemUpdated={() => {
-          // Reload data if needed
-          if (searchQuery.trim()) {
-            performSearch(searchQuery);
-          }
-        }}
-      />
     </SafeAreaView>
   );
 }
@@ -196,6 +213,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
     fontFamily: 'Inter',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  voiceInputButton: {
+    marginHorizontal: 4,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -234,6 +259,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6B7280',
     fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6B7280',
     fontFamily: 'Inter',
   },
   resultsList: {
@@ -312,8 +346,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'Inter',
     lineHeight: 25.6,
-  },
-  voiceInputButton: {
-    marginHorizontal: 4,
   },
 });

@@ -22,8 +22,7 @@ import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSecti
 import { getNotes, saveNote, deleteNote, getUserSettings, getCustomTemplates, saveTemplateEntry, getTemplateEntries } from '@/utils/storage';
 import { mockSpeechToText } from '@/utils/speech';
 import TemplateEntriesScreen from './TemplateEntriesScreen';
-import VoiceInput from '@/components/VoiceInput';
-import SearchResultsModal from '@/components/SearchResultsModal';
+
 import WritingStyleSelector from '@/components/WritingStyleSelector';
 import WritingStyleEditor from '@/components/WritingStyleEditor';
 
@@ -57,19 +56,7 @@ export default function NotesScreen() {
   const [noteSections, setNoteSections] = useState<NoteSection[]>([]);
   const [checkedItems, setCheckedItems] = useState<boolean[]>([]);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
-  const [showSearchModal, setShowSearchModal] = useState(false);
-  const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
-  const [voiceSearchResults, setVoiceSearchResults] = useState<any[]>([]);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-
-  // Debug voice search state changes
-  useEffect(() => {
-    console.log('[NOTES] Voice search state changed:', {
-      voiceSearchQuery,
-      voiceSearchResultsCount: voiceSearchResults.length,
-      showSearchModal
-    });
-  }, [voiceSearchQuery, voiceSearchResults, showSearchModal]);
+  
 
   useEffect(() => {
     loadNotes();
@@ -522,87 +509,14 @@ export default function NotesScreen() {
     );
   }
 
-  const handleVoiceCommand = async (result: any) => {
-    console.log('[NOTES] Voice command executed:', result);
-    if (result.success) {
-      // Check if it's a multi-task result, single result, or complex AI agent result
-      const hasNoteCreated = result.data && (
-        result.data.id || // Single note creation
-        (result.data.created && result.data.created.some((item: any) => item.type === 'note')) || // Multi-task with note
-        (result.data.results && result.data.results.some((item: any) => item.type === 'note')) || // Complex AI agent with note
-        (result.data.counts && result.data.counts.breakdown && result.data.counts.breakdown.notes > 0) // Complex command note count
-      );
-
-      if (hasNoteCreated) {
-        console.log('[NOTES] Note creation detected, refreshing notes list...');
-        // Refresh notes list to show the new note(s) with a small delay to ensure storage is updated
-        setTimeout(async () => {
-          await loadNotes();
-        }, 100);
-      }
-    }
-  };
-
-  const handleSearchRequested = (query: string, results: any[]) => {
-    console.log('[NOTES] Search requested with query:', query);
-    console.log('[NOTES] Search results received:', results?.length || 0, 'items');
-    console.log('[NOTES] Search results details:', results);
-
-    // Ensure results is an array and properly formatted
-    const safeResults = Array.isArray(results) ? results : [];
-    
-    // Format results for SearchResultsModal
-    const formattedResults = safeResults.map(result => {
-      // Handle direct search result format
-      if (result && result.type && result.item) {
-        return {
-          type: result.type,
-          item: result.item,
-          relevance: result.relevance || 0
-        };
-      }
-      // Handle legacy format or malformed data
-      else if (result && (result.id || result.title)) {
-        return {
-          type: result.type || 'note',
-          item: result,
-          relevance: result.relevance || result.score || 0
-        };
-      }
-      // Skip invalid results
-      return null;
-    }).filter(Boolean);
-
-    console.log('[NOTES] Setting search state with', formattedResults.length, 'formatted results');
-    
-    // Use the voice search states for consistency
-    setVoiceSearchQuery(query || '');
-    setVoiceSearchResults(formattedResults);
-    setShowSearchModal(true);
-  };
-
-  const handleVoiceSearchRequested = (query: string, results: any[]) => {
-    console.log('[NOTES] Voice search requested with query:', query);
-    console.log('[NOTES] Voice search results received:', results?.length || 0, 'items');
-    console.log('[NOTES] Voice search results details:', results);
-
-    // Use the same logic as handleSearchRequested
-    handleSearchRequested(query, results);
-  };
+  
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Notes</Text>
         <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.iconButton} onPress={() => setIsSearchVisible(!isSearchVisible)}>
-            <IconSymbol size={24} name="magnifyingglass" color="#FFFFFF" />
-          </TouchableOpacity>
-          <VoiceInput
-            onCommandExecuted={handleVoiceCommand}
-            onSearchRequested={handleSearchRequested}
-            style={styles.voiceInputButton}
-          />
+          
           <TouchableOpacity style={styles.iconButton} onPress={openMenu}>
             <IconSymbol size={24} name="line.horizontal.3" color="#FFFFFF" />
           </TouchableOpacity>
@@ -693,22 +607,7 @@ export default function NotesScreen() {
         </TouchableWithoutFeedback>
       )}
 
-      <SearchResultsModal
-        visible={showSearchModal}
-        onClose={() => {
-          console.log('[NOTES] Closing search modal');
-          setShowSearchModal(false);
-          setVoiceSearchQuery('');
-          setVoiceSearchResults([]);
-        }}
-        searchQuery={voiceSearchQuery}
-        results={voiceSearchResults}
-        onItemUpdated={async () => {
-          // Reload notes when items are updated
-          console.log('[NOTES] Reloading notes after item update');
-          await loadNotes();
-        }}
-      />
+      
     </SafeAreaView>
   );
 }
@@ -1020,7 +919,5 @@ const styles = StyleSheet.create({
   templateContentContainer: {
     padding: 16,
   },
-  voiceInputButton: {
-    marginHorizontal: 4,
-  },
+  
 });
