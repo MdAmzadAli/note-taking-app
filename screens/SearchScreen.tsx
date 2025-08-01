@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -8,6 +9,7 @@ import {
   StyleSheet,
   SafeAreaView,
   Platform,
+  Modal,
 } from 'react-native';
 import { Note, Task, Reminder } from '@/types';
 import { getNotes, getTasks, getReminders, getUserSettings } from '@/utils/storage';
@@ -22,6 +24,8 @@ export default function SearchScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [profession, setProfession] = useState<ProfessionType>('doctor');
   const [isVoiceSearch, setIsVoiceSearch] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showFullResults, setShowFullResults] = useState(false);
 
   useEffect(() => {
     loadUserSettings();
@@ -30,6 +34,7 @@ export default function SearchScreen() {
   useEffect(() => {
     if (searchQuery.trim() && !isVoiceSearch) {
       performSearch(searchQuery);
+      setShowPreviewModal(true);
     } else if (!searchQuery.trim()) {
       setSearchResults({
         priorityMatches: [],
@@ -37,6 +42,8 @@ export default function SearchScreen() {
         totalResults: 0,
         searchIntent: 'general'
       });
+      setShowPreviewModal(false);
+      setShowFullResults(false);
       setIsVoiceSearch(false);
     }
   }, [searchQuery, profession]);
@@ -109,6 +116,7 @@ export default function SearchScreen() {
 
     // Set results directly without triggering performSearch
     setSearchResults(formattedResults);
+    setShowFullResults(true);
   };
 
   const handleVoiceCommand = async (result: any) => {
@@ -124,6 +132,11 @@ export default function SearchScreen() {
         }
       }, 100);
     }
+  };
+
+  const handleSearchIconPress = () => {
+    setShowFullResults(true);
+    setShowPreviewModal(false);
   };
 
   const renderSearchResult = ({ item }: { item: any }) => (
@@ -160,6 +173,27 @@ export default function SearchScreen() {
     </TouchableOpacity>
   );
 
+  const renderPreviewResult = ({ item }: { item: any }) => (
+    <TouchableOpacity style={styles.previewResultItem}>
+      <View style={styles.previewResultHeader}>
+        <Text style={styles.previewResultType}>{item.type}</Text>
+        {item.relevance !== undefined && (
+          <Text style={styles.previewResultScore}>
+            {Math.round((1 - item.relevance) * 100)}%
+          </Text>
+        )}
+      </View>
+      <Text style={styles.previewResultTitle} numberOfLines={1}>
+        {item.title || (item.content ? item.content.substring(0, 50) + '...' : 'Untitled')}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const previewResults = [
+    ...searchResults.priorityMatches?.slice(0, 3) || [],
+    ...searchResults.relatedMatches?.slice(0, 2) || []
+  ];
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -184,72 +218,130 @@ export default function SearchScreen() {
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity
-            style={styles.clearButton}
-            onPress={() => {
-              setSearchQuery('');
-              setSearchResults({
-                priorityMatches: [],
-                relatedMatches: [],
-                totalResults: 0,
-                searchIntent: 'general'
-              });
-              setIsVoiceSearch(false);
-            }}
+            style={styles.searchButton}
+            onPress={handleSearchIconPress}
           >
-            <Text style={styles.clearButtonText}>Clear</Text>
+            <IconSymbol name="magnifyingglass" size={20} color="#6B7280" />
           </TouchableOpacity>
         )}
       </View>
 
-      {isLoading && (
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Searching...</Text>
-        </View>
-      )}
+      {/* Real-time Preview Modal */}
+      <Modal
+        visible={showPreviewModal && searchQuery.trim() !== '' && !showFullResults}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPreviewModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.previewModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowPreviewModal(false)}
+        >
+          <View style={styles.previewModalContent}>
+            <View style={styles.previewHeader}>
+              <Text style={styles.previewTitle}>Quick Results</Text>
+              <TouchableOpacity onPress={handleSearchIconPress}>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {isLoading ? (
+              <View style={styles.previewLoadingContainer}>
+                <Text style={styles.previewLoadingText}>Searching...</Text>
+              </View>
+            ) : previewResults.length === 0 ? (
+              <View style={styles.previewEmptyState}>
+                <Text style={styles.previewEmptyText}>No results found</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={previewResults}
+                keyExtractor={(item, index) => `preview-${item.type}-${item.id || index}`}
+                renderItem={renderPreviewResult}
+                showsVerticalScrollIndicator={false}
+                style={styles.previewList}
+              />
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
-      {searchQuery.trim() === '' ? (
+      {/* Full Results Modal */}
+      <Modal
+        visible={showFullResults}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowFullResults(false)}
+      >
+        <View style={styles.fullModalOverlay}>
+          <View style={styles.fullModalContent}>
+            <View style={styles.fullModalHeader}>
+              <Text style={styles.fullModalTitle}>
+                Search Results for "{searchQuery}"
+              </Text>
+              <TouchableOpacity 
+                onPress={() => setShowFullResults(false)} 
+                style={styles.closeButton}
+              >
+                <IconSymbol name="xmark.circle.fill" size={20} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            {searchResults.totalResults === 0 && !isLoading ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No results found</Text>
+                <Text style={styles.emptySubtext}>Try different keywords or check your spelling</Text>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.resultsCount}>
+                  Found {searchResults.totalResults} result{searchResults.totalResults !== 1 ? 's' : ''}
+                </Text>
+
+                <FlatList
+                  data={[
+                    // Add section headers and combine results
+                    ...(searchResults.priorityMatches?.length > 0 ? [
+                      { type: 'header', title: 'Priority Matches', intent: searchResults.searchIntent }
+                    ] : []),
+                    ...searchResults.priorityMatches || [],
+                    ...(searchResults.relatedMatches?.length > 0 ? [
+                      { type: 'header', title: 'Related Results' }
+                    ] : []),
+                    ...searchResults.relatedMatches || []
+                  ]}
+                  keyExtractor={(item, index) => {
+                    if (item.type === 'header') return `header-${index}`;
+                    return `${item.type}-${item.id || index}`;
+                  }}
+                  renderItem={({ item }) => {
+                    if (item.type === 'header') {
+                      return (
+                        <View style={styles.sectionHeader}>
+                          <Text style={styles.sectionHeaderText}>{item.title}</Text>
+                          {item.intent && item.intent !== 'general' && (
+                            <Text style={styles.sectionIntentText}>Intent: {item.intent}</Text>
+                          )}
+                        </View>
+                      );
+                    }
+                    return renderSearchResult({ item });
+                  }}
+                  contentContainerStyle={styles.resultsList}
+                  showsVerticalScrollIndicator={false}
+                />
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {searchQuery.trim() === '' && !showFullResults && (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>Enter a search term or use voice search</Text>
           <Text style={styles.emptySubtext}>Search across notes, tasks, and reminders</Text>
         </View>
-      ) : searchResults.totalResults === 0 && !isLoading ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No results found</Text>
-          <Text style={styles.emptySubtext}>Try different keywords or check your spelling</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={[
-            // Add section headers and combine results
-            ...(searchResults.priorityMatches.length > 0 ? [
-              { type: 'header', title: 'Priority Matches', intent: searchResults.searchIntent }
-            ] : []),
-            ...searchResults.priorityMatches,
-            ...(searchResults.relatedMatches.length > 0 ? [
-              { type: 'header', title: 'Related Results' }
-            ] : []),
-            ...searchResults.relatedMatches
-          ]}
-          keyExtractor={(item, index) => {
-            if (item.type === 'header') return `header-${index}`;
-            return `${item.type}-${item.id || index}`;
-          }}
-          renderItem={({ item }) => {
-            if (item.type === 'header') {
-              return (
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionHeaderText}>{item.title}</Text>
-                  {item.intent && item.intent !== 'general' && (
-                    <Text style={styles.sectionIntentText}>Intent: {item.intent}</Text>
-                  )}
-                </View>
-              );
-            }
-            return renderSearchResult({ item });
-          }}
-          contentContainerStyle={styles.resultsList}
-          showsVerticalScrollIndicator={false}
-        />
       )}
     </SafeAreaView>
   );
@@ -307,34 +399,149 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     color: '#000000',
   },
-  clearButton: {
+  searchButton: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    minHeight: 36,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  clearButtonText: {
-    fontSize: 13,
-    color: '#6B7280',
+  // Preview Modal Styles
+  previewModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'flex-start',
+    paddingTop: Platform.OS === 'ios' ? 140 : 120,
+  },
+  previewModalContent: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    borderRadius: 12,
+    maxHeight: 300,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  previewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  previewTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+    fontFamily: 'Inter',
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: '#3B82F6',
     fontWeight: '500',
     fontFamily: 'Inter',
   },
-  loadingContainer: {
+  previewList: {
+    maxHeight: 200,
+  },
+  previewResultItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  previewResultHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  previewResultType: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B7280',
+    fontFamily: 'Inter',
+    textTransform: 'capitalize',
+  },
+  previewResultScore: {
+    fontSize: 11,
+    color: '#10B981',
+    fontFamily: 'Inter',
+    fontWeight: '500',
+  },
+  previewResultTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#000000',
+    fontFamily: 'Inter',
+  },
+  previewLoadingContainer: {
     padding: 20,
     alignItems: 'center',
   },
-  loadingText: {
-    fontSize: 16,
+  previewLoadingText: {
+    fontSize: 14,
     color: '#6B7280',
     fontFamily: 'Inter',
   },
+  previewEmptyState: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  previewEmptyText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontFamily: 'Inter',
+  },
+  // Full Modal Styles
+  fullModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    width: '90%',
+    maxHeight: '80%',
+  },
+  fullModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  fullModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000000',
+    fontFamily: 'Inter',
+    flex: 1,
+  },
+  closeButton: {
+    padding: 8,
+  },
+  resultsCount: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 16,
+    fontFamily: 'Inter',
+  },
   resultsList: {
-    padding: 16,
+    paddingBottom: 16,
   },
   resultItem: {
     backgroundColor: '#FFFFFF',
