@@ -84,10 +84,13 @@ export default function NotesScreen() {
   );
 
   useEffect(() => {
+    console.log('[NOTES] Search filter effect triggered - query:', searchQuery, 'notes count:', notes.length);
+    
     if (searchQuery.trim()) {
       const filtered = notes.filter(note => 
         note.content.toLowerCase().includes(searchQuery.toLowerCase())
       );
+      console.log('[NOTES] Filtered notes count:', filtered.length);
       setFilteredNotes(filtered);
 
       const filteredTemps = templates.filter(template =>
@@ -95,15 +98,19 @@ export default function NotesScreen() {
       );
       setFilteredTemplates(filteredTemps);
     } else {
-      setFilteredNotes(notes);
-      setFilteredTemplates(templates);
+      console.log('[NOTES] No search query, showing all notes:', notes.length);
+      setFilteredNotes([...notes]); // Create a new array to ensure re-render
+      setFilteredTemplates([...templates]);
     }
   }, [searchQuery, notes, templates]);
 
   const loadNotes = async () => {
     try {
+      console.log('[NOTES] Loading notes from storage...');
       // Convert existing structured notes to simple format for backward compatibility
       const existingNotes = await getNotes();
+      console.log('[NOTES] Retrieved notes from storage:', existingNotes.length);
+      
       const simpleNotes: SimpleNote[] = existingNotes.map(note => ({
         id: note.id,
         content: note.content || Object.values(note.fields || {}).join('\n'),
@@ -112,8 +119,23 @@ export default function NotesScreen() {
       }));
 
       const sortedNotes = simpleNotes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      console.log('[NOTES] Setting notes state with', sortedNotes.length, 'notes');
+      
+      // Update both notes and filtered notes atomically
       setNotes(sortedNotes);
-      setFilteredNotes(sortedNotes);
+      
+      // Only update filtered notes if there's no active search
+      if (!searchQuery.trim()) {
+        setFilteredNotes(sortedNotes);
+      } else {
+        // Re-apply search filter
+        const filtered = sortedNotes.filter(note => 
+          note.content.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        setFilteredNotes(filtered);
+      }
+      
+      console.log('[NOTES] Notes state updated successfully');
     } catch (error) {
       console.error('Error loading notes:', error);
     }
@@ -215,7 +237,10 @@ export default function NotesScreen() {
         await saveNote(newNote);
       }
 
-      // Reset all state
+      // First reload notes to ensure data persistence
+      await loadNotes();
+      
+      // Then reset all state after successful reload
       setCurrentNoteText('');
       setSelectedWritingStyle('mind_dump');
       setNoteSections([]);
@@ -223,7 +248,6 @@ export default function NotesScreen() {
       setIsCreating(false);
       setIsEditing(false);
       setEditingNoteId(null);
-      loadNotes();
     } catch (error) {
       console.error('Error saving note:', error);
       Alert.alert('Error', 'Failed to save note');
@@ -511,8 +535,10 @@ export default function NotesScreen() {
 
       if (hasNoteCreated) {
         console.log('[NOTES] Note creation detected, refreshing notes list...');
-        // Refresh notes list to show the new note(s)
-        await loadNotes();
+        // Refresh notes list to show the new note(s) with a small delay to ensure storage is updated
+        setTimeout(async () => {
+          await loadNotes();
+        }, 100);
       }
     }
   };
