@@ -504,7 +504,7 @@ export default function TasksScreen() {
     );
   }
 
-  d:', results.length, 'items');
+  console.log('[TASKS] Voice search results received:', results.length, 'items');
 
     // Format results for SearchResultsModal
     const formattedResults = results.map(result => ({
