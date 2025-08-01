@@ -231,7 +231,7 @@ export const parseVoiceCommand = (text: string): VoiceCommand => {
   ];
 
   console.log('[VOICE_PARSER] Checking reminder patterns...');
-  for (let i = 0; < reminderPatterns.length; i++) {
+  for (let i = 0; i< reminderPatterns.length; i++) {
     const pattern = reminderPatterns[i];
     const match = text.match(pattern);
     console.log(`[VOICE_PARSER] Reminder pattern ${i}:`, pattern);
@@ -270,7 +270,7 @@ export const parseVoiceCommand = (text: string): VoiceCommand => {
   ];
 
   console.log('[VOICE_PARSER] Checking task patterns...');
-  for (let i = 0; < taskPatterns.length; i++) {
+  for (let i = 0; i< taskPatterns.length; i++) {
     const pattern = taskPatterns[i];
     const match = text.match(pattern);
     console.log(`[VOICE_PARSER] Task pattern ${i}:`, pattern);
@@ -757,8 +757,7 @@ const handleCreateNoteCommand = async (content: string, profession: string): Pro
     console.log('[VOICE_COMMANDS] Note saved successfully');
 
     const result = {
-      ```text
-success: true,
+      success: true,
       message: `Created note: "${note.title}"`,
       data: note
     };
