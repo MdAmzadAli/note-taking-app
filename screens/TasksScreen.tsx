@@ -903,7 +903,4 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     lineHeight: 25.6,
   },
-  
-    marginHorizontal: 4,
-  },
 });
