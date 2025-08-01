@@ -56,7 +56,8 @@ export default function NotesScreen() {
   const [noteSections, setNoteSections] = useState<NoteSection[]>([]);
   const [checkedItems, setCheckedItems] = useState<boolean[]>([]);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
-  
+  const [currentNoteTitle, setCurrentNoteTitle] = useState('');
+
 
   useEffect(() => {
     loadNotes();
@@ -72,7 +73,7 @@ export default function NotesScreen() {
 
   useEffect(() => {
     console.log('[NOTES] Search filter effect triggered - query:', searchQuery, 'notes count:', notes.length);
-    
+
     if (searchQuery.trim()) {
       const filtered = notes.filter(note => 
         note.content.toLowerCase().includes(searchQuery.toLowerCase())
@@ -97,7 +98,7 @@ export default function NotesScreen() {
       // Convert existing structured notes to simple format for backward compatibility
       const existingNotes = await getNotes();
       console.log('[NOTES] Retrieved notes from storage:', existingNotes.length);
-      
+
       const simpleNotes: SimpleNote[] = existingNotes.map(note => ({
         id: note.id,
         content: note.content || Object.values(note.fields || {}).join('\n'),
@@ -107,10 +108,10 @@ export default function NotesScreen() {
 
       const sortedNotes = simpleNotes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       console.log('[NOTES] Setting notes state with', sortedNotes.length, 'notes');
-      
+
       // Update both notes and filtered notes atomically
       setNotes(sortedNotes);
-      
+
       // Only update filtered notes if there's no active search
       if (!searchQuery.trim()) {
         setFilteredNotes(sortedNotes);
@@ -121,7 +122,7 @@ export default function NotesScreen() {
         );
         setFilteredNotes(filtered);
       }
-      
+
       console.log('[NOTES] Notes state updated successfully');
     } catch (error) {
       console.error('Error loading notes:', error);
@@ -176,7 +177,9 @@ export default function NotesScreen() {
 
       // Generate title based on writing style and content
       let title = '';
-      if (selectedWritingStyle === 'cornell' && noteSections.length > 0) {
+      if (currentNoteTitle) {
+        title = currentNoteTitle;
+      } else if (selectedWritingStyle === 'cornell' && noteSections.length > 0) {
         const notesSection = noteSections.find(s => s.type === 'notes');
         title = (notesSection?.content || currentNoteText).substring(0, 50);
       } else if (selectedWritingStyle === 'checklist') {
@@ -226,9 +229,10 @@ export default function NotesScreen() {
 
       // First reload notes to ensure data persistence
       await loadNotes();
-      
+
       // Then reset all state after successful reload
       setCurrentNoteText('');
+      setCurrentNoteTitle('');
       setSelectedWritingStyle('mind_dump');
       setNoteSections([]);
       setCheckedItems([]);
@@ -249,11 +253,13 @@ export default function NotesScreen() {
 
       if (fullNote) {
         setCurrentNoteText(fullNote.content);
+        setCurrentNoteTitle(fullNote.title || '');
         setSelectedWritingStyle(fullNote.writingStyle || 'mind_dump');
         setNoteSections(fullNote.sections || []);
         setCheckedItems(fullNote.checkedItems || []);
       } else {
         setCurrentNoteText(note.content);
+        setCurrentNoteTitle('');
         setSelectedWritingStyle('mind_dump');
         setNoteSections([]);
         setCheckedItems([]);
@@ -265,6 +271,7 @@ export default function NotesScreen() {
     } catch (error) {
       console.error('Error loading note for editing:', error);
       setCurrentNoteText(note.content);
+      setCurrentNoteTitle('');
       setSelectedWritingStyle('mind_dump');
       setNoteSections([]);
       setCheckedItems([]);
@@ -481,6 +488,7 @@ export default function NotesScreen() {
                 setIsEditing(false);
                 setEditingNoteId(null);
                 setCurrentNoteText('');
+                setCurrentNoteTitle('');
                 setSelectedWritingStyle('mind_dump');
                 setNoteSections([]);
                 setCheckedItems([]);
@@ -492,6 +500,12 @@ export default function NotesScreen() {
         </View>
 
         <View style={styles.editorContainer}>
+          <TextInput
+            style={styles.titleInput}
+            placeholder="Enter title (optional)"
+            value={currentNoteTitle}
+            onChangeText={setCurrentNoteTitle}
+          />
           <WritingStyleSelector
             selectedStyle={selectedWritingStyle}
             onStyleChange={handleWritingStyleChange}
@@ -509,14 +523,14 @@ export default function NotesScreen() {
     );
   }
 
-  
+
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Notes</Text>
         <View style={styles.headerButtons}>
-          
+
           <TouchableOpacity style={styles.iconButton} onPress={openMenu}>
             <IconSymbol size={24} name="line.horizontal.3" color="#FFFFFF" />
           </TouchableOpacity>
@@ -607,7 +621,7 @@ export default function NotesScreen() {
         </TouchableWithoutFeedback>
       )}
 
-      
+
     </SafeAreaView>
   );
 }
@@ -919,5 +933,16 @@ const styles = StyleSheet.create({
   templateContentContainer: {
     padding: 16,
   },
-  
+  titleInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#FFFFFF',
+    fontFamily: 'Inter',
+    color: '#000000',
+    marginBottom: 16,
+  }
+
 });
