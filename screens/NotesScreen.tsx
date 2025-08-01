@@ -62,6 +62,15 @@ export default function NotesScreen() {
   const [voiceSearchResults, setVoiceSearchResults] = useState<any[]>([]);
   const [searchResults, setSearchResults] = useState<any[]>([]);
 
+  // Debug voice search state changes
+  useEffect(() => {
+    console.log('[NOTES] Voice search state changed:', {
+      voiceSearchQuery,
+      voiceSearchResultsCount: voiceSearchResults.length,
+      showSearchModal
+    });
+  }, [voiceSearchQuery, voiceSearchResults, showSearchModal]);
+
   useEffect(() => {
     loadNotes();
     loadTemplates();
@@ -519,9 +528,9 @@ export default function NotesScreen() {
   };
 
   const handleVoiceSearchRequested = (query: string, results: any[]) => {
-    console.log('[NOTES] Search requested with query:', query);
-    console.log('[NOTES] Search results received:', results.length, 'items');
-    console.log('[NOTES] Search results details:', results);
+    console.log('[NOTES] Voice search requested with query:', query);
+    console.log('[NOTES] Voice search results received:', results.length, 'items');
+    console.log('[NOTES] Voice search results details:', results);
 
     // Format results for SearchResultsModal
     const formattedResults = results.map(result => ({
@@ -530,11 +539,19 @@ export default function NotesScreen() {
       relevance: result.relevance || 0
     }));
 
+    console.log('[NOTES] Setting voice search state:', { query, formattedResultsCount: formattedResults.length });
     setVoiceSearchQuery(query);
     setVoiceSearchResults(formattedResults);
     setShowSearchModal(true);
 
-    console.log('[NOTES] Modal state set - Query:', query, 'Results:', formattedResults.length, 'Modal visible:', true);
+    console.log('[NOTES] Voice search modal state updated');
+    
+    // Log current state after setting (will be logged in next render)
+    setTimeout(() => {
+      console.log('[NOTES] Current state after update - voiceSearchQuery:', query);
+      console.log('[NOTES] Current state after update - voiceSearchResults count:', formattedResults.length);
+      console.log('[NOTES] Current state after update - showSearchModal:', true);
+    }, 100);
   };
 
   return (
@@ -642,7 +659,10 @@ export default function NotesScreen() {
 
       <SearchResultsModal
         visible={showSearchModal}
-        onClose={() => setShowSearchModal(false)}
+        onClose={() => {
+          console.log('[NOTES] Closing search modal');
+          setShowSearchModal(false);
+        }}
         searchQuery={voiceSearchQuery}
         results={voiceSearchResults}
         onItemUpdated={() => {

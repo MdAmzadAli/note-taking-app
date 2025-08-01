@@ -43,11 +43,14 @@ export default function SearchResultsModal({
 
   // Debug logging
   React.useEffect(() => {
+    console.log('[SEARCH_MODAL] Props changed - Visible:', visible, 'Query:', searchQuery, 'Results count:', results?.length || 0);
     if (visible) {
       console.log('[SEARCH_MODAL] Modal opened');
       console.log('[SEARCH_MODAL] Search query:', searchQuery);
       console.log('[SEARCH_MODAL] Results count:', results?.length || 0);
       console.log('[SEARCH_MODAL] Results:', results);
+      console.log('[SEARCH_MODAL] Results type:', typeof results);
+      console.log('[SEARCH_MODAL] Results array check:', Array.isArray(results));
     }
   }, [visible, searchQuery, results]);
 

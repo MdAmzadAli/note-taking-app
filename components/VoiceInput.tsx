@@ -289,8 +289,8 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
           }
 
           // Extract the actual search query from execution result
-          const actualSearchQuery = executionResult.data?.results?.[0]?.action?.replace('Search for ', '') || 
-                                   executionResult.data?.executionPlan?.[0]?.parameters?.query || 
+          const actualSearchQuery = executionResult.data?.executionPlan?.[0]?.parameters?.query || 
+                                   executionResult.data?.results?.[0]?.action?.replace('Search for ', '') || 
                                    searchQuery;
 
           console.log('[VOICE] Search query for callback:', actualSearchQuery);
@@ -299,8 +299,14 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
           console.log('[VOICE] Search query being passed:', actualSearchQuery);
           console.log('[VOICE] Search results being passed:', searchResults.length, 'items');
           console.log('[VOICE] Search results details:', searchResults);
-          console.log('[VOICE] Calling onSearchRequested...');
-          onSearchRequested(actualSearchQuery, searchResults);
+          console.log('[VOICE] About to call onSearchRequested with:', { query: actualSearchQuery, resultsCount: searchResults.length });
+          
+          if (onSearchRequested) {
+            onSearchRequested(actualSearchQuery, searchResults);
+            console.log('[VOICE] onSearchRequested callback executed successfully');
+          } else {
+            console.error('[VOICE] onSearchRequested callback is not available!');
+          }
 
           // Close modal quickly for search results
           setTimeout(() => {
