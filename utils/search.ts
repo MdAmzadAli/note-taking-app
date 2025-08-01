@@ -267,7 +267,9 @@ export const searchContent = (
       id: item.id,
       title: item.title,
       hasSearchText: !!item.searchableText,
-      searchTextLength: (item.searchableText || '').length
+      searchTextLength: (item.searchableText || '').length,
+      titleLower: titleLower.substring(0, 50),
+      lowerQuery
     });
 
     let score = 0;
@@ -296,8 +298,8 @@ export const searchContent = (
       console.log('[SEARCH] Content match found:', item.id);
     }
     // 4. ANY word match in title (very inclusive)
-    else if (queryWords.some(word => titleLower.includes(word.toLowerCase()))) {
-      const matchedWords = queryWords.filter(word => titleLower.includes(word.toLowerCase()));
+    else if (queryWords.some(word => titleLower.includes(word))) {
+      const matchedWords = queryWords.filter(word => titleLower.includes(word));
       const matchRatio = matchedWords.length / queryWords.length;
       
       score = 0.2 + (1 - matchRatio) * 0.1;
@@ -307,12 +309,10 @@ export const searchContent = (
     }
     // 5. ANY word match in content or searchable text (very inclusive)
     else if (queryWords.some(word => {
-      const wordLower = word.toLowerCase();
-      return contentLower.includes(wordLower) || searchTextLower.includes(wordLower);
+      return contentLower.includes(word) || searchTextLower.includes(word);
     })) {
       const matchedWords = queryWords.filter(word => {
-        const wordLower = word.toLowerCase();
-        return contentLower.includes(wordLower) || searchTextLower.includes(wordLower);
+        return contentLower.includes(word) || searchTextLower.includes(word);
       });
       const matchRatio = matchedWords.length / queryWords.length;
 
@@ -345,17 +345,25 @@ export const searchContent = (
 
       console.log('[SEARCH] Adding result:', {
         id: item.id,
+        title: item.title,
         score: finalScore,
+        originalScore: score,
         matchType,
-        isPriority: isPriorityMatch
+        isPriority: isPriorityMatch,
+        willAddToPriority: isPriorityMatch && finalScore <= 0.7,
+        willAddToRelated: finalScore <= 0.9
       });
 
       // More lenient priority matching - include more results as priority
       if (isPriorityMatch && finalScore <= 0.7) {
         priorityMatches.push(result);
+        console.log('[SEARCH] Added to priority matches:', item.id);
       } else if (finalScore <= 0.9) {
         relatedMatches.push(result);
+        console.log('[SEARCH] Added to related matches:', item.id);
       }
+    } else {
+      console.log('[SEARCH] Item rejected - score:', score, 'item:', item.id, item.title);
     }
   });
 
