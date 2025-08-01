@@ -28,6 +28,7 @@ import WritingStyleEditor from '@/components/WritingStyleEditor';
 
 interface SimpleNote {
   id: string;
+  title?: string;
   content: string;
   createdAt: string;
   updatedAt: string;
@@ -76,7 +77,8 @@ export default function NotesScreen() {
 
     if (searchQuery.trim()) {
       const filtered = notes.filter(note => 
-        note.content.toLowerCase().includes(searchQuery.toLowerCase())
+        note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (note.title && note.title.toLowerCase().includes(searchQuery.toLowerCase()))
       );
       console.log('[NOTES] Filtered notes count:', filtered.length);
       setFilteredNotes(filtered);
@@ -101,6 +103,7 @@ export default function NotesScreen() {
 
       const simpleNotes: SimpleNote[] = existingNotes.map(note => ({
         id: note.id,
+        title: note.title,
         content: note.content || Object.values(note.fields || {}).join('\n'),
         createdAt: note.createdAt,
         updatedAt: note.updatedAt,
@@ -382,7 +385,12 @@ export default function NotesScreen() {
           <Text style={styles.deleteButtonText}>Delete</Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.noteContent} numberOfLines={3}>
+      {item.title && (
+        <Text style={styles.noteTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
+      )}
+      <Text style={styles.noteContent} numberOfLines={item.title ? 2 : 3}>
         {item.content}
       </Text>
     </TouchableOpacity>
@@ -740,6 +748,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#000000',
     fontFamily: 'Inter',
+  },
+  noteTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000000',
+    fontFamily: 'Inter',
+    marginBottom: 8,
   },
   noteContent: {
     fontSize: 16,
