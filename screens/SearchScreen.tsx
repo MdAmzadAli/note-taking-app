@@ -42,11 +42,11 @@ export default function SearchScreen() {
     }
 
     if (searchQuery.trim() && !isVoiceSearch) {
-      // Add 500ms delay before searching
+      // Add 1000ms delay before searching
       searchTimeoutRef.current = setTimeout(() => {
         performSearch(searchQuery);
         setShowResults(true);
-      }, 500);
+      }, 1000);
     } else if (!searchQuery.trim()) {
       setSearchResults({
         priorityMatches: [],

@@ -125,25 +125,35 @@ export const convertToSearchResults = (
 ): SearchResult[] => {
   const results: SearchResult[] = [];
 
+  console.log('[SEARCH] Converting data - Notes:', notes.length, 'Reminders:', reminders.length, 'Tasks:', tasks.length);
+
   // Convert notes with comprehensive text extraction
   notes.forEach(note => {
     const fieldValues = Object.values(note.fields || {});
     const allText = [
       note.title || '',
       note.content || '',
-      ...fieldValues,
+      ...fieldValues.map(v => String(v)),
       note.profession || ''
-    ].join(' ');
+    ].filter(text => text.trim().length > 0).join(' ');
 
-    results.push({
+    const searchResult = {
       id: note.id,
       title: note.title || 'Untitled Note',
       content: note.content || fieldValues.join(' '),
       searchableText: allText,
-      type: 'note',
+      type: 'note' as const,
       createdAt: note.createdAt,
       profession: note.profession
+    };
+
+    console.log('[SEARCH] Note converted:', {
+      id: note.id,
+      title: note.title,
+      searchableText: allText.substring(0, 100) + '...'
     });
+
+    results.push(searchResult);
   });
 
   // Convert reminders
@@ -153,14 +163,14 @@ export const convertToSearchResults = (
       reminder.description || '',
       reminder.profession || '',
       'reminder'
-    ].join(' ');
+    ].filter(text => text.trim().length > 0).join(' ');
 
     results.push({
       id: reminder.id,
       title: reminder.title,
       content: reminder.description || '',
       searchableText: allText,
-      type: 'reminder',
+      type: 'reminder' as const,
       createdAt: reminder.createdAt,
       profession: reminder.profession
     });
@@ -174,14 +184,14 @@ export const convertToSearchResults = (
       task.profession || '',
       'task',
       task.isCompleted ? 'completed' : 'pending'
-    ].join(' ');
+    ].filter(text => text.trim().length > 0).join(' ');
 
     results.push({
       id: task.id,
       title: task.title,
       content: task.description || '',
       searchableText: allText,
-      type: 'task',
+      type: 'task' as const,
       createdAt: task.createdAt,
       profession: task.profession
     });
@@ -192,20 +202,21 @@ export const convertToSearchResults = (
     const fieldValues = Object.values(entry.values || {});
     const allText = [
       entry.templateName || '',
-      ...fieldValues,
+      ...fieldValues.map(v => String(v)),
       'template'
-    ].join(' ');
+    ].filter(text => text.trim().length > 0).join(' ');
 
     results.push({
       id: entry.id,
       title: entry.templateName || 'Template Entry',
       content: fieldValues.join(' '),
       searchableText: allText,
-      type: 'template',
+      type: 'template' as const,
       createdAt: entry.createdAt,
     });
   });
 
+  console.log('[SEARCH] Total searchable items created:', results.length);
   return results;
 };
 
@@ -248,9 +259,16 @@ export const searchContent = (
   const relatedMatches: SearchResult[] = [];
 
   filteredData.forEach(item => {
-    const titleLower = item.title.toLowerCase();
-    const contentLower = item.content.toLowerCase();
+    const titleLower = (item.title || '').toLowerCase();
+    const contentLower = (item.content || '').toLowerCase();
     const searchTextLower = (item.searchableText || '').toLowerCase();
+
+    console.log('[SEARCH] Checking item:', {
+      id: item.id,
+      title: item.title,
+      hasSearchText: !!item.searchableText,
+      searchTextLength: (item.searchableText || '').length
+    });
 
     let score = 0;
     let matchType: 'exact' | 'title' | 'content' | 'loose' = 'loose';
@@ -261,46 +279,48 @@ export const searchContent = (
       score = 0.05; // Lowest score = highest priority
       matchType = 'exact';
       isPriorityMatch = true;
+      console.log('[SEARCH] Exact match found:', item.id);
     }
     // 2. Title exact phrase match
     else if (titleLower.includes(lowerQuery)) {
       score = 0.1;
       matchType = 'title';
       isPriorityMatch = true;
+      console.log('[SEARCH] Title match found:', item.id);
     }
     // 3. Content exact phrase match
     else if (contentLower.includes(lowerQuery)) {
       score = 0.15;
       matchType = 'content';
       isPriorityMatch = true;
+      console.log('[SEARCH] Content match found:', item.id);
     }
-    // 4. Title contains any search terms (flexible matching)
-    else if (queryWords.some(word => titleLower.includes(word))) {
-      const matchedWords = queryWords.filter(word => titleLower.includes(word));
+    // 4. ANY word match in title (very inclusive)
+    else if (queryWords.some(word => titleLower.includes(word.toLowerCase()))) {
+      const matchedWords = queryWords.filter(word => titleLower.includes(word.toLowerCase()));
       const matchRatio = matchedWords.length / queryWords.length;
       
-      // More lenient - any match in title is priority
       score = 0.2 + (1 - matchRatio) * 0.1;
       matchType = 'title';
       isPriorityMatch = true;
+      console.log('[SEARCH] Title word match found:', item.id, 'matched words:', matchedWords);
     }
-    // 5. Content contains any search terms (flexible matching)
-    else if (queryWords.some(word => contentLower.includes(word) || searchTextLower.includes(word))) {
-      const matchedWords = queryWords.filter(word => 
-        contentLower.includes(word) || searchTextLower.includes(word)
-      );
+    // 5. ANY word match in content or searchable text (very inclusive)
+    else if (queryWords.some(word => {
+      const wordLower = word.toLowerCase();
+      return contentLower.includes(wordLower) || searchTextLower.includes(wordLower);
+    })) {
+      const matchedWords = queryWords.filter(word => {
+        const wordLower = word.toLowerCase();
+        return contentLower.includes(wordLower) || searchTextLower.includes(wordLower);
+      });
       const matchRatio = matchedWords.length / queryWords.length;
 
-      // More lenient - any match in content is priority if ratio is decent
-      if (matchRatio >= 0.3) { // At least 30% of words match
-        score = 0.3 + (1 - matchRatio) * 0.2;
-        matchType = 'content';
-        isPriorityMatch = true;
-      } else if (matchRatio > 0) { // Some match but lower ratio goes to related
-        score = 0.6 + (1 - matchRatio) * 0.3;
-        matchType = 'loose';
-        isPriorityMatch = false;
-      }
+      // Very lenient - any match is priority
+      score = 0.3 + (1 - matchRatio) * 0.2;
+      matchType = 'content';
+      isPriorityMatch = true;
+      console.log('[SEARCH] Content word match found:', item.id, 'matched words:', matchedWords);
     }
 
     // Apply intent-based scoring
@@ -323,10 +343,17 @@ export const searchContent = (
         matchedFields: [matchType]
       };
 
+      console.log('[SEARCH] Adding result:', {
+        id: item.id,
+        score: finalScore,
+        matchType,
+        isPriority: isPriorityMatch
+      });
+
       // More lenient priority matching - include more results as priority
-      if (isPriorityMatch && finalScore <= 0.6) {
+      if (isPriorityMatch && finalScore <= 0.7) {
         priorityMatches.push(result);
-      } else if (finalScore <= 0.9) { // Related matches should still be relevant
+      } else if (finalScore <= 0.9) {
         relatedMatches.push(result);
       }
     }
