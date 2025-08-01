@@ -529,28 +529,49 @@ export default function NotesScreen() {
 
   const handleVoiceSearchRequested = (query: string, results: any[]) => {
     console.log('[NOTES] Voice search requested with query:', query);
-    console.log('[NOTES] Voice search results received:', results.length, 'items');
+    console.log('[NOTES] Voice search results received:', results?.length || 0, 'items');
     console.log('[NOTES] Voice search results details:', results);
 
-    // Format results for SearchResultsModal
-    const formattedResults = results.map(result => ({
-      type: result.type,
-      item: result.item,
-      relevance: result.relevance || 0
-    }));
+    // Ensure results is an array and properly formatted
+    const safeResults = Array.isArray(results) ? results : [];
+    
+    // Format results for SearchResultsModal - handle both direct results and nested structures
+    const formattedResults = safeResults.map(result => {
+      // Handle direct search result format
+      if (result && result.type && result.item) {
+        return {
+          type: result.type,
+          item: result.item,
+          relevance: result.relevance || 0
+        };
+      }
+      // Handle legacy format or malformed data
+      else if (result && (result.id || result.title)) {
+        return {
+          type: result.type || 'note',
+          item: result,
+          relevance: result.relevance || result.score || 0
+        };
+      }
+      // Skip invalid results
+      return null;
+    }).filter(Boolean);
 
     console.log('[NOTES] Setting voice search state:', { query, formattedResultsCount: formattedResults.length });
-    setVoiceSearchQuery(query);
+    setVoiceSearchQuery(query || '');
     setVoiceSearchResults(formattedResults);
     setShowSearchModal(true);
 
     console.log('[NOTES] Voice search modal state updated');
     
-    // Log current state after setting (will be logged in next render)
-    setTimeout(() => {
+    // Ensure notes data remains consistent by reloading if needed
+    setTimeout(async () => {
       console.log('[NOTES] Current state after update - voiceSearchQuery:', query);
       console.log('[NOTES] Current state after update - voiceSearchResults count:', formattedResults.length);
       console.log('[NOTES] Current state after update - showSearchModal:', true);
+      
+      // Refresh notes to ensure data consistency
+      await loadNotes();
     }, 100);
   };
 
@@ -662,12 +683,15 @@ export default function NotesScreen() {
         onClose={() => {
           console.log('[NOTES] Closing search modal');
           setShowSearchModal(false);
+          setVoiceSearchQuery('');
+          setVoiceSearchResults([]);
         }}
         searchQuery={voiceSearchQuery}
         results={voiceSearchResults}
-        onItemUpdated={() => {
+        onItemUpdated={async () => {
           // Reload notes when items are updated
-          loadNotes();
+          console.log('[NOTES] Reloading notes after item update');
+          await loadNotes();
         }}
       />
     </SafeAreaView>

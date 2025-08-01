@@ -293,16 +293,28 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
                                    executionResult.data?.results?.[0]?.action?.replace('Search for ', '') || 
                                    searchQuery;
 
+          // Ensure searchResults is always an array
+          let finalSearchResults = [];
+          if (Array.isArray(searchResults)) {
+            finalSearchResults = searchResults;
+          } else if (executionResult.data && Array.isArray(executionResult.data)) {
+            // For simple search commands, the data is directly the results array
+            finalSearchResults = executionResult.data;
+          } else if (executionResult.data && executionResult.data.searchResults && Array.isArray(executionResult.data.searchResults)) {
+            // For complex commands, extract from searchResults property
+            finalSearchResults = executionResult.data.searchResults;
+          }
+
           console.log('[VOICE] Search query for callback:', actualSearchQuery);
-          console.log('[VOICE] Search results for callback:', searchResults);
+          console.log('[VOICE] Final search results for callback:', finalSearchResults);
           console.log('[VOICE] onSearchRequested callback available:', !!onSearchRequested);
           console.log('[VOICE] Search query being passed:', actualSearchQuery);
-          console.log('[VOICE] Search results being passed:', searchResults.length, 'items');
-          console.log('[VOICE] Search results details:', searchResults);
-          console.log('[VOICE] About to call onSearchRequested with:', { query: actualSearchQuery, resultsCount: searchResults.length });
+          console.log('[VOICE] Search results being passed:', finalSearchResults.length, 'items');
+          console.log('[VOICE] Search results details:', finalSearchResults);
+          console.log('[VOICE] About to call onSearchRequested with:', { query: actualSearchQuery, resultsCount: finalSearchResults.length });
           
           if (onSearchRequested) {
-            onSearchRequested(actualSearchQuery, searchResults);
+            onSearchRequested(actualSearchQuery, finalSearchResults);
             console.log('[VOICE] onSearchRequested callback executed successfully');
           } else {
             console.error('[VOICE] onSearchRequested callback is not available!');

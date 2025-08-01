@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -36,6 +35,9 @@ export default function SearchResultsModal({
   results,
   onItemUpdated
 }: SearchResultsModalProps) {
+  // Ensure results is always an array and handle malformed data
+  const safeResults = Array.isArray(results) ? results : [];
+
   const [editingItem, setEditingItem] = useState<any>(null);
   const [editingType, setEditingType] = useState<'note' | 'task' | 'reminder' | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -43,14 +45,15 @@ export default function SearchResultsModal({
 
   // Debug logging
   React.useEffect(() => {
-    console.log('[SEARCH_MODAL] Props changed - Visible:', visible, 'Query:', searchQuery, 'Results count:', results?.length || 0);
+    console.log('[SEARCH_MODAL] Props changed - Visible:', visible, 'Query:', searchQuery, 'Results count:', safeResults.length);
+
     if (visible) {
       console.log('[SEARCH_MODAL] Modal opened');
       console.log('[SEARCH_MODAL] Search query:', searchQuery);
-      console.log('[SEARCH_MODAL] Results count:', results?.length || 0);
-      console.log('[SEARCH_MODAL] Results:', results);
-      console.log('[SEARCH_MODAL] Results type:', typeof results);
-      console.log('[SEARCH_MODAL] Results array check:', Array.isArray(results));
+      console.log('[SEARCH_MODAL] Safe results count:', safeResults.length);
+      console.log('[SEARCH_MODAL] Safe results:', safeResults);
+      console.log('[SEARCH_MODAL] Original results type:', typeof results);
+      console.log('[SEARCH_MODAL] Original results array check:', Array.isArray(results));
     }
   }, [visible, searchQuery, results]);
 
@@ -86,7 +89,7 @@ export default function SearchResultsModal({
       setEditingType(null);
       setEditTitle('');
       setEditContent('');
-      
+
       if (onItemUpdated) {
         onItemUpdated();
       }
@@ -123,7 +126,7 @@ export default function SearchResultsModal({
               </TouchableOpacity>
             </View>
           </View>
-          
+
           <TextInput
             style={styles.editInput}
             value={editTitle}
@@ -131,7 +134,7 @@ export default function SearchResultsModal({
             placeholder="Title"
             multiline
           />
-          
+
           <TextInput
             style={[styles.editInput, styles.editContentInput]}
             value={editContent}
@@ -161,17 +164,17 @@ export default function SearchResultsModal({
             <IconSymbol name="pencil.circle" size={16} color="#6B7280" />
           </TouchableOpacity>
         </View>
-        
+
         <Text style={styles.resultTitle} numberOfLines={2}>
           {item.title || ((item as Note).content ? (item as Note).content.substring(0, 100) + '...' : 'Untitled')}
         </Text>
-        
+
         {((item as Note).content || (item as Task | Reminder).description) && (
           <Text style={styles.resultDescription} numberOfLines={3}>
             {(item as Note).content || (item as Task | Reminder).description}
           </Text>
         )}
-        
+
         <Text style={styles.resultDate}>
           {new Date(item.createdAt).toLocaleDateString()}
         </Text>
@@ -197,7 +200,7 @@ export default function SearchResultsModal({
             </TouchableOpacity>
           </View>
 
-          {results.length === 0 ? (
+          {safeResults.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>No results found</Text>
               <Text style={styles.emptySubtext}>
@@ -207,11 +210,11 @@ export default function SearchResultsModal({
           ) : (
             <>
               <Text style={styles.resultsCount}>
-                Found {results.length} result{results.length !== 1 ? 's' : ''}
+                Found {safeResults.length} result{safeResults.length !== 1 ? 's' : ''}
               </Text>
-              
+
               <FlatList
-                data={results}
+                data={safeResults}
                 keyExtractor={(item, index) => `${item.type}-${item.item.id}-${index}`}
                 renderItem={renderSearchResult}
                 contentContainerStyle={styles.resultsList}
