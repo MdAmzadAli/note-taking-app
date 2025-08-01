@@ -1,5 +1,4 @@
 
-
 import Fuse from 'fuse.js';
 import { Note, Reminder, Task, TemplateEntry } from '@/types';
 
@@ -12,6 +11,15 @@ export interface SearchResult {
   profession?: string;
   score?: number;
   matchedFields?: string[];
+  intentScore?: number;
+  matchType?: 'exact' | 'title' | 'content' | 'loose';
+}
+
+export interface EnhancedSearchResults {
+  priorityMatches: SearchResult[];
+  relatedMatches: SearchResult[];
+  totalResults: number;
+  searchIntent: string;
 }
 
 // Enhanced Fuse.js configuration for more flexible fuzzy search
@@ -22,13 +30,90 @@ const fuseOptions = {
     { name: 'searchableText', weight: 0.2 },
     { name: 'type', weight: 0.1 }
   ],
-  threshold: 0.6, // More lenient threshold for better recall
+  threshold: 0.6,
   includeScore: true,
   includeMatches: true,
   minMatchCharLength: 1,
   ignoreLocation: true,
   findAllMatches: true,
   useExtendedSearch: true,
+};
+
+// Detect search intent from query
+const detectSearchIntent = (query: string): { intent: string; intentType: string; confidence: number } => {
+  const lowerQuery = query.toLowerCase().trim();
+  
+  // Task-related intent patterns
+  const taskPatterns = [
+    /\b(task|tasks|todo|assignment|work|job|deadline|due)\b/i,
+    /\b(complete|finish|do|accomplish)\b/i
+  ];
+  
+  // Note-related intent patterns
+  const notePatterns = [
+    /\b(note|notes|document|text|written|record|memo)\b/i,
+    /\b(write|wrote|written|documented)\b/i
+  ];
+  
+  // Reminder-related intent patterns
+  const reminderPatterns = [
+    /\b(remind|reminder|reminders|alert|notification|appointment)\b/i,
+    /\b(meeting|call|visit|schedule)\b/i
+  ];
+  
+  // Template-related intent patterns
+  const templatePatterns = [
+    /\b(template|templates|form|entry|entries)\b/i
+  ];
+  
+  let maxConfidence = 0;
+  let detectedIntent = 'general';
+  let intentType = 'general';
+  
+  // Check each intent type
+  const intentChecks = [
+    { patterns: taskPatterns, intent: 'task', type: 'task' },
+    { patterns: notePatterns, intent: 'note', type: 'note' },
+    { patterns: reminderPatterns, intent: 'reminder', type: 'reminder' },
+    { patterns: templatePatterns, intent: 'template', type: 'template' }
+  ];
+  
+  intentChecks.forEach(({ patterns, intent, type }) => {
+    let matches = 0;
+    patterns.forEach(pattern => {
+      if (pattern.test(lowerQuery)) matches++;
+    });
+    
+    const confidence = matches / patterns.length;
+    if (confidence > maxConfidence) {
+      maxConfidence = confidence;
+      detectedIntent = intent;
+      intentType = type;
+    }
+  });
+  
+  return { intent: detectedIntent, intentType, confidence: maxConfidence };
+};
+
+// Calculate intent-based score boost
+const calculateIntentScore = (item: SearchResult, searchIntent: { intent: string; intentType: string; confidence: number }): number => {
+  let intentScore = 0;
+  
+  if (searchIntent.confidence > 0) {
+    // Give higher score if item type matches detected intent
+    if (item.type === searchIntent.intentType) {
+      intentScore = searchIntent.confidence * 0.3; // Up to 0.3 boost
+    }
+    // Give smaller boost for related types
+    else if (searchIntent.intentType === 'note' && item.type === 'template') {
+      intentScore = searchIntent.confidence * 0.1;
+    }
+    else if (searchIntent.intentType === 'task' && item.type === 'reminder') {
+      intentScore = searchIntent.confidence * 0.1;
+    }
+  }
+  
+  return intentScore;
 };
 
 // Convert various data types to searchable format with enhanced text extraction
@@ -124,13 +209,20 @@ export const convertToSearchResults = (
   return results;
 };
 
-// Enhanced search function with multiple search strategies
+// Enhanced search function with two-part results
 export const searchContent = (
   query: string,
   data: { notes: Note[], tasks: Task[], reminders: Reminder[], templateEntries?: TemplateEntry[] },
   profession?: string
-): SearchResult[] => {
-  if (!query.trim()) return [];
+): EnhancedSearchResults => {
+  if (!query.trim()) {
+    return {
+      priorityMatches: [],
+      relatedMatches: [],
+      totalResults: 0,
+      searchIntent: 'general'
+    };
+  }
 
   const searchResults = convertToSearchResults(
     data.notes,
@@ -144,87 +236,163 @@ export const searchContent = (
     ? searchResults.filter(item => !item.profession || item.profession === profession)
     : searchResults;
 
-  // Strategy 1: Exact phrase matching (highest priority)
-  const exactMatches = filteredData.filter(item => {
-    const searchText = `${item.title} ${item.content} ${item.searchableText}`.toLowerCase();
-    return searchText.includes(query.toLowerCase());
+  // Detect search intent
+  const searchIntent = detectSearchIntent(query);
+  console.log(`[SEARCH] Detected intent:`, searchIntent);
+
+  const lowerQuery = query.toLowerCase().trim();
+  const queryWords = lowerQuery.split(/\s+/).filter(word => word.length > 1);
+
+  // PART 1: PRIORITY MATCHES
+  const priorityMatches: SearchResult[] = [];
+  const relatedMatches: SearchResult[] = [];
+
+  filteredData.forEach(item => {
+    const titleLower = item.title.toLowerCase();
+    const contentLower = item.content.toLowerCase();
+    const searchTextLower = (item.searchableText || '').toLowerCase();
+
+    let score = 0;
+    let matchType: 'exact' | 'title' | 'content' | 'loose' = 'loose';
+    let isPriorityMatch = false;
+
+    // 1. Exact phrase match (highest priority)
+    if (searchTextLower.includes(lowerQuery)) {
+      score = 0.05; // Lowest score = highest priority
+      matchType = 'exact';
+      isPriorityMatch = true;
+    }
+    // 2. Title exact phrase match
+    else if (titleLower.includes(lowerQuery)) {
+      score = 0.1;
+      matchType = 'title';
+      isPriorityMatch = true;
+    }
+    // 3. Content exact phrase match
+    else if (contentLower.includes(lowerQuery)) {
+      score = 0.15;
+      matchType = 'content';
+      isPriorityMatch = true;
+    }
+    // 4. Title word matching (for notes, prioritize title)
+    else if (item.type === 'note' && queryWords.some(word => titleLower.includes(word))) {
+      const matchedWords = queryWords.filter(word => titleLower.includes(word));
+      const matchRatio = matchedWords.length / queryWords.length;
+      
+      if (matchRatio >= 0.6) { // At least 60% words match in title
+        score = 0.2 + (1 - matchRatio) * 0.1;
+        matchType = 'title';
+        isPriorityMatch = true;
+      }
+    }
+    // 5. Multi-word matching across all content
+    else if (queryWords.length > 1) {
+      const matchedWords = queryWords.filter(word => 
+        titleLower.includes(word) || contentLower.includes(word) || searchTextLower.includes(word)
+      );
+      const matchRatio = matchedWords.length / queryWords.length;
+
+      if (matchRatio >= 0.7) { // At least 70% of words match
+        score = 0.3 + (1 - matchRatio) * 0.2;
+        matchType = 'content';
+        isPriorityMatch = true;
+      } else if (matchRatio >= 0.4) { // 40-70% match goes to related
+        score = 0.6 + (1 - matchRatio) * 0.3;
+        matchType = 'loose';
+        isPriorityMatch = false;
+      }
+    }
+    // 6. Single word matching
+    else if (queryWords.length === 1) {
+      const word = queryWords[0];
+      if (titleLower.includes(word)) {
+        score = 0.25;
+        matchType = 'title';
+        isPriorityMatch = true;
+      } else if (contentLower.includes(word) || searchTextLower.includes(word)) {
+        score = 0.4;
+        matchType = 'content';
+        isPriorityMatch = true;
+      }
+    }
+
+    // Apply intent-based scoring
+    const intentScore = calculateIntentScore({
+      ...item,
+      score,
+      matchType
+    } as SearchResult, searchIntent);
+
+    // Adjust final score with intent
+    const finalScore = Math.max(0, score - intentScore);
+
+    // Only include items that have some relevance
+    if (score > 0 && score <= 1) {
+      const result: SearchResult = {
+        ...item,
+        score: finalScore,
+        intentScore,
+        matchType,
+        matchedFields: [matchType]
+      };
+
+      if (isPriorityMatch && finalScore <= 0.5) {
+        priorityMatches.push(result);
+      } else if (finalScore <= 0.9) { // Related matches should still be relevant
+        relatedMatches.push(result);
+      }
+    }
   });
 
-  // Strategy 2: Fuzzy search with Fuse.js
-  const fuse = new Fuse(filteredData, fuseOptions);
-  const fuzzyResults = fuse.search(query);
+  // PART 2: FUZZY SEARCH FOR ADDITIONAL RELATED MATCHES
+  if (relatedMatches.length < 10) { // Only if we need more related matches
+    const fuse = new Fuse(filteredData, fuseOptions);
+    const fuzzyResults = fuse.search(query);
 
-  // Strategy 3: Word-based search (split query into words)
-  const queryWords = query.toLowerCase().split(/\s+/).filter(word => word.length > 1);
-  const wordMatches = filteredData.filter(item => {
-    const searchText = `${item.title} ${item.content} ${item.searchableText}`.toLowerCase();
-    return queryWords.some(word => searchText.includes(word));
-  });
+    fuzzyResults.forEach(result => {
+      // Only add if not already in priority or related matches
+      const existsInPriority = priorityMatches.some(item => item.id === result.item.id);
+      const existsInRelated = relatedMatches.some(item => item.id === result.item.id);
 
-  // Strategy 4: Partial word matching
-  const partialMatches = filteredData.filter(item => {
-    const searchText = `${item.title} ${item.content} ${item.searchableText}`.toLowerCase();
-    return queryWords.some(word => {
-      if (word.length < 3) return false;
-      // Check if any word in the content starts with the query word
-      const contentWords = searchText.split(/\s+/);
-      return contentWords.some(contentWord => contentWord.startsWith(word));
+      if (!existsInPriority && !existsInRelated && result.score && result.score <= 0.8) {
+        const intentScore = calculateIntentScore(result.item as SearchResult, searchIntent);
+        const finalScore = Math.max(0, result.score - intentScore * 0.5); // Less intent boost for fuzzy
+
+        if (finalScore <= 0.9) {
+          relatedMatches.push({
+            ...result.item,
+            score: finalScore,
+            intentScore,
+            matchType: 'loose',
+            matchedFields: result.matches?.map(match => match.key || '') || ['fuzzy']
+          } as SearchResult);
+        }
+      }
     });
-  });
+  }
 
-  // Combine and deduplicate results
-  const allResults = new Map<string, SearchResult>();
+  // Sort priority matches by score (lower = better)
+  priorityMatches.sort((a, b) => (a.score || 0) - (b.score || 0));
 
-  // Add exact matches with highest score
-  exactMatches.forEach(item => {
-    allResults.set(item.id, { ...item, score: 0.1, matchedFields: ['exact'] });
-  });
+  // Sort related matches by score (lower = better)
+  relatedMatches.sort((a, b) => (a.score || 0) - (b.score || 0));
 
-  // Add fuzzy results
-  fuzzyResults.forEach(result => {
-    const existing = allResults.get(result.item.id);
-    if (!existing || (result.score && result.score < existing.score!)) {
-      const matchedFields = result.matches?.map(match => match.key || '') || [];
-      allResults.set(result.item.id, { 
-        ...result.item, 
-        score: result.score,
-        matchedFields
-      });
-    }
-  });
+  // Limit results
+  const finalPriorityMatches = priorityMatches.slice(0, 15);
+  const finalRelatedMatches = relatedMatches.slice(0, 20);
 
-  // Add word matches
-  wordMatches.forEach(item => {
-    if (!allResults.has(item.id)) {
-      allResults.set(item.id, { ...item, score: 0.5, matchedFields: ['word'] });
-    }
-  });
+  console.log(`[SEARCH] Query: "${query}" - Intent: ${searchIntent.intent}`);
+  console.log(`[SEARCH] Priority matches: ${finalPriorityMatches.length}, Related matches: ${finalRelatedMatches.length}`);
 
-  // Add partial matches
-  partialMatches.forEach(item => {
-    if (!allResults.has(item.id)) {
-      allResults.set(item.id, { ...item, score: 0.7, matchedFields: ['partial'] });
-    }
-  });
-
-  // Convert back to array and sort by score
-  const finalResults = Array.from(allResults.values())
-    .sort((a, b) => (a.score || 0) - (b.score || 0))
-    .slice(0, 50); // Limit to top 50 results
-
-  console.log(`[SEARCH] Query: "${query}" found ${finalResults.length} results`);
-  console.log('[SEARCH] Results breakdown:', {
-    exact: exactMatches.length,
-    fuzzy: fuzzyResults.length,
-    word: wordMatches.length,
-    partial: partialMatches.length,
-    final: finalResults.length
-  });
-
-  return finalResults;
+  return {
+    priorityMatches: finalPriorityMatches,
+    relatedMatches: finalRelatedMatches,
+    totalResults: finalPriorityMatches.length + finalRelatedMatches.length,
+    searchIntent: searchIntent.intent
+  };
 };
 
-// Main search function (legacy compatibility)
+// Legacy search function for backward compatibility
 export const searchAll = (
   query: string,
   data: SearchResult[]
@@ -415,4 +583,3 @@ export const getSearchSuggestions = (
 
   return Array.from(suggestions).slice(0, 8);
 };
-

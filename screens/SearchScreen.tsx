@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -32,7 +31,12 @@ export default function SearchScreen() {
     if (searchQuery.trim() && !isVoiceSearch) {
       performSearch(searchQuery);
     } else if (!searchQuery.trim()) {
-      setSearchResults([]);
+      setSearchResults({
+        priorityMatches: [],
+        relatedMatches: [],
+        totalResults: 0,
+        searchIntent: 'general'
+      });
       setIsVoiceSearch(false);
     }
   }, [searchQuery, profession]);
@@ -48,7 +52,12 @@ export default function SearchScreen() {
 
   const performSearch = async (query: string) => {
     if (!query.trim()) {
-      setSearchResults([]);
+      setSearchResults({
+        priorityMatches: [],
+        relatedMatches: [],
+        totalResults: 0,
+        searchIntent: 'general'
+      });
       return;
     }
 
@@ -62,11 +71,16 @@ export default function SearchScreen() {
 
       console.log('[SEARCH] Performing search for:', query);
       const results = searchContent(query, { notes, tasks, reminders }, profession);
-      console.log('[SEARCH] Results found:', results.length);
+      console.log('[SEARCH] Total results found:', results.totalResults);
       setSearchResults(results);
     } catch (error) {
       console.error('Search error:', error);
-      setSearchResults([]);
+      setSearchResults({
+        priorityMatches: [],
+        relatedMatches: [],
+        totalResults: 0,
+        searchIntent: 'general'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -74,11 +88,11 @@ export default function SearchScreen() {
 
   const handleVoiceSearchRequested = (query: string, results: any[]) => {
     console.log('[SEARCH] Voice search requested:', query, results);
-    
+
     // Set voice search flag to prevent automatic search
     setIsVoiceSearch(true);
     setSearchQuery(query);
-    
+
     // Format the voice search results for display and sort by relevance (lower = better)
     const formattedResults = results
       .map((result: any) => ({
@@ -99,7 +113,7 @@ export default function SearchScreen() {
 
   const handleVoiceCommand = async (result: any) => {
     console.log('[SEARCH] Voice command executed:', result);
-    
+
     // If a note/task/reminder was created, we should refresh the current search
     // to include the newly created item
     if (result.success && (result.data || result.message.includes('Created'))) {
@@ -173,7 +187,12 @@ export default function SearchScreen() {
             style={styles.clearButton}
             onPress={() => {
               setSearchQuery('');
-              setSearchResults([]);
+              setSearchResults({
+                priorityMatches: [],
+                relatedMatches: [],
+                totalResults: 0,
+                searchIntent: 'general'
+              });
               setIsVoiceSearch(false);
             }}
           >
@@ -193,16 +212,41 @@ export default function SearchScreen() {
           <Text style={styles.emptyText}>Enter a search term or use voice search</Text>
           <Text style={styles.emptySubtext}>Search across notes, tasks, and reminders</Text>
         </View>
-      ) : searchResults.length === 0 && !isLoading ? (
+      ) : searchResults.totalResults === 0 && !isLoading ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>No results found</Text>
           <Text style={styles.emptySubtext}>Try different keywords or check your spelling</Text>
         </View>
       ) : (
         <FlatList
-          data={searchResults}
-          keyExtractor={(item, index) => `${item.type}-${item.id || index}`}
-          renderItem={renderSearchResult}
+          data={[
+            // Add section headers and combine results
+            ...(searchResults.priorityMatches.length > 0 ? [
+              { type: 'header', title: 'Priority Matches', intent: searchResults.searchIntent }
+            ] : []),
+            ...searchResults.priorityMatches,
+            ...(searchResults.relatedMatches.length > 0 ? [
+              { type: 'header', title: 'Related Results' }
+            ] : []),
+            ...searchResults.relatedMatches
+          ]}
+          keyExtractor={(item, index) => {
+            if (item.type === 'header') return `header-${index}`;
+            return `${item.type}-${item.id || index}`;
+          }}
+          renderItem={({ item }) => {
+            if (item.type === 'header') {
+              return (
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionHeaderText}>{item.title}</Text>
+                  {item.intent && item.intent !== 'general' && (
+                    <Text style={styles.sectionIntentText}>Intent: {item.intent}</Text>
+                  )}
+                </View>
+              );
+            }
+            return renderSearchResult({ item });
+          }}
           contentContainerStyle={styles.resultsList}
           showsVerticalScrollIndicator={false}
         />
@@ -365,5 +409,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'Inter',
     lineHeight: 25.6,
+  },
+  sectionHeader: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#F2F2F2',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  sectionHeaderText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333333',
+  },
+  sectionIntentText: {
+    fontSize: 14,
+    color: '#777777',
+    fontStyle: 'italic',
   },
 });
