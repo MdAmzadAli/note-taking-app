@@ -22,16 +22,18 @@ export default function SearchScreen() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [profession, setProfession] = useState<ProfessionType>('doctor');
+  const [isVoiceSearch, setIsVoiceSearch] = useState(false);
 
   useEffect(() => {
     loadUserSettings();
   }, []);
 
   useEffect(() => {
-    if (searchQuery.trim()) {
+    if (searchQuery.trim() && !isVoiceSearch) {
       performSearch(searchQuery);
-    } else {
+    } else if (!searchQuery.trim()) {
       setSearchResults([]);
+      setIsVoiceSearch(false);
     }
   }, [searchQuery, profession]);
 
@@ -72,26 +74,42 @@ export default function SearchScreen() {
 
   const handleVoiceSearchRequested = (query: string, results: any[]) => {
     console.log('[SEARCH] Voice search requested:', query, results);
+    
+    // Set voice search flag to prevent automatic search
+    setIsVoiceSearch(true);
     setSearchQuery(query);
     
-    // Format the voice search results for display
-    const formattedResults = results.map((result: any) => ({
-      id: result.item?.id || result.id,
-      type: result.type,
-      title: result.item?.title || result.item?.content?.substring(0, 50) || result.title || 'Untitled',
-      content: result.item?.content || result.item?.description || result.content || result.description,
-      createdAt: result.item?.createdAt || result.item?.dateTime || result.createdAt || result.dateTime,
-      relevance: result.relevance,
-      score: result.score,
-      matchedFields: result.matchedFields
-    }));
+    // Format the voice search results for display and sort by relevance (lower = better)
+    const formattedResults = results
+      .map((result: any) => ({
+        id: result.item?.id || result.id,
+        type: result.type,
+        title: result.item?.title || result.item?.content?.substring(0, 50) || result.title || 'Untitled',
+        content: result.item?.content || result.item?.description || result.content || result.description,
+        createdAt: result.item?.createdAt || result.item?.dateTime || result.createdAt || result.dateTime,
+        relevance: result.relevance,
+        score: result.score,
+        matchedFields: result.matchedFields
+      }))
+      .sort((a, b) => (a.relevance || 0) - (b.relevance || 0)); // Sort by relevance (lower number = higher relevance)
 
+    // Set results directly without triggering performSearch
     setSearchResults(formattedResults);
   };
 
   const handleVoiceCommand = async (result: any) => {
     console.log('[SEARCH] Voice command executed:', result);
-    // Handle other voice commands if needed
+    
+    // If a note/task/reminder was created, we should refresh the current search
+    // to include the newly created item
+    if (result.success && (result.data || result.message.includes('Created'))) {
+      // Small delay to ensure the item is saved
+      setTimeout(() => {
+        if (searchQuery.trim()) {
+          performSearch(searchQuery);
+        }
+      }, 100);
+    }
   };
 
   const renderSearchResult = ({ item }: { item: any }) => (
@@ -101,14 +119,14 @@ export default function SearchScreen() {
         <Text style={styles.resultDate}>
           {new Date(item.createdAt || item.dateTime).toLocaleDateString()}
         </Text>
-        {item.score && (
+        {item.relevance !== undefined && (
           <Text style={styles.resultScore}>
-            {Math.round((1 - item.score) * 100)}% match
+            {Math.round((1 - item.relevance) * 100)}% match
           </Text>
         )}
-        {item.relevance && (
+        {!item.relevance && item.score && (
           <Text style={styles.resultScore}>
-            {Math.round(item.relevance * 100)}% match
+            {Math.round((1 - item.score) * 100)}% match
           </Text>
         )}
       </View>
@@ -156,6 +174,7 @@ export default function SearchScreen() {
             onPress={() => {
               setSearchQuery('');
               setSearchResults([]);
+              setIsVoiceSearch(false);
             }}
           >
             <Text style={styles.clearButtonText}>Clear</Text>

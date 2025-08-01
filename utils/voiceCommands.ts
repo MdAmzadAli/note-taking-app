@@ -231,7 +231,7 @@ export const parseVoiceCommand = (text: string): VoiceCommand => {
   ];
 
   console.log('[VOICE_PARSER] Checking reminder patterns...');
-  for (let i = 0; i < reminderPatterns.length; i++) {
+  for (let i = 0; < reminderPatterns.length; i++) {
     const pattern = reminderPatterns[i];
     const match = text.match(pattern);
     console.log(`[VOICE_PARSER] Reminder pattern ${i}:`, pattern);
@@ -270,7 +270,7 @@ export const parseVoiceCommand = (text: string): VoiceCommand => {
   ];
 
   console.log('[VOICE_PARSER] Checking task patterns...');
-  for (let i = 0; i < taskPatterns.length; i++) {
+  for (let i = 0; < taskPatterns.length; i++) {
     const pattern = taskPatterns[i];
     const match = text.match(pattern);
     console.log(`[VOICE_PARSER] Task pattern ${i}:`, pattern);
@@ -572,7 +572,7 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
     else if (searchTerms.length > 1) {
       const matchedTerms = searchTerms.filter(term => searchText.includes(term));
       const matchRatio = matchedTerms.length / searchTerms.length;
-      
+
       if (matchRatio >= 0.7) { // At least 70% of terms must match
         relevance = 0.3 + (1 - matchRatio) * 0.2; // Better match ratio = lower relevance score
         hasMatch = true;
@@ -627,7 +627,7 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
     else if (searchTerms.length > 1) {
       const matchedTerms = searchTerms.filter(term => searchText.includes(term));
       const matchRatio = matchedTerms.length / searchTerms.length;
-      
+
       if (matchRatio >= 0.7) {
         relevance = 0.3 + (1 - matchRatio) * 0.2 - relevanceBoost;
         hasMatch = true;
@@ -678,7 +678,7 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
     else if (searchTerms.length > 1) {
       const matchedTerms = searchTerms.filter(term => searchText.includes(term));
       const matchRatio = matchedTerms.length / searchTerms.length;
-      
+
       if (matchRatio >= 0.7) {
         relevance = 0.3 + (1 - matchRatio) * 0.2;
         hasMatch = true;
@@ -757,7 +757,8 @@ const handleCreateNoteCommand = async (content: string, profession: string): Pro
     console.log('[VOICE_COMMANDS] Note saved successfully');
 
     const result = {
-      success: true,
+      ```text
+success: true,
       message: `Created note: "${note.title}"`,
       data: note
     };
