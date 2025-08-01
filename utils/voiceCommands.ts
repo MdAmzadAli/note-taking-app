@@ -536,19 +536,18 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
 
   const results: SearchResult[] = [];
 
-  // Clean up the query - remove common search prefixes and task-related terms
+  // Clean up the query - remove common search prefixes but be more lenient
   let cleanQuery = query.toLowerCase().trim();
+  cleanQuery = cleanQuery.replace(/^(search for|find|look for|show me|get me|display)\s+/i, '');
   cleanQuery = cleanQuery.replace(/^(all|my|the)\s+/, '');
-  cleanQuery = cleanQuery.replace(/\s+(which|that)\s+i\s+(have\s+to\s+do|need\s+to\s+do)\s*/, ' ');
-  cleanQuery = cleanQuery.replace(/\s+(tomorrow|today|yesterday)\s*$/, '');
 
   console.log('[VOICE_COMMANDS] Cleaned search query:', cleanQuery);
 
-  // Search with much stricter matching criteria
-  const searchTerms = cleanQuery.split(/\s+/).filter(term => term.length > 2);
+  // More flexible search terms - include smaller words too
+  const searchTerms = cleanQuery.split(/\s+/).filter(term => term.length > 1);
   console.log('[VOICE_COMMANDS] Search terms:', searchTerms);
 
-  // Search notes with very strict relevance requirements
+  // Search notes with more flexible matching
   notes.forEach(note => {
     const content = (note.content || '').toLowerCase();
     const title = (note.title || '').toLowerCase();
@@ -559,32 +558,34 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
 
     // Exact phrase match (highest relevance)
     if (searchText.includes(cleanQuery)) {
-      relevance = 3;
+      relevance = 0.1; // Lower number = higher relevance
       hasMatch = true;
+      console.log('[VOICE_COMMANDS] Exact phrase match found in note:', note.id);
     }
-    // Title exact match
+    // Title contains query
     else if (title.includes(cleanQuery)) {
-      relevance = 2;
+      relevance = 0.2;
       hasMatch = true;
+      console.log('[VOICE_COMMANDS] Title match found in note:', note.id);
     }
-    // Require ALL search terms to match for multi-term queries
+    // Multi-term search - require at least 70% of terms to match
     else if (searchTerms.length > 1) {
       const matchedTerms = searchTerms.filter(term => searchText.includes(term));
       const matchRatio = matchedTerms.length / searchTerms.length;
-      // Require 100% match for multi-term queries
-      if (matchRatio === 1.0) {
-        relevance = 1.5;
+      
+      if (matchRatio >= 0.7) { // At least 70% of terms must match
+        relevance = 0.3 + (1 - matchRatio) * 0.2; // Better match ratio = lower relevance score
         hasMatch = true;
+        console.log('[VOICE_COMMANDS] Multi-term match found in note:', note.id, 'ratio:', matchRatio);
       }
     }
-    // For single term searches, require exact word match
+    // Single term search - more flexible matching
     else if (searchTerms.length === 1) {
       const searchTerm = searchTerms[0];
-      // Check for whole word match using word boundaries
-      const wordRegex = new RegExp(`\\b${searchTerm}\\b`, 'i');
-      if (wordRegex.test(searchText)) {
-        relevance = 1.0;
+      if (searchText.includes(searchTerm)) {
+        relevance = 0.4;
         hasMatch = true;
+        console.log('[VOICE_COMMANDS] Single term match found in note:', note.id);
       }
     }
 
@@ -597,7 +598,7 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
     }
   });
 
-  // Search tasks with very strict matching
+  // Search tasks with flexible matching
   tasks.forEach(task => {
     const title = task.title.toLowerCase();
     const description = (task.description || '').toLowerCase();
@@ -608,35 +609,38 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
 
     // Check for "tasks" or "task" in query - if present, give higher relevance
     const isTaskQuery = /\btasks?\b/.test(query.toLowerCase());
-    const baseRelevance = isTaskQuery ? 1 : 0;
+    const relevanceBoost = isTaskQuery ? 0.1 : 0;
 
     // Exact phrase match
     if (searchText.includes(cleanQuery)) {
-      relevance = 3 + baseRelevance;
+      relevance = 0.1 - relevanceBoost;
       hasMatch = true;
+      console.log('[VOICE_COMMANDS] Exact phrase match found in task:', task.id);
     }
-    // Title exact match
+    // Title contains query
     else if (title.includes(cleanQuery)) {
-      relevance = 2 + baseRelevance;
+      relevance = 0.2 - relevanceBoost;
       hasMatch = true;
+      console.log('[VOICE_COMMANDS] Title match found in task:', task.id);
     }
-    // Require ALL search terms to match for multi-term queries
+    // Multi-term search - require at least 70% of terms to match
     else if (searchTerms.length > 1) {
       const matchedTerms = searchTerms.filter(term => searchText.includes(term));
       const matchRatio = matchedTerms.length / searchTerms.length;
-      // Require 100% match for multi-term queries
-      if (matchRatio === 1.0) {
-        relevance = 1.5 + baseRelevance;
+      
+      if (matchRatio >= 0.7) {
+        relevance = 0.3 + (1 - matchRatio) * 0.2 - relevanceBoost;
         hasMatch = true;
+        console.log('[VOICE_COMMANDS] Multi-term match found in task:', task.id, 'ratio:', matchRatio);
       }
     }
-    // For single term searches, require exact word match
+    // Single term search
     else if (searchTerms.length === 1) {
       const searchTerm = searchTerms[0];
-      const wordRegex = new RegExp(`\\b${searchTerm}\\b`, 'i');
-      if (wordRegex.test(searchText)) {
-        relevance = 1.0 + baseRelevance;
+      if (searchText.includes(searchTerm)) {
+        relevance = 0.4 - relevanceBoost;
         hasMatch = true;
+        console.log('[VOICE_COMMANDS] Single term match found in task:', task.id);
       }
     }
 
@@ -649,7 +653,7 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
     }
   });
 
-  // Search reminders with very strict matching
+  // Search reminders with flexible matching
   reminders.forEach(reminder => {
     const title = reminder.title.toLowerCase();
     const description = (reminder.description || '').toLowerCase();
@@ -660,31 +664,34 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
 
     // Exact phrase match
     if (searchText.includes(cleanQuery)) {
-      relevance = 3;
+      relevance = 0.1;
       hasMatch = true;
+      console.log('[VOICE_COMMANDS] Exact phrase match found in reminder:', reminder.id);
     }
-    // Title exact match
+    // Title contains query
     else if (title.includes(cleanQuery)) {
-      relevance = 2;
+      relevance = 0.2;
       hasMatch = true;
+      console.log('[VOICE_COMMANDS] Title match found in reminder:', reminder.id);
     }
-    // Require ALL search terms to match for multi-term queries
+    // Multi-term search - require at least 70% of terms to match
     else if (searchTerms.length > 1) {
       const matchedTerms = searchTerms.filter(term => searchText.includes(term));
       const matchRatio = matchedTerms.length / searchTerms.length;
-      // Require 100% match for multi-term queries
-      if (matchRatio === 1.0) {
-        relevance = 1.5;
+      
+      if (matchRatio >= 0.7) {
+        relevance = 0.3 + (1 - matchRatio) * 0.2;
         hasMatch = true;
+        console.log('[VOICE_COMMANDS] Multi-term match found in reminder:', reminder.id, 'ratio:', matchRatio);
       }
     }
-    // For single term searches, require exact word match
+    // Single term search
     else if (searchTerms.length === 1) {
       const searchTerm = searchTerms[0];
-      const wordRegex = new RegExp(`\\b${searchTerm}\\b`, 'i');
-      if (wordRegex.test(searchText)) {
-        relevance = 1.0;
+      if (searchText.includes(searchTerm)) {
+        relevance = 0.4;
         hasMatch = true;
+        console.log('[VOICE_COMMANDS] Single term match found in reminder:', reminder.id);
       }
     }
 
@@ -697,11 +704,16 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
     }
   });
 
-  // Sort by relevance (highest first)
-  results.sort((a, b) => b.relevance - a.relevance);
+  // Sort by relevance (lowest score = highest relevance)
+  results.sort((a, b) => a.relevance - b.relevance);
 
   console.log('[VOICE_COMMANDS] Search results found:', results.length);
-  console.log('[VOICE_COMMANDS] Search results details:', results.map(r => ({ type: r.type, relevance: r.relevance, title: r.item.title || r.item.content?.substring(0, 30) })));
+  console.log('[VOICE_COMMANDS] Search results details:', results.map(r => ({ 
+    type: r.type, 
+    relevance: r.relevance, 
+    title: r.item.title || (r.item as any).content?.substring(0, 50) + '...' || 'Untitled',
+    id: r.item.id
+  })));
 
   const searchResult = {
     success: true,
@@ -709,7 +721,7 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
     data: results
   };
 
-  console.log('[VOICE_COMMANDS] Returning search result:', JSON.stringify(searchResult, null, 2));
+  console.log('[VOICE_COMMANDS] Returning search result with', results.length, 'items');
   return searchResult;
 };
 
@@ -852,7 +864,7 @@ AVAILABLE ACTIONS:
 2. "create_task" - Create tasks with due dates
 3. "create_reminder" - Set reminders with times
 4. "create_note" - Create notes with content
-5. "search" - Search through existing data
+5. "search" - Search through existing data (PRESERVE ORIGINAL SEARCH TERMS)
 
 FIELD TYPES for templates:
 - "text" - Text input field
@@ -866,6 +878,12 @@ EXECUTION STRATEGY:
 - Priority 2: Search commands (always execute after creations to include newly created items)
 - Group similar actions together for efficiency
 - Execute in logical dependency order
+
+SEARCH QUERY RULES:
+- NEVER modify or rephrase the original search terms
+- Use the exact words from the user's input
+- Do NOT add filters unless explicitly requested
+- Preserve the user's intent and language
 
 Return ONLY valid JSON in this exact format:
 {
@@ -881,13 +899,19 @@ Return ONLY valid JSON in this exact format:
         // For task: {"title": "task title", "dueDate": "when due", "description": "optional details"}
         // For reminder: {"title": "reminder title", "time": "when to remind", "description": "optional details"}
         // For note: {"content": "note content", "title": "optional title"}
-        // For search: {"query": "search query", "filters": "optional filters"}
+        // For search: {"query": "EXACT USER SEARCH TERMS - DO NOT MODIFY"}
       },
       "priority": 1-2
     }
   ],
   "reasoning": "Brief explanation of the execution plan strategy"
 }
+
+IMPORTANT FOR SEARCHES:
+- If user says "Find the best book to read in 2025" -> query should be "best book to read in 2025"
+- If user says "Search for patient notes" -> query should be "patient notes"
+- NEVER change singular to plural or add publication years or filters
+- Use the user's exact terminology
 
 COMPLEX EXAMPLES:
 
@@ -947,6 +971,7 @@ IMPORTANT:
 - Use intelligent prioritization (creations before searches)
 - Extract precise parameters for each action
 - Infer missing details logically (default times, dates, field names)
+- PRESERVE ORIGINAL SEARCH TERMS EXACTLY
 - Always provide clear reasoning for the execution strategy
 `;
 

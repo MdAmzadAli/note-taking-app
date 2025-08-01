@@ -545,24 +545,13 @@ export default function NotesScreen() {
 
   const handleSearchRequested = (query: string, results: any[]) => {
     console.log('[NOTES] Search requested with query:', query);
-    console.log('[NOTES] Search results received:', results.length, 'items');
+    console.log('[NOTES] Search results received:', results?.length || 0, 'items');
     console.log('[NOTES] Search results details:', results);
-
-    // Don't set searchQuery for voice search as it affects the main notes list
-    // setSearchQuery(query);
-    setSearchResults(results);
-    setShowSearchModal(true);
-  };
-
-  const handleVoiceSearchRequested = (query: string, results: any[]) => {
-    console.log('[NOTES] Voice search requested with query:', query);
-    console.log('[NOTES] Voice search results received:', results?.length || 0, 'items');
-    console.log('[NOTES] Voice search results details:', results);
 
     // Ensure results is an array and properly formatted
     const safeResults = Array.isArray(results) ? results : [];
     
-    // Format results for SearchResultsModal - handle both direct results and nested structures
+    // Format results for SearchResultsModal
     const formattedResults = safeResults.map(result => {
       // Handle direct search result format
       if (result && result.type && result.item) {
@@ -584,15 +573,21 @@ export default function NotesScreen() {
       return null;
     }).filter(Boolean);
 
-    console.log('[NOTES] Setting voice search state:', { query, formattedResultsCount: formattedResults.length });
+    console.log('[NOTES] Setting search state with', formattedResults.length, 'formatted results');
+    
+    // Use the voice search states for consistency
     setVoiceSearchQuery(query || '');
     setVoiceSearchResults(formattedResults);
     setShowSearchModal(true);
+  };
 
-    console.log('[NOTES] Voice search modal state updated');
-    
-    // Don't reload notes here as it's not necessary and can cause UI flicker
-    // The notes data should remain consistent without manual reload
+  const handleVoiceSearchRequested = (query: string, results: any[]) => {
+    console.log('[NOTES] Voice search requested with query:', query);
+    console.log('[NOTES] Voice search results received:', results?.length || 0, 'items');
+    console.log('[NOTES] Voice search results details:', results);
+
+    // Use the same logic as handleSearchRequested
+    handleSearchRequested(query, results);
   };
 
   return (

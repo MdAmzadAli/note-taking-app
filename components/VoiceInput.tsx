@@ -312,7 +312,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
           console.log('[VOICE] Search results being passed:', finalSearchResults.length, 'items');
           console.log('[VOICE] Search results details:', finalSearchResults);
           console.log('[VOICE] About to call onSearchRequested with:', { query: actualSearchQuery, resultsCount: finalSearchResults.length });
-          
+
           if (onSearchRequested) {
             onSearchRequested(actualSearchQuery, finalSearchResults);
             console.log('[VOICE] onSearchRequested callback executed successfully');
