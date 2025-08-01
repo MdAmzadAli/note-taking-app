@@ -13,6 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import VoiceInput from '@/components/VoiceInput';
 import { CustomTemplate, FieldType } from '@/types';
 import { getCustomTemplates, saveCustomTemplate, deleteCustomTemplate, getUserSettings } from '@/utils/storage';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
