@@ -504,7 +504,8 @@ export default function TasksScreen() {
     );
   }
 
-  console.log('[TASKS] Voice search results received:', results.length, 'items');
+  const handleVoiceSearchRequested = (query: string, results: any[]) => {
+    console.log('[TASKS] Voice search results received:', results.length, 'items');
 
     // Format results for SearchResultsModal
     const formattedResults = results.map(result => ({
