@@ -241,7 +241,7 @@ export const searchContent = (
   console.log(`[SEARCH] Detected intent:`, searchIntent);
 
   const lowerQuery = query.toLowerCase().trim();
-  const queryWords = lowerQuery.split(/\s+/).filter(word => word.length > 1);
+  const queryWords = lowerQuery.split(/\s+/).filter(word => word.length > 0); // Allow single character searches
 
   // PART 1: PRIORITY MATCHES
   const priorityMatches: SearchResult[] = [];
@@ -274,45 +274,32 @@ export const searchContent = (
       matchType = 'content';
       isPriorityMatch = true;
     }
-    // 4. Title word matching (for notes, prioritize title)
-    else if (item.type === 'note' && queryWords.some(word => titleLower.includes(word))) {
+    // 4. Title contains any search terms (flexible matching)
+    else if (queryWords.some(word => titleLower.includes(word))) {
       const matchedWords = queryWords.filter(word => titleLower.includes(word));
       const matchRatio = matchedWords.length / queryWords.length;
       
-      if (matchRatio >= 0.6) { // At least 60% words match in title
-        score = 0.2 + (1 - matchRatio) * 0.1;
-        matchType = 'title';
-        isPriorityMatch = true;
-      }
+      // More lenient - any match in title is priority
+      score = 0.2 + (1 - matchRatio) * 0.1;
+      matchType = 'title';
+      isPriorityMatch = true;
     }
-    // 5. Multi-word matching across all content
-    else if (queryWords.length > 1) {
+    // 5. Content contains any search terms (flexible matching)
+    else if (queryWords.some(word => contentLower.includes(word) || searchTextLower.includes(word))) {
       const matchedWords = queryWords.filter(word => 
-        titleLower.includes(word) || contentLower.includes(word) || searchTextLower.includes(word)
+        contentLower.includes(word) || searchTextLower.includes(word)
       );
       const matchRatio = matchedWords.length / queryWords.length;
 
-      if (matchRatio >= 0.7) { // At least 70% of words match
+      // More lenient - any match in content is priority if ratio is decent
+      if (matchRatio >= 0.3) { // At least 30% of words match
         score = 0.3 + (1 - matchRatio) * 0.2;
         matchType = 'content';
         isPriorityMatch = true;
-      } else if (matchRatio >= 0.4) { // 40-70% match goes to related
+      } else if (matchRatio > 0) { // Some match but lower ratio goes to related
         score = 0.6 + (1 - matchRatio) * 0.3;
         matchType = 'loose';
         isPriorityMatch = false;
-      }
-    }
-    // 6. Single word matching
-    else if (queryWords.length === 1) {
-      const word = queryWords[0];
-      if (titleLower.includes(word)) {
-        score = 0.25;
-        matchType = 'title';
-        isPriorityMatch = true;
-      } else if (contentLower.includes(word) || searchTextLower.includes(word)) {
-        score = 0.4;
-        matchType = 'content';
-        isPriorityMatch = true;
       }
     }
 
@@ -336,7 +323,8 @@ export const searchContent = (
         matchedFields: [matchType]
       };
 
-      if (isPriorityMatch && finalScore <= 0.5) {
+      // More lenient priority matching - include more results as priority
+      if (isPriorityMatch && finalScore <= 0.6) {
         priorityMatches.push(result);
       } else if (finalScore <= 0.9) { // Related matches should still be relevant
         relatedMatches.push(result);
