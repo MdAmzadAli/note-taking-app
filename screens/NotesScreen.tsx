@@ -548,7 +548,8 @@ export default function NotesScreen() {
     console.log('[NOTES] Search results received:', results.length, 'items');
     console.log('[NOTES] Search results details:', results);
 
-    setSearchQuery(query);
+    // Don't set searchQuery for voice search as it affects the main notes list
+    // setSearchQuery(query);
     setSearchResults(results);
     setShowSearchModal(true);
   };
@@ -590,15 +591,8 @@ export default function NotesScreen() {
 
     console.log('[NOTES] Voice search modal state updated');
     
-    // Ensure notes data remains consistent by reloading if needed
-    setTimeout(async () => {
-      console.log('[NOTES] Current state after update - voiceSearchQuery:', query);
-      console.log('[NOTES] Current state after update - voiceSearchResults count:', formattedResults.length);
-      console.log('[NOTES] Current state after update - showSearchModal:', true);
-      
-      // Refresh notes to ensure data consistency
-      await loadNotes();
-    }, 100);
+    // Don't reload notes here as it's not necessary and can cause UI flicker
+    // The notes data should remain consistent without manual reload
   };
 
   return (
