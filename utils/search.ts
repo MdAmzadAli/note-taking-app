@@ -1,4 +1,3 @@
-
 import { Note, Reminder, Task, TemplateEntry } from '@/types';
 
 export interface SearchResult {
@@ -199,21 +198,21 @@ const calculateMatch = (item: SearchResult, searchPhrase: string, keywords: stri
     for (const keyword of keywords) {
       if (keyword.length >= 2) {
         const keywordLower = keyword.toLowerCase();
-        
+
         // Check for exact keyword match in title
         if (title.includes(keywordLower)) {
           titleMatches++;
           bestTitleMatch = true;
           console.log('[SEARCH_MATCH] Keyword match in title:', keyword);
         }
-        
+
         // Check for exact keyword match in content
         if (content.includes(keywordLower)) {
           contentMatches++;
           bestContentMatch = true;
           console.log('[SEARCH_MATCH] Keyword match in content:', keyword);
         }
-        
+
         // Check for partial word matches (e.g., "medic" matches "medicine")
         const titleWords = title.split(/\s+/);
         const contentWords = content.split(/\s+/);
@@ -223,7 +222,7 @@ const calculateMatch = (item: SearchResult, searchPhrase: string, keywords: stri
           bestTitleMatch = true;
           console.log('[SEARCH_MATCH] Partial keyword match in title:', keyword);
         }
-        
+
         if (contentWords.some(word => word.startsWith(keywordLower) || word.includes(keywordLower))) {
           contentMatches += 0.5;
           bestContentMatch = true;
@@ -307,12 +306,11 @@ export const searchContent = (
     contentPreview: item.content.substring(0, 100)
   })));
 
-  // Filter by profession if specified
-  const filteredItems = profession 
-    ? allItems.filter(item => !item.profession || item.profession === profession)
-    : allItems;
+  // For search, include all items regardless of profession to ensure comprehensive results
+  // Users expect to find all their content when searching
+  const filteredItems = allItems;
 
-  console.log('[INTELLIGENT_SEARCH] Items after profession filter:', filteredItems.length);
+  console.log('[INTELLIGENT_SEARCH] Items to search (no profession filter):', filteredItems.length);
 
   // Detect content type intention
   const intentDetection = detectContentTypeIntent(query);
@@ -332,7 +330,7 @@ export const searchContent = (
       type: item.type,
       title: item.title.substring(0, 50)
     });
-    
+
     const match = calculateMatch(item, searchPhrase, keywords);
     if (match) {
       allMatches.push(match);
