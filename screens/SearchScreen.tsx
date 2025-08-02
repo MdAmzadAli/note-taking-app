@@ -188,7 +188,7 @@ export default function SearchScreen() {
           </Text>
           {item.score !== undefined && (
             <Text style={styles.resultScore}>
-              {Math.round((1 - (item.score / 10)) * 100)}% match
+              {Math.round(item.score)}% match
             </Text>
           )}
           {item.relevance !== undefined && (

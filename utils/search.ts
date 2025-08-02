@@ -153,13 +153,14 @@ const convertToSearchableItems = (
   return items;
 };
 
-// Improved matching algorithm with comprehensive search
+// Improved matching algorithm with proper relevance scoring
 const calculateMatch = (item: SearchResult, searchPhrase: string, keywords: string[]): SearchResult | null => {
   const title = item.title.toLowerCase();
   const content = item.content.toLowerCase();
   const phrase = searchPhrase.toLowerCase();
 
-  let score = 1000; // Lower is better
+  let titleScore = 0;
+  let contentScore = 0;
   let matchedIn: 'title' | 'content' = 'title';
   let matchType: 'exact' | 'partial' | 'keyword' = 'keyword';
   let hasMatch = false;
@@ -172,77 +173,99 @@ const calculateMatch = (item: SearchResult, searchPhrase: string, keywords: stri
     keywords
   });
 
-  // 1. Exact phrase match in title (highest priority)
+  // 1. Exact phrase match (highest score)
   if (title.includes(phrase)) {
-    score = 1;
+    titleScore = 100;
     matchedIn = 'title';
     matchType = 'exact';
     hasMatch = true;
     console.log('[SEARCH_MATCH] Exact phrase match in title');
-  }
-  // 2. Exact phrase match in content
-  else if (content.includes(phrase)) {
-    score = 2;
+  } else if (content.includes(phrase)) {
+    contentScore = 100;
     matchedIn = 'content';
     matchType = 'exact';
     hasMatch = true;
     console.log('[SEARCH_MATCH] Exact phrase match in content');
   }
-  // 3. Check for individual keyword matches
+  // 2. Check for individual keyword matches
   else {
-    let titleMatches = 0;
-    let contentMatches = 0;
-    let bestTitleMatch = false;
-    let bestContentMatch = false;
+    let titleKeywordMatches = 0;
+    let contentKeywordMatches = 0;
+    let titlePartialMatches = 0;
+    let contentPartialMatches = 0;
 
     for (const keyword of keywords) {
       if (keyword.length >= 2) {
         const keywordLower = keyword.toLowerCase();
 
+        // Skip common words that don't add meaning
+        if (['to', 'in', 'on', 'at', 'by', 'for', 'the', 'a', 'an'].includes(keywordLower)) {
+          continue;
+        }
+
         // Check for exact keyword match in title
         if (title.includes(keywordLower)) {
-          titleMatches++;
-          bestTitleMatch = true;
+          titleKeywordMatches++;
           console.log('[SEARCH_MATCH] Keyword match in title:', keyword);
         }
 
         // Check for exact keyword match in content
         if (content.includes(keywordLower)) {
-          contentMatches++;
-          bestContentMatch = true;
+          contentKeywordMatches++;
           console.log('[SEARCH_MATCH] Keyword match in content:', keyword);
         }
 
-        // Check for partial word matches (e.g., "medic" matches "medicine")
+        // Check for partial word matches
         const titleWords = title.split(/\s+/);
         const contentWords = content.split(/\s+/);
 
-        if (titleWords.some(word => word.startsWith(keywordLower) || word.includes(keywordLower))) {
-          titleMatches += 0.5; // Partial match gets lower weight
-          bestTitleMatch = true;
+        if (titleWords.some(word => word.startsWith(keywordLower))) {
+          titlePartialMatches++;
           console.log('[SEARCH_MATCH] Partial keyword match in title:', keyword);
         }
 
-        if (contentWords.some(word => word.startsWith(keywordLower) || word.includes(keywordLower))) {
-          contentMatches += 0.5;
-          bestContentMatch = true;
+        if (contentWords.some(word => word.startsWith(keywordLower))) {
+          contentPartialMatches++;
           console.log('[SEARCH_MATCH] Partial keyword match in content:', keyword);
         }
       }
     }
 
-    if (bestTitleMatch && titleMatches > 0) {
-      score = 3 + (1 - Math.min(titleMatches / keywords.length, 1)) * 2;
+    // Filter out common words for meaningful keyword count
+    const meaningfulKeywords = keywords.filter(k => 
+      k.length >= 2 && !['to', 'in', 'on', 'at', 'by', 'for', 'the', 'a', 'an'].includes(k.toLowerCase())
+    );
+
+    if (meaningfulKeywords.length === 0) {
+      console.log('[SEARCH_MATCH] No meaningful keywords found');
+      return null;
+    }
+
+    // Calculate scores based on keyword matches
+    if (titleKeywordMatches > 0 || titlePartialMatches > 0) {
+      // Title scoring: exact matches worth more than partial matches
+      titleScore = Math.min(
+        (titleKeywordMatches * 25 + titlePartialMatches * 15) / meaningfulKeywords.length * 100,
+        100
+      );
       matchedIn = 'title';
-      matchType = titleMatches >= keywords.length ? 'partial' : 'keyword';
+      matchType = titleKeywordMatches >= meaningfulKeywords.length ? 'partial' : 'keyword';
       hasMatch = true;
-      console.log('[SEARCH_MATCH] Title match found, score:', score);
-    } else if (bestContentMatch && contentMatches > 0) {
-      score = 5 + (1 - Math.min(contentMatches / keywords.length, 1)) * 2;
-      matchedIn = 'content';
-      matchType = contentMatches >= keywords.length ? 'partial' : 'keyword';
-      hasMatch = true;
-      console.log('[SEARCH_MATCH] Content match found, score:', score);
+      console.log('[SEARCH_MATCH] Title matches found:', { titleKeywordMatches, titlePartialMatches, titleScore });
+    }
+
+    if (contentKeywordMatches > 0 || contentPartialMatches > 0) {
+      // Content scoring: exact matches worth more than partial matches
+      contentScore = Math.min(
+        (contentKeywordMatches * 25 + contentPartialMatches * 15) / meaningfulKeywords.length * 100,
+        100
+      );
+      if (!hasMatch) {
+        matchedIn = 'content';
+        matchType = contentKeywordMatches >= meaningfulKeywords.length ? 'partial' : 'keyword';
+        hasMatch = true;
+      }
+      console.log('[SEARCH_MATCH] Content matches found:', { contentKeywordMatches, contentPartialMatches, contentScore });
     }
   }
 
@@ -251,8 +274,19 @@ const calculateMatch = (item: SearchResult, searchPhrase: string, keywords: stri
     return null;
   }
 
+  // Calculate final relevance score: title weighted 1.5x more than content
+  const finalScore = Math.round((titleScore * 1.5 + contentScore) / (titleScore > 0 && contentScore > 0 ? 2.5 : titleScore > 0 ? 1.5 : 1));
+
+  // Set minimum relevance threshold - items with score below 25% are considered irrelevant
+  if (finalScore < 25) {
+    console.log('[SEARCH_MATCH] Score below relevance threshold:', finalScore);
+    return null;
+  }
+
   console.log('[SEARCH_MATCH] Final match result:', {
-    score,
+    titleScore,
+    contentScore,
+    finalScore,
     matchedIn,
     matchType,
     hasMatch
@@ -260,7 +294,7 @@ const calculateMatch = (item: SearchResult, searchPhrase: string, keywords: stri
 
   return {
     ...item,
-    score,
+    score: finalScore,
     matchedIn,
     matchType
   };
@@ -344,10 +378,10 @@ export const searchContent = (
     }
   });
 
-  // Sort by score (lower is better), then by title
+  // Sort by score (higher is better), then by title
   allMatches.sort((a, b) => {
     if (a.score !== b.score) {
-      return a.score - b.score;
+      return b.score - a.score; // Higher score first
     }
     return a.title.localeCompare(b.title);
   });
