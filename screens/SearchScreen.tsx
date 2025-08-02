@@ -96,8 +96,21 @@ export default function SearchScreen() {
 
       console.log('[SEARCH] Performing search for:', query);
       const results = searchContent(query, { notes, tasks, reminders }, profession);
-      console.log('[SEARCH] Total results found:', results.totalResults);
-      setSearchResults(results);
+      console.log('[SEARCH] Search results received:', results);
+      console.log('[SEARCH] Primary results:', results.primaryResults?.length);
+      console.log('[SEARCH] Related results:', results.relatedResults?.length);
+
+      // Convert the search results to the expected format
+      const formattedResults = {
+        priorityMatches: results.primaryResults || [],
+        relatedMatches: results.relatedResults || [],
+        totalResults: results.totalResults || 0,
+        searchIntent: results.searchIntent || 'general'
+      };
+
+      console.log('[SEARCH] Formatted results:', formattedResults);
+      console.log('[SEARCH] Total results found:', formattedResults.totalResults);
+      setSearchResults(formattedResults);
     } catch (error) {
       console.error('Search error:', error);
       setSearchResults({
@@ -163,51 +176,75 @@ export default function SearchScreen() {
     setIsVoiceSearch(false);
   };
 
-  const renderSearchResult = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.resultItem}>
-      <View style={styles.resultHeader}>
-        <Text style={styles.resultType}>{item.type}</Text>
-        <Text style={styles.resultDate}>
-          {new Date(item.createdAt || item.dateTime).toLocaleDateString()}
+  const renderSearchResult = ({ item }: { item: any }) => {
+    console.log('[SEARCH_RENDER] Rendering item:', item);
+    
+    return (
+      <TouchableOpacity style={styles.resultItem}>
+        <View style={styles.resultHeader}>
+          <Text style={styles.resultType}>{item.type?.toUpperCase() || 'UNKNOWN'}</Text>
+          <Text style={styles.resultDate}>
+            {new Date(item.createdAt || item.dateTime || Date.now()).toLocaleDateString()}
+          </Text>
+          {item.score !== undefined && (
+            <Text style={styles.resultScore}>
+              {Math.round((1 - (item.score / 10)) * 100)}% match
+            </Text>
+          )}
+          {item.relevance !== undefined && (
+            <Text style={styles.resultScore}>
+              {Math.round((1 - item.relevance) * 100)}% match
+            </Text>
+          )}
+        </View>
+        <Text style={styles.resultTitle} numberOfLines={2}>
+          {item.title || (item.content ? item.content.substring(0, 100) + '...' : 'Untitled')}
         </Text>
-        {item.relevance !== undefined && (
-          <Text style={styles.resultScore}>
-            {Math.round((1 - item.relevance) * 100)}% match
+        {(item.content || item.description) && (
+          <Text style={styles.resultDescription} numberOfLines={2}>
+            {item.content || item.description}
           </Text>
         )}
-        {!item.relevance && item.score && (
-          <Text style={styles.resultScore}>
-            {Math.round((1 - item.score) * 100)}% match
+        {item.matchedIn && (
+          <Text style={styles.matchInfo}>
+            Matched in: {item.matchedIn} ({item.matchType || 'keyword'})
           </Text>
         )}
-      </View>
-      <Text style={styles.resultTitle} numberOfLines={2}>
-        {item.title || (item.content ? item.content.substring(0, 100) + '...' : 'Untitled')}
-      </Text>
-      {(item.content || item.description) && (
-        <Text style={styles.resultDescription} numberOfLines={2}>
-          {item.content || item.description}
-        </Text>
-      )}
-      {item.matchedFields && item.matchedFields.length > 0 && (
-        <Text style={styles.matchInfo}>
-          Matched: {item.matchedFields.join(', ')}
-        </Text>
-      )}
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
-  const allResults = [
-    // Add section headers and combine results
-    ...(searchResults.priorityMatches?.length > 0 ? [
-      { type: 'header', title: 'Priority Matches', intent: searchResults.searchIntent }
-    ] : []),
-    ...searchResults.priorityMatches || [],
-    ...(searchResults.relatedMatches?.length > 0 ? [
-      { type: 'header', title: 'Related Results' }
-    ] : []),
-    ...searchResults.relatedMatches || []
-  ];
+  const allResults = React.useMemo(() => {
+    console.log('[SEARCH_RESULTS] Building results list');
+    console.log('[SEARCH_RESULTS] Priority matches:', searchResults.priorityMatches?.length || 0);
+    console.log('[SEARCH_RESULTS] Related matches:', searchResults.relatedMatches?.length || 0);
+    console.log('[SEARCH_RESULTS] Priority matches data:', searchResults.priorityMatches);
+    console.log('[SEARCH_RESULTS] Related matches data:', searchResults.relatedMatches);
+
+    const results = [
+      // Add section headers and combine results
+      ...(searchResults.priorityMatches?.length > 0 ? [
+        { type: 'header', title: 'Priority Matches', intent: searchResults.searchIntent, id: 'header-priority' }
+      ] : []),
+      ...(searchResults.priorityMatches || []).map((item, index) => ({
+        ...item,
+        id: item.id || `priority-${index}`,
+        displayIndex: index
+      })),
+      ...(searchResults.relatedMatches?.length > 0 ? [
+        { type: 'header', title: 'Related Results', id: 'header-related' }
+      ] : []),
+      ...(searchResults.relatedMatches || []).map((item, index) => ({
+        ...item,
+        id: item.id || `related-${index}`,
+        displayIndex: index
+      }))
+    ];
+
+    console.log('[SEARCH_RESULTS] Final results array:', results.length, 'items');
+    console.log('[SEARCH_RESULTS] Final results preview:', results.slice(0, 3));
+    return results;
+  }, [searchResults]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -267,10 +304,12 @@ export default function SearchScreen() {
               <FlatList
                 data={allResults}
                 keyExtractor={(item, index) => {
-                  if (item.type === 'header') return `header-${index}`;
-                  return `${item.type}-${item.id || index}`;
+                  if (item.type === 'header') return item.id || `header-${index}`;
+                  return item.id || `${item.type || 'unknown'}-${index}`;
                 }}
-                renderItem={({ item }) => {
+                renderItem={({ item, index }) => {
+                  console.log('[SEARCH_RENDER] Rendering item at index', index, ':', item.type, item.title?.substring(0, 30));
+                  
                   if (item.type === 'header') {
                     return (
                       <View style={styles.sectionHeader}>
@@ -286,6 +325,12 @@ export default function SearchScreen() {
                 style={styles.resultsList}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
+                ListEmptyComponent={() => (
+                  <View style={styles.emptyResultsContainer}>
+                    <Text style={styles.emptyResultsText}>No results to display</Text>
+                    <Text style={styles.emptyResultsSubtext}>Debug: {JSON.stringify(searchResults, null, 2)}</Text>
+                  </View>
+                )}
               />
             </>
           )}
