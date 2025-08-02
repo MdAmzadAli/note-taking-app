@@ -257,7 +257,8 @@ export const searchContent = (
   console.log('[SEARCH] Query processing:', {
     originalQuery: query,
     lowerQuery,
-    queryWords
+    queryWords,
+    searchingItemsCount: filteredData.length
   });
 
   const allMatches: SearchResult[] = [];
@@ -271,7 +272,10 @@ export const searchContent = (
     console.log('[SEARCH] Checking item:', {
       id: item.id,
       title: item.title,
-      type: item.type
+      type: item.type,
+      titleLower: titleLower.substring(0, 50),
+      contentLower: contentLower.substring(0, 50),
+      searchTextLower: searchTextLower.substring(0, 50)
     });
 
     let score = 1; // Start with lowest priority score
@@ -283,7 +287,7 @@ export const searchContent = (
       score = 0.01;
       matchType = 'exact';
       hasMatch = true;
-      console.log('[SEARCH] ✓ Exact phrase match found:', item.id, item.title);
+      console.log('[SEARCH] ✓ Exact phrase match found in searchableText:', item.id, item.title);
     }
     // 2. Title exact phrase match
     else if (titleLower.includes(lowerQuery)) {
@@ -309,8 +313,12 @@ export const searchContent = (
         if (titleLower.includes(word)) {
           titleMatches++;
           wordMatches++;
-        } else if (contentLower.includes(word) || searchTextLower.includes(word)) {
+        }
+        if (contentLower.includes(word)) {
           contentMatches++;
+          wordMatches++;
+        }
+        if (searchTextLower.includes(word) && !titleLower.includes(word) && !contentLower.includes(word)) {
           wordMatches++;
         }
       });
@@ -336,15 +344,18 @@ export const searchContent = (
 
     // If we found a match, add it to results
     if (hasMatch) {
-      // Apply intent-based scoring for general searches
-      const intentScore = searchIntent.confidence > 0.5 ? calculateIntentScore({
+      // Apply intent-based scoring
+      const intentScore = calculateIntentScore({
         ...item,
         score,
         matchType
-      } as SearchResult, searchIntent) : 0;
+      } as SearchResult, searchIntent);
 
-      // For general searches, don't apply intent scoring heavily
-      const finalScore = searchIntent.confidence > 0.5 ? Math.max(0, score - intentScore * 0.5) : score;
+      // For specific intent searches, boost matching types
+      let finalScore = score;
+      if (searchIntent.confidence > 0.5 && item.type === searchIntent.intentType) {
+        finalScore = Math.max(0.001, score - 0.05); // Boost priority items
+      }
 
       const result: SearchResult = {
         ...item,
@@ -367,8 +378,15 @@ export const searchContent = (
     }
   });
 
-  // Sort all matches by score (lower = better/higher priority)
-  allMatches.sort((a, b) => (a.score || 0) - (b.score || 0));
+  // Sort all matches by score (lower = better/higher priority), then by title for same scores
+  allMatches.sort((a, b) => {
+    const scoreDiff = (a.score || 0) - (b.score || 0);
+    if (Math.abs(scoreDiff) < 0.001) {
+      // If scores are very close, sort by title then content
+      return a.title.localeCompare(b.title);
+    }
+    return scoreDiff;
+  });
 
   console.log('[SEARCH] ===== ALL MATCHES FOUND =====');
   allMatches.forEach((match, index) => {
@@ -385,20 +403,32 @@ export const searchContent = (
   const priorityMatches: SearchResult[] = [];
   const relatedMatches: SearchResult[] = [];
 
-  allMatches.forEach(match => {
-    // For specific intent searches (task, note, reminder), prioritize matching types
-    if (searchIntent.confidence > 0.5 && match.type === searchIntent.intentType) {
-      priorityMatches.push(match);
-    }
-    // For general searches or high-quality matches, use score-based prioritization
-    else if (searchIntent.confidence <= 0.5 || (match.score !== undefined && match.score <= 0.4)) {
-      priorityMatches.push(match);
-    }
-    // Everything else goes to related
-    else {
-      relatedMatches.push(match);
-    }
-  });
+  if (searchIntent.confidence > 0.5) {
+    // For specific intent searches (e.g., "task about taking medicine")
+    console.log('[SEARCH] Intent-based categorization for:', searchIntent.intent);
+    
+    allMatches.forEach(match => {
+      if (match.type === searchIntent.intentType) {
+        priorityMatches.push(match);
+      } else {
+        relatedMatches.push(match);
+      }
+    });
+  } else {
+    // For general searches (e.g., "best"), show all results prioritized by relevance
+    console.log('[SEARCH] General search categorization');
+    
+    // Put highest relevance items (better scores) in priority
+    const midPoint = Math.ceil(allMatches.length * 0.7); // Top 70% go to priority
+    
+    allMatches.forEach((match, index) => {
+      if (index < midPoint || (match.score !== undefined && match.score <= 0.1)) {
+        priorityMatches.push(match);
+      } else {
+        relatedMatches.push(match);
+      }
+    });
+  }
 
   // Limit results but be generous
   const finalPriorityMatches = priorityMatches.slice(0, 20);
@@ -408,6 +438,14 @@ export const searchContent = (
   console.log(`[SEARCH] Query: "${query}" - Intent: ${searchIntent.intent} (${searchIntent.confidence})`);
   console.log(`[SEARCH] Priority matches: ${finalPriorityMatches.length}, Related matches: ${finalRelatedMatches.length}`);
   console.log(`[SEARCH] Total results: ${finalPriorityMatches.length + finalRelatedMatches.length}`);
+  
+  finalPriorityMatches.forEach((match, i) => {
+    console.log(`[SEARCH] Priority ${i+1}: ${match.type} - ${match.title} (score: ${match.score})`);
+  });
+  
+  finalRelatedMatches.forEach((match, i) => {
+    console.log(`[SEARCH] Related ${i+1}: ${match.type} - ${match.title} (score: ${match.score})`);
+  });
   
   return {
     priorityMatches: finalPriorityMatches,
