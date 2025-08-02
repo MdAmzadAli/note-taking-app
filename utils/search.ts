@@ -220,7 +220,7 @@ export const convertToSearchResults = (
   return results;
 };
 
-// Enhanced comprehensive matching function with more inclusive logic
+// COMPLETELY REWRITTEN: More inclusive and accurate matching function
 const isMatchFound = (searchText: string, title: string, content: string, query: string, queryWords: string[]): {
   hasMatch: boolean;
   priority: number;
@@ -231,97 +231,103 @@ const isMatchFound = (searchText: string, title: string, content: string, query:
   const lowerContent = content.toLowerCase();
   const lowerSearchText = searchText.toLowerCase();
 
+  console.log('[SEARCH] Checking match for:', { title: title.substring(0, 50), query: lowerQuery });
+
   // 1. EXACT PHRASE MATCHING IN TITLE (Highest Priority = 1)
   if (lowerTitle.includes(lowerQuery)) {
+    console.log('[SEARCH] ✓ EXACT PHRASE IN TITLE:', title);
     return { hasMatch: true, priority: 1, matchType: 'title' };
   }
   
   // 2. EXACT PHRASE MATCHING IN CONTENT (Priority = 2)
   if (lowerContent.includes(lowerQuery)) {
+    console.log('[SEARCH] ✓ EXACT PHRASE IN CONTENT:', title);
     return { hasMatch: true, priority: 2, matchType: 'content' };
   }
   
   // 3. EXACT PHRASE MATCHING IN SEARCHABLE TEXT (Priority = 3)
   if (lowerSearchText.includes(lowerQuery)) {
+    console.log('[SEARCH] ✓ EXACT PHRASE IN SEARCHABLE TEXT:', title);
     return { hasMatch: true, priority: 3, matchType: 'exact' };
   }
 
-  // 4. WORD-BY-WORD MATCHING (More Inclusive - 50% threshold instead of 70%)
-  if (queryWords.length > 1) {
-    let titleMatches = 0;
-    let contentMatches = 0;
-    let totalUniqueMatches = 0;
-    const matchedWords = new Set<string>();
+  // 4. INDIVIDUAL WORD MATCHING (Very Inclusive - ANY word matches count)
+  let hasAnyWordMatch = false;
+  let titleWordMatches = 0;
+  let contentWordMatches = 0;
+  let totalWordMatches = 0;
 
-    queryWords.forEach(word => {
-      let wordMatched = false;
-      
+  queryWords.forEach(word => {
+    if (word.length >= 1) { // Even single characters count
       if (lowerTitle.includes(word)) {
-        titleMatches++;
-        wordMatched = true;
+        titleWordMatches++;
+        hasAnyWordMatch = true;
       }
       if (lowerContent.includes(word)) {
-        contentMatches++;
-        wordMatched = true;
+        contentWordMatches++;
+        hasAnyWordMatch = true;
       }
-      if (!wordMatched && lowerSearchText.includes(word)) {
-        wordMatched = true;
+      if (lowerSearchText.includes(word)) {
+        totalWordMatches++;
+        hasAnyWordMatch = true;
       }
-      
-      if (wordMatched) {
-        matchedWords.add(word);
-      }
-    });
+    }
+  });
 
-    totalUniqueMatches = matchedWords.size;
-    const matchRatio = totalUniqueMatches / queryWords.length;
-    
-    // Lowered threshold from 70% to 50% for more inclusive results
-    if (matchRatio >= 0.5) {
-      if (titleMatches > 0) {
-        // Title has some matches - higher priority
-        return { 
-          hasMatch: true, 
-          priority: 4 + (1 - matchRatio), // 4.0 to 4.5 range
-          matchType: 'title' 
-        };
-      } else {
-        // Only content/other matches - lower priority
-        return { 
-          hasMatch: true, 
-          priority: 5 + (1 - matchRatio), // 5.0 to 5.5 range
-          matchType: 'content' 
-        };
-      }
+  if (hasAnyWordMatch) {
+    if (titleWordMatches > 0) {
+      const priority = 4 + (1 - (titleWordMatches / queryWords.length));
+      console.log('[SEARCH] ✓ WORD MATCH IN TITLE:', title, 'matches:', titleWordMatches);
+      return { hasMatch: true, priority, matchType: 'title' };
+    } else if (contentWordMatches > 0) {
+      const priority = 5 + (1 - (contentWordMatches / queryWords.length));
+      console.log('[SEARCH] ✓ WORD MATCH IN CONTENT:', title, 'matches:', contentWordMatches);
+      return { hasMatch: true, priority, matchType: 'content' };
+    } else if (totalWordMatches > 0) {
+      const priority = 6 + (1 - (totalWordMatches / queryWords.length));
+      console.log('[SEARCH] ✓ WORD MATCH IN SEARCHABLE:', title, 'matches:', totalWordMatches);
+      return { hasMatch: true, priority, matchType: 'loose' };
     }
   }
 
-  // 5. SINGLE WORD MATCHING (Very Inclusive)
-  if (queryWords.length === 1) {
-    const word = queryWords[0];
-    
-    if (lowerTitle.includes(word)) {
-      return { hasMatch: true, priority: 6, matchType: 'title' };
-    }
-    
-    if (lowerContent.includes(word)) {
-      return { hasMatch: true, priority: 7, matchType: 'content' };
-    }
-    
-    if (lowerSearchText.includes(word)) {
-      return { hasMatch: true, priority: 8, matchType: 'loose' };
-    }
-  }
-
-  // 6. PARTIAL WORD MATCHING (Most Inclusive)
+  // 5. PARTIAL WORD MATCHING (For words 2+ characters)
   for (const word of queryWords) {
-    if (word.length >= 3) { // Only for words of 3+ characters
-      if (lowerTitle.includes(word) || lowerContent.includes(word) || lowerSearchText.includes(word)) {
+    if (word.length >= 2) {
+      // Check if any text contains this partial word
+      if (lowerTitle.includes(word)) {
+        console.log('[SEARCH] ✓ PARTIAL WORD IN TITLE:', title, 'word:', word);
+        return { hasMatch: true, priority: 7, matchType: 'title' };
+      }
+      if (lowerContent.includes(word)) {
+        console.log('[SEARCH] ✓ PARTIAL WORD IN CONTENT:', title, 'word:', word);
+        return { hasMatch: true, priority: 8, matchType: 'content' };
+      }
+      if (lowerSearchText.includes(word)) {
+        console.log('[SEARCH] ✓ PARTIAL WORD IN SEARCHABLE:', title, 'word:', word);
         return { hasMatch: true, priority: 9, matchType: 'loose' };
       }
     }
   }
 
+  // 6. FUZZY MATCHING (Last resort - check if any query characters exist)
+  const queryChars = lowerQuery.replace(/\s+/g, '').split('');
+  const titleChars = lowerTitle.replace(/\s+/g, '');
+  const contentChars = lowerContent.replace(/\s+/g, '');
+  
+  let charMatches = 0;
+  queryChars.forEach(char => {
+    if (titleChars.includes(char) || contentChars.includes(char)) {
+      charMatches++;
+    }
+  });
+  
+  const charMatchRatio = charMatches / queryChars.length;
+  if (charMatchRatio >= 0.6) { // 60% of characters must match
+    console.log('[SEARCH] ✓ FUZZY MATCH:', title, 'ratio:', charMatchRatio);
+    return { hasMatch: true, priority: 10, matchType: 'loose' };
+  }
+
+  console.log('[SEARCH] ✗ NO MATCH:', title);
   return { hasMatch: false, priority: 999, matchType: 'loose' };
 };
 
@@ -354,7 +360,8 @@ export const searchContent = (
 
   // Detect search intent
   const searchIntent = detectSearchIntent(query);
-  console.log(`[SEARCH] Detected intent:`, searchIntent);
+  console.log(`[SEARCH] ===== STARTING SEARCH =====`);
+  console.log(`[SEARCH] Query: "${query}" - Intent: ${searchIntent.intent} (confidence: ${searchIntent.confidence})`);
 
   const lowerQuery = query.toLowerCase().trim();
   const queryWords = lowerQuery.split(/\s+/).filter(word => word.length > 0);
@@ -368,24 +375,30 @@ export const searchContent = (
 
   const allMatches: SearchResult[] = [];
 
-  // COMPREHENSIVE SEARCH - Check every item thoroughly
-  filteredData.forEach(item => {
+  // COMPREHENSIVE SEARCH - Check every item with more inclusive logic
+  filteredData.forEach((item, index) => {
     const title = item.title || '';
     const content = item.content || '';
     const searchText = item.searchableText || '';
+
+    console.log(`[SEARCH] Checking item ${index + 1}/${filteredData.length}:`, { 
+      id: item.id, 
+      type: item.type, 
+      title: title.substring(0, 30) + '...' 
+    });
 
     const matchResult = isMatchFound(searchText, title, content, lowerQuery, queryWords);
 
     if (matchResult.hasMatch) {
       const result: SearchResult = {
         ...item,
-        score: matchResult.priority, // Use priority as score (lower = better)
+        score: matchResult.priority,
         matchType: matchResult.matchType,
         matchedFields: [matchResult.matchType]
       };
 
       allMatches.push(result);
-      console.log('[SEARCH] ✓ Added to results:', {
+      console.log('[SEARCH] ✅ ADDED TO RESULTS:', {
         id: item.id,
         title: item.title,
         type: item.type,
@@ -394,6 +407,8 @@ export const searchContent = (
       });
     }
   });
+
+  console.log(`[SEARCH] ===== TOTAL MATCHES FOUND: ${allMatches.length} =====`);
 
   // Sort all matches by priority (lower = better), then by title for same priorities
   allMatches.sort((a, b) => {
@@ -404,15 +419,9 @@ export const searchContent = (
     return priorityDiff;
   });
 
-  console.log('[SEARCH] ===== ALL MATCHES FOUND =====');
+  console.log('[SEARCH] ===== SORTED MATCHES =====');
   allMatches.forEach((match, index) => {
-    console.log(`[SEARCH] Match ${index + 1}:`, {
-      id: match.id,
-      title: match.title,
-      type: match.type,
-      priority: match.score,
-      matchType: match.matchType
-    });
+    console.log(`[SEARCH] ${index + 1}. ${match.type.toUpperCase()}: "${match.title}" (priority: ${match.score})`);
   });
 
   // CATEGORIZE RESULTS BASED ON INTENT
@@ -421,18 +430,21 @@ export const searchContent = (
 
   if (searchIntent.confidence > 0.5) {
     // For specific intent searches (e.g., "task about taking medicine")
-    console.log('[SEARCH] Intent-based categorization for:', searchIntent.intent);
+    console.log('[SEARCH] ===== INTENT-BASED CATEGORIZATION =====');
+    console.log('[SEARCH] Detected intent type:', searchIntent.intentType);
     
     allMatches.forEach(match => {
       if (match.type === searchIntent.intentType) {
         priorityMatches.push(match);
+        console.log('[SEARCH] → PRIMARY:', match.type, match.title);
       } else {
         relatedMatches.push(match);
+        console.log('[SEARCH] → RELATED:', match.type, match.title);
       }
     });
   } else {
     // For general searches (e.g., "best"), show all results together
-    console.log('[SEARCH] General search - showing all results in priority');
+    console.log('[SEARCH] ===== GENERAL SEARCH - ALL RESULTS AS PRIMARY =====');
     priorityMatches.push(...allMatches);
   }
 
@@ -440,18 +452,10 @@ export const searchContent = (
   const finalPriorityMatches = priorityMatches.slice(0, 50);
   const finalRelatedMatches = relatedMatches.slice(0, 30);
 
-  console.log(`[SEARCH] ===== FINAL CATEGORIZED RESULTS =====`);
-  console.log(`[SEARCH] Query: "${query}" - Intent: ${searchIntent.intent} (${searchIntent.confidence})`);
-  console.log(`[SEARCH] Priority matches: ${finalPriorityMatches.length}, Related matches: ${finalRelatedMatches.length}`);
+  console.log(`[SEARCH] ===== FINAL RESULTS =====`);
+  console.log(`[SEARCH] Primary matches: ${finalPriorityMatches.length}`);
+  console.log(`[SEARCH] Related matches: ${finalRelatedMatches.length}`);
   console.log(`[SEARCH] Total results: ${finalPriorityMatches.length + finalRelatedMatches.length}`);
-  
-  finalPriorityMatches.forEach((match, i) => {
-    console.log(`[SEARCH] Priority ${i+1}: ${match.type} - ${match.title} (priority: ${match.score})`);
-  });
-  
-  finalRelatedMatches.forEach((match, i) => {
-    console.log(`[SEARCH] Related ${i+1}: ${match.type} - ${match.title} (priority: ${match.score})`);
-  });
   
   return {
     priorityMatches: finalPriorityMatches,
