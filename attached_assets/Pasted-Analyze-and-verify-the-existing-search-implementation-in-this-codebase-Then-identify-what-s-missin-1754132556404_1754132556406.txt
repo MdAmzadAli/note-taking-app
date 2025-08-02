@@ -1,0 +1,64 @@
+Analyze and verify the existing search implementation in this codebase. Then, identify what’s missing or broken based on the expected behavior described below, and fix or enhance the code accordingly.
+
+✅ Step 1 – Analyze Existing Implementation:
+
+Locate the search-related functions or modules.
+
+Identify how search is currently performed: what fields are searched (e.g., title, description), what content types are included (Tasks, Notes, Reminders, Templates), and how results are ordered.
+
+✅ Step 2 – Verify Against the Following Requirements:
+
+General Phrase or Keyword Search:
+
+Should work across all content types (Tasks, Notes, Reminders, Templates).
+
+Show items that contain the entire phrase or any keyword.
+
+Relevance Order:
+Results must be sorted so that:
+
+Items with the keyword/phrase in title appear first.
+
+Then items with it in description.
+
+Intent-Aware Search (e.g., "task about taking medicine"):
+
+If the query mentions a specific type like “task”, restrict Primary Results to that type.
+
+In Primary Results, prioritize:
+
+Exact/partial match of the phrase (e.g., “taking medicine”) in the title.
+
+Then those with it in description.
+
+Then fallback to partial match (e.g., “medicine”).
+
+Related Results:
+
+Search across all other content types.
+
+Show matching results based on the same logic.
+
+Group these separately under a "Related Results" section.
+
+✅ Step 3 – Fix or Improve:
+
+If any required functionality is not implemented, partially implemented, or broken:
+
+Implement the missing parts cleanly.
+
+Optimize for accuracy and performance.
+
+Ensure proper result grouping and ordering is respected (title > description).
+
+✅ Other Expectations:
+
+Search should be case-insensitive.
+
+Support partial word matching (e.g., “medic” → “medicine”).
+
+If no perfect match is found, fall back to partial matches.
+
+Final output should include a structured JSON or similar format that clearly separates "Primary Results" and "Related Results".
+
+🔁 Finally, provide a summary of what was already working, what you added/fixed, and any suggestions for future improvements.
