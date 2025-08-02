@@ -220,10 +220,10 @@ export const convertToSearchResults = (
   return results;
 };
 
-// Enhanced comprehensive matching function
+// Enhanced comprehensive matching function with more inclusive logic
 const isMatchFound = (searchText: string, title: string, content: string, query: string, queryWords: string[]): {
   hasMatch: boolean;
-  score: number;
+  priority: number;
   matchType: 'exact' | 'title' | 'content' | 'loose';
 } => {
   const lowerQuery = query.toLowerCase().trim();
@@ -231,83 +231,98 @@ const isMatchFound = (searchText: string, title: string, content: string, query:
   const lowerContent = content.toLowerCase();
   const lowerSearchText = searchText.toLowerCase();
 
-  // 1. EXACT PHRASE MATCHING (Highest Priority)
-  // Check exact phrase in title first (highest priority)
+  // 1. EXACT PHRASE MATCHING IN TITLE (Highest Priority = 1)
   if (lowerTitle.includes(lowerQuery)) {
-    return { hasMatch: true, score: 0.01, matchType: 'title' };
+    return { hasMatch: true, priority: 1, matchType: 'title' };
   }
   
-  // Check exact phrase in content
+  // 2. EXACT PHRASE MATCHING IN CONTENT (Priority = 2)
   if (lowerContent.includes(lowerQuery)) {
-    return { hasMatch: true, score: 0.02, matchType: 'content' };
+    return { hasMatch: true, priority: 2, matchType: 'content' };
   }
   
-  // Check exact phrase in any searchable text
+  // 3. EXACT PHRASE MATCHING IN SEARCHABLE TEXT (Priority = 3)
   if (lowerSearchText.includes(lowerQuery)) {
-    return { hasMatch: true, score: 0.03, matchType: 'exact' };
+    return { hasMatch: true, priority: 3, matchType: 'exact' };
   }
 
-  // 2. WORD-BY-WORD MATCHING (For multi-word queries)
+  // 4. WORD-BY-WORD MATCHING (More Inclusive - 50% threshold instead of 70%)
   if (queryWords.length > 1) {
     let titleMatches = 0;
     let contentMatches = 0;
-    let totalMatches = 0;
+    let totalUniqueMatches = 0;
+    const matchedWords = new Set<string>();
 
     queryWords.forEach(word => {
+      let wordMatched = false;
+      
       if (lowerTitle.includes(word)) {
         titleMatches++;
-        totalMatches++;
+        wordMatched = true;
       }
       if (lowerContent.includes(word)) {
         contentMatches++;
-        if (!lowerTitle.includes(word)) {
-          totalMatches++; // Only count if not already counted in title
-        }
+        wordMatched = true;
       }
-      if (!lowerTitle.includes(word) && !lowerContent.includes(word) && lowerSearchText.includes(word)) {
-        totalMatches++;
+      if (!wordMatched && lowerSearchText.includes(word)) {
+        wordMatched = true;
+      }
+      
+      if (wordMatched) {
+        matchedWords.add(word);
       }
     });
 
-    // Require at least 70% of words to match for multi-word queries
-    const matchRatio = totalMatches / queryWords.length;
-    if (matchRatio >= 0.7) {
+    totalUniqueMatches = matchedWords.size;
+    const matchRatio = totalUniqueMatches / queryWords.length;
+    
+    // Lowered threshold from 70% to 50% for more inclusive results
+    if (matchRatio >= 0.5) {
       if (titleMatches > 0) {
-        // Title has some matches - prioritize
+        // Title has some matches - higher priority
         return { 
           hasMatch: true, 
-          score: 0.1 + (1 - matchRatio) * 0.1,
+          priority: 4 + (1 - matchRatio), // 4.0 to 4.5 range
           matchType: 'title' 
         };
       } else {
-        // Only content/other matches
+        // Only content/other matches - lower priority
         return { 
           hasMatch: true, 
-          score: 0.2 + (1 - matchRatio) * 0.2,
+          priority: 5 + (1 - matchRatio), // 5.0 to 5.5 range
           matchType: 'content' 
         };
       }
     }
   }
 
-  // 3. SINGLE WORD MATCHING (For single word queries)
+  // 5. SINGLE WORD MATCHING (Very Inclusive)
   if (queryWords.length === 1) {
     const word = queryWords[0];
     
     if (lowerTitle.includes(word)) {
-      return { hasMatch: true, score: 0.3, matchType: 'title' };
+      return { hasMatch: true, priority: 6, matchType: 'title' };
     }
     
     if (lowerContent.includes(word)) {
-      return { hasMatch: true, score: 0.4, matchType: 'content' };
+      return { hasMatch: true, priority: 7, matchType: 'content' };
     }
     
     if (lowerSearchText.includes(word)) {
-      return { hasMatch: true, score: 0.5, matchType: 'loose' };
+      return { hasMatch: true, priority: 8, matchType: 'loose' };
     }
   }
 
-  return { hasMatch: false, score: 1, matchType: 'loose' };
+  // 6. PARTIAL WORD MATCHING (Most Inclusive)
+  for (const word of queryWords) {
+    if (word.length >= 3) { // Only for words of 3+ characters
+      if (lowerTitle.includes(word) || lowerContent.includes(word) || lowerSearchText.includes(word)) {
+        return { hasMatch: true, priority: 9, matchType: 'loose' };
+      }
+    }
+  }
+
+  return { hasMatch: false, priority: 999, matchType: 'loose' };
 };
 
 // Enhanced search function with comprehensive matching
@@ -359,32 +374,12 @@ export const searchContent = (
     const content = item.content || '';
     const searchText = item.searchableText || '';
 
-    console.log('[SEARCH] Checking item:', {
-      id: item.id,
-      title: item.title,
-      type: item.type
-    });
-
     const matchResult = isMatchFound(searchText, title, content, lowerQuery, queryWords);
 
     if (matchResult.hasMatch) {
-      // Apply intent-based scoring
-      const intentScore = calculateIntentScore({
-        ...item,
-        score: matchResult.score,
-        matchType: matchResult.matchType
-      } as SearchResult, searchIntent);
-
-      // For specific intent searches, boost matching types
-      let finalScore = matchResult.score;
-      if (searchIntent.confidence > 0.5 && item.type === searchIntent.intentType) {
-        finalScore = Math.max(0.001, matchResult.score - 0.05); // Boost priority items
-      }
-
       const result: SearchResult = {
         ...item,
-        score: finalScore,
-        intentScore,
+        score: matchResult.priority, // Use priority as score (lower = better)
         matchType: matchResult.matchType,
         matchedFields: [matchResult.matchType]
       };
@@ -394,22 +389,19 @@ export const searchContent = (
         id: item.id,
         title: item.title,
         type: item.type,
-        score: finalScore,
+        priority: matchResult.priority,
         matchType: matchResult.matchType
       });
-    } else {
-      console.log('[SEARCH] ✗ No match found for:', item.id, item.title);
     }
   });
 
-  // Sort all matches by score (lower = better/higher priority), then by title for same scores
+  // Sort all matches by priority (lower = better), then by title for same priorities
   allMatches.sort((a, b) => {
-    const scoreDiff = (a.score || 0) - (b.score || 0);
-    if (Math.abs(scoreDiff) < 0.001) {
-      // If scores are very close, sort by title then content
+    const priorityDiff = (a.score || 999) - (b.score || 999);
+    if (priorityDiff === 0) {
       return a.title.localeCompare(b.title);
     }
-    return scoreDiff;
+    return priorityDiff;
   });
 
   console.log('[SEARCH] ===== ALL MATCHES FOUND =====');
@@ -418,12 +410,12 @@ export const searchContent = (
       id: match.id,
       title: match.title,
       type: match.type,
-      score: match.score,
+      priority: match.score,
       matchType: match.matchType
     });
   });
 
-  // CATEGORIZE RESULTS BASED ON INTENT AND SCORE
+  // CATEGORIZE RESULTS BASED ON INTENT
   const priorityMatches: SearchResult[] = [];
   const relatedMatches: SearchResult[] = [];
 
@@ -439,15 +431,9 @@ export const searchContent = (
       }
     });
   } else {
-    // For general searches (e.g., "best"), show all results with no artificial splitting
+    // For general searches (e.g., "best"), show all results together
     console.log('[SEARCH] General search - showing all results in priority');
-    
-    // For general searches, put ALL results in priority, ordered by relevance (title > description)
-    allMatches.forEach(match => {
-      priorityMatches.push(match);
-    });
-    
-    // Keep related empty for general searches since we want all results together
+    priorityMatches.push(...allMatches);
   }
 
   // Limit results but be generous
@@ -460,11 +446,11 @@ export const searchContent = (
   console.log(`[SEARCH] Total results: ${finalPriorityMatches.length + finalRelatedMatches.length}`);
   
   finalPriorityMatches.forEach((match, i) => {
-    console.log(`[SEARCH] Priority ${i+1}: ${match.type} - ${match.title} (score: ${match.score})`);
+    console.log(`[SEARCH] Priority ${i+1}: ${match.type} - ${match.title} (priority: ${match.score})`);
   });
   
   finalRelatedMatches.forEach((match, i) => {
-    console.log(`[SEARCH] Related ${i+1}: ${match.type} - ${match.title} (score: ${match.score})`);
+    console.log(`[SEARCH] Related ${i+1}: ${match.type} - ${match.title} (priority: ${match.score})`);
   });
   
   return {
