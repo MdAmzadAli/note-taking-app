@@ -1,3 +1,4 @@
+
 import { Note, Reminder, Task, TemplateEntry } from '@/types';
 
 export interface SearchResult {
@@ -74,7 +75,7 @@ const detectContentTypeIntent = (query: string): { type: string | null; confiden
   };
 };
 
-// Convert data to searchable format
+// Convert data to searchable format with comprehensive content extraction
 const convertToSearchableItems = (
   notes: Note[],
   reminders: Reminder[],
@@ -83,15 +84,18 @@ const convertToSearchableItems = (
 ): SearchResult[] => {
   const items: SearchResult[] = [];
 
-  // Convert notes
+  // Convert notes - search in title, content, and all field values
   notes.forEach(note => {
     const fieldValues = Object.values(note.fields || {});
-    const content = note.content || fieldValues.join(' ');
+    const allContent = [
+      note.content || '',
+      ...fieldValues
+    ].filter(Boolean).join(' ');
 
     items.push({
       id: note.id,
       title: note.title || 'Untitled Note',
-      content: content,
+      content: allContent,
       type: 'note',
       createdAt: note.createdAt,
       profession: note.profession,
@@ -150,7 +154,7 @@ const convertToSearchableItems = (
   return items;
 };
 
-// Calculate match score and details
+// Improved matching algorithm with comprehensive search
 const calculateMatch = (item: SearchResult, searchPhrase: string, keywords: string[]): SearchResult | null => {
   const title = item.title.toLowerCase();
   const content = item.content.toLowerCase();
@@ -161,12 +165,21 @@ const calculateMatch = (item: SearchResult, searchPhrase: string, keywords: stri
   let matchType: 'exact' | 'partial' | 'keyword' = 'keyword';
   let hasMatch = false;
 
+  console.log('[SEARCH_MATCH] Checking item:', {
+    type: item.type,
+    title: item.title.substring(0, 30),
+    contentLength: item.content.length,
+    phrase,
+    keywords
+  });
+
   // 1. Exact phrase match in title (highest priority)
   if (title.includes(phrase)) {
     score = 1;
     matchedIn = 'title';
     matchType = 'exact';
     hasMatch = true;
+    console.log('[SEARCH_MATCH] Exact phrase match in title');
   }
   // 2. Exact phrase match in content
   else if (content.includes(phrase)) {
@@ -174,48 +187,77 @@ const calculateMatch = (item: SearchResult, searchPhrase: string, keywords: stri
     matchedIn = 'content';
     matchType = 'exact';
     hasMatch = true;
+    console.log('[SEARCH_MATCH] Exact phrase match in content');
   }
-  // 3. Partial word matches in title
+  // 3. Check for individual keyword matches
   else {
     let titleMatches = 0;
     let contentMatches = 0;
+    let bestTitleMatch = false;
+    let bestContentMatch = false;
 
     for (const keyword of keywords) {
       if (keyword.length >= 2) {
-        // Check for partial matches (e.g., "medic" matches "medicine")
-        if (title.includes(keyword)) {
+        const keywordLower = keyword.toLowerCase();
+        
+        // Check for exact keyword match in title
+        if (title.includes(keywordLower)) {
           titleMatches++;
-        } else if (content.includes(keyword)) {
-          contentMatches++;
+          bestTitleMatch = true;
+          console.log('[SEARCH_MATCH] Keyword match in title:', keyword);
         }
-        // Check if title/content words start with the keyword
+        
+        // Check for exact keyword match in content
+        if (content.includes(keywordLower)) {
+          contentMatches++;
+          bestContentMatch = true;
+          console.log('[SEARCH_MATCH] Keyword match in content:', keyword);
+        }
+        
+        // Check for partial word matches (e.g., "medic" matches "medicine")
         const titleWords = title.split(/\s+/);
         const contentWords = content.split(/\s+/);
 
-        if (titleWords.some(word => word.startsWith(keyword))) {
-          titleMatches++;
-        } else if (contentWords.some(word => word.startsWith(keyword))) {
-          contentMatches++;
+        if (titleWords.some(word => word.startsWith(keywordLower) || word.includes(keywordLower))) {
+          titleMatches += 0.5; // Partial match gets lower weight
+          bestTitleMatch = true;
+          console.log('[SEARCH_MATCH] Partial keyword match in title:', keyword);
+        }
+        
+        if (contentWords.some(word => word.startsWith(keywordLower) || word.includes(keywordLower))) {
+          contentMatches += 0.5;
+          bestContentMatch = true;
+          console.log('[SEARCH_MATCH] Partial keyword match in content:', keyword);
         }
       }
     }
 
-    if (titleMatches > 0) {
-      score = 3 + (1 - titleMatches / keywords.length) * 2;
+    if (bestTitleMatch && titleMatches > 0) {
+      score = 3 + (1 - Math.min(titleMatches / keywords.length, 1)) * 2;
       matchedIn = 'title';
-      matchType = titleMatches === keywords.length ? 'partial' : 'keyword';
+      matchType = titleMatches >= keywords.length ? 'partial' : 'keyword';
       hasMatch = true;
-    } else if (contentMatches > 0) {
-      score = 5 + (1 - contentMatches / keywords.length) * 2;
+      console.log('[SEARCH_MATCH] Title match found, score:', score);
+    } else if (bestContentMatch && contentMatches > 0) {
+      score = 5 + (1 - Math.min(contentMatches / keywords.length, 1)) * 2;
       matchedIn = 'content';
-      matchType = contentMatches === keywords.length ? 'partial' : 'keyword';
+      matchType = contentMatches >= keywords.length ? 'partial' : 'keyword';
       hasMatch = true;
+      console.log('[SEARCH_MATCH] Content match found, score:', score);
     }
   }
 
   if (!hasMatch) {
+    console.log('[SEARCH_MATCH] No match found');
     return null;
   }
+
+  console.log('[SEARCH_MATCH] Final match result:', {
+    score,
+    matchedIn,
+    matchType,
+    hasMatch
+  });
 
   return {
     ...item,
@@ -258,10 +300,19 @@ export const searchContent = (
     templates: allItems.filter(i => i.type === 'template').length
   });
 
+  // Sample of items for debugging
+  console.log('[INTELLIGENT_SEARCH] Sample items:', allItems.slice(0, 3).map(item => ({
+    type: item.type,
+    title: item.title,
+    contentPreview: item.content.substring(0, 100)
+  })));
+
   // Filter by profession if specified
   const filteredItems = profession 
     ? allItems.filter(item => !item.profession || item.profession === profession)
     : allItems;
+
+  console.log('[INTELLIGENT_SEARCH] Items after profession filter:', filteredItems.length);
 
   // Detect content type intention
   const intentDetection = detectContentTypeIntent(query);
@@ -276,11 +327,16 @@ export const searchContent = (
   // Find all matches
   const allMatches: SearchResult[] = [];
 
-  filteredItems.forEach(item => {
+  filteredItems.forEach((item, index) => {
+    console.log(`[INTELLIGENT_SEARCH] Processing item ${index + 1}/${filteredItems.length}:`, {
+      type: item.type,
+      title: item.title.substring(0, 50)
+    });
+    
     const match = calculateMatch(item, searchPhrase, keywords);
     if (match) {
       allMatches.push(match);
-      console.log('[INTELLIGENT_SEARCH] Match found:', {
+      console.log('[INTELLIGENT_SEARCH] Match added:', {
         type: item.type,
         title: item.title.substring(0, 30),
         score: match.score,
@@ -299,6 +355,12 @@ export const searchContent = (
   });
 
   console.log('[INTELLIGENT_SEARCH] Total matches found:', allMatches.length);
+  console.log('[INTELLIGENT_SEARCH] Top matches:', allMatches.slice(0, 5).map(m => ({
+    type: m.type,
+    title: m.title.substring(0, 30),
+    score: m.score,
+    matchedIn: m.matchedIn
+  })));
 
   // Separate into primary and related results based on intent
   let primaryResults: SearchResult[] = [];
