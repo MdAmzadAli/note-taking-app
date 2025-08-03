@@ -170,6 +170,9 @@ const HELP_PATTERNS = [
   /(?:what\s+)?(?:are\s+)?(?:your\s+)?(?:capabilities|functions|features)/i,
   /(?:list\s+)?(?:all\s+)?(?:available\s+)?(?:commands|functions|features)/i,
   /(?:how\s+)?(?:can\s+)?(?:i\s+use\s+)?(?:this\s+app|you)/i,
+  /tell\s+me\s+what\s+all\s+(?:you\s+)?can\s+do/i,
+  /what\s+all\s+can\s+you\s+do/i,
+  /(?:show|list)\s+(?:me\s+)?(?:all\s+)?(?:your\s+)?capabilities/i,
 ];
 
 export const parseVoiceCommand = (text: string): VoiceCommand => {
@@ -512,6 +515,17 @@ export const executeVoiceCommand = async (
 
       default:
         console.log('[VOICE_COMMANDS] UNKNOWN command intent:', enhancedCommand.intent);
+        
+        // Check if this might be a help request that wasn't caught
+        const lowerText = command.originalText.toLowerCase();
+        const helpKeywords = ['what', 'can', 'do', 'help', 'capabilities', 'features', 'functions', 'commands'];
+        const hasHelpKeywords = helpKeywords.some(keyword => lowerText.includes(keyword));
+        
+        if (hasHelpKeywords) {
+          console.log('[VOICE_COMMANDS] Treating as help request due to help keywords');
+          return handleShowHelpCommand();
+        }
+        
         return {
           success: false,
           message: `I didn't understand the command: "${command.originalText}". Try saying "create note", "set reminder", "create task", "search for", or "what can you do" for help.`
@@ -925,7 +939,7 @@ const handleShowHelpCommand = (): { success: boolean; message: string; data: any
 
   return {
     success: true,
-    message: "Here are my capabilities and features:",
+    message: "show_capabilities",
     data: capabilities
   };
 };
@@ -944,6 +958,16 @@ const processComplexCommand = async (text: string, profession: string): Promise<
 }> => {
   console.log('[VOICE_COMMANDS] ===== PROCESSING COMPLEX AI AGENT COMMAND =====');
   console.log('[VOICE_COMMANDS] Raw text:', text);
+
+  // Check if this is a help/capabilities request - don't process as complex command
+  const lowerText = text.toLowerCase();
+  const helpKeywords = ['what can you do', 'tell me what', 'your capabilities', 'what all can', 'show me features', 'help', 'what are your'];
+  const isHelpRequest = helpKeywords.some(keyword => lowerText.includes(keyword));
+  
+  if (isHelpRequest) {
+    console.log('[VOICE_COMMANDS] Detected help request, skipping complex command processing');
+    return { isComplexCommand: false, executionPlan: [], reasoning: 'Help request detected' };
+  }
 
   try {
     if (!isGeminiInitialized()) {

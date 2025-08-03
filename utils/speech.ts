@@ -539,11 +539,13 @@ For example:
   → "Patient consultation: Patient presented with headache symptoms during today's visit. Requires follow-up assessment."
 
 Understand the user's intent and extract relevant information. Focus on these command types:
-1. SHOW HELP: "what can you do", "tell me your capabilities", "show me features", "help", "what are your functions"
+1. SHOW HELP: "what can you do", "tell me your capabilities", "show me features", "help", "what are your functions", "tell me what all you can do", "what all can you do", "list your capabilities", "show capabilities"
 2. CREATE NOTE: "create note", "new note", "add note", "write note", "make note"
 3. SET REMINDER: "set reminder", "remind me", "create reminder", "schedule reminder"  
 4. CREATE TASK: "create task", "new task", "add task", "make task", "todo"
 5. SEARCH: "search for", "find", "look for", "show me"
+
+IMPORTANT: For SHOW HELP commands, NEVER create templates or perform searches. These are requests to display capabilities, not to create anything.
 
 Return ONLY valid JSON in this exact format:
 {

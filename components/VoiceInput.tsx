@@ -327,6 +327,16 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
             setShowModal(false);
             resetState();
           }, 500);
+        } else if (executionResult.message === 'show_capabilities') {
+          console.log('[VOICE] ===== SHOW CAPABILITIES COMMAND =====');
+          console.log('[VOICE] Displaying capabilities modal');
+          
+          // Close voice modal and show capabilities
+          setShowModal(false);
+          resetState();
+          
+          // Display capabilities modal
+          displayHelpModal(executionResult.data);
         } else {
           console.log('[VOICE] ===== NON-SEARCH COMMAND SUCCESS =====');
           console.log('[VOICE] onCommandExecuted callback available:', !!onCommandExecuted);
@@ -634,13 +644,19 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
         <View style={styles.modalOverlay}>
           <View style={styles.helpModalContainer}>
             <View style={styles.helpHeader}>
-              <Text style={styles.helpTitle}>App Capabilities</Text>
+              <Text style={styles.helpTitle}>What I Can Do</Text>
               <TouchableOpacity 
                 style={styles.closeButton}
                 onPress={() => setShowHelpModalState(false)}
               >
                 <IconSymbol size={24} name="xmark" color="#666" />
               </TouchableOpacity>
+            </View>
+
+            <View style={styles.sorryMessage}>
+              <Text style={styles.sorryText}>
+                Sorry, this request is beyond my capabilities right now. Here's what I can help you with:
+              </Text>
             </View>
 
             <ScrollView style={styles.helpContent} showsVerticalScrollIndicator={false}>
@@ -1170,6 +1186,20 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontFamily: 'Inter',
     marginBottom: 4,
+    lineHeight: 20,
+  },
+  sorryMessage: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 8,
+    padding: 16,
+    margin: 20,
+    marginTop: 0,
+  },
+  sorryText: {
+    fontSize: 14,
+    color: '#92400E',
+    fontFamily: 'Inter',
+    textAlign: 'center',
     lineHeight: 20,
   },
 });
