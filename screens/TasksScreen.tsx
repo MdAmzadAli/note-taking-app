@@ -46,7 +46,7 @@ export default function TasksScreen() {
 
   useEffect(() => {
     const taskCreatedListener = (task: Task) => {
-      setTasks(prevTasks => [...prevTasks, task]);
+      setTasks(prevTasks => [task, ...prevTasks]);
     };
 
     const taskUpdatedListener = (updatedTask: Task) => {
@@ -92,7 +92,9 @@ export default function TasksScreen() {
   const loadTasksAndSettings = async () => {
     try {
       const tasksData = await getTasks();
-      setTasks(tasksData);
+      // Sort tasks by creation date, newest first
+      const sortedTasks = tasksData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setTasks(sortedTasks);
     } catch (error) {
       console.error('Error loading tasks:', error);
     }

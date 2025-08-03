@@ -21,7 +21,7 @@ import { eventBus, EVENTS } from '@/utils/eventBus';
 
 export default function TemplatesScreen() {
   const [templates, setTemplates] = useState<CustomTemplate[]>([]);
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -43,7 +43,9 @@ export default function TemplatesScreen() {
   const loadTemplatesAndSettings = async () => {
     try {
       const templatesData = await getCustomTemplates();
-      setTemplates(templatesData);
+      // Sort templates by creation date, newest first
+      const sortedTemplates = templatesData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setTemplates(sortedTemplates);
     } catch (error) {
       console.error('Error loading templates:', error);
     }

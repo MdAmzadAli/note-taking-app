@@ -67,8 +67,10 @@ export default function RemindersScreen() {
   const loadRemindersAndSettings = async () => {
     try {
       const remindersData = await getReminders();
-      setReminders(remindersData);
-      setFilteredReminders(remindersData);
+      // Sort reminders by creation date, newest first
+      const sortedReminders = remindersData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setReminders(sortedReminders);
+      setFilteredReminders(sortedReminders);
     } catch (error) {
       console.error('Error loading reminders:', error);
     }

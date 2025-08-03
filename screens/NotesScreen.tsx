@@ -228,6 +228,8 @@ export default function NotesScreen() {
           updatedAt: now,
         };
         await saveNote(newNote);
+                // Update notes to place the new note at the top
+        setNotes(prevNotes => [newNote, ...prevNotes]);
       }
 
       // First reload notes to ensure data persistence
@@ -446,7 +448,9 @@ export default function NotesScreen() {
     // Subscribe to real-time events from other screens
     const unsubscribeNoteCreated = eventBus.subscribe(EVENTS.NOTE_CREATED, (newNote: Note) => {
       console.log('[NOTES] Real-time: Note created from external source');
-      setNotes(prevNotes => [...prevNotes, newNote]);
+      // Ensure new notes created via voice are placed at the top
+      setNotes(prevNotes => [newNote, ...prevNotes]);
+      setFilteredNotes(prevNotes => [newNote, ...prevNotes]);
     });
 
     const unsubscribeNoteUpdated = eventBus.subscribe(EVENTS.NOTE_UPDATED, (updatedNote: Note) => {
