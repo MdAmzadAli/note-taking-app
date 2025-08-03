@@ -87,13 +87,11 @@ const VoiceInput = ({ profession, voiceRecognitionMethod, onCommandExecuted, onS
   const loadUserSettings = async () => {
     try {
       const settings = await getUserSettings();
-      setProfession(settings.profession);
 
       // Set voice recognition method and language
       const method = (settings.voiceRecognitionMethod || 'assemblyai-regex') as VoiceRecognitionMethod;
       const language = settings.voiceLanguage || 'en-US';
       setVoiceMethod(method);
-      setVoiceLanguage(language);
       setVoiceLanguage(language);
 
       console.log('[VOICE] Loaded voice method from settings:', method);
@@ -587,9 +585,7 @@ const VoiceInput = ({ profession, voiceRecognitionMethod, onCommandExecuted, onS
   };
 
 
-  useEffect(() => {
-    checkVoiceSupport();
-  }, []);
+  
 
   // Sync voice method with props when settings change
   useEffect(() => {
@@ -889,10 +885,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
   closeButton: {
-padding: 8,
+    padding: 8,
   },
   closeButtonText: {
     fontSize: 18,
+    color: '#6B7280',
+    fontWeight: 'bold',
   },
   warningContainer: {
     backgroundColor: '#FEF3C7',
