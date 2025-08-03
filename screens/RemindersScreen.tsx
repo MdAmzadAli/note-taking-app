@@ -41,7 +41,8 @@ export default function RemindersScreen() {
   const [isRecurring, setIsRecurring] = useState(false);
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [selectedTimes, setSelectedTimes] = useState<string[]>(['09:00']);
-  const [newTimeInput, setNewTimeInput] = useState('');
+  const [newTime, setNewTime] = useState(new Date());
+  const [showNewTimePicker, setShowNewTimePicker] = useState(false);
 
   useEffect(() => {
     loadRemindersAndSettings();
@@ -188,7 +189,7 @@ export default function RemindersScreen() {
       setIsRecurring(false);
       setSelectedDays([]);
       setSelectedTimes(['09:00']);
-      setNewTimeInput('');
+      setNewTime(new Date());
       setIsCreating(false);
     } catch (error) {
       console.error('Error creating reminder:', error);
@@ -335,24 +336,22 @@ export default function RemindersScreen() {
   };
 
   const addTime = () => {
-    if (!newTimeInput.trim()) {
-      Alert.alert('Error', 'Please enter a time in HH:MM format');
-      return;
-    }
-
-    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    if (!timeRegex.test(newTimeInput)) {
-      Alert.alert('Error', 'Please enter a valid time in HH:MM format (e.g., 09:30)');
-      return;
-    }
-
-    if (selectedTimes.includes(newTimeInput)) {
+    const timeString = newTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    
+    if (selectedTimes.includes(timeString)) {
       Alert.alert('Error', 'This time is already added');
       return;
     }
 
-    setSelectedTimes(prev => [...prev, newTimeInput].sort());
-    setNewTimeInput('');
+    setSelectedTimes(prev => [...prev, timeString].sort());
+    setNewTime(new Date()); // Reset to current time
+  };
+
+  const onNewTimeChange = (event: any, selectedTime?: Date) => {
+    setShowNewTimePicker(false);
+    if (selectedTime) {
+      setNewTime(selectedTime);
+    }
   };
 
   const removeTime = (timeToRemove: string) => {
@@ -476,7 +475,7 @@ export default function RemindersScreen() {
                 setIsRecurring(false);
                 setSelectedDays([]);
                 setSelectedTimes(['09:00']);
-                setNewTimeInput('');
+                setNewTime(new Date());
               }}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -581,20 +580,30 @@ export default function RemindersScreen() {
                 </View>
                 
                 <View style={styles.addTimeContainer}>
-                  <TextInput
-                    style={styles.timeInput}
-                    value={newTimeInput}
-                    onChangeText={setNewTimeInput}
-                    placeholder="HH:MM (e.g., 14:30)"
-                    placeholderTextColor="#6B7280"
-                  />
+                  <TouchableOpacity
+                    style={styles.timePickerButton}
+                    onPress={() => setShowNewTimePicker(true)}
+                  >
+                    <Text style={styles.timePickerButtonText}>
+                      🕐 {newTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.addTimeButton}
                     onPress={addTime}
                   >
-                    <Text style={styles.addTimeButtonText}>Add</Text>
+                    <Text style={styles.addTimeButtonText}>Add Time</Text>
                   </TouchableOpacity>
                 </View>
+
+                {showNewTimePicker && (
+                  <DateTimePicker
+                    value={newTime}
+                    mode="time"
+                    display="default"
+                    onChange={onNewTimeChange}
+                  />
+                )}
               </View>
             </>
           ) : (
@@ -1057,7 +1066,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  timeInput: {
+  timePickerButton: {
     flex: 1,
     borderWidth: 1,
     borderColor: '#E5E7EB',
@@ -1065,9 +1074,14 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#FFFFFF',
-    fontFamily: 'Inter',
-    color: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
     minHeight: 44,
+  },
+  timePickerButtonText: {
+    fontSize: 16,
+    color: '#000000',
+    fontFamily: 'Inter',
   },
   addTimeButton: {
     paddingHorizontal: 16,
