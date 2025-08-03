@@ -42,12 +42,17 @@ export default function TemplatesScreen() {
     // Subscribe to real-time template events
     const unsubscribeCreated = eventBus.subscribe(EVENTS.TEMPLATE_CREATED, () => {
       console.log('[TEMPLATES] Real-time: Template created, reloading...');
-      loadTemplatesAndSettings();
+      // Add small delay to ensure storage operation completes
+      setTimeout(() => {
+        loadTemplatesAndSettings();
+      }, 100);
     });
 
     const unsubscribeUpdated = eventBus.subscribe(EVENTS.TEMPLATE_UPDATED, () => {
       console.log('[TEMPLATES] Real-time: Template updated, reloading...');
-      loadTemplatesAndSettings();
+      setTimeout(() => {
+        loadTemplatesAndSettings();
+      }, 100);
     });
 
     return () => {
@@ -58,12 +63,19 @@ export default function TemplatesScreen() {
 
   const loadTemplatesAndSettings = async () => {
     try {
+      console.log('[TEMPLATES] Loading templates from storage...');
       const templatesData = await getCustomTemplates();
+      console.log('[TEMPLATES] Retrieved templates from storage:', templatesData.length);
+      
       // Sort templates by creation date, newest first
       const sortedTemplates = templatesData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setTemplates(sortedTemplates);
+      console.log('[TEMPLATES] Setting templates state with', sortedTemplates.length, 'templates');
+      
+      // Force state update with new array reference
+      setTemplates([...sortedTemplates]);
+      console.log('[TEMPLATES] Templates state updated successfully');
     } catch (error) {
-      console.error('Error loading templates:', error);
+      console.error('[TEMPLATES] Error loading templates:', error);
     }
   };
 

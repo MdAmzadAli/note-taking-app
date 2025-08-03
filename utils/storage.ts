@@ -198,13 +198,20 @@ export const saveCustomTemplate = async (template: CustomTemplate): Promise<void
 
     if (existingIndex >= 0) {
       templates[existingIndex] = template;
-      eventBus.emit(EVENTS.TEMPLATE_UPDATED, template);
     } else {
       templates.push(template);
-      eventBus.emit(EVENTS.TEMPLATE_CREATED, template);
     }
 
+    // Save to storage first
     await AsyncStorage.setItem('custom_templates', JSON.stringify(templates));
+    console.log('[STORAGE] Template saved to AsyncStorage, emitting event...');
+    
+    // Then emit event after successful save
+    if (existingIndex >= 0) {
+      eventBus.emit(EVENTS.TEMPLATE_UPDATED, template);
+    } else {
+      eventBus.emit(EVENTS.TEMPLATE_CREATED, template);
+    }
   } catch (error) {
     console.error('Error saving custom template:', error);
     throw error;

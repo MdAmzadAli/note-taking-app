@@ -456,7 +456,7 @@ export const executeVoiceCommand = async (
               const dueDate = task.parameters.dueDate === null || task.parameters.dueDate === undefined 
                 ? 'tomorrow' 
                 : task.parameters.dueDate;
-              
+
               result = await handleCreateTaskCommand(
                 task.parameters.title || task.parameters.content,
                 dueDate,
