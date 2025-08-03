@@ -418,11 +418,21 @@ export const executeVoiceCommand = async (
       console.log('[VOICE_COMMANDS] Gemini processed tasks:', geminiResult);
 
       if (geminiResult.success && geminiResult.tasks && geminiResult.tasks.length > 0) {
-        // Execute each task returned by Gemini
+        // Sort tasks to ensure search commands execute last
+        const sortedTasks = [...geminiResult.tasks].sort((a, b) => {
+          // Search commands always go last
+          if (a.type === 'search' && b.type !== 'search') return 1;
+          if (b.type === 'search' && a.type !== 'search') return -1;
+          
+          // If both are search commands or both are non-search, maintain original order
+          return 0;
+        });
+
+        // Execute each task returned by Gemini in sorted order
         const results = [];
         let searchResults = [];
 
-        for (const task of geminiResult.tasks) {
+        for (const task of sortedTasks) {
           console.log('[VOICE_COMMANDS] Executing Gemini task:', task);
           
           let result;
@@ -1333,6 +1343,11 @@ const handleComplexCommand = async (
       // Search commands always go last regardless of original priority
       if (a.type === 'search' && b.type !== 'search') return 1;
       if (b.type === 'search' && a.type !== 'search') return -1;
+      
+      // If both are search commands, maintain their relative order
+      if (a.type === 'search' && b.type === 'search') {
+        return a.step - b.step;
+      }
       
       // For non-search commands, sort by priority then step
       return a.priority - b.priority || a.step - b.step;
