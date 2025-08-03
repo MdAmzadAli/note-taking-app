@@ -479,6 +479,7 @@ TASK TYPES:
 - create_task: Create a task with title (ALWAYS required) and dueDate (ALWAYS required)
 - set_reminder: Set a reminder with title (ALWAYS required) and time (ALWAYS required)
 - create_note: Create a note with title (ALWAYS required) and content (ALWAYS required)
+- create_template: Create a template with name (ALWAYS required) and fields array (ALWAYS required)
 - search: Search through user's data with query (ALWAYS required)
 
 TITLE EXTRACTION RULES:
@@ -496,6 +497,13 @@ TIME RULES:
 - Extract time references: "2pm", "tomorrow at 9am", "in 2 hours", etc.
 - If no time mentioned, default to "tomorrow 9am"
 - NEVER use null for time - always provide a string value
+
+TEMPLATE CREATION RULES:
+- Extract template name from phrases like "template named X", "template called X"
+- Identify field specifications: "text field for name", "number field for age", "date field for birth"
+- Support field types: "text", "longtext", "number", "date", "boolean"
+- Create meaningful field names from descriptions
+- If field type not specified, default to "text"
 
 OUTPUT: JSON array of tasks with exact parameters needed for execution.
 
@@ -519,6 +527,7 @@ Examples:
 "Create note about meeting" → [{"type": "create_note", "parameters": {"title": "Meeting Notes", "content": "meeting notes"}}]
 "Create task to visit doctor tomorrow" → [{"type": "create_task", "parameters": {"title": "Visit doctor", "dueDate": "tomorrow"}}]
 "Remind me tomorrow at 2pm" → [{"type": "set_reminder", "parameters": {"title": "Reminder", "time": "tomorrow at 2pm"}}]
+"Create template named Patient Info with text field for name and number field for age" → [{"type": "create_template", "parameters": {"name": "Patient Info", "fields": [{"name": "Name", "type": "text"}, {"name": "Age", "type": "number"}]}}]
 "Search for doctor notes" → [{"type": "search", "parameters": {"query": "doctor notes"}}]
 "What can you do" → [{"type": "show_help", "parameters": {}}]
 

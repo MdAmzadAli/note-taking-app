@@ -431,7 +431,7 @@ export const executeVoiceCommand = async (
         // Execute each task returned by Gemini in sorted order
         const results = [];
         let searchResults = [];
-        const counts = { tasks: 0, reminders: 0, notes: 0, searches: 0, help: 0 };
+        const counts = { tasks: 0, reminders: 0, notes: 0, templates: 0, searches: 0, help: 0 };
 
         for (const task of sortedTasks) {
           console.log('[VOICE_COMMANDS] Executing Gemini task:', task);
@@ -463,6 +463,14 @@ export const executeVoiceCommand = async (
               );
               if (result.success) counts.tasks++;
               break;
+            case 'create_template':
+              result = await handleCreateTemplateCommand(
+                task.parameters.name,
+                task.parameters.fields || [],
+                profession
+              );
+              if (result.success) counts.templates = (counts.templates || 0) + 1;
+              break;
             case 'search':
               result = await handleSearchCommand(task.parameters.query);
               if (result.success && result.data) {
@@ -484,10 +492,20 @@ export const executeVoiceCommand = async (
         }
 
         if (results.length > 0) {
-          const taskTypes = results.map(r => r.task).join(', ');
+          const itemTypes = [];
+          if (counts.templates > 0) itemTypes.push(`${counts.templates} template${counts.templates !== 1 ? 's' : ''}`);
+          if (counts.tasks > 0) itemTypes.push(`${counts.tasks} task${counts.tasks !== 1 ? 's' : ''}`);
+          if (counts.reminders > 0) itemTypes.push(`${counts.reminders} reminder${counts.reminders !== 1 ? 's' : ''}`);
+          if (counts.notes > 0) itemTypes.push(`${counts.notes} note${counts.notes !== 1 ? 's' : ''}`);
+          if (counts.searches > 0) itemTypes.push(`${counts.searches} search${counts.searches !== 1 ? 'es' : ''}`);
+
+          const message = itemTypes.length > 0 
+            ? `Successfully created ${itemTypes.join(', ')}`
+            : `Executed ${results.length} task(s)`;
+
           return {
             success: true,
-            message: `Executed ${results.length} task(s): ${taskTypes}`,
+            message,
             data: searchResults.length > 0 ? searchResults : results[0]?.result?.data
           };
         }
@@ -944,6 +962,15 @@ const handleShowHelpCommand = (): { success: boolean; message: string; data: any
           "Find tasks about project",
           "Look for reminders",
           "Show me notes about meeting"
+        ]
+      },
+      {
+        category: "Template Creation",
+        commands: [
+          "Create template named Patient Info with text field for name",
+          "Make template called Meeting Notes with text and date fields",
+          "Create template named Budget with number field for amount and text field for description",
+          "New template called Project Status with text, number, and date fields"
         ]
       },
       {
@@ -1652,6 +1679,12 @@ export const getExampleCommands = (): string[] => [
   "New note called shopping list",
   "Remind me to call John in 2 hours",
   "Add task finish presentation due tomorrow",
+
+  // Template creation examples
+  "Create template named Patient Info with text field for name and number field for age",
+  "Make template called Meeting Notes with text and date fields",
+  "New template named Budget Tracker with number field for amount and text field for category",
+  "Create template called Project Status with text field for name and date field for deadline",
 
   // Multi-item examples (Gemini mode only)
   "Create two tasks: exercise tomorrow and gym at 5pm",
