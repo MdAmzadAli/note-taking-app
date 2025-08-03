@@ -196,7 +196,7 @@ export const scheduleAlarmNotification = async (
     const notificationContent: any = {
       title: '⏰ Reminder Alarm',
       body: reminder.title,
-      sound: soundMap[reminder.alarmSound] || 'default',
+      sound: 'default', // Use default system sound for the notification
       priority: Platform.OS === 'android' ? 'max' : 'high',
       categoryIdentifier: 'ALARM_CATEGORY',
       sticky: true,
