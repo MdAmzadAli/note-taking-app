@@ -422,16 +422,16 @@ export const extractFieldsFromSpeech = (
 };
 
 // Mock speech-to-text implementation for fallback
-export const mockSpeechToText = (): string => {
+export const mockSpeechToText = (): Promise<string> => {
   return new Promise((resolve) => {
     setTimeout(() => {
       const sampleTexts = [
         "This is a sample voice input text",
-        "Patient complains of headache and fatigue",
-        "Meeting scheduled for tomorrow at 2 PM",
-        "Remember to review the contract details",
-        "Code review needed for the new feature",
-        "Follow up with client regarding requirements"
+        "Create a note about the meeting",
+        "Set reminder for tomorrow at 2 PM",
+        "Add task to review the documents",
+        "Search for previous notes",
+        "Create task for follow up"
       ];
 
       const randomText = sampleTexts[Math.floor(Math.random() * sampleTexts.length)];
@@ -691,21 +691,4 @@ export const isSpeechRecognitionAvailable = async (method?: VoiceRecognitionMeth
   }
 };
 
-// Profession-specific mock voice input
-export const mockSpeechToText = (): string => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const sampleTexts = [
-        "This is a sample voice input text",
-        "Patient complains of headache and fatigue",
-        "Meeting scheduled for tomorrow at 2 PM",
-        "Remember to review the contract details",
-        "Code review needed for the new feature",
-        "Follow up with client regarding requirements"
-      ];
-
-      const randomText = sampleTexts[Math.floor(Math.random() * sampleTexts.length)];
-      resolve(randomText);
-    }, 1500);
-  });
-};
+// Removed duplicate function - keeping the one at the end of the file

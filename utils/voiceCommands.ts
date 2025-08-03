@@ -1125,7 +1125,7 @@ IMPORTANT:
 };
 
 // Process multi-task commands using Gemini AI (simplified version for backward compatibility)
-const processMultiTaskCommand = async (text: string, profession: string): Promise<{
+const processMultiTaskCommand = async (text: string): Promise<{
   isMultiTask: boolean;
   items: Array<{ 
     type: 'task' | 'reminder' | 'note'; 
@@ -1139,7 +1139,7 @@ const processMultiTaskCommand = async (text: string, profession: string): Promis
   console.log('[VOICE_COMMANDS] ===== PROCESSING MULTI-TASK COMMAND =====');
 
   // First try complex command processing
-  const complexResult = await processComplexCommand(text, profession);
+  const complexResult = await processComplexCommand(text);
 
   if (complexResult.isComplexCommand) {
     // Convert complex execution plan to simple multi-task format for compatibility

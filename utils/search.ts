@@ -6,7 +6,6 @@ export interface SearchResult {
   content: string;
   type: 'note' | 'reminder' | 'task' | 'template';
   createdAt: string;
-  profession?: string;
   score: number;
   matchedIn: 'title' | 'content';
   matchType: 'exact' | 'partial' | 'keyword';
@@ -97,7 +96,6 @@ const convertToSearchableItems = (
       content: allContent,
       type: 'note',
       createdAt: note.createdAt,
-      profession: note.profession,
       score: 0,
       matchedIn: 'title',
       matchType: 'exact'
@@ -112,7 +110,6 @@ const convertToSearchableItems = (
       content: reminder.description || '',
       type: 'reminder',
       createdAt: reminder.createdAt,
-      profession: reminder.profession,
       score: 0,
       matchedIn: 'title',
       matchType: 'exact'
@@ -127,7 +124,6 @@ const convertToSearchableItems = (
       content: task.description || '',
       type: 'task',
       createdAt: task.createdAt,
-      profession: task.profession,
       score: 0,
       matchedIn: 'title',
       matchType: 'exact'
@@ -303,8 +299,7 @@ const calculateMatch = (item: SearchResult, searchPhrase: string, keywords: stri
 // Main intelligent search function
 export const searchContent = (
   query: string,
-  data: { notes: Note[], tasks: Task[], reminders: Reminder[], templateEntries?: TemplateEntry[] },
-  profession?: string
+  data: { notes: Note[], tasks: Task[], reminders: Reminder[], templateEntries?: TemplateEntry[] }
 ): IntelligentSearchResults => {
   console.log('[INTELLIGENT_SEARCH] Starting search for:', query);
 
@@ -468,10 +463,9 @@ export interface EnhancedSearchResults {
 // Backward compatibility wrapper
 export const enhancedSearchWrapper = (
   query: string,
-  data: { notes: Note[], tasks: Task[], reminders: Reminder[], templateEntries?: TemplateEntry[] },
-  profession?: string
+  data: { notes: Note[], tasks: Task[], reminders: Reminder[], templateEntries?: TemplateEntry[] }
 ): EnhancedSearchResults => {
-  const results = searchContent(query, data, profession);
+  const results = searchContent(query, data);
 
   return {
     priorityMatches: results.primaryResults,
@@ -579,14 +573,11 @@ export const highlightSearchTerms = (text: string, searchQuery: string): string 
 };
 
 export const getSearchSuggestions = (
-  data: SearchResult[],
-  profession?: string
+  data: SearchResult[]
 ): string[] => {
   const suggestions = new Set<string>();
 
   data.forEach(item => {
-    if (profession && item.profession !== profession) return;
-
     const text = `${item.title} ${item.content}`.toLowerCase();
     const words = text.split(/\s+/).filter(word => 
       word.length > 3 && 

@@ -892,8 +892,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontWeight: 'bold',
   },
-  warningContainer: {
-    backgroundColor: '#FEFF3C7',
+  warningContainer: {    backgroundColor: '#FEFF3C7',
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
