@@ -19,7 +19,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSection } from '@/types';
-import { saveNote, saveTemplate, getNotes, getTemplates, deleteNote, updateNote, TemplateEntry, Note, getUserSettings, UserSettings } from '@/utils/storage';
+import { saveNote, saveTemplate, getNotes, getTemplates, deleteNote, updateNote, getUserSettings, UserSettings } from '@/utils/storage';
 import { mockSpeechToText } from '@/utils/speech';
 import TemplateEntriesScreen from './TemplateEntriesScreen';
 

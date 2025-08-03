@@ -889,12 +889,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
   closeButton: {
-    padding: 8,
+padding: 8,
   },
   closeButtonText: {
     fontSize: 18,
-    color: '#6B7280',
-    fontWeight: 'bold',
   },
   warningContainer: {
     backgroundColor: '#FEF3C7',
