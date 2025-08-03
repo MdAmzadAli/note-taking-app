@@ -36,6 +36,12 @@ export default function RemindersScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [isSearchVisible, setIsSearchVisible] = useState(false);
+  
+  // New recurring reminder states
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [selectedTimes, setSelectedTimes] = useState<string[]>(['09:00']);
+  const [newTimeInput, setNewTimeInput] = useState('');
 
   useEffect(() => {
     loadRemindersAndSettings();
@@ -103,6 +109,16 @@ export default function RemindersScreen() {
       return;
     }
 
+    if (isRecurring && selectedDays.length === 0) {
+      Alert.alert('Error', 'Please select at least one day for recurring reminder');
+      return;
+    }
+
+    if (isRecurring && selectedTimes.length === 0) {
+      Alert.alert('Error', 'Please add at least one time for recurring reminder');
+      return;
+    }
+
     try {
       const reminder: Reminder = {
         id: Date.now().toString(),
@@ -111,17 +127,54 @@ export default function RemindersScreen() {
         dateTime: selectedDate.toISOString(),
         isCompleted: false,
         createdAt: new Date().toISOString(),
+        isRecurring: isRecurring,
+        recurringDays: isRecurring ? selectedDays : undefined,
+        recurringTimes: isRecurring ? selectedTimes : undefined,
       };
 
-      // Schedule notification
-      const notificationId = await scheduleNotification(
-        `Reminder`,
-        reminder.title,
-        selectedDate
-      );
+      if (isRecurring) {
+        // Schedule multiple notifications for recurring reminders
+        const notificationIds: string[] = [];
+        
+        for (const dayOfWeek of selectedDays) {
+          for (const timeStr of selectedTimes) {
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            const notificationDate = new Date();
+            
+            // Find the next occurrence of this day of week
+            const daysUntilTarget = (dayOfWeek - notificationDate.getDay() + 7) % 7;
+            notificationDate.setDate(notificationDate.getDate() + daysUntilTarget);
+            notificationDate.setHours(hours, minutes, 0, 0);
+            
+            // If the time has passed today and it's the same day, schedule for next week
+            if (daysUntilTarget === 0 && notificationDate <= new Date()) {
+              notificationDate.setDate(notificationDate.getDate() + 7);
+            }
+            
+            const notificationId = await scheduleNotification(
+              `Recurring Reminder`,
+              reminder.title,
+              notificationDate
+            );
+            
+            if (notificationId) {
+              notificationIds.push(notificationId);
+            }
+          }
+        }
+        
+        reminder.notificationIds = notificationIds;
+      } else {
+        // Schedule single notification for non-recurring reminders
+        const notificationId = await scheduleNotification(
+          `Reminder`,
+          reminder.title,
+          selectedDate
+        );
 
-      if (notificationId) {
-        reminder.notificationId = notificationId;
+        if (notificationId) {
+          reminder.notificationId = notificationId;
+        }
       }
 
       await saveReminder(reminder);
@@ -132,6 +185,10 @@ export default function RemindersScreen() {
       setNewTitle('');
       setNewDescription('');
       setSelectedDate(new Date());
+      setIsRecurring(false);
+      setSelectedDays([]);
+      setSelectedTimes(['09:00']);
+      setNewTimeInput('');
       setIsCreating(false);
     } catch (error) {
       console.error('Error creating reminder:', error);
@@ -144,6 +201,9 @@ export default function RemindersScreen() {
     setNewTitle(reminder.title);
     setNewDescription(reminder.description || '');
     setSelectedDate(new Date(reminder.dateTime));
+    setIsRecurring(reminder.isRecurring || false);
+    setSelectedDays(reminder.recurringDays || []);
+    setSelectedTimes(reminder.recurringTimes || ['09:00']);
     setIsEditing(true);
   };
 
@@ -266,6 +326,45 @@ export default function RemindersScreen() {
     }
   };
 
+  const toggleDay = (dayIndex: number) => {
+    setSelectedDays(prev => 
+      prev.includes(dayIndex) 
+        ? prev.filter(d => d !== dayIndex)
+        : [...prev, dayIndex].sort()
+    );
+  };
+
+  const addTime = () => {
+    if (!newTimeInput.trim()) {
+      Alert.alert('Error', 'Please enter a time in HH:MM format');
+      return;
+    }
+
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    if (!timeRegex.test(newTimeInput)) {
+      Alert.alert('Error', 'Please enter a valid time in HH:MM format (e.g., 09:30)');
+      return;
+    }
+
+    if (selectedTimes.includes(newTimeInput)) {
+      Alert.alert('Error', 'This time is already added');
+      return;
+    }
+
+    setSelectedTimes(prev => [...prev, newTimeInput].sort());
+    setNewTimeInput('');
+  };
+
+  const removeTime = (timeToRemove: string) => {
+    if (selectedTimes.length <= 1) {
+      Alert.alert('Error', 'At least one time is required');
+      return;
+    }
+    setSelectedTimes(prev => prev.filter(time => time !== timeToRemove));
+  };
+
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
   const renderReminderItem = ({ item }: { item: Reminder }) => {
     const isOverdue = new Date(item.dateTime) < new Date() && !item.isCompleted;
 
@@ -374,6 +473,10 @@ export default function RemindersScreen() {
                 setNewTitle('');
                 setNewDescription('');
                 setSelectedDate(new Date());
+                setIsRecurring(false);
+                setSelectedDays([]);
+                setSelectedTimes(['09:00']);
+                setNewTimeInput('');
               }}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -423,27 +526,101 @@ export default function RemindersScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Date & Time</Text>
-            <View style={styles.dateTimeContainer}>
+            <View style={styles.recurringToggleContainer}>
+              <Text style={styles.label}>Recurring Reminder</Text>
               <TouchableOpacity
-                style={styles.dateTimeButton}
-                onPress={() => setShowDatePicker(true)}
+                style={[styles.toggleButton, isRecurring && styles.toggleButtonActive]}
+                onPress={() => setIsRecurring(!isRecurring)}
               >
-                <Text style={styles.dateTimeText}>
-                  📅 {selectedDate.toLocaleDateString()}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.dateTimeButton}
-                onPress={() => setShowTimePicker(true)}
-              >
-                <Text style={styles.dateTimeText}>
-                  🕐 {selectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                <Text style={[styles.toggleButtonText, isRecurring && styles.toggleButtonTextActive]}>
+                  {isRecurring ? 'ON' : 'OFF'}
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
+
+          {isRecurring ? (
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Select Days</Text>
+                <View style={styles.daysContainer}>
+                  {dayNames.map((day, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.dayButton,
+                        selectedDays.includes(index) && styles.dayButtonSelected
+                      ]}
+                      onPress={() => toggleDay(index)}
+                    >
+                      <Text style={[
+                        styles.dayButtonText,
+                        selectedDays.includes(index) && styles.dayButtonTextSelected
+                      ]}>
+                        {day}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Times</Text>
+                <View style={styles.timesContainer}>
+                  {selectedTimes.map((time, index) => (
+                    <View key={index} style={styles.timeChip}>
+                      <Text style={styles.timeChipText}>{time}</Text>
+                      <TouchableOpacity
+                        onPress={() => removeTime(time)}
+                        style={styles.removeTimeButton}
+                      >
+                        <Text style={styles.removeTimeButtonText}>×</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+                
+                <View style={styles.addTimeContainer}>
+                  <TextInput
+                    style={styles.timeInput}
+                    value={newTimeInput}
+                    onChangeText={setNewTimeInput}
+                    placeholder="HH:MM (e.g., 14:30)"
+                    placeholderTextColor="#6B7280"
+                  />
+                  <TouchableOpacity
+                    style={styles.addTimeButton}
+                    onPress={addTime}
+                  >
+                    <Text style={styles.addTimeButtonText}>Add</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </>
+          ) : (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Date & Time</Text>
+              <View style={styles.dateTimeContainer}>
+                <TouchableOpacity
+                  style={styles.dateTimeButton}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text style={styles.dateTimeText}>
+                    📅 {selectedDate.toLocaleDateString()}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.dateTimeButton}
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <Text style={styles.dateTimeText}>
+                    🕐 {selectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           {showDatePicker && (
             <DateTimePicker
@@ -786,5 +963,125 @@ const styles = StyleSheet.create({
   },
   voiceInputButton: {
     marginHorizontal: 4,
+  },
+  recurringToggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  toggleButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  toggleButtonActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  toggleButtonText: {
+    fontSize: 14,
+    color: '#000000',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  toggleButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  daysContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  dayButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  dayButtonSelected: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  dayButtonText: {
+    fontSize: 14,
+    color: '#000000',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  dayButtonTextSelected: {
+    color: '#FFFFFF',
+  },
+  timesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  timeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  timeChipText: {
+    fontSize: 14,
+    color: '#000000',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+    marginRight: 8,
+  },
+  removeTimeButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeTimeButtonText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    lineHeight: 14,
+  },
+  addTimeContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  timeInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#FFFFFF',
+    fontFamily: 'Inter',
+    color: '#000000',
+    minHeight: 44,
+  },
+  addTimeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  addTimeButtonText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '500',
+    fontFamily: 'Inter',
   },
 });
