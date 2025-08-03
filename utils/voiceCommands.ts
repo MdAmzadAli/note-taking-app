@@ -431,6 +431,7 @@ export const executeVoiceCommand = async (
         // Execute each task returned by Gemini in sorted order
         const results = [];
         let searchResults = [];
+        const counts = { tasks: 0, reminders: 0, notes: 0, searches: 0, help: 0 };
 
         for (const task of sortedTasks) {
           console.log('[VOICE_COMMANDS] Executing Gemini task:', task);
@@ -443,26 +444,35 @@ export const executeVoiceCommand = async (
                 profession,
                 task.parameters.title
               );
+              if (result.success) counts.notes++;
               break;
             case 'set_reminder':
               result = await handleSetReminderCommand(task.parameters.title, task.parameters.time || 'tomorrow', profession);
+              if (result.success) counts.reminders++;
               break;
             case 'create_task':
-            result = await handleCreateTaskCommand(
-              task.parameters.title || task.parameters.content,
-              task.parameters.dueDate || 'tomorrow',
-              profession
-            );
-            if (result.success) counts.tasks++;
-            break;
+              // Handle null dueDate from Gemini
+              const dueDate = task.parameters.dueDate === null || task.parameters.dueDate === undefined 
+                ? 'tomorrow' 
+                : task.parameters.dueDate;
+              
+              result = await handleCreateTaskCommand(
+                task.parameters.title || task.parameters.content,
+                dueDate,
+                profession
+              );
+              if (result.success) counts.tasks++;
+              break;
             case 'search':
               result = await handleSearchCommand(task.parameters.query);
               if (result.success && result.data) {
                 searchResults = result.data;
+                counts.searches++;
               }
               break;
             case 'show_help':
               result = handleShowHelpCommand();
+              if (result.success) counts.help++;
               break;
             default:
               result = { success: false, message: `Unknown task type: ${task.type}` };

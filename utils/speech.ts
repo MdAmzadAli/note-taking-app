@@ -476,16 +476,26 @@ DIRECT PROCESSING: Convert voice transcription to executable tasks.
 Input transcription: "${transcription}"
 
 TASK TYPES:
-- create_task: Create a task with title (ALWAYS required) and due date
-- set_reminder: Set a reminder with title (ALWAYS required) and time  
-- create_note: Create a note with title (ALWAYS required) and content
-- search: Search through user's data
+- create_task: Create a task with title (ALWAYS required) and dueDate (ALWAYS required)
+- set_reminder: Set a reminder with title (ALWAYS required) and time (ALWAYS required)
+- create_note: Create a note with title (ALWAYS required) and content (ALWAYS required)
+- search: Search through user's data with query (ALWAYS required)
 
 TITLE EXTRACTION RULES:
 - For "create task to visit lawyer" → extract "Visit lawyer" as title
 - For "remind me about doctor appointment" → extract "Doctor appointment" as title  
 - For "note about best restaurants" → extract "Best restaurants" as title
 - Always generate meaningful, concise titles from user descriptions
+
+DUE DATE RULES:
+- Extract time references: "tomorrow", "today", "next week", "Friday", etc.
+- If no time mentioned, default to "tomorrow"
+- NEVER use null for dueDate - always provide a string value
+
+TIME RULES:
+- Extract time references: "2pm", "tomorrow at 9am", "in 2 hours", etc.
+- If no time mentioned, default to "tomorrow 9am"
+- NEVER use null for time - always provide a string value
 
 OUTPUT: JSON array of tasks with exact parameters needed for execution.
 
@@ -506,9 +516,13 @@ Return ONLY this JSON format:
 }
 
 Examples:
-"Create note about meeting" → [{"type": "create_note", "parameters": {"content": "meeting notes"}}]
-"Remind me tomorrow at 2pm" → [{"type": "set_reminder", "parameters": {"title": "reminder", "time": "tomorrow at 2pm"}}]
+"Create note about meeting" → [{"type": "create_note", "parameters": {"title": "Meeting Notes", "content": "meeting notes"}}]
+"Create task to visit doctor tomorrow" → [{"type": "create_task", "parameters": {"title": "Visit doctor", "dueDate": "tomorrow"}}]
+"Remind me tomorrow at 2pm" → [{"type": "set_reminder", "parameters": {"title": "Reminder", "time": "tomorrow at 2pm"}}]
+"Search for doctor notes" → [{"type": "search", "parameters": {"query": "doctor notes"}}]
 "What can you do" → [{"type": "show_help", "parameters": {}}]
+
+CRITICAL: All parameters must be strings, never null or undefined.
 `;
 
     const result = await model.generateContent(prompt);
