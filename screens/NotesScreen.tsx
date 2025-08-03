@@ -19,7 +19,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSection } from '@/types';
-import { getNotes, saveNote, deleteNote, getUserSettings, getCustomTemplates, saveTemplateEntry, getTemplateEntries } from '@/utils/storage';
+import { saveNote, saveTemplate, getNotes, getTemplates, deleteNote, updateNote, TemplateEntry, Note, getUserSettings, UserSettings } from '@/utils/storage';
 import { mockSpeechToText } from '@/utils/speech';
 import TemplateEntriesScreen from './TemplateEntriesScreen';
 
@@ -51,6 +51,22 @@ export default function NotesScreen() {
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [currentView, setCurrentView] = useState<'notes' | 'template'>('notes');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [profession] = useState('developer');
+  const [settings, setSettings] = useState<UserSettings>({
+    profession: 'developer',
+    voiceLanguage: 'en-US',
+    voiceRecognitionMethod: 'assemblyai-regex',
+    assemblyAIApiKey: '',
+    geminiApiKey: '',
+    writingStyle: 'professional',
+    notifications: true,
+    darkMode: false,
+    notificationsEnabled: true,
+    theme: 'auto',
+    autoSync: true,
+    viewMode: 'paragraph',
+    isOnboardingComplete: true,
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [selectedWritingStyle, setSelectedWritingStyle] = useState<WritingStyle>('mind_dump');
@@ -71,6 +87,7 @@ export default function NotesScreen() {
 
   useEffect(() => {
     loadNotes();
+    loadSettings();
     loadTemplates();
   }, []);
 
@@ -439,6 +456,16 @@ export default function NotesScreen() {
     </View>
   );
 
+  const loadSettings = async () => {
+    try {
+      const userSettings = await getUserSettings();
+      setSettings(userSettings);
+      console.log('[NOTES] Settings loaded:', userSettings.voiceRecognitionMethod);
+    } catch (error) {
+      console.error('[NOTES] Error loading settings:', error);
+    }
+  };
+
   if (currentView === 'template' && selectedTemplateId) {
     return (
       <TemplateEntriesScreen
@@ -526,6 +553,10 @@ export default function NotesScreen() {
           <WritingStyleSelector
             selectedStyle={selectedWritingStyle}
             onStyleChange={handleWritingStyleChange}
+          />
+          <VoiceInput
+            profession={profession}
+            voiceRecognitionMethod={settings.voiceRecognitionMethod}
           />
           <WritingStyleEditor
             style={selectedWritingStyle}
@@ -960,7 +991,8 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     borderRadius: 8,
     padding: 12,
-    fontSize: 16,
+    fontSize: 16```python
+
     backgroundColor: '#FFFFFF',
     fontFamily: 'Inter',
     color: '#000000',

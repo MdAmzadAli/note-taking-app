@@ -28,12 +28,14 @@ import {
 } from '@/utils/speech';
 
 interface VoiceInputProps {
+  profession: string;
+  voiceRecognitionMethod?: VoiceRecognitionMethod;
   onCommandExecuted?: (result: any) => void;
   onSearchRequested?: (query: string, results: any[]) => void;
   style?: any;
 }
 
-export default function VoiceInput({ onCommandExecuted, onSearchRequested, style }: VoiceInputProps) {
+const VoiceInput = ({ profession, voiceRecognitionMethod, onCommandExecuted, onSearchRequested, style }: VoiceInputProps) => {
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState<string>('');
@@ -43,11 +45,12 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
   const [lastCommand, setLastCommand] = useState<VoiceCommand | null>(null);
   const [fuzzyResult, setFuzzyResult] = useState<FuzzyProcessingResult | null>(null);
   const [showFuzzyComparison, setShowFuzzyComparison] = useState(false);
-  const [profession, setProfession] = useState('doctor');
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [assemblyAIError, setAssemblyAIError] = useState<string | null>(null);
-  const [voiceMethod, setVoiceMethod] = useState<VoiceRecognitionMethod>('assemblyai-regex');
-  const [voiceLanguage, setVoiceLanguageState] = useState('en-US');
+
+  // Voice recognition state
+  const [voiceMethod, setVoiceMethod] = useState<VoiceRecognitionMethod>(voiceRecognitionMethod || 'assemblyai-regex');
+  const [voiceLanguage, setVoiceLanguage] = useState('en-US');
   const [geminiSupported, setGeminiSupported] = useState(false);
   const [showHelpModalState, setShowHelpModalState] = useState(false);
   const [helpData, setHelpData] = useState<any>(null);
@@ -66,7 +69,6 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       const settings = await getUserSettings();
       const method = (settings.voiceRecognitionMethod || 'assemblyai-regex') as VoiceRecognitionMethod;
       if (method !== voiceMethod) {
-        console.log('[VOICE] Voice method changed from', voiceMethod, 'to', method);
         setVoiceMethod(method);
       }
     };
@@ -91,7 +93,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       const method = (settings.voiceRecognitionMethod || 'assemblyai-regex') as VoiceRecognitionMethod;
       const language = settings.voiceLanguage || 'en-US';
       setVoiceMethod(method);
-      setVoiceLanguageState(language);
+      setVoiceLanguage(language);
       setVoiceLanguage(language);
 
       console.log('[VOICE] Loaded voice method from settings:', method);
@@ -136,7 +138,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     try {
       const settings = await getUserSettings();
       setVoiceMethod(settings.voiceRecognitionMethod || 'assemblyai-regex');
-      setVoiceLanguageState(settings.voiceLanguage || 'en-US');
+      setVoiceLanguage(settings.voiceLanguage || 'en-US');
 
       // Set voice language
       setVoiceLanguage(settings.voiceLanguage || 'en-US');
@@ -313,11 +315,11 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
         } else if (executionResult.message === 'show_capabilities') {
           console.log('[VOICE] ===== SHOW CAPABILITIES COMMAND =====');
           console.log('[VOICE] Displaying capabilities modal');
-          
+
           // Close voice modal and show capabilities
           setShowModal(false);
           resetState();
-          
+
           // Display capabilities modal
           displayHelpModal(executionResult.data);
         } else {
@@ -585,6 +587,17 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
   };
 
 
+  useEffect(() => {
+    checkVoiceSupport();
+  }, []);
+
+  // Sync voice method with props when settings change
+  useEffect(() => {
+    if (voiceRecognitionMethod && voiceRecognitionMethod !== voiceMethod) {
+      console.log('[VOICE] Voice method updated from settings:', voiceRecognitionMethod);
+      setVoiceMethod(voiceRecognitionMethod);
+    }
+  }, [voiceRecognitionMethod, voiceMethod]);
 
   return (
     <View style={[styles.container, style]}>
@@ -877,6 +890,7 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     padding: 8,
+```text
   },
   closeButtonText: {
     fontSize: 18,
@@ -1186,3 +1200,5 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 });
+
+export default VoiceInput;
