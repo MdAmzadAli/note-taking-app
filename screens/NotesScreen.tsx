@@ -460,9 +460,22 @@ export default function NotesScreen() {
       );
     });
 
+    // Subscribe to template events to refresh the templates menu
+    const unsubscribeTemplateCreated = eventBus.subscribe(EVENTS.TEMPLATE_CREATED, () => {
+      console.log('[NOTES] Real-time: Template created, reloading templates...');
+      loadTemplates();
+    });
+
+    const unsubscribeTemplateUpdated = eventBus.subscribe(EVENTS.TEMPLATE_UPDATED, () => {
+      console.log('[NOTES] Real-time: Template updated, reloading templates...');
+      loadTemplates();
+    });
+
     return () => {
       unsubscribeNoteCreated();
       unsubscribeNoteUpdated();
+      unsubscribeTemplateCreated();
+      unsubscribeTemplateUpdated();
     };
   }, []);
 

@@ -1,4 +1,3 @@
-
 type EventCallback = (data: any) => void;
 
 class EventBus {
@@ -8,9 +7,9 @@ class EventBus {
     if (!this.events.has(event)) {
       this.events.set(event, []);
     }
-    
+
     this.events.get(event)!.push(callback);
-    
+
     // Return unsubscribe function
     return () => {
       const callbacks = this.events.get(event);
@@ -57,14 +56,14 @@ export const eventBus = new EventBus();
 export const EVENTS = {
   NOTE_CREATED: 'note_created',
   NOTE_UPDATED: 'note_updated',
-  NOTE_DELETED: 'note_deleted',
   TASK_CREATED: 'task_created',
   TASK_UPDATED: 'task_updated',
-  TASK_DELETED: 'task_deleted',
   REMINDER_CREATED: 'reminder_created',
   REMINDER_UPDATED: 'reminder_updated',
-  REMINDER_DELETED: 'reminder_deleted',
   TEMPLATE_CREATED: 'template_created',
   TEMPLATE_UPDATED: 'template_updated',
+  NOTE_DELETED: 'note_deleted',
+  TASK_DELETED: 'task_deleted',
+  REMINDER_DELETED: 'reminder_deleted',
   TEMPLATE_DELETED: 'template_deleted',
 } as const;

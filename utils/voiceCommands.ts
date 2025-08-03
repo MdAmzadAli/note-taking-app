@@ -3,6 +3,7 @@ import { saveNote, saveReminder, saveTask, getNotes, getTasks, getReminders } fr
 import { Note, Task, Reminder } from '@/types';
 import { scheduleNotification } from './notifications';
 import { processWithGemini, processWithGeminiDirect, isGeminiInitialized } from './speech';
+import { eventBus, EVENTS } from './eventBus';
 
 export interface VoiceCommand {
   intent: 'search' | 'create_note' | 'set_reminder' | 'create_task' | 'show_help' | 'unknown';
@@ -1340,6 +1341,9 @@ const handleCreateTemplateCommand = async (
 
     await saveTemplate(template);
     console.log('[VOICE_COMMANDS] Template created successfully:', template.id);
+
+    // Emit event for real-time updates
+    eventBus.emit(EVENTS.TEMPLATE_CREATED, template);
 
     return {
       success: true,

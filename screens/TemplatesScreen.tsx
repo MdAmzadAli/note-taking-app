@@ -38,6 +38,22 @@ export default function TemplatesScreen() {
 
   useEffect(() => {
     loadTemplatesAndSettings();
+
+    // Subscribe to real-time template events
+    const unsubscribeCreated = eventBus.subscribe(EVENTS.TEMPLATE_CREATED, () => {
+      console.log('[TEMPLATES] Real-time: Template created, reloading...');
+      loadTemplatesAndSettings();
+    });
+
+    const unsubscribeUpdated = eventBus.subscribe(EVENTS.TEMPLATE_UPDATED, () => {
+      console.log('[TEMPLATES] Real-time: Template updated, reloading...');
+      loadTemplatesAndSettings();
+    });
+
+    return () => {
+      unsubscribeCreated();
+      unsubscribeUpdated();
+    };
   }, []);
 
   const loadTemplatesAndSettings = async () => {
@@ -329,10 +345,6 @@ export default function TemplatesScreen() {
             <Text style={styles.addButtonText}>New Template</Text>
           </TouchableOpacity>
         </View>
-        <VoiceInput 
-            onCommandExecuted={handleVoiceCommand}
-            onSearchRequested={handleVoiceSearchRequested}
-          />
       </View>
 
       {isSearchVisible && (

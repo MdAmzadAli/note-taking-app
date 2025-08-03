@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Note, Task, Reminder, UserSettings, Template, TemplateEntry } from '@/types';
+import { Note, Task, Reminder, UserSettings, Template, TemplateEntry, CustomTemplate } from '@/types';
 import { eventBus, EVENTS } from './eventBus';
 
 const KEYS = {
