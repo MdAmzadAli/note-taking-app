@@ -11,9 +11,10 @@ import {
   Platform,
 } from 'react-native';
 import { IconSymbol } from './ui/IconSymbol';
-import { parseVoiceCommand, executeVoiceCommand, getExampleCommands, processFuzzyThought, VoiceCommand, FuzzyProcessingResult } from '@/utils/voiceCommands';
-import { getUserSettings } from '@/utils/storage';
+import { parseVoiceCommand, executeVoiceCommand, executeVoiceCommandPreview, getExampleCommands, processFuzzyThought, VoiceCommand, FuzzyProcessingResult } from '@/utils/voiceCommands';
+import { getUserSettings, saveNote, saveTask, saveReminder, saveCustomTemplate } from '@/utils/storage';
 import { requestMicrophonePermission } from '@/utils/permissions';
+import { scheduleNotification } from '@/utils/notifications';
 import { 
   initializeAssemblyAI, 
   initializeGemini,
@@ -26,6 +27,8 @@ import {
   isSpeechRecognitionAvailable,
   VoiceRecognitionMethod
 } from '@/utils/speech';
+import VoiceCommandPreviewModal from './VoiceCommandPreviewModal';
+import { Note, Task, Reminder, CustomTemplate } from '@/types';
 
 interface VoiceInputProps {
   profession: string;
@@ -54,6 +57,11 @@ const VoiceInput = ({ profession, voiceRecognitionMethod, onCommandExecuted, onS
   const [geminiSupported, setGeminiSupported] = useState(false);
   const [showHelpModalState, setShowHelpModalState] = useState(false);
   const [helpData, setHelpData] = useState<any>(null);
+  
+  // Preview modal state
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewItems, setPreviewItems] = useState<any[]>([]);
+  const [originalCommandText, setOriginalCommandText] = useState('');
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -245,7 +253,7 @@ const VoiceInput = ({ profession, voiceRecognitionMethod, onCommandExecuted, onS
       }
 
       console.log('[VOICE] About to execute command with processing method:', processingMethod);
-      const executionResult = await executeVoiceCommand(command, profession || 'developer', processingMethod);
+      const executionResult = await executeVoiceCommandPreview(command, profession || 'developer', processingMethod);
 
       console.log('[VOICE] ===== EXECUTION RESULT =====');
       console.log('[VOICE] Execution result:', JSON.stringify(executionResult, null, 2));
@@ -322,22 +330,34 @@ const VoiceInput = ({ profession, voiceRecognitionMethod, onCommandExecuted, onS
           displayHelpModal(executionResult.data);
         } else {
           console.log('[VOICE] ===== NON-SEARCH COMMAND SUCCESS =====');
-          console.log('[VOICE] onCommandExecuted callback available:', !!onCommandExecuted);
-
-          if (onCommandExecuted) {
-            console.log('[VOICE] Calling onCommandExecuted...');
-            await onCommandExecuted(executionResult);
-            console.log('[VOICE] onCommandExecuted callback completed');
+          console.log('[VOICE] Converting execution result to preview items...');
+          
+          // Convert execution result to preview items
+          const items = convertExecutionResultToPreviewItems(executionResult, speechText);
+          console.log('[VOICE] Preview items:', items.length);
+          
+          if (items.length > 0) {
+            // Show preview modal for user to review and confirm
+            setOriginalCommandText(speechText);
+            setPreviewItems(items);
+            setShowModal(false); // Close voice modal
+            resetState();
+            setShowPreviewModal(true); // Show preview modal
           } else {
-            console.log('[VOICE] WARNING: onCommandExecuted callback not available');
+            // No items to preview, handle as before (for help commands, etc.)
+            if (onCommandExecuted) {
+              console.log('[VOICE] Calling onCommandExecuted...');
+              await onCommandExecuted(executionResult);
+              console.log('[VOICE] onCommandExecuted callback completed');
+            }
+
+            // Close modal and reset state
+            setShowModal(false);
+            resetState();
+
+            // Show a brief success message
+            Alert.alert('Success', executionResult.message, [{ text: 'OK' }], { cancelable: true });
           }
-
-          // Close modal and reset state
-          setShowModal(false);
-          resetState();
-
-          // Show a brief success message (simulated toast)
-          Alert.alert('Success', executionResult.message, [{ text: 'OK' }], { cancelable: true });
         }
       } else {
         console.log('[VOICE] ===== COMMAND EXECUTION FAILED =====');
@@ -553,6 +573,142 @@ const VoiceInput = ({ profession, voiceRecognitionMethod, onCommandExecuted, onS
     setShowHelpModalState(true);
   };
 
+  const convertExecutionResultToPreviewItems = (executionResult: any, commandText: string) => {
+    const items: any[] = [];
+    
+    if (executionResult.data) {
+      // Single item creation (note, task, reminder, template)
+      if (executionResult.data.id && executionResult.data.createdAt) {
+        let type = 'note';
+        if (executionResult.data.scheduledDate) type = 'task';
+        else if (executionResult.data.dateTime) type = 'reminder';
+        else if (executionResult.data.fields) type = 'template';
+        
+        items.push({
+          type,
+          data: executionResult.data,
+          originalData: { ...executionResult.data }
+        });
+      }
+      // Multiple items from AI agent
+      else if (executionResult.data.results && Array.isArray(executionResult.data.results)) {
+        executionResult.data.results.forEach((result: any) => {
+          if (result.data && result.data.id && result.data.createdAt && result.type !== 'search') {
+            let type = result.type;
+            if (type === 'create_note') type = 'note';
+            else if (type === 'create_task') type = 'task';
+            else if (type === 'set_reminder') type = 'reminder';
+            else if (type === 'create_template') type = 'template';
+            
+            if (['note', 'task', 'reminder', 'template'].includes(type)) {
+              items.push({
+                type,
+                data: result.data,
+                originalData: { ...result.data }
+              });
+            }
+          }
+        });
+      }
+    }
+    
+    return items;
+  };
+
+  const handlePreviewConfirm = async (items: any[]) => {
+    try {
+      console.log('[VOICE] Saving confirmed items:', items.length);
+      
+      // Save each item to storage
+      for (const item of items) {
+        switch (item.type) {
+          case 'note':
+            await saveNote(item.data as Note);
+            console.log('[VOICE] Saved note:', item.data.title);
+            break;
+          case 'task':
+            await saveTask(item.data as Task);
+            console.log('[VOICE] Saved task:', item.data.title);
+            break;
+          case 'reminder':
+            const reminder = item.data as Reminder;
+            // Re-schedule notification if needed
+            if (reminder.dateTime) {
+              const notificationId = await scheduleNotification(
+                'Reminder',
+                reminder.title,
+                new Date(reminder.dateTime)
+              );
+              if (notificationId) {
+                reminder.notificationId = notificationId;
+                await saveReminder(reminder);
+              }
+            } else {
+              await saveReminder(reminder);
+            }
+            console.log('[VOICE] Saved reminder:', item.data.title);
+            break;
+          case 'template':
+            await saveCustomTemplate(item.data as CustomTemplate);
+            console.log('[VOICE] Saved template:', item.data.name);
+            break;
+        }
+      }
+      
+      // Close preview modal
+      setShowPreviewModal(false);
+      setPreviewItems([]);
+      setOriginalCommandText('');
+      
+      // Close voice modal
+      setShowModal(false);
+      resetState();
+      
+      // Show success message
+      const itemTypes = [];
+      const counts = { templates: 0, notes: 0, tasks: 0, reminders: 0 };
+      
+      items.forEach(item => {
+        switch (item.type) {
+          case 'template': counts.templates++; break;
+          case 'note': counts.notes++; break;
+          case 'task': counts.tasks++; break;
+          case 'reminder': counts.reminders++; break;
+        }
+      });
+      
+      if (counts.templates > 0) itemTypes.push(`${counts.templates} template${counts.templates !== 1 ? 's' : ''}`);
+      if (counts.notes > 0) itemTypes.push(`${counts.notes} note${counts.notes !== 1 ? 's' : ''}`);
+      if (counts.tasks > 0) itemTypes.push(`${counts.tasks} task${counts.tasks !== 1 ? 's' : ''}`);
+      if (counts.reminders > 0) itemTypes.push(`${counts.reminders} reminder${counts.reminders !== 1 ? 's' : ''}`);
+      
+      const message = `Successfully saved ${itemTypes.join(', ')}!`;
+      Alert.alert('Success', message);
+      
+      // Notify parent component
+      if (onCommandExecuted) {
+        await onCommandExecuted({
+          success: true,
+          message,
+          data: items
+        });
+      }
+      
+    } catch (error) {
+      console.error('[VOICE] Error saving preview items:', error);
+      Alert.alert('Error', 'Failed to save some items. Please try again.');
+    }
+  };
+
+  const handlePreviewCancel = () => {
+    setShowPreviewModal(false);
+    setPreviewItems([]);
+    setOriginalCommandText('');
+    
+    // Return to voice modal
+    // setShowModal(true);
+  };
+
   const getCurrentText = () => {
     if (finalResult) return finalResult;
     if (partialResults.length > 0) return partialResults[0];
@@ -625,6 +781,15 @@ const VoiceInput = ({ profession, voiceRecognitionMethod, onCommandExecuted, onS
             <Text style={styles.statusText}>{processingStatus}</Text>
           </View>
         )}
+
+      {/* Preview Modal */}
+      <VoiceCommandPreviewModal
+        visible={showPreviewModal}
+        items={previewItems}
+        onConfirm={handlePreviewConfirm}
+        onCancel={handlePreviewCancel}
+        commandText={originalCommandText}
+      />
 
       {/* Help Modal */}
       <Modal

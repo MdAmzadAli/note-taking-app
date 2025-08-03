@@ -400,6 +400,209 @@ const parseTime = (timeStr: string): Date => {
   return tomorrow;
 };
 
+// Execute voice commands with different processing methods (preview version - doesn't save to storage)
+export const executeVoiceCommandPreview = async (
+  command: VoiceCommand,
+  profession: string = 'doctor',
+  processingMethod: 'regex' | 'gemini' = 'regex'
+): Promise<{ success: boolean; message: string; data?: any }> => {
+  console.log('[VOICE_COMMANDS] ===== STARTING COMMAND PREVIEW EXECUTION =====');
+  console.log('[VOICE_COMMANDS] Processing method:', processingMethod);
+  console.log('[VOICE_COMMANDS] Raw transcription:', command.originalText);
+
+  try {
+    if (processingMethod === 'gemini' && isGeminiInitialized()) {
+      console.log('[VOICE_COMMANDS] DIRECT FLOW: AssemblyAI → Gemini → Preview');
+
+      // DIRECT FLOW: Send transcription directly to Gemini for task processing
+      const geminiResult = await processWithGeminiDirect(command.originalText, profession);
+      console.log('[VOICE_COMMANDS] Gemini processed tasks:', geminiResult);
+
+      if (geminiResult.success && geminiResult.tasks && geminiResult.tasks.length > 0) {
+        // Sort tasks to ensure search commands execute last
+        const sortedTasks = [...geminiResult.tasks].sort((a, b) => {
+          // Search commands always go last
+          if (a.type === 'search' && b.type !== 'search') return 1;
+          if (b.type === 'search' && a.type !== 'search') return -1;
+
+          // If both are search commands or both are non-search, maintain original order
+          return 0;
+        });
+
+        // Execute each task returned by Gemini in sorted order (PREVIEW MODE - NO SAVING)
+        const results = [];
+        let searchResults = [];
+        const counts = { tasks: 0, reminders: 0, notes: 0, templates: 0, searches: 0, help: 0 };
+
+        for (const task of sortedTasks) {
+          console.log('[VOICE_COMMANDS] Creating preview for Gemini task:', task);
+
+          let result;
+          switch (task.type) {
+            case 'create_note':
+              result = await handleCreateNoteCommandPreview(
+                task.parameters.content || task.parameters.title, 
+                profession,
+                task.parameters.title
+              );
+              if (result.success) counts.notes++;
+              break;
+            case 'set_reminder':
+              result = await handleSetReminderCommandPreview(task.parameters.title, task.parameters.time || 'tomorrow', profession);
+              if (result.success) counts.reminders++;
+              break;
+            case 'create_task':
+              // Handle null dueDate from Gemini
+              const dueDate = task.parameters.dueDate === null || task.parameters.dueDate === undefined 
+                ? 'tomorrow' 
+                : task.parameters.dueDate;
+
+              result = await handleCreateTaskCommandPreview(
+                task.parameters.title || task.parameters.content,
+                dueDate,
+                profession
+              );
+              if (result.success) counts.tasks++;
+              break;
+            case 'create_template':
+              result = await handleCreateTemplateCommandPreview(
+                task.parameters.name,
+                task.parameters.fields || [],
+                profession
+              );
+              if (result.success) counts.templates = (counts.templates || 0) + 1;
+              break;
+            case 'search':
+              result = await handleSearchCommand(task.parameters.query);
+              if (result.success && result.data) {
+                searchResults = result.data;
+                counts.searches++;
+              }
+              break;
+            case 'show_help':
+              result = handleShowHelpCommand();
+              if (result.success) counts.help++;
+              break;
+            default:
+              result = { success: false, message: `Unknown task type: ${task.type}` };
+          }
+
+          if (result.success) {
+            results.push({ task: task.type, result });
+          }
+        }
+
+        if (results.length > 0) {
+          const itemTypes = [];
+          if (counts.templates > 0) itemTypes.push(`${counts.templates} template${counts.templates !== 1 ? 's' : ''}`);
+          if (counts.tasks > 0) itemTypes.push(`${counts.tasks} task${counts.tasks !== 1 ? 's' : ''}`);
+          if (counts.reminders > 0) itemTypes.push(`${counts.reminders} reminder${counts.reminders !== 1 ? 's' : ''}`);
+          if (counts.notes > 0) itemTypes.push(`${counts.notes} note${counts.notes !== 1 ? 's' : ''}`);
+          if (counts.searches > 0) itemTypes.push(`${counts.searches} search${counts.searches !== 1 ? 'es' : ''}`);
+
+          const message = itemTypes.length > 0 
+            ? `Successfully created ${itemTypes.join(', ')}`
+            : `Executed ${results.length} task(s)`;
+
+          return {
+            success: true,
+            message,
+            data: searchResults.length > 0 ? searchResults : results[0]?.result?.data
+          };
+        }
+      }
+
+      // If no tasks or processing failed, return appropriate message
+      return {
+        success: false,
+        message: "Sorry, I couldn't understand that command. Please try again."
+      };
+    }
+
+    // Regex processing (fallback or direct) - PREVIEW MODE
+    console.log('[VOICE_COMMANDS] Using regex-based processing (preview mode)');
+    const parsedCommand = parseVoiceCommand(command.originalText);
+    console.log('[VOICE_COMMANDS] Parsed command:', parsedCommand);
+
+    console.log('[VOICE_COMMANDS] Parsed command intent:', parsedCommand.intent);
+    console.log('[VOICE_COMMANDS] Parsed command parameters:', JSON.stringify(parsedCommand.parameters, null, 2));
+
+    switch (parsedCommand.intent) {
+      case 'show_help':
+        console.log('[VOICE_COMMANDS] Executing SHOW_HELP command');
+        return handleShowHelpCommand();
+
+      case 'search':
+        console.log('[VOICE_COMMANDS] Executing SEARCH command');
+        const searchQuery = parsedCommand.parameters.query || parsedCommand.parameters.content;
+        console.log('[VOICE_COMMANDS] Search query:', searchQuery);
+        return await handleSearchCommand(searchQuery);
+
+      case 'create_note':
+        console.log('[VOICE_COMMANDS] Executing CREATE_NOTE command (preview)');
+        const noteContent = parsedCommand.parameters.content || parsedCommand.parameters.title;
+        const noteTitle = parsedCommand.parameters.title;
+        console.log('[VOICE_COMMANDS] Note content:', noteContent);
+        console.log('[VOICE_COMMANDS] Note title:', noteTitle);
+        return await handleCreateNoteCommandPreview(noteContent, profession, noteTitle);
+
+      case 'set_reminder':
+        console.log('[VOICE_COMMANDS] Executing SET_REMINDER command (preview)');
+        const reminderTitle = parsedCommand.parameters.title || parsedCommand.parameters.content;
+        const reminderTime = parsedCommand.parameters.time || 'tomorrow';
+        console.log('[VOICE_COMMANDS] Reminder title:', reminderTitle);
+        console.log('[VOICE_COMMANDS] Reminder time:', reminderTime);
+        return await handleSetReminderCommandPreview(reminderTitle, reminderTime, profession);
+
+      case 'create_task':
+        console.log('[VOICE_COMMANDS] Executing CREATE_TASK command (preview)');
+        const taskTitle = parsedCommand.parameters.title || parsedCommand.parameters.content;
+        const taskDueDate = parsedCommand.parameters.dueDate || 'tomorrow';
+        console.log('[VOICE_COMMANDS] Task title:', taskTitle);
+        console.log('[VOICE_COMMANDS] Task due date:', taskDueDate);
+        return await handleCreateTaskCommandPreview(taskTitle, taskDueDate, profession);
+
+      default:
+        console.log('[VOICE_COMMANDS] UNKNOWN command intent:', parsedCommand.intent);
+
+        // Check if this might be a help request that wasn't caught
+        const lowerText = command.originalText.toLowerCase();
+        const helpKeywords = ['what', 'can', 'do', 'help', 'capabilities', 'features', 'functions', 'commands'];
+        const hasHelpKeywords = helpKeywords.some(keyword => lowerText.includes(keyword));
+
+        if (hasHelpKeywords) {
+          console.log('[VOICE_COMMANDS] Treating as help request due to help keywords');
+          return handleShowHelpCommand();
+        }
+
+        return {
+          success: false,
+          message: `I didn't understand the command: "${command.originalText}". Try saying "create note", "set reminder", "create task", "search for", or "what can you do" for help.`
+        };
+    }
+  } catch (error) {
+    console.error('[VOICE_COMMANDS] Error executing voice command preview:', error);
+
+    // Provide more specific error messages based on the error type
+    let errorMessage = 'Sorry, there was an error processing your command.';
+
+    if (error instanceof Error) {
+      if (error.message.includes('storage')) {
+        errorMessage = 'Failed to preview data. Please try again.';
+      } else if (error.message.includes('network')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      } else if (error.message.includes('permission')) {
+        errorMessage = 'Permission error. Please check app permissions.';
+      }
+    }
+
+    return {
+      success: false,
+      message: errorMessage
+    };
+  }
+};
+
 // Execute voice commands with different processing methods
 export const executeVoiceCommand = async (
   command: VoiceCommand,
@@ -1667,6 +1870,127 @@ const handleMultiItemCommand = async (
       message: `Failed to process multi-item command: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
+};
+
+// Preview versions of command handlers (don't save to storage)
+const handleCreateNoteCommandPreview = async (content: string, profession: string, title?: string): Promise<{ success: boolean; message: string; data?: Note }> => {
+  console.log('[VOICE_COMMANDS] ===== HANDLING CREATE NOTE COMMAND (PREVIEW) =====');
+  console.log('[VOICE_COMMANDS] Note content:', content);
+  console.log('[VOICE_COMMANDS] Note title:', title);
+  console.log('[VOICE_COMMANDS] Profession:', profession);
+
+  if (!content || content.trim().length === 0) {
+    console.log('[VOICE_COMMANDS] ERROR: Empty note content');
+    return {
+      success: false,
+      message: 'Cannot create note with empty content'
+    };
+  }
+
+  const now = new Date().toISOString();
+
+  // Use AI-provided title if available, otherwise generate from content
+  const noteTitle = title && title.trim() 
+    ? title.trim() 
+    : content.substring(0, 50) + (content.length > 50 ? '...' : '');
+
+  const note: Note = {
+    id: Date.now().toString(),
+    title: noteTitle,
+    content,
+    fields: {},
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  console.log('[VOICE_COMMANDS] Created note preview:', JSON.stringify(note, null, 2));
+
+  return {
+    success: true,
+    message: `Created note: "${note.title}"`,
+    data: note
+  };
+};
+
+const handleSetReminderCommandPreview = async (title: string, timeStr: string, profession: string): Promise<{ success: boolean; message: string; data?: Reminder }> => {
+  const dateTime = parseTime(timeStr);
+  const now = new Date().toISOString();
+
+  const reminder: Reminder = {
+    id: Date.now().toString(),
+    title,
+    description: '',
+    dateTime: dateTime.toISOString(),
+    isCompleted: false,
+    createdAt: now,
+    profession: profession as any,
+  };
+
+  console.log('[VOICE_COMMANDS] Created reminder preview:', JSON.stringify(reminder, null, 2));
+
+  return {
+    success: true,
+    message: `Set reminder "${title}" for ${dateTime.toLocaleDateString()} at ${dateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+    data: reminder
+  };
+};
+
+const handleCreateTaskCommandPreview = async (title: string, dueDateStr: string, profession: string): Promise<{ success: boolean; message: string; data?: Task }> => {
+  const dueDate = parseTime(dueDateStr);
+  const now = new Date().toISOString();
+
+  const task: Task = {
+    id: Date.now().toString(),
+    title,
+    description: '',
+    isCompleted: false,
+    scheduledDate: dueDate.toISOString(),
+    createdAt: now,
+    profession: profession as any,
+  };
+
+  console.log('[VOICE_COMMANDS] Created task preview:', JSON.stringify(task, null, 2));
+
+  return {
+    success: true,
+    message: `Created task "${title}" due ${dueDate.toLocaleDateString()}`,
+    data: task
+  };
+};
+
+const handleCreateTemplateCommandPreview = async (
+  name: string,
+  fields: Array<{ name: string; type: string; options?: string[] }>,
+  profession: string
+): Promise<{ success: boolean; message: string; data?: any }> => {
+  console.log('[VOICE_COMMANDS] ===== HANDLING CREATE TEMPLATE COMMAND (PREVIEW) =====');
+  console.log('[VOICE_COMMANDS] Template name:', name);
+  console.log('[VOICE_COMMANDS] Fields:', JSON.stringify(fields, null, 2));
+  console.log('[VOICE_COMMANDS] Profession:', profession);
+
+  const now = new Date().toISOString();
+  const template = {
+    id: Date.now().toString(),
+    name,
+    description: '',
+    fields: fields.map((field, index) => ({
+      id: `field_${index + 1}`,
+      label: field.name,
+      type: field.type as any,
+      required: false,
+      options: field.options || undefined
+    })),
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  console.log('[VOICE_COMMANDS] Created template preview:', JSON.stringify(template, null, 2));
+
+  return {
+    success: true,
+    message: `Created template "${name}" with ${fields.length} field${fields.length !== 1 ? 's' : ''}`,
+    data: template
+  };
 };
 
 // Get example commands for help
