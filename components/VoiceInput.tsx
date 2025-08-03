@@ -49,6 +49,8 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
   const [voiceMethod, setVoiceMethod] = useState<VoiceRecognitionMethod>('assemblyai-regex');
   const [voiceLanguage, setVoiceLanguageState] = useState('en-US');
   const [geminiSupported, setGeminiSupported] = useState(false);
+  const [showHelpModalState, setShowHelpModalState] = useState(false);
+  const [helpData, setHelpData] = useState<any>(null);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -550,8 +552,12 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
     setLastCommand(null);
     setFuzzyResult(null);
     setShowFuzzyComparison(false);
-    setIsProcessing(false);
     setProcessingStatus('');
+  };
+
+  const displayHelpModal = (data: any) => {
+    setHelpData(data);
+    setShowHelpModalState(true);
   };
 
   const getCurrentText = () => {
@@ -617,6 +623,53 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
             <Text style={styles.statusText}>{processingStatus}</Text>
           </View>
         )}
+
+      {/* Help Modal */}
+      <Modal
+        visible={showHelpModalState}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowHelpModalState(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.helpModalContainer}>
+            <View style={styles.helpHeader}>
+              <Text style={styles.helpTitle}>App Capabilities</Text>
+              <TouchableOpacity 
+                style={styles.closeButton}
+                onPress={() => setShowHelpModalState(false)}
+              >
+                <IconSymbol size={24} name="xmark" color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.helpContent} showsVerticalScrollIndicator={false}>
+              {helpData?.voiceCommands?.map((category: any, index: number) => (
+                <View key={index} style={styles.helpCategory}>
+                  <Text style={styles.helpCategoryTitle}>{category.category}</Text>
+                  {category.commands.map((command: string, cmdIndex: number) => (
+                    <Text key={cmdIndex} style={styles.helpCommand}>• "{command}"</Text>
+                  ))}
+                </View>
+              ))}
+
+              <View style={styles.helpCategory}>
+                <Text style={styles.helpCategoryTitle}>App Features</Text>
+                {helpData?.appFeatures?.map((feature: string, index: number) => (
+                  <Text key={index} style={styles.helpCommand}>• {feature}</Text>
+                ))}
+              </View>
+
+              <View style={styles.helpCategory}>
+                <Text style={styles.helpCategoryTitle}>Voice Methods</Text>
+                {helpData?.voiceMethods?.map((method: string, index: number) => (
+                  <Text key={index} style={styles.helpCommand}>• {method}</Text>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={showModal}
@@ -800,7 +853,8 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
@@ -1072,5 +1126,50 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     textAlign: 'center',
     fontWeight: '500',
+  },
+  helpModalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    margin: 20,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  helpHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  helpTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000000',
+    fontFamily: 'Inter',
+  },
+  helpContent: {
+    padding: 20,
+  },
+  helpCategory: {
+    marginBottom: 20,
+  },
+  helpCategoryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000000',
+    fontFamily: 'Inter',
+    marginBottom: 10,
+  },
+  helpCommand: {
+    fontSize: 14,
+    color: '#374151',
+    fontFamily: 'Inter',
+    marginBottom: 4,
+    lineHeight: 20,
   },
 });

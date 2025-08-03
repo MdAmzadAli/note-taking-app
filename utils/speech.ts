@@ -539,15 +539,16 @@ For example:
   → "Patient consultation: Patient presented with headache symptoms during today's visit. Requires follow-up assessment."
 
 Understand the user's intent and extract relevant information. Focus on these command types:
-1. CREATE NOTE: "create note", "new note", "add note", "write note", "make note"
-2. SET REMINDER: "set reminder", "remind me", "create reminder", "schedule reminder"  
-3. CREATE TASK: "create task", "new task", "add task", "make task", "todo"
-4. SEARCH: "search for", "find", "look for", "show me"
+1. SHOW HELP: "what can you do", "tell me your capabilities", "show me features", "help", "what are your functions"
+2. CREATE NOTE: "create note", "new note", "add note", "write note", "make note"
+3. SET REMINDER: "set reminder", "remind me", "create reminder", "schedule reminder"  
+4. CREATE TASK: "create task", "new task", "add task", "make task", "todo"
+5. SEARCH: "search for", "find", "look for", "show me"
 
 Return ONLY valid JSON in this exact format:
 {
   "processedText": "cleaned and corrected version of the input - for notes, make this a clear, professional, well-structured note",
-  "intent": "create_note, set_reminder, create_task, or search",
+  "intent": "show_help, create_note, set_reminder, create_task, or search",
   "parameters": {
     "content": "main content for notes/tasks/reminders - for notes, this should be the clear, professional version",
     "title": "extracted title if specified", 
@@ -559,6 +560,8 @@ Return ONLY valid JSON in this exact format:
 }
 
 Examples:
+- "What can you do" → intent: "show_help", parameters: {}
+- "Tell me your capabilities" → intent: "show_help", parameters: {}
 - "Create a task for tomorrow to do exercise at 12pm" → intent: "create_task", content: "exercise at 12pm", dueDate: "tomorrow"
 - "Set reminder to call doctor tomorrow at 2pm" → intent: "set_reminder", content: "call doctor", time: "tomorrow at 2pm"
 - "uh, create note about, like, meeting discussion and stuff" → intent: "create_note", content: "Meeting discussion notes and key points covered during the session"

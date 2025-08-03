@@ -5,7 +5,7 @@ import { scheduleNotification } from './notifications';
 import { processWithGemini, isGeminiInitialized } from './speech';
 
 export interface VoiceCommand {
-  intent: 'search' | 'create_note' | 'set_reminder' | 'create_task' | 'unknown';
+  intent: 'search' | 'create_note' | 'set_reminder' | 'create_task' | 'show_help' | 'unknown';
   parameters: Record<string, any>;
   originalText: string;
   cleanedText?: string;
@@ -162,8 +162,30 @@ const NOTE_PATTERNS = [
   /(?:create|make|add)\s+(?:a\s+)?note\s+title\s+(.+?)(?:\s+and\s+(?:in\s+the\s+)?description\s+write\s+(.+))?/i,
 ];
 
+// Help/capability patterns
+const HELP_PATTERNS = [
+  /(?:what\s+)?(?:can\s+you|do\s+you)\s+do/i,
+  /(?:tell\s+me\s+)?(?:what\s+)?(?:all\s+)?(?:you\s+can\s+do|your\s+capabilities|features|functions)/i,
+  /(?:show\s+me\s+)?(?:help|commands|options|features)/i,
+  /(?:what\s+)?(?:are\s+)?(?:your\s+)?(?:capabilities|functions|features)/i,
+  /(?:list\s+)?(?:all\s+)?(?:available\s+)?(?:commands|functions|features)/i,
+  /(?:how\s+)?(?:can\s+)?(?:i\s+use\s+)?(?:this\s+app|you)/i,
+];
+
 export const parseVoiceCommand = (text: string): VoiceCommand => {
   const cleanText = text.trim().toLowerCase();
+
+  // Check for help/capability requests first
+  for (const pattern of HELP_PATTERNS) {
+    if (pattern.test(cleanText)) {
+      return {
+        intent: 'show_help',
+        parameters: {},
+        originalText: text,
+        confidence: 0.95
+      };
+    }
+  }
 
   // Create Note with complex structure (title + description)
   const complexNoteMatch = cleanText.match(/(?:create|make|add)\s+(?:a\s+)?note\s+title\s+(.+?)(?:\s+and\s+(?:in\s+the\s+)?description\s+write\s+(.+))?/i);
@@ -456,6 +478,10 @@ export const executeVoiceCommand = async (
     console.log('[VOICE_COMMANDS] Enhanced command parameters:', JSON.stringify(enhancedCommand.parameters, null, 2));
 
     switch (enhancedCommand.intent) {
+      case 'show_help':
+        console.log('[VOICE_COMMANDS] Executing SHOW_HELP command');
+        return handleShowHelpCommand();
+
       case 'search':
         console.log('[VOICE_COMMANDS] Executing SEARCH command');
         const searchQuery = enhancedCommand.parameters.query || enhancedCommand.parameters.content;
@@ -488,7 +514,7 @@ export const executeVoiceCommand = async (
         console.log('[VOICE_COMMANDS] UNKNOWN command intent:', enhancedCommand.intent);
         return {
           success: false,
-          message: `I didn't understand the command: "${command.originalText}". Try saying "create note", "set reminder", "create task", or "search for".`
+          message: `I didn't understand the command: "${command.originalText}". Try saying "create note", "set reminder", "create task", "search for", or "what can you do" for help.`
         };
     }
   } catch (error) {
@@ -827,6 +853,80 @@ const handleCreateTaskCommand = async (title: string, dueDateStr: string, profes
     success: true,
     message: `Created task "${title}" due ${dueDate.toLocaleDateString()}`,
     data: task
+  };
+};
+
+const handleShowHelpCommand = (): { success: boolean; message: string; data: any } => {
+  console.log('[VOICE_COMMANDS] ===== HANDLING SHOW HELP COMMAND =====');
+
+  const capabilities = {
+    voiceCommands: [
+      {
+        category: "Note Creation",
+        commands: [
+          "Create note about meeting",
+          "New note called shopping list",
+          "Add note patient follow-up required",
+          "Write note about project ideas"
+        ]
+      },
+      {
+        category: "Task Management", 
+        commands: [
+          "Create task review contract due Friday",
+          "New task finish presentation due tomorrow",
+          "Add task call client due next week",
+          "Make task update documentation"
+        ]
+      },
+      {
+        category: "Reminders",
+        commands: [
+          "Set reminder for doctor appointment tomorrow at 2pm",
+          "Remind me to call John in 2 hours", 
+          "Create reminder for team meeting Friday at 10am",
+          "Set reminder to review contract tomorrow"
+        ]
+      },
+      {
+        category: "Search & Find",
+        commands: [
+          "Search for patient notes",
+          "Find tasks about project",
+          "Look for reminders",
+          "Show me notes about meeting"
+        ]
+      },
+      {
+        category: "AI Enhanced Features (Gemini Mode)",
+        commands: [
+          "Create 2 tasks: exercise tomorrow and gym at 5pm",
+          "Make template called Patient Assessment with text field",
+          "Set reminder for dentist and create note about appointment",
+          "Create task to finish report and search for related files"
+        ]
+      }
+    ],
+    appFeatures: [
+      "Voice-powered note creation with natural language",
+      "Profession-based templates (Doctor, Lawyer, Developer)",
+      "Smart search across all your content",
+      "Task management with due dates",
+      "Reminder system with notifications",
+      "Offline-first data storage",
+      "AI-enhanced command understanding with Gemini",
+      "Multi-language voice support"
+    ],
+    voiceMethods: [
+      "Standard Mode: AssemblyAI + Regex parsing",
+      "AI Mode: AssemblyAI + Gemini AI enhancement for better understanding"
+    ]
+  };
+
+  return {
+    success: true,
+    message: "Here are my capabilities and features:",
+    data: capabilities
   };
 };
 
