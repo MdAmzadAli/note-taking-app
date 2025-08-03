@@ -890,7 +890,6 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     padding: 8,
-```text
   },
   closeButtonText: {
     fontSize: 18,
