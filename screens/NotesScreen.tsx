@@ -991,8 +991,7 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     borderRadius: 8,
     padding: 12,
-    fontSize: 16```python
-
+    fontSize: 16,
     backgroundColor: '#FFFFFF',
     fontFamily: 'Inter',
     color: '#000000',
