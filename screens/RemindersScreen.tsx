@@ -40,7 +40,7 @@ export default function RemindersScreen() {
   // New recurring reminder states
   const [isRecurring, setIsRecurring] = useState(false);
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
-  const [selectedTimes, setSelectedTimes] = useState<string[]>(['09:00']);
+  const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
   const [newTime, setNewTime] = useState(new Date());
   const [showNewTimePicker, setShowNewTimePicker] = useState(false);
 
@@ -188,7 +188,7 @@ export default function RemindersScreen() {
       setSelectedDate(new Date());
       setIsRecurring(false);
       setSelectedDays([]);
-      setSelectedTimes(['09:00']);
+      setSelectedTimes([]);
       setNewTime(new Date());
       setIsCreating(false);
     } catch (error) {
@@ -204,7 +204,7 @@ export default function RemindersScreen() {
     setSelectedDate(new Date(reminder.dateTime));
     setIsRecurring(reminder.isRecurring || false);
     setSelectedDays(reminder.recurringDays || []);
-    setSelectedTimes(reminder.recurringTimes || ['09:00']);
+    setSelectedTimes(reminder.recurringTimes || []);
     setIsEditing(true);
   };
 
@@ -474,7 +474,7 @@ export default function RemindersScreen() {
                 setSelectedDate(new Date());
                 setIsRecurring(false);
                 setSelectedDays([]);
-                setSelectedTimes(['09:00']);
+                setSelectedTimes([]);
                 setNewTime(new Date());
               }}
             >
