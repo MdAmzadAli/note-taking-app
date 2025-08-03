@@ -428,7 +428,11 @@ export const executeVoiceCommand = async (
           let result;
           switch (task.type) {
             case 'create_note':
-              result = await handleCreateNoteCommand(task.parameters.content || task.parameters.title, profession);
+              result = await handleCreateNoteCommand(
+                task.parameters.content || task.parameters.title, 
+                profession,
+                task.parameters.title
+              );
               break;
             case 'set_reminder':
               result = await handleSetReminderCommand(task.parameters.title, task.parameters.time || 'tomorrow', profession);
@@ -493,8 +497,10 @@ export const executeVoiceCommand = async (
       case 'create_note':
         console.log('[VOICE_COMMANDS] Executing CREATE_NOTE command');
         const noteContent = parsedCommand.parameters.content || parsedCommand.parameters.title;
+        const noteTitle = parsedCommand.parameters.title;
         console.log('[VOICE_COMMANDS] Note content:', noteContent);
-        return await handleCreateNoteCommand(noteContent, profession);
+        console.log('[VOICE_COMMANDS] Note title:', noteTitle);
+        return await handleCreateNoteCommand(noteContent, profession, noteTitle);
 
       case 'set_reminder':
         console.log('[VOICE_COMMANDS] Executing SET_REMINDER command');
@@ -764,9 +770,10 @@ const handleSearchCommand = async (query: string): Promise<{ success: boolean; m
   return searchResult;
 };
 
-const handleCreateNoteCommand = async (content: string, profession: string): Promise<{ success: boolean; message: string; data?: Note }> => {
+const handleCreateNoteCommand = async (content: string, profession: string, title?: string): Promise<{ success: boolean; message: string; data?: Note }> => {
   console.log('[VOICE_COMMANDS] ===== HANDLING CREATE NOTE COMMAND =====');
   console.log('[VOICE_COMMANDS] Note content:', content);
+  console.log('[VOICE_COMMANDS] Note title:', title);
   console.log('[VOICE_COMMANDS] Profession:', profession);
 
   if (!content || content.trim().length === 0) {
@@ -779,17 +786,21 @@ const handleCreateNoteCommand = async (content: string, profession: string): Pro
 
   const now = new Date().toISOString();
 
+  // Use AI-provided title if available, otherwise generate from content
+  const noteTitle = title && title.trim() 
+    ? title.trim() 
+    : content.substring(0, 50) + (content.length > 50 ? '...' : '');
+
   const note: Note = {
     id: Date.now().toString(),
-    title: content.substring(0, 50) + (content.length > 50 ? '...' : ''),
+    title: noteTitle,
     content,
-    profession: profession as any,
     fields: {},
     createdAt: now,
     updatedAt: now,
   };
 
-  console.log('[VOICE_COMMANDS] Creating note:', JSON.stringify(note, null, 2));
+  console.log('[VOICE_COMMANDS] Creating note with AI title:', JSON.stringify(note, null, 2));
 
   try {
     await saveNote(note);
@@ -1372,7 +1383,8 @@ const handleComplexCommand = async (
             console.log(`[VOICE_COMMANDS] Creating note: "${step.parameters.content || step.parameters.title}"`);
             result = await handleCreateNoteCommand(
               step.parameters.content || step.parameters.title,
-              profession
+              profession,
+              step.parameters.title
             );
             if (result.success) counts.notes++;
             break;
@@ -1519,7 +1531,7 @@ const handleMultiItemCommand = async (
           case 'note':
             const noteContent = item.content || item.title;
             console.log(`[VOICE_COMMANDS] Creating note ${i + 1}: "${noteContent}"`);
-            result = await handleCreateNoteCommand(noteContent, profession);
+            result = await handleCreateNoteCommand(noteContent, profession, item.title);
             if (result.success) counts.notes++;
             break;
 
