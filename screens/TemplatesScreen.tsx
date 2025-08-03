@@ -11,6 +11,7 @@ import {
   Modal,
   ScrollView,
   Platform,
+  DeviceEventEmitter,
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import VoiceInput from '@/components/VoiceInput';
@@ -38,6 +39,26 @@ export default function TemplatesScreen() {
 
   useEffect(() => {
     loadTemplatesAndSettings();
+  }, []);
+
+  useEffect(() => {
+    // Listen for voice command events from any screen
+    const voiceCommandListener = DeviceEventEmitter.addListener(
+      'voiceCommandExecuted',
+      async (event) => {
+        console.log('[TEMPLATES] Received voice command event:', event);
+        if (event.type === 'voice_command_success') {
+          console.log('[TEMPLATES] Reloading data due to voice command success...');
+          await loadTemplatesAndSettings();
+          console.log('[TEMPLATES] Data reloaded after voice command');
+        }
+      }
+    );
+
+    // Cleanup listener on unmount
+    return () => {
+      voiceCommandListener.remove();
+    };
   }, []);
 
   const loadTemplatesAndSettings = async () => {
@@ -143,7 +164,7 @@ export default function TemplatesScreen() {
     );
   };
 
-  
+
 
   const renderTemplateItem = ({ item }: { item: CustomTemplate }) => (
     <TouchableOpacity
@@ -190,7 +211,7 @@ export default function TemplatesScreen() {
       console.log('[TEMPLATES] Reloading templates after voice command...');
       await loadTemplatesAndSettings();
       console.log('[TEMPLATES] Templates reloaded successfully after voice command');
-      
+
       // Force a re-render by updating the search state
       const currentQuery = searchQuery;
       setSearchQuery('');
@@ -373,7 +394,7 @@ export default function TemplatesScreen() {
         }
       />
 
-      
+
     </SafeAreaView>
   );
 }
