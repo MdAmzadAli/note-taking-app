@@ -406,59 +406,72 @@ export const executeVoiceCommand = async (
   processingMethod: 'regex' | 'gemini' = 'regex'
 ): Promise<{ success: boolean; message: string; data?: any }> => {
   console.log('[VOICE_COMMANDS] ===== STARTING COMMAND EXECUTION =====');
-  console.log('[VOICE_COMMANDS] Executing command:', JSON.stringify(command, null, 2));
   console.log('[VOICE_COMMANDS] Processing method:', processingMethod);
-  console.log('[VOICE_COMMANDS] Profession:', profession);
+  console.log('[VOICE_COMMANDS] Raw transcription:', command.originalText);
 
   try {
-    let enhancedCommand = command;
-
     if (processingMethod === 'gemini' && isGeminiInitialized()) {
-      console.log('[VOICE_COMMANDS] Using DIRECT Gemini processing (AssemblyAI → Gemini → Execute)');
+      console.log('[VOICE_COMMANDS] DIRECT FLOW: AssemblyAI → Gemini → Execute');
+      
+      // DIRECT FLOW: Send transcription directly to Gemini for task processing
+      const geminiResult = await processWithGeminiDirect(command.originalText, profession);
+      console.log('[VOICE_COMMANDS] Gemini processed tasks:', geminiResult);
 
-      // DIRECT FLOW: AssemblyAI transcription → Gemini processing → Execute tasks
-      const geminiResult = await processWithGemini(command.originalText, profession);
-      console.log('[VOICE_COMMANDS] Direct Gemini result:', geminiResult);
+      if (geminiResult.success && geminiResult.tasks && geminiResult.tasks.length > 0) {
+        // Execute each task returned by Gemini
+        const results = [];
+        let searchResults = [];
 
-      if (geminiResult.success && geminiResult.confidence > 0.6) {
-        // Map Gemini intent to our command intents
-        let mappedIntent = geminiResult.intent;
-        if (mappedIntent === 'create_note' || mappedIntent === 'note') {
-          mappedIntent = 'create_note';
-        } else if (mappedIntent === 'set_reminder' || mappedIntent === 'reminder') {
-          mappedIntent = 'set_reminder';
-        } else if (mappedIntent === 'create_task' || mappedIntent === 'task') {
-          mappedIntent = 'create_task';
-        } else if (mappedIntent === 'search') {
-          mappedIntent = 'search';
+        for (const task of geminiResult.tasks) {
+          console.log('[VOICE_COMMANDS] Executing Gemini task:', task);
+          
+          let result;
+          switch (task.type) {
+            case 'create_note':
+              result = await handleCreateNoteCommand(task.parameters.content || task.parameters.title, profession);
+              break;
+            case 'set_reminder':
+              result = await handleSetReminderCommand(task.parameters.title, task.parameters.time || 'tomorrow', profession);
+              break;
+            case 'create_task':
+              result = await handleCreateTaskCommand(task.parameters.title, task.parameters.dueDate || 'tomorrow', profession);
+              break;
+            case 'search':
+              result = await handleSearchCommand(task.parameters.query);
+              if (result.success && result.data) {
+                searchResults = result.data;
+              }
+              break;
+            case 'show_help':
+              result = handleShowHelpCommand();
+              break;
+            default:
+              result = { success: false, message: `Unknown task type: ${task.type}` };
+          }
+
+          if (result.success) {
+            results.push({ task: task.type, result });
+          }
         }
 
-        enhancedCommand = {
-          ...command,
-          intent: mappedIntent as any,
-          parameters: {
-            ...command.parameters,
-            ...geminiResult.parameters
-          },
-          cleanedText: geminiResult.processedText,
-          confidence: geminiResult.confidence
-        };
-        console.log('[VOICE_COMMANDS] Enhanced command with Gemini:', enhancedCommand);
-      } else {
-        console.log('[VOICE_COMMANDS] Gemini confidence too low, falling back to regex');
-        // Fallback to regex if Gemini confidence is low
-        if (command.intent === 'unknown') {
-          enhancedCommand = parseVoiceCommand(command.originalText);
+        if (results.length > 0) {
+          const taskTypes = results.map(r => r.task).join(', ');
+          return {
+            success: true,
+            message: `Executed ${results.length} task(s): ${taskTypes}`,
+            data: searchResults.length > 0 ? searchResults : results[0]?.result?.data
+          };
         }
       }
-    } else if (processingMethod === 'regex' || !isGeminiInitialized()) {
-      // Use regex-based parsing (existing implementation)
-      console.log('[VOICE_COMMANDS] Using regex-based command parsing');
-      if (command.intent === 'unknown') {
-        // Re-parse with more aggressive regex patterns for better matching
-        enhancedCommand = parseVoiceCommand(command.originalText);
-      }
+
+      // Fallback to regex if Gemini processing fails
+      console.log('[VOICE_COMMANDS] Gemini processing failed, falling back to regex');
     }
+
+    // Regex processing (fallback or direct)
+    console.log('[VOICE_COMMANDS] Using regex-based processing');
+    const parsedCommand = parseVoiceCommand(command.originalText);
+    console.log('[VOICE_COMMANDS] Parsed command:', parsedCommand);
 
     console.log('[VOICE_COMMANDS] Enhanced command intent:', enhancedCommand.intent);
     console.log('[VOICE_COMMANDS] Enhanced command parameters:', JSON.stringify(enhancedCommand.parameters, null, 2));

@@ -498,7 +498,83 @@ export const stopListening = async (): Promise<void> => {
   await stopAssemblyAISpeechRecognition();
 };
 
-// Process text with Gemini AI for better command understanding
+// Direct Gemini processing for AssemblyAI transcription → JSON tasks
+export const processWithGeminiDirect = async (transcription: string, profession: string): Promise<{
+  success: boolean;
+  tasks: Array<{
+    type: 'create_note' | 'set_reminder' | 'create_task' | 'search' | 'show_help';
+    parameters: Record<string, any>;
+  }>;
+  confidence: number;
+}> => {
+  try {
+    if (!geminiAI) {
+      return { success: false, tasks: [], confidence: 0 };
+    }
+
+    const model = geminiAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+    const prompt = `
+DIRECT PROCESSING: Convert voice transcription to executable tasks.
+
+Input transcription: "${transcription}"
+Profession context: ${profession}
+
+TASK TYPES:
+- create_note: For recording information
+- set_reminder: For time-based alerts  
+- create_task: For actionable items
+- search: For finding existing content
+- show_help: For capability requests
+
+OUTPUT: JSON array of tasks with exact parameters needed for execution.
+
+Return ONLY this JSON format:
+{
+  "tasks": [
+    {
+      "type": "create_note|set_reminder|create_task|search|show_help",
+      "parameters": {
+        "content": "note content",
+        "title": "title if applicable", 
+        "time": "reminder time",
+        "dueDate": "task due date",
+        "query": "search terms"
+      }
+    }
+  ]
+}
+
+Examples:
+"Create note about meeting" → [{"type": "create_note", "parameters": {"content": "meeting notes"}}]
+"Remind me tomorrow at 2pm" → [{"type": "set_reminder", "parameters": {"title": "reminder", "time": "tomorrow at 2pm"}}]
+"What can you do" → [{"type": "show_help", "parameters": {}}]
+`;
+
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+
+    console.log('[SPEECH] Gemini direct response:', responseText);
+
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        success: true,
+        tasks: parsed.tasks || [],
+        confidence: 0.9
+      };
+    }
+
+    throw new Error('Failed to parse Gemini response');
+
+  } catch (error) {
+    console.error('[SPEECH] Gemini direct processing error:', error);
+    return { success: false, tasks: [], confidence: 0 };
+  }
+};
+
+// Process text with Gemini AI for better command understanding (legacy)
 export const processWithGemini = async (text: string, profession: string): Promise<{
   success: boolean;
   processedText: string;
