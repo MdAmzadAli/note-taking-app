@@ -273,7 +273,7 @@ const VoiceCommandPreviewModal: React.FC<VoiceCommandPreviewModalProps> = ({
         
         <View style={styles.fieldsContainer}>
           <Text style={styles.fieldsLabel}>Fields:</Text>
-          {template.fields.map((field, fieldIndex) => (
+          {(template.fields || []).map((field, fieldIndex) => (
             <View key={fieldIndex} style={styles.templateFieldContainer}>
               <View style={styles.templateFieldHeader}>
                 <Text style={styles.templateFieldNumber}>Field {fieldIndex + 1}</Text>

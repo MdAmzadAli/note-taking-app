@@ -582,7 +582,7 @@ const VoiceInput = ({ profession, voiceRecognitionMethod, onCommandExecuted, onS
         let type = 'note';
         if (executionResult.data.scheduledDate) type = 'task';
         else if (executionResult.data.dateTime) type = 'reminder';
-        else if (executionResult.data.fields) type = 'template';
+        else if (executionResult.data.fields && Array.isArray(executionResult.data.fields)) type = 'template';
         
         items.push({
           type,
