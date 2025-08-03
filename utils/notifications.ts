@@ -36,21 +36,41 @@ const setupNotificationCategories = async () => {
     await Notifications.setNotificationCategoryAsync('ALARM_CATEGORY', [
       {
         identifier: 'STOP_ALARM',
-        buttonTitle: 'Stop Alarm',
+        buttonTitle: 'Stop',
         options: {
           foreground: true,
-          destructive: false,
+          destructive: true,
         },
       },
       {
         identifier: 'SNOOZE_ALARM',
-        buttonTitle: 'Snooze (5 min)',
+        buttonTitle: 'Snooze',
         options: {
           foreground: false,
           destructive: false,
         },
       }
-    ]);
+    ], {
+      intentIdentifiers: ['STOP_ALARM', 'SNOOZE_ALARM'],
+      hiddenPreviewsBodyPlaceholder: 'Alarm notification',
+      categorySummaryFormat: '%u more alarm notifications',
+    });
+
+    // Create high priority alarm channel for Android
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('alarm-channel', {
+        name: 'Alarm Notifications',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        bypassDnd: true,
+        enableVibrate: true,
+        showBadge: true,
+        enableLights: true,
+        sound: 'default',
+      });
+    }
   } catch (error) {
     console.error('Error setting up notification categories:', error);
   }
@@ -154,20 +174,33 @@ export const scheduleAlarmNotification = async (
       throw new Error('Notification permissions not granted');
     }
 
+    // Map alarm sounds to system sounds
+    const soundMap: { [key: string]: string | boolean } = {
+      'default': 'default',
+      'bell': 'bell.caf',
+      'chime': 'chime.caf',
+      'alert': 'alert.caf'
+    };
+
     const notificationContent: any = {
       title: '⏰ Reminder Alarm',
       body: reminder.title,
-      sound: reminder.alarmSound || 'default',
-      priority: 'max',
+      sound: soundMap[reminder.alarmSound] || 'default',
+      priority: Platform.OS === 'android' ? 'max' : 'high',
       categoryIdentifier: 'ALARM_CATEGORY',
       sticky: true,
       autoDismiss: false,
       badge: 1,
+      interruptionLevel: Platform.OS === 'ios' ? 'critical' : undefined,
       data: {
         reminderId: reminder.id,
         isAlarm: true,
         vibrationEnabled: reminder.vibrationEnabled !== false,
         alarmDuration: reminder.alarmDuration || 5,
+        alarmSound: reminder.alarmSound || 'default',
+        originalTitle: reminder.title,
+        description: reminder.description,
+        imageUri: reminder.imageUri,
         scheduledTime: dateTime.toISOString(),
       },
     };
@@ -177,34 +210,28 @@ export const scheduleAlarmNotification = async (
       notificationContent.attachments = [{
         identifier: 'reminder_image',
         url: reminder.imageUri,
-        type: 'image'
+        type: 'image',
+        options: {
+          thumbnailHidden: false,
+          thumbnailClippingRect: { x: 0, y: 0, width: 1, height: 0.5 }
+        }
       }];
     }
 
     // Configure for Android critical notifications
     if (Platform.OS === 'android') {
       notificationContent.channelId = 'alarm-channel';
-      
-      // Create alarm channel if it doesn't exist
-      await Notifications.setNotificationChannelAsync('alarm-channel', {
-        name: 'Alarm Notifications',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-        bypassDnd: true,
-        enableVibrate: true,
-        showBadge: true,
-      });
     }
 
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: notificationContent,
       trigger: {
         date: dateTime,
+        repeats: false,
       },
     });
 
+    console.log(`Alarm notification scheduled with ID: ${notificationId} for ${dateTime}`);
     return notificationId;
   } catch (error) {
     console.error('Error scheduling alarm notification:', error);
@@ -214,16 +241,29 @@ export const scheduleAlarmNotification = async (
 
 export const stopAlarm = async (reminderId: string): Promise<void> => {
   try {
-    // Cancel any active notifications for this reminder
+    console.log(`Stopping alarm for reminder: ${reminderId}`);
+    
+    // Cancel any scheduled notifications for this reminder
     const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
     for (const notification of scheduledNotifications) {
-      if (notification.content.data?.reminderId === reminderId) {
+      if (notification.content.data?.reminderId === reminderId || 
+          notification.content.data?.originalReminderId === reminderId) {
         await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+        console.log(`Cancelled scheduled notification: ${notification.identifier}`);
       }
     }
     
-    // Also dismiss any currently displayed notifications
-    await Notifications.dismissAllNotificationsAsync();
+    // Dismiss any currently displayed notifications for this reminder
+    const presentedNotifications = await Notifications.getPresentedNotificationsAsync();
+    for (const notification of presentedNotifications) {
+      if (notification.request.content.data?.reminderId === reminderId ||
+          notification.request.content.data?.originalReminderId === reminderId) {
+        await Notifications.dismissNotificationAsync(notification.request.identifier);
+        console.log(`Dismissed presented notification: ${notification.request.identifier}`);
+      }
+    }
+    
+    console.log(`Alarm stopped successfully for reminder: ${reminderId}`);
   } catch (error) {
     console.error('Error stopping alarm:', error);
   }
@@ -231,34 +271,60 @@ export const stopAlarm = async (reminderId: string): Promise<void> => {
 
 export const snoozeAlarm = async (reminderId: string, snoozeMinutes: number = 5): Promise<void> => {
   try {
-    // First stop the current alarm
+    console.log(`Snoozing alarm for reminder: ${reminderId} for ${snoozeMinutes} minutes`);
+    
+    // Get the original reminder data before stopping
+    const presentedNotifications = await Notifications.getPresentedNotificationsAsync();
+    let originalReminderData = null;
+    
+    for (const notification of presentedNotifications) {
+      if (notification.request.content.data?.reminderId === reminderId) {
+        originalReminderData = notification.request.content.data;
+        break;
+      }
+    }
+    
+    // Stop the current alarm
     await stopAlarm(reminderId);
     
     // Calculate snooze time
     const snoozeTime = new Date();
     snoozeTime.setMinutes(snoozeTime.getMinutes() + snoozeMinutes);
     
-    // Reschedule the alarm for snooze time
-    const notificationId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: '⏰ Snoozed Reminder',
-        body: `Your reminder is snoozed for ${snoozeMinutes} minutes`,
-        sound: 'default',
-        priority: 'max',
-        categoryIdentifier: 'ALARM_CATEGORY',
-        sticky: true,
-        autoDismiss: false,
-        badge: 1,
-        data: {
-          reminderId,
-          isAlarm: true,
-          isSnoozed: true,
-          vibrationEnabled: true,
-          alarmDuration: 5,
-        },
+    // Reschedule the alarm for snooze time with original data
+    const notificationContent: any = {
+      title: '⏰ Snoozed Reminder',
+      body: originalReminderData?.originalTitle || `Reminder snoozed for ${snoozeMinutes} minutes`,
+      sound: originalReminderData?.alarmSound || 'default',
+      priority: Platform.OS === 'android' ? 'max' : 'high',
+      categoryIdentifier: 'ALARM_CATEGORY',
+      sticky: true,
+      autoDismiss: false,
+      badge: 1,
+      interruptionLevel: Platform.OS === 'ios' ? 'critical' : undefined,
+      data: {
+        reminderId: `${reminderId}_snoozed_${Date.now()}`,
+        originalReminderId: reminderId,
+        isAlarm: true,
+        isSnoozed: true,
+        vibrationEnabled: originalReminderData?.vibrationEnabled !== false,
+        alarmDuration: originalReminderData?.alarmDuration || 5,
+        alarmSound: originalReminderData?.alarmSound || 'default',
+        originalTitle: originalReminderData?.originalTitle || 'Snoozed Reminder',
+        snoozeCount: (originalReminderData?.snoozeCount || 0) + 1,
+        scheduledTime: snoozeTime.toISOString(),
       },
+    };
+
+    if (Platform.OS === 'android') {
+      notificationContent.channelId = 'alarm-channel';
+    }
+    
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: notificationContent,
       trigger: {
         date: snoozeTime,
+        repeats: false,
       },
     });
 

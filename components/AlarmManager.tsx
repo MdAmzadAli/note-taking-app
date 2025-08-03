@@ -31,18 +31,28 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
 
   useEffect(() => {
     let autoStopTimeout: NodeJS.Timeout;
+    let vibrationInterval: NodeJS.Timeout;
     
     if (visible && reminder) {
       setIsRinging(true);
+      console.log('Starting alarm for reminder:', reminder.id);
       
-      // Start vibration pattern if enabled
+      // Start continuous vibration pattern if enabled
       if (reminder.vibrationEnabled !== false) {
-        const vibrationPattern = [1000, 2000, 1000, 2000];
-        Vibration.vibrate(vibrationPattern, true);
+        const startVibration = () => {
+          // Alarm-style vibration pattern: short bursts with pauses
+          const pattern = [0, 500, 200, 500, 200, 500, 1000]; // More aggressive pattern
+          Vibration.vibrate(pattern);
+        };
+        
+        startVibration(); // Start immediately
+        vibrationInterval = setInterval(startVibration, 3000); // Repeat every 3 seconds
       }
 
       // Auto-stop alarm after duration
       const duration = (reminder.alarmDuration || 5) * 60 * 1000; // Convert to milliseconds
+      console.log(`Setting auto-stop timer for ${reminder.alarmDuration || 5} minutes`);
+      
       autoStopTimeout = setTimeout(() => {
         console.log('Auto-stopping alarm after', reminder.alarmDuration || 5, 'minutes');
         handleStopAlarm();
@@ -52,7 +62,11 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
         if (autoStopTimeout) {
           clearTimeout(autoStopTimeout);
         }
+        if (vibrationInterval) {
+          clearInterval(vibrationInterval);
+        }
         Vibration.cancel();
+        console.log('Cleaned up alarm effects');
       };
     } else {
       setIsRinging(false);

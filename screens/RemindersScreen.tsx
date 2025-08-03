@@ -19,7 +19,7 @@ import VoiceInput from '@/components/VoiceInput';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Reminder } from '@/types';
 import { getReminders, saveReminder, deleteReminder, updateReminder, getUserSettings } from '@/utils/storage';
-import { scheduleNotification, scheduleAlarmNotification, cancelNotification, stopAlarm } from '@/utils/notifications';
+import { scheduleNotification, scheduleAlarmNotification, cancelNotification, stopAlarm, snoozeAlarm } from '@/utils/notifications';
 import { eventBus, EVENTS } from '@/utils/eventBus';
 import { mockSpeechToText } from '@/utils/speech';
 import { AlarmManager } from '@/components/AlarmManager';
@@ -245,7 +245,12 @@ export default function RemindersScreen() {
             }
             
             const notificationId = alarmEnabled 
-              ? await scheduleAlarmNotification(reminder, notificationDate)
+              ? await scheduleAlarmNotification({
+                  ...reminder,
+                  alarmSound,
+                  vibrationEnabled,
+                  alarmDuration,
+                }, notificationDate)
               : await scheduleNotification(
                   `Recurring Reminder`,
                   reminder.title,
@@ -267,7 +272,12 @@ export default function RemindersScreen() {
       } else {
         // Schedule single notification for non-recurring reminders
         const notificationId = alarmEnabled 
-          ? await scheduleAlarmNotification(reminder, selectedDate)
+          ? await scheduleAlarmNotification({
+              ...reminder,
+              alarmSound,
+              vibrationEnabled,
+              alarmDuration,
+            }, selectedDate)
           : await scheduleNotification(
               `Reminder`,
               reminder.title,
