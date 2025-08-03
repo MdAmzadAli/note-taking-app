@@ -168,7 +168,7 @@ const HELP_PATTERNS = [
   /(?:what\s+)?(?:can\s+you|do\s+you)\s+do/i,
   /(?:tell\s+me\s+)?(?:what\s+)?(?:all\s+)?(?:you\s+can\s+do|your\s+capabilities|features|functions)/i,
   /(?:show\s+me\s+)?(?:help|commands|options|features)/i,
-  /(?:what\s+)?(?:are\s+)?(?:your\s+)?(?:capabilities|functions|features)/i,
+  /(?:what\s+)?(?:are\s+)?(?:your\s+)?(?:your\s+)?(?:capabilities|functions|features)/i,
   /(?:list\s+)?(?:all\s+)?(?:available\s+)?(?:commands|functions|features)/i,
   /(?:how\s+)?(?:can\s+)?(?:i\s+use\s+)?(?:this\s+app|you)/i,
   /tell\s+me\s+what\s+all\s+(?:you\s+)?can\s+do/i,
@@ -504,10 +504,15 @@ export const executeVoiceCommandPreview = async (
             ? `Successfully created ${itemTypes.join(', ')}`
             : `Executed ${results.length} task(s)`;
 
+          // Return all created items for preview, not just the first one
+          const allCreatedItems = results
+            .filter(result => result.result && result.result.data && result.type !== 'search')
+            .map(result => result.result.data);
+
           return {
             success: true,
             message,
-            data: searchResults.length > 0 ? searchResults : results[0]?.result?.data
+            data: searchResults.length > 0 ? searchResults : (allCreatedItems.length > 1 ? { results: results } : allCreatedItems[0])
           };
         }
       }
@@ -1291,7 +1296,7 @@ Return ONLY valid JSON in this exact format:
         // For note: {"content": "note content", "title": "optional title"}
         // For search: {"query": "EXACT USER SEARCH TERMS - DO NOT MODIFY"}
       },
-      "priority": 1-2
+      "priority":": 1-2
     }
   ],
   "reasoning": "Brief explanation of the execution plan strategy"

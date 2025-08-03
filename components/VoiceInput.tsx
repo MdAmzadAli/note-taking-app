@@ -576,6 +576,8 @@ const VoiceInput = ({ profession, voiceRecognitionMethod, onCommandExecuted, onS
   const convertExecutionResultToPreviewItems = (executionResult: any, commandText: string) => {
     const items: any[] = [];
     
+    console.log('[VOICE] Converting execution result to preview items:', JSON.stringify(executionResult, null, 2));
+    
     if (executionResult.data) {
       // Single item creation (note, task, reminder, template)
       if (executionResult.data.id && executionResult.data.createdAt) {
@@ -584,27 +586,34 @@ const VoiceInput = ({ profession, voiceRecognitionMethod, onCommandExecuted, onS
         else if (executionResult.data.dateTime) type = 'reminder';
         else if (executionResult.data.fields && Array.isArray(executionResult.data.fields)) type = 'template';
         
+        console.log('[VOICE] Found single item:', type, executionResult.data.title || executionResult.data.name);
         items.push({
           type,
           data: executionResult.data,
           originalData: { ...executionResult.data }
         });
       }
-      // Multiple items from AI agent
+      // Multiple items from AI agent - new structure
       else if (executionResult.data.results && Array.isArray(executionResult.data.results)) {
+        console.log('[VOICE] Found multiple items from AI agent:', executionResult.data.results.length);
         executionResult.data.results.forEach((result: any) => {
-          if (result.data && result.data.id && result.data.createdAt && result.type !== 'search') {
-            let type = result.type;
+          // Handle both old structure (result.data) and new structure (result.result.data)
+          const itemData = result.result?.data || result.data;
+          const itemType = result.type || result.result?.type;
+          
+          if (itemData && itemData.id && itemData.createdAt && itemType !== 'search') {
+            let type = itemType;
             if (type === 'create_note') type = 'note';
             else if (type === 'create_task') type = 'task';
             else if (type === 'set_reminder') type = 'reminder';
             else if (type === 'create_template') type = 'template';
             
             if (['note', 'task', 'reminder', 'template'].includes(type)) {
+              console.log('[VOICE] Adding item to preview:', type, itemData.title || itemData.name);
               items.push({
                 type,
-                data: result.data,
-                originalData: { ...result.data }
+                data: itemData,
+                originalData: { ...itemData }
               });
             }
           }
@@ -612,6 +621,7 @@ const VoiceInput = ({ profession, voiceRecognitionMethod, onCommandExecuted, onS
       }
     }
     
+    console.log('[VOICE] Final preview items:', items.length, items.map(item => ({ type: item.type, title: item.data.title || item.data.name })));
     return items;
   };
 
