@@ -597,12 +597,12 @@ const VoiceInput = ({ profession, voiceRecognitionMethod, onCommandExecuted, onS
       else if (executionResult.data.results && Array.isArray(executionResult.data.results)) {
         console.log('[VOICE] Found multiple items from AI agent:', executionResult.data.results.length);
         executionResult.data.results.forEach((result: any) => {
-          // Handle both old structure (result.data) and new structure (result.result.data)
-          const itemData = result.result?.data || result.data;
-          const itemType = result.type || result.result?.type;
+          // Handle the actual structure: result.result.data contains the item data
+          const itemData = result.result?.data;
+          const taskType = result.task; // This contains 'create_task', 'create_note', etc.
           
-          if (itemData && itemData.id && itemData.createdAt && itemType !== 'search') {
-            let type = itemType;
+          if (itemData && itemData.id && itemData.createdAt && taskType !== 'search') {
+            let type = taskType;
             if (type === 'create_note') type = 'note';
             else if (type === 'create_task') type = 'task';
             else if (type === 'set_reminder') type = 'reminder';
