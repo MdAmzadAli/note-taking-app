@@ -9,16 +9,20 @@ import {
   Alert,
   Platform,
   SafeAreaView,
+  Image,
+  Modal,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import VoiceInput from '@/components/VoiceInput';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Reminder } from '@/types';
 import { getReminders, saveReminder, deleteReminder, updateReminder, getUserSettings } from '@/utils/storage';
-import { scheduleNotification, cancelNotification } from '@/utils/notifications';
+import { scheduleNotification, scheduleAlarmNotification, cancelNotification, stopAlarm } from '@/utils/notifications';
 import { eventBus, EVENTS } from '@/utils/eventBus';
 import { mockSpeechToText } from '@/utils/speech';
+import { AlarmManager } from '@/components/AlarmManager';
 export default function RemindersScreen() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [filteredReminders, setFilteredReminders] = useState<Reminder[]>([]);
@@ -44,6 +48,15 @@ export default function RemindersScreen() {
   const [newTime, setNewTime] = useState(new Date());
   const [showNewTimePicker, setShowNewTimePicker] = useState(false);
 
+  // Image and alarm settings
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [alarmEnabled, setAlarmEnabled] = useState(false);
+  const [alarmSound, setAlarmSound] = useState('default');
+  const [vibrationEnabled, setVibrationEnabled] = useState(true);
+  const [alarmDuration, setAlarmDuration] = useState(5);
+  const [showAlarmSettings, setShowAlarmSettings] = useState(false);
+  const [activeAlarmReminder, setActiveAlarmReminder] = useState<Reminder | null>(null);
+
   useEffect(() => {
     loadRemindersAndSettings();
 
@@ -54,9 +67,34 @@ export default function RemindersScreen() {
 
     eventBus.on(EVENTS.REMINDER_UPDATED, reminderUpdateListener);
 
+    // Handle notification responses for alarms
+    const notificationResponseListener = Notifications.addNotificationResponseReceivedListener(
+      async (response) => {
+        const { data } = response.notification.request.content;
+        
+        if (data?.isAlarm && data?.reminderId) {
+          // Find the reminder
+          const reminders = await getReminders();
+          const reminder = reminders.find(r => r.id === data.reminderId);
+          
+          if (reminder) {
+            if (response.actionIdentifier === 'STOP_ALARM') {
+              await stopAlarm(reminder.id);
+            } else if (response.actionIdentifier === 'SNOOZE_ALARM') {
+              await snoozeAlarm(reminder.id, 5);
+            } else {
+              // Default action - show alarm screen
+              setActiveAlarmReminder(reminder);
+            }
+          }
+        }
+      }
+    );
+
     // Clean up subscription on unmount
     return () => {
       eventBus.off(EVENTS.REMINDER_UPDATED, reminderUpdateListener);
+      notificationResponseListener.remove();
     };
   }, []);
 
@@ -104,6 +142,30 @@ export default function RemindersScreen() {
     );
   };
 
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant camera roll permissions to add images.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setSelectedImageUri(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
   const createReminder = async () => {
     if (!newTitle.trim()) {
       Alert.alert('Error', 'Please enter a reminder title');
@@ -131,6 +193,10 @@ export default function RemindersScreen() {
         isRecurring: isRecurring,
         recurringDays: isRecurring ? selectedDays : undefined,
         recurringTimes: isRecurring ? selectedTimes : undefined,
+        imageUri: selectedImageUri || undefined,
+        alarmSound: alarmEnabled ? alarmSound : undefined,
+        vibrationEnabled: alarmEnabled ? vibrationEnabled : undefined,
+        alarmDuration: alarmEnabled ? alarmDuration : undefined,
       };
 
       if (isRecurring) {
@@ -152,11 +218,18 @@ export default function RemindersScreen() {
               notificationDate.setDate(notificationDate.getDate() + 7);
             }
             
-            const notificationId = await scheduleNotification(
-              `Recurring Reminder`,
-              reminder.title,
-              notificationDate
-            );
+            const notificationId = alarmEnabled 
+              ? await scheduleAlarmNotification(reminder, notificationDate)
+              : await scheduleNotification(
+                  `Recurring Reminder`,
+                  reminder.title,
+                  notificationDate,
+                  {
+                    imageUri: selectedImageUri || undefined,
+                    sound: alarmSound,
+                    vibration: vibrationEnabled,
+                  }
+                );
             
             if (notificationId) {
               notificationIds.push(notificationId);
@@ -167,11 +240,18 @@ export default function RemindersScreen() {
         reminder.notificationIds = notificationIds;
       } else {
         // Schedule single notification for non-recurring reminders
-        const notificationId = await scheduleNotification(
-          `Reminder`,
-          reminder.title,
-          selectedDate
-        );
+        const notificationId = alarmEnabled 
+          ? await scheduleAlarmNotification(reminder, selectedDate)
+          : await scheduleNotification(
+              `Reminder`,
+              reminder.title,
+              selectedDate,
+              {
+                imageUri: selectedImageUri || undefined,
+                sound: alarmSound,
+                vibration: vibrationEnabled,
+              }
+            );
 
         if (notificationId) {
           reminder.notificationId = notificationId;
@@ -190,6 +270,11 @@ export default function RemindersScreen() {
       setSelectedDays([]);
       setSelectedTimes([]);
       setNewTime(new Date());
+      setSelectedImageUri(null);
+      setAlarmEnabled(false);
+      setAlarmSound('default');
+      setVibrationEnabled(true);
+      setAlarmDuration(5);
       setIsCreating(false);
     } catch (error) {
       console.error('Error creating reminder:', error);
@@ -407,7 +492,16 @@ export default function RemindersScreen() {
               {new Date(item.dateTime).toLocaleDateString()} at{' '}
               {new Date(item.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               {isOverdue && ' (Overdue)'}
+              {item.alarmSound && ' ⏰'}
             </Text>
+
+            {item.imageUri && (
+              <Image 
+                source={{ uri: item.imageUri }} 
+                style={styles.reminderImage}
+                resizeMode="cover"
+              />
+            )}
           </View>
 
           <TouchableOpacity onPress={(e) => {
@@ -649,7 +743,151 @@ export default function RemindersScreen() {
               onChange={onTimeChange}
             />
           )}
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Reminder Image (Optional)</Text>
+            <View style={styles.imagePickerContainer}>
+              {selectedImageUri ? (
+                <View style={styles.selectedImageContainer}>
+                  <Image source={{ uri: selectedImageUri }} style={styles.selectedImage} />
+                  <TouchableOpacity
+                    style={styles.removeImageButton}
+                    onPress={() => setSelectedImageUri(null)}
+                  >
+                    <Text style={styles.removeImageText}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.imagePickerButton} onPress={pickImage}>
+                  <Text style={styles.imagePickerText}>📷 Add Image</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <View style={styles.alarmToggleContainer}>
+              <Text style={styles.label}>Alarm Notification</Text>
+              <TouchableOpacity
+                style={[styles.toggleButton, alarmEnabled && styles.toggleButtonActive]}
+                onPress={() => setAlarmEnabled(!alarmEnabled)}
+              >
+                <Text style={[styles.toggleButtonText, alarmEnabled && styles.toggleButtonTextActive]}>
+                  {alarmEnabled ? 'ON' : 'OFF'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {alarmEnabled && (
+              <TouchableOpacity
+                style={styles.alarmSettingsButton}
+                onPress={() => setShowAlarmSettings(true)}
+              >
+                <Text style={styles.alarmSettingsText}>⚙️ Alarm Settings</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {showTimePicker && (
+            <DateTimePicker
+              value={selectedDate}
+              mode="time"
+              display="default"
+              onChange={onTimeChange}
+            />
+          )}
         </View>
+
+        {/* Alarm Settings Modal */}
+        <Modal
+          visible={showAlarmSettings}
+          animationType="slide"
+          presentationStyle="pageSheet"
+        >
+          <SafeAreaView style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Alarm Settings</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowAlarmSettings(false)}
+              >
+                <Text style={styles.modalCloseText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalContent}>
+              <View style={styles.settingGroup}>
+                <Text style={styles.settingLabel}>Alarm Sound</Text>
+                <View style={styles.soundOptions}>
+                  {[
+                    { label: 'Default', value: 'default' },
+                    { label: 'Bell', value: 'bell' },
+                    { label: 'Chime', value: 'chime' },
+                    { label: 'Alert', value: 'alert' }
+                  ].map((sound) => (
+                    <TouchableOpacity
+                      key={sound.value}
+                      style={[
+                        styles.soundOption,
+                        alarmSound === sound.value && styles.soundOptionSelected
+                      ]}
+                      onPress={() => setAlarmSound(sound.value)}
+                    >
+                      <Text style={[
+                        styles.soundOptionText,
+                        alarmSound === sound.value && styles.soundOptionTextSelected
+                      ]}>
+                        {sound.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.settingGroup}>
+                <View style={styles.settingToggle}>
+                  <Text style={styles.settingLabel}>Vibration</Text>
+                  <TouchableOpacity
+                    style={[styles.toggleButton, vibrationEnabled && styles.toggleButtonActive]}
+                    onPress={() => setVibrationEnabled(!vibrationEnabled)}
+                  >
+                    <Text style={[styles.toggleButtonText, vibrationEnabled && styles.toggleButtonTextActive]}>
+                      {vibrationEnabled ? 'ON' : 'OFF'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.settingGroup}>
+                <Text style={styles.settingLabel}>Alarm Duration: {alarmDuration} minutes</Text>
+                <View style={styles.durationButtons}>
+                  {[1, 2, 5, 10, 15].map((duration) => (
+                    <TouchableOpacity
+                      key={duration}
+                      style={[
+                        styles.durationButton,
+                        alarmDuration === duration && styles.durationButtonSelected
+                      ]}
+                      onPress={() => setAlarmDuration(duration)}
+                    >
+                      <Text style={[
+                        styles.durationButtonText,
+                        alarmDuration === duration && styles.durationButtonTextSelected
+                      ]}>
+                        {duration}m
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+          </SafeAreaView>
+        </Modal>
+
+        <AlarmManager
+          visible={!!activeAlarmReminder}
+          onClose={() => setActiveAlarmReminder(null)}
+          reminder={activeAlarmReminder || undefined}
+        />
       </SafeAreaView>
     );
   }
@@ -1097,5 +1335,171 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '500',
     fontFamily: 'Inter',
+  },
+  imagePickerContainer: {
+    marginTop: 8,
+  },
+  imagePickerButton: {
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F9FAFB',
+  },
+  imagePickerText: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontFamily: 'Inter',
+  },
+  selectedImageContainer: {
+    alignItems: 'center',
+  },
+  selectedImage: {
+    width: '100%',
+    height: 150,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  removeImageButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#EF4444',
+    borderRadius: 4,
+  },
+  removeImageText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  alarmToggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  alarmSettingsButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+  },
+  alarmSettingsText: {
+    fontSize: 14,
+    color: '#000000',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000000',
+    fontFamily: 'Inter',
+  },
+  modalCloseButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  modalCloseText: {
+    fontSize: 16,
+    color: '#000000',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  modalContent: {
+    flex: 1,
+    padding: 16,
+  },
+  settingGroup: {
+    marginBottom: 24,
+  },
+  settingLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000000',
+    fontFamily: 'Inter',
+    marginBottom: 8,
+  },
+  settingToggle: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  soundOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  soundOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  soundOptionSelected: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  soundOptionText: {
+    fontSize: 14,
+    color: '#000000',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  soundOptionTextSelected: {
+    color: '#FFFFFF',
+  },
+  durationButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  durationButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  durationButtonSelected: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  durationButtonText: {
+    fontSize: 14,
+    color: '#000000',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  durationButtonTextSelected: {
+    color: '#FFFFFF',
+  },
+  reminderImage: {
+    width: '100%',
+    height: 120,
+    borderRadius: 8,
+    marginTop: 8,
   },
 });
