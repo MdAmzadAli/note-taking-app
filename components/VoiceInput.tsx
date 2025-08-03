@@ -326,7 +326,8 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
 
           if (onCommandExecuted) {
             console.log('[VOICE] Calling onCommandExecuted...');
-            onCommandExecuted(executionResult);
+            await onCommandExecuted(executionResult);
+            console.log('[VOICE] onCommandExecuted callback completed');
           } else {
             console.log('[VOICE] WARNING: onCommandExecuted callback not available');
           }

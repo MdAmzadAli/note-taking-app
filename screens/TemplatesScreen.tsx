@@ -187,8 +187,14 @@ export default function TemplatesScreen() {
     console.log('[TEMPLATES] Voice command executed:', result);
     if (result.success) {
       // Force reload templates to show newly created items
+      console.log('[TEMPLATES] Reloading templates after voice command...');
       await loadTemplatesAndSettings();
-      console.log('[TEMPLATES] Templates reloaded after voice command');
+      console.log('[TEMPLATES] Templates reloaded successfully after voice command');
+      
+      // Force a re-render by updating the search state
+      const currentQuery = searchQuery;
+      setSearchQuery('');
+      setTimeout(() => setSearchQuery(currentQuery), 100);
     }
   };
 
