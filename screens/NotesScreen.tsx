@@ -22,7 +22,6 @@ import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSecti
 import { getNotes, saveNote, deleteNote, getUserSettings, getCustomTemplates, saveTemplateEntry, getTemplateEntries } from '@/utils/storage';
 import { mockSpeechToText } from '@/utils/speech';
 import TemplateEntriesScreen from './TemplateEntriesScreen';
-import VoiceInput from '@/components/VoiceInput';
 
 import WritingStyleSelector from '@/components/WritingStyleSelector';
 import WritingStyleEditor from '@/components/WritingStyleEditor';
@@ -61,17 +60,12 @@ export default function NotesScreen() {
   const [currentNoteTitle, setCurrentNoteTitle] = useState('');
 
   const handleVoiceCommand = async (result: any) => {
-    console.log('[NOTES] Voice command executed:', result);
+    console.log('[NOTES] Voice command executed from Search tab:', result);
     if (result.success) {
       // Force reload notes to show newly created items
       console.log('[NOTES] Reloading notes after voice command...');
       await loadNotes();
       console.log('[NOTES] Notes reloaded successfully after voice command');
-      
-      // Force a re-render by updating the search state
-      const currentQuery = searchQuery;
-      setSearchQuery('');
-      setTimeout(() => setSearchQuery(currentQuery), 100);
     }
   };
 
@@ -539,8 +533,6 @@ export default function NotesScreen() {
             sections={noteSections}
             checkedItems={checkedItems}
             onContentChange={handleContentChange}
-            onVoiceInput={handleVoiceInput}
-            onCommandExecuted={handleVoiceCommand}
           />
         </View>
       </SafeAreaView>
@@ -554,10 +546,6 @@ export default function NotesScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Notes</Text>
         <View style={styles.headerButtons}>
-          <VoiceInput 
-            onCommandExecuted={handleVoiceCommand}
-            style={styles.voiceInputHeader}
-          />
           <TouchableOpacity style={styles.iconButton} onPress={openMenu}>
             <IconSymbol size={24} name="line.horizontal.3" color="#FFFFFF" />
           </TouchableOpacity>
@@ -978,8 +966,5 @@ const styles = StyleSheet.create({
     color: '#000000',
     marginBottom: 16,
   },
-  voiceInputHeader: {
-    marginRight: 8,
-  }
 
 });
