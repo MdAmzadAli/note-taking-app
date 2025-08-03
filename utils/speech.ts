@@ -505,6 +505,10 @@ export const processWithGemini = async (text: string, profession: string): Promi
   intent: string;
   parameters: Record<string, any>;
   confidence: number;
+  tasks?: Array<{
+    type: 'create_note' | 'set_reminder' | 'create_task' | 'search' | 'show_help';
+    parameters: Record<string, any>;
+  }>;
 }> => {
   try {
     if (!geminiAI) {
@@ -525,51 +529,54 @@ You are an AI assistant that processes voice commands for a ${profession}'s note
 
 Analyze this voice input: "${text}"
 
-SPECIAL FOCUS FOR NOTE CREATION:
-When the intent is to create a note, you must transform fuzzy, unclear, or incomplete thoughts into clear, well-structured, and professional notes. This includes:
-- Removing filler words (um, uh, like, you know, etc.)
-- Correcting grammar and sentence structure
-- Organizing scattered thoughts into coherent paragraphs
-- Adding context and clarity where needed
-- Maintaining the original meaning while improving readability
-- Using professional language appropriate for a ${profession}
+TASK: Process the voice command and extract tasks. Clean up the text and separate multiple tasks if present.
 
-For example:
-- "um, like, create note about that patient who came in today with, uh, headache and stuff" 
-  → "Patient consultation: Patient presented with headache symptoms during today's visit. Requires follow-up assessment."
-
-Understand the user's intent and extract relevant information. Focus on these command types:
-1. SHOW HELP: "what can you do", "tell me your capabilities", "show me features", "help", "what are your functions", "tell me what all you can do", "what all can you do", "list your capabilities", "show capabilities"
-2. CREATE NOTE: "create note", "new note", "add note", "write note", "make note"
-3. SET REMINDER: "set reminder", "remind me", "create reminder", "schedule reminder"  
+COMMAND TYPES:
+1. SHOW HELP: "what can you do", "tell me your capabilities", "show me features", "help"
+2. CREATE NOTE: "create note", "new note", "add note", "write note", "make note"  
+3. SET REMINDER: "set reminder", "remind me", "create reminder", "schedule reminder"
 4. CREATE TASK: "create task", "new task", "add task", "make task", "todo"
 5. SEARCH: "search for", "find", "look for", "show me"
 
-IMPORTANT: For SHOW HELP commands, NEVER create templates or perform searches. These are requests to display capabilities, not to create anything.
+CLEANING RULES FOR NOTES:
+- Remove filler words (um, uh, like, you know, etc.)
+- Correct grammar and sentence structure
+- Make content professional and clear
+- Maintain original meaning
 
 Return ONLY valid JSON in this exact format:
 {
-  "processedText": "cleaned and corrected version of the input - for notes, make this a clear, professional, well-structured note",
-  "intent": "show_help, create_note, set_reminder, create_task, or search",
+  "processedText": "cleaned version of the input",
+  "intent": "primary intent (show_help, create_note, set_reminder, create_task, search)",
   "parameters": {
-    "content": "main content for notes/tasks/reminders - for notes, this should be the clear, professional version",
-    "title": "extracted title if specified", 
-    "time": "extracted time/date for reminders (e.g., 'tomorrow', '2pm', 'next week')",
-    "query": "search query if intent is search",
-    "dueDate": "due date for tasks (e.g., 'tomorrow', 'Friday', 'next week')"
+    "content": "main content",
+    "title": "extracted title if specified",
+    "time": "time for reminders",
+    "query": "search query", 
+    "dueDate": "due date for tasks"
   },
-  "confidence": 0.85
+  "confidence": 0.95,
+  "tasks": [
+    {
+      "type": "create_note|set_reminder|create_task|search|show_help",
+      "parameters": {
+        "content": "task-specific content",
+        "title": "title if applicable",
+        "time": "time if applicable",
+        "dueDate": "due date if applicable",
+        "query": "search query if applicable"
+      }
+    }
+  ]
 }
 
 Examples:
-- "What can you do" → intent: "show_help", parameters: {}
-- "Tell me your capabilities" → intent: "show_help", parameters: {}
-- "Create a task for tomorrow to do exercise at 12pm" → intent: "create_task", content: "exercise at 12pm", dueDate: "tomorrow"
-- "Set reminder to call doctor tomorrow at 2pm" → intent: "set_reminder", content: "call doctor", time: "tomorrow at 2pm"
-- "uh, create note about, like, meeting discussion and stuff" → intent: "create_note", content: "Meeting discussion notes and key points covered during the session"
-- "Search for patient notes" → intent: "search", query: "patient notes"
+- "Create note about meeting" → Single task: create_note
+- "Create two tasks: exercise and shopping" → Multiple tasks: create_task (exercise), create_task (shopping)
+- "Set reminder and create note about project" → Multiple tasks: set_reminder, create_note
+- "What can you do" → Single task: show_help
 
-Clean up filler words, correct grammar, and be confident in your intent detection. For notes specifically, prioritize clarity and professionalism.
+Detect if there are multiple tasks and separate them in the tasks array. Each task should have clear parameters.
 `;
 
     const result = await model.generateContent(prompt);

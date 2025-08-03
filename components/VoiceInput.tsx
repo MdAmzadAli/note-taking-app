@@ -213,33 +213,16 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
       }
 
       // Set initial processing status
-      setProcessingStatus('Analyzing');
+      setProcessingStatus('Processing with Gemini');
 
-      // First, process fuzzy thoughts
-      const fuzzyProcessing = processFuzzyThought(speechText);
-      setFuzzyResult(fuzzyProcessing);
+      // DIRECT FLOW: Create simple command with original text for Gemini processing
+      const command: VoiceCommand = {
+        intent: 'unknown',
+        parameters: {},
+        originalText: speechText
+      };
 
-      console.log('[VOICE] Fuzzy processing completed:', fuzzyProcessing);
-
-      // Create command using fuzzy processing result if it has good confidence
-      let command;
-      if (fuzzyProcessing && fuzzyProcessing.confidence > 0.6) {
-        command = {
-          intent: fuzzyProcessing.detectedIntent as any,
-          parameters: fuzzyProcessing.detectedIntent === 'create_note' ? { content: fuzzyProcessing.cleanedText.replace('Create note: ', '').replace('.', '') } :
-                     fuzzyProcessing.detectedIntent === 'search' ? { query: fuzzyProcessing.cleanedText.replace('Search for: ', '').replace('.', '') } :
-                     fuzzyProcessing.detectedIntent === 'create_task' ? { title: fuzzyProcessing.cleanedText.replace('Create task: ', '').replace('.', '') } :
-                     fuzzyProcessing.detectedIntent === 'set_reminder' ? { title: fuzzyProcessing.cleanedText.replace('Set reminder: ', '').split(' due ')[0], time: fuzzyProcessing.cleanedText.includes(' due ') ? fuzzyProcessing.cleanedText.split(' due ')[1] : 'tomorrow' } : {},
-          originalText: speechText,
-          cleanedText: fuzzyProcessing.cleanedText,
-          confidence: fuzzyProcessing.confidence
-        };
-      } else {
-        // Fallback to regex parsing
-        command = parseVoiceCommand(speechText);
-      }
-
-      console.log('[VOICE] Final command to execute:', JSON.stringify(command, null, 2));
+      console.log('[VOICE] Direct command for Gemini processing:', JSON.stringify(command, null, 2));
 
       // Determine processing method based on voice method and Gemini availability
       const isGeminiMethod = voiceMethod === 'assemblyai-gemini';

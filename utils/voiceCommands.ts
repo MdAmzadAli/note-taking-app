@@ -414,31 +414,14 @@ export const executeVoiceCommand = async (
     let enhancedCommand = command;
 
     if (processingMethod === 'gemini' && isGeminiInitialized()) {
-      console.log('[VOICE_COMMANDS] Using Gemini AI Agent to process command');
+      console.log('[VOICE_COMMANDS] Using DIRECT Gemini processing (AssemblyAI → Gemini → Execute)');
 
-      // First, try complex command processing for advanced AI agent functionality
-      const complexResult = await processComplexCommand(command.originalText, profession);
-
-      if (complexResult.isComplexCommand && complexResult.executionPlan.length > 0) {
-        console.log('[VOICE_COMMANDS] Complex AI agent command detected with', complexResult.executionPlan.length, 'steps');
-        console.log('[VOICE_COMMANDS] AI reasoning:', complexResult.reasoning);
-        return await handleComplexCommand(complexResult.executionPlan, complexResult.reasoning, profession);
-      }
-
-      // Fallback to original Gemini processing for simpler commands
+      // DIRECT FLOW: AssemblyAI transcription → Gemini processing → Execute tasks
       const geminiResult = await processWithGemini(command.originalText, profession);
-      console.log('[VOICE_COMMANDS] Gemini simple result:', geminiResult);
+      console.log('[VOICE_COMMANDS] Direct Gemini result:', geminiResult);
 
       if (geminiResult.success && geminiResult.confidence > 0.6) {
-        // Check if this is a multi-task command by analyzing the processed text
-        const multiTaskResult = await processMultiTaskCommand(command.originalText, profession);
-
-        if (multiTaskResult.isMultiTask && multiTaskResult.items.length > 1) {
-          console.log('[VOICE_COMMANDS] Multi-item command detected:', multiTaskResult.items.length, 'items');
-          return await handleMultiItemCommand(multiTaskResult.items, profession);
-        }
-
-        // Map Gemini intent to our command intents for single items
+        // Map Gemini intent to our command intents
         let mappedIntent = geminiResult.intent;
         if (mappedIntent === 'create_note' || mappedIntent === 'note') {
           mappedIntent = 'create_note';
