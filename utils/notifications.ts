@@ -17,10 +17,6 @@ export const initializeNotificationSystem = async (): Promise<void> => {
   }
 };
 
-
-import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
-
 // Configure notification handler
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
