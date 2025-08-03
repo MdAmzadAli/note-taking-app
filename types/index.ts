@@ -24,8 +24,14 @@ export interface Reminder {
   description?: string;
   dateTime: string;
   isCompleted: boolean;
-  notificationId?: string;
   createdAt: string;
+  notificationId?: string;
+  profession?: string;
+  // Recurring reminder properties
+  isRecurring?: boolean;
+  recurringDays?: number[]; // 0=Sunday, 1=Monday, ..., 6=Saturday
+  recurringTimes?: string[]; // Array of time strings like "09:00", "18:30"
+  notificationIds?: string[]; // Array of notification IDs for recurring reminders
 }
 
 export interface Task {

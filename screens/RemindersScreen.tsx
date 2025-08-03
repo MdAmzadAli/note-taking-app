@@ -23,7 +23,7 @@ export default function RemindersScreen() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [filteredReminders, setFilteredReminders] = useState<Reminder[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
   const [voiceSearchResults, setVoiceSearchResults] = useState<any[]>([]);
@@ -224,8 +224,14 @@ export default function RemindersScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              // Cancel all notifications for this reminder
               if (reminder.notificationId) {
                 await cancelNotification(reminder.notificationId);
+              }
+              if (reminder.notificationIds) {
+                for (const notificationId of reminder.notificationIds) {
+                  await cancelNotification(notificationId);
+                }
               }
               await deleteReminder(reminder.id);
               eventBus.emit(EVENTS.REMINDER_UPDATED);
@@ -473,7 +479,7 @@ export default function RemindersScreen() {
           >
             <IconSymbol size={20} name="magnifyingglass" color="#FFFFFF" />
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={styles.addButton}
             onPress={() => setIsCreating(true)}
