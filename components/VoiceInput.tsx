@@ -202,7 +202,7 @@ const VoiceInput = ({ profession, voiceRecognitionMethod, onCommandExecuted, onS
       console.log('[VOICE] ===== PROCESSING VOICE COMMAND =====');
       console.log('[VOICE] Processing speech text:', speechText);
       console.log('[VOICE] Speech text length:', speechText.length);
-      console.log('[VOICE] Current profession:', profession);
+      console.log('[VOICE] Current profession:', profession || 'developer');
       console.log('[VOICE] Voice method:', voiceMethod);
       console.log('[VOICE] Gemini supported:', geminiSupported);
 
@@ -245,7 +245,7 @@ const VoiceInput = ({ profession, voiceRecognitionMethod, onCommandExecuted, onS
       }
 
       console.log('[VOICE] About to execute command with processing method:', processingMethod);
-      const executionResult = await executeVoiceCommand(command, profession, processingMethod);
+      const executionResult = await executeVoiceCommand(command, profession || 'developer', processingMethod);
 
       console.log('[VOICE] ===== EXECUTION RESULT =====');
       console.log('[VOICE] Execution result:', JSON.stringify(executionResult, null, 2));

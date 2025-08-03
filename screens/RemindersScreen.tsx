@@ -309,10 +309,15 @@ export default function RemindersScreen() {
     );
   };
 
+  
+
   const handleVoiceCommand = async (result: any) => {
     console.log('[REMINDERS] Voice command executed:', result);
     if (result.success) {
-      loadReminders();
+      // Force reload reminders to show newly created items
+      console.log('[REMINDERS] Reloading reminders after voice command...');
+      await loadRemindersAndSettings();
+      console.log('[REMINDERS] Reminders reloaded successfully after voice command');
     }
   };
 
@@ -461,15 +466,9 @@ export default function RemindersScreen() {
             <IconSymbol size={20} name="magnifyingglass" color="#FFFFFF" />
           </TouchableOpacity>
           <VoiceInput
-            onCommandExecuted={(result) => {
-              if (result.data && result.data.id) {
-                loadRemindersAndSettings(); // Refresh reminders list
-              }
-            }}
-            onSearchRequested={(query, results) => {
-              setSearchQuery(query);
-              setIsSearchVisible(true);
-            }}
+            profession={profession}
+            onCommandExecuted={handleVoiceCommand}
+            onSearchRequested={handleVoiceSearchRequested}
             style={styles.voiceInputButton}
           />
           <TouchableOpacity

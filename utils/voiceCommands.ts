@@ -1315,10 +1315,20 @@ const handleComplexCommand = async (
   let searchResults: any[] = [];
 
   try {
-    // Sort by priority (1 = creation commands, 2 = search commands)
-    const sortedPlan = [...executionPlan].sort((a, b) => a.priority - b.priority || a.step - b.step);
+    // Sort by priority with guaranteed search command ordering:
+    // Priority 1: Creation commands (templates, tasks, reminders, notes)
+    // Priority 2: Search commands (always executed last)
+    const sortedPlan = [...executionPlan].sort((a, b) => {
+      // Search commands always go last regardless of original priority
+      if (a.type === 'search' && b.type !== 'search') return 1;
+      if (b.type === 'search' && a.type !== 'search') return -1;
+      
+      // For non-search commands, sort by priority then step
+      return a.priority - b.priority || a.step - b.step;
+    });
 
-    console.log('[VOICE_COMMANDS] Executing steps in optimized order...');
+    console.log('[VOICE_COMMANDS] Executing steps in optimized order (search commands last)...');
+    console.log('[VOICE_COMMANDS] Execution order:', sortedPlan.map(s => `${s.step}:${s.type}`).join(' → '));
 
     for (let i = 0; i < sortedPlan.length; i++) {
       const step = sortedPlan[i];

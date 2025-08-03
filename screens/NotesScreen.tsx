@@ -76,13 +76,24 @@ export default function NotesScreen() {
   const [currentNoteTitle, setCurrentNoteTitle] = useState('');
 
   const handleVoiceCommand = async (result: any) => {
-    console.log('[NOTES] Voice command executed from Search tab:', result);
+    console.log('[NOTES] Voice command executed:', result);
     if (result.success) {
       // Force reload notes to show newly created items
       console.log('[NOTES] Reloading notes after voice command...');
       await loadNotes();
       console.log('[NOTES] Notes reloaded successfully after voice command');
+      
+      // Force refresh filtered notes state
+      const currentQuery = searchQuery;
+      setSearchQuery('');
+      setTimeout(() => setSearchQuery(currentQuery), 100);
     }
+  };
+
+  const handleVoiceSearchRequested = (query: string, results: any[]) => {
+    console.log('[NOTES] Voice search requested:', query, 'Results:', results.length);
+    setSearchQuery(query);
+    setIsSearchVisible(true);
   };
 
   useEffect(() => {
@@ -557,6 +568,8 @@ export default function NotesScreen() {
           <VoiceInput
             profession={profession}
             voiceRecognitionMethod={settings.voiceRecognitionMethod}
+            onCommandExecuted={handleVoiceCommand}
+            onSearchRequested={handleVoiceSearchRequested}
           />
           <WritingStyleEditor
             style={selectedWritingStyle}
