@@ -2,7 +2,7 @@ import { Alert } from 'react-native';
 import { saveNote, saveReminder, saveTask, getNotes, getTasks, getReminders } from './storage';
 import { Note, Task, Reminder } from '@/types';
 import { scheduleNotification } from './notifications';
-import { processWithGemini, isGeminiInitialized } from './speech';
+import { processWithGemini, processWithGeminiDirect, isGeminiInitialized } from './speech';
 
 export interface VoiceCommand {
   intent: 'search' | 'create_note' | 'set_reminder' | 'create_task' | 'show_help' | 'unknown';
@@ -464,8 +464,11 @@ export const executeVoiceCommand = async (
         }
       }
 
-      // Fallback to regex if Gemini processing fails
-      console.log('[VOICE_COMMANDS] Gemini processing failed, falling back to regex');
+      // If no tasks or processing failed, return appropriate message
+      return {
+        success: false,
+        message: "Sorry, I couldn't understand that command. Please try again."
+      };
     }
 
     // Regex processing (fallback or direct)
@@ -473,44 +476,44 @@ export const executeVoiceCommand = async (
     const parsedCommand = parseVoiceCommand(command.originalText);
     console.log('[VOICE_COMMANDS] Parsed command:', parsedCommand);
 
-    console.log('[VOICE_COMMANDS] Enhanced command intent:', enhancedCommand.intent);
-    console.log('[VOICE_COMMANDS] Enhanced command parameters:', JSON.stringify(enhancedCommand.parameters, null, 2));
+    console.log('[VOICE_COMMANDS] Parsed command intent:', parsedCommand.intent);
+    console.log('[VOICE_COMMANDS] Parsed command parameters:', JSON.stringify(parsedCommand.parameters, null, 2));
 
-    switch (enhancedCommand.intent) {
+    switch (parsedCommand.intent) {
       case 'show_help':
         console.log('[VOICE_COMMANDS] Executing SHOW_HELP command');
         return handleShowHelpCommand();
 
       case 'search':
         console.log('[VOICE_COMMANDS] Executing SEARCH command');
-        const searchQuery = enhancedCommand.parameters.query || enhancedCommand.parameters.content;
+        const searchQuery = parsedCommand.parameters.query || parsedCommand.parameters.content;
         console.log('[VOICE_COMMANDS] Search query:', searchQuery);
         return await handleSearchCommand(searchQuery);
 
       case 'create_note':
         console.log('[VOICE_COMMANDS] Executing CREATE_NOTE command');
-        const noteContent = enhancedCommand.parameters.content || enhancedCommand.parameters.title;
+        const noteContent = parsedCommand.parameters.content || parsedCommand.parameters.title;
         console.log('[VOICE_COMMANDS] Note content:', noteContent);
         return await handleCreateNoteCommand(noteContent, profession);
 
       case 'set_reminder':
         console.log('[VOICE_COMMANDS] Executing SET_REMINDER command');
-        const reminderTitle = enhancedCommand.parameters.title || enhancedCommand.parameters.content;
-        const reminderTime = enhancedCommand.parameters.time || 'tomorrow';
+        const reminderTitle = parsedCommand.parameters.title || parsedCommand.parameters.content;
+        const reminderTime = parsedCommand.parameters.time || 'tomorrow';
         console.log('[VOICE_COMMANDS] Reminder title:', reminderTitle);
         console.log('[VOICE_COMMANDS] Reminder time:', reminderTime);
         return await handleSetReminderCommand(reminderTitle, reminderTime, profession);
 
       case 'create_task':
         console.log('[VOICE_COMMANDS] Executing CREATE_TASK command');
-        const taskTitle = enhancedCommand.parameters.title || enhancedCommand.parameters.content;
-        const taskDueDate = enhancedCommand.parameters.dueDate || 'tomorrow';
+        const taskTitle = parsedCommand.parameters.title || parsedCommand.parameters.content;
+        const taskDueDate = parsedCommand.parameters.dueDate || 'tomorrow';
         console.log('[VOICE_COMMANDS] Task title:', taskTitle);
         console.log('[VOICE_COMMANDS] Task due date:', taskDueDate);
         return await handleCreateTaskCommand(taskTitle, taskDueDate, profession);
 
       default:
-        console.log('[VOICE_COMMANDS] UNKNOWN command intent:', enhancedCommand.intent);
+        console.log('[VOICE_COMMANDS] UNKNOWN command intent:', parsedCommand.intent);
         
         // Check if this might be a help request that wasn't caught
         const lowerText = command.originalText.toLowerCase();
