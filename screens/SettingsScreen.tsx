@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { getUserSettings, saveUserSettings, UserSettings } from '@/utils/storage';
 import { clearAllData } from '@/utils/storage';
-import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 import { VoiceRecognitionMethod } from '@/utils/speech';
 import VoiceCommandsScreen from './VoiceCommandsScreen';
 
@@ -38,7 +37,6 @@ const VOICE_LANGUAGES = [
 
 const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
   const [settings, setSettings] = useState<UserSettings>({
-    profession: 'doctor',
     voiceLanguage: 'en-US',
     voiceRecognitionMethod: 'assemblyai-regex',
     assemblyAIApiKey: '',
@@ -52,7 +50,6 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
     viewMode: 'paragraph',
     isOnboardingComplete: true,
   });
-  const [currentProfession, setCurrentProfession] = useState<ProfessionType>('doctor');
   const [showVoiceCommands, setShowVoiceCommands] = useState(false);
 
   useEffect(() => {
@@ -63,7 +60,6 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
     try {
       const userSettings = await getUserSettings();
       setSettings(userSettings);
-      setCurrentProfession(userSettings.profession);
     } catch (error) {
       console.error('Error loading settings:', error);
     }
@@ -74,32 +70,11 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
       const updatedSettings = { ...settings, ...newSettings };
       await saveUserSettings(updatedSettings);
       setSettings(updatedSettings);
-
-      if (newSettings.profession) {
-        setCurrentProfession(newSettings.profession);
-      }
-
       Alert.alert('Success', 'Settings saved successfully');
     } catch (error) {
       console.error('Error saving settings:', error);
       Alert.alert('Error', 'Failed to save settings');
     }
-  };
-
-
-
-  const changeProfession = (profession: ProfessionType) => {
-    Alert.alert(
-      'Change Profession',
-      `Switch to ${PROFESSIONS[profession].name}? Your existing notes will remain but new notes will use the ${profession} template.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Change',
-          onPress: () => updateSettings({ profession }),
-        },
-      ]
-    );
   };
 
   const toggleViewMode = () => {
@@ -120,7 +95,6 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
             try {
               await clearAllData();
               await updateSettings({
-                profession: 'doctor',
                 viewMode: 'paragraph',
                 isOnboardingComplete: false,
               });
@@ -133,8 +107,6 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
       ]
     );
   };
-
-  const professionConfig = PROFESSIONS[currentProfession];
 
   if (showVoiceCommands) {
     return <VoiceCommandsScreen onBack={() => setShowVoiceCommands(false)} />;
@@ -176,7 +148,7 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
                 styles.apiStatusValue,
                 { color: process.env.EXPO_PUBLIC_GEMINI_API_KEY ? '#10B981' : '#F59E0B' }
               ]}>
-                {process.env.EXPO_PUBLIC_GEMINI_API_KEY ? '✓ Configured' : '⚠ Optional'}
+                {process.env.EXPO_PUBLIC_GEMini_API_KEY ? '✓ Configured' : '⚠ Optional'}
               </Text>
             </View>
           </View>
@@ -189,51 +161,6 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
               </Text>
             </View>
           )}
-        </View>
-
-        {/* Current Profession */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Current Profession</Text>
-          <View style={styles.currentProfessionCard}>
-            <Text style={styles.currentProfessionIcon}>{professionConfig.icon}</Text>
-            <View style={styles.currentProfessionInfo}>
-              <Text style={styles.currentProfessionName}>
-                {professionConfig.name}
-              </Text>
-              <Text style={styles.currentProfessionHeader}>
-                {professionConfig.header}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Change Profession */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Change Profession</Text>
-          {Object.entries(PROFESSIONS).map(([key, config]) => (
-            <TouchableOpacity
-              key={key}
-              style={[
-                styles.professionOption,
-                currentProfession === key && styles.professionOptionActive,
-              ]}
-              onPress={() => changeProfession(key as ProfessionType)}
-              disabled={currentProfession === key}
-            >
-              <Text style={styles.professionIcon}>{config.icon}</Text>
-              <View style={styles.professionInfo}>
-                <Text style={styles.professionName}>
-                  {config.name}
-                </Text>
-                <Text style={styles.professionHeader}>
-                  {config.header}
-                </Text>
-              </View>
-              {currentProfession === key && (
-                <Text style={styles.currentBadge}>✓</Text>
-              )}
-            </TouchableOpacity>
-          ))}
         </View>
 
         {/* Voice Recognition Settings */}

@@ -51,9 +51,7 @@ export default function NotesScreen() {
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [currentView, setCurrentView] = useState<'notes' | 'template'>('notes');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [profession] = useState('developer');
   const [settings, setSettings] = useState<UserSettings>({
-    profession: 'developer',
     voiceLanguage: 'en-US',
     voiceRecognitionMethod: 'assemblyai-regex',
     assemblyAIApiKey: '',
@@ -207,7 +205,6 @@ export default function NotesScreen() {
             id: existingNote.id,
             title,
             content: currentNoteText,
-            profession: 'general',
             fields: {},
             writingStyle: selectedWritingStyle,
             sections: noteSections.length > 0 ? noteSections : undefined,
@@ -223,7 +220,6 @@ export default function NotesScreen() {
           id: Date.now().toString(),
           title,
           content: currentNoteText,
-          profession: 'general',
           fields: {},
           writingStyle: selectedWritingStyle,
           sections: noteSections.length > 0 ? noteSections : undefined,
@@ -974,8 +970,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   titleInput: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,

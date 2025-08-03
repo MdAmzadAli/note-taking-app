@@ -410,53 +410,9 @@ export const simulateVoiceToText = (): Promise<string> => {
 // Helper function to extract structured data from voice input
 export const extractFieldsFromSpeech = (
   text: string,
-  profession: 'doctor' | 'lawyer' | 'developer'
 ): Record<string, string> => {
   const fields: Record<string, string> = {};
   const lowerText = text.toLowerCase();
-
-  switch (profession) {
-    case 'doctor':
-      if (lowerText.includes('patient') || lowerText.includes('name')) {
-        const nameMatch = text.match(/patient\s+(?:name\s+is\s+)?(\w+(?:\s+\w+)?)/i);
-        if (nameMatch) fields['Patient Name'] = nameMatch[1];
-      }
-      if (lowerText.includes('symptom') || lowerText.includes('fever') || lowerText.includes('pain')) {
-        fields['Symptoms'] = text;
-      }
-      if (lowerText.includes('diagnos') || lowerText.includes('condition')) {
-        fields['Diagnosis'] = text;
-      }
-      if (lowerText.includes('prescri') || lowerText.includes('medication')) {
-        fields['Prescription'] = text;
-      }
-      break;
-
-    case 'lawyer':
-      if (lowerText.includes('client')) {
-        const nameMatch = text.match(/client\s+(?:name\s+is\s+)?(\w+(?:\s+\w+)?)/i);
-        if (nameMatch) fields['Client Name'] = nameMatch[1];
-      }
-      if (lowerText.includes('case') || lowerText.includes('matter')) {
-        fields['Case Summary'] = text;
-      }
-      if (lowerText.includes('action') || lowerText.includes('todo') || lowerText.includes('follow')) {
-        fields['Action Items'] = text;
-      }
-      break;
-
-    case 'developer':
-      if (lowerText.includes('feature') || lowerText.includes('implement')) {
-        fields['Feature'] = text;
-      }
-      if (lowerText.includes('code') || lowerText.includes('function') || lowerText.includes('class')) {
-        fields['Code Snippet'] = text;
-      }
-      if (lowerText.includes('todo') || lowerText.includes('task') || lowerText.includes('fix')) {
-        fields['To-Do'] = text;
-      }
-      break;
-  }
 
   if (Object.keys(fields).length === 0) {
     fields['Notes'] = text;
@@ -466,7 +422,7 @@ export const extractFieldsFromSpeech = (
 };
 
 // Mock speech-to-text implementation for fallback
-export const mockSpeechToText = async (): Promise<string> => {
+export const mockSpeechToText = (): string => {
   return new Promise((resolve) => {
     setTimeout(() => {
       const sampleTexts = [
@@ -499,7 +455,7 @@ export const stopListening = async (): Promise<void> => {
 };
 
 // Direct Gemini processing for AssemblyAI transcription → JSON tasks
-export const processWithGeminiDirect = async (transcription: string, profession: string): Promise<{
+export const processWithGeminiDirect = async (transcription: string): Promise<{
   success: boolean;
   tasks: Array<{
     type: 'create_note' | 'set_reminder' | 'create_task' | 'search' | 'show_help';
@@ -518,7 +474,6 @@ export const processWithGeminiDirect = async (transcription: string, profession:
 DIRECT PROCESSING: Convert voice transcription to executable tasks.
 
 Input transcription: "${transcription}"
-Profession context: ${profession}
 
 TASK TYPES:
 - create_note: For recording information
@@ -575,7 +530,7 @@ Examples:
 };
 
 // Process text with Gemini AI for better command understanding (legacy)
-export const processWithGemini = async (text: string, profession: string): Promise<{
+export const processWithGemini = async (text: string): Promise<{
   success: boolean;
   processedText: string;
   intent: string;
@@ -601,7 +556,7 @@ export const processWithGemini = async (text: string, profession: string): Promi
     const model = geminiAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const prompt = `
-You are an AI assistant that processes voice commands for a ${profession}'s note-taking app. 
+You are an AI assistant that processes voice commands for a note-taking app. 
 
 Analyze this voice input: "${text}"
 
@@ -737,11 +692,20 @@ export const isSpeechRecognitionAvailable = async (method?: VoiceRecognitionMeth
 };
 
 // Profession-specific mock voice input
-export const mockSpeechByProfession = (profession: string): string => {
-  const mockTexts = {
-    doctor: "Patient complains of headache and fever symptoms lasting 3 days",
-    lawyer: "Client needs assistance with contract review and legal documentation", 
-    developer: "Implement user authentication system with JWT tokens"
-  };
-  return mockTexts[profession as keyof typeof mockTexts] || "Sample voice input text";
+export const mockSpeechToText = (): string => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const sampleTexts = [
+        "This is a sample voice input text",
+        "Patient complains of headache and fatigue",
+        "Meeting scheduled for tomorrow at 2 PM",
+        "Remember to review the contract details",
+        "Code review needed for the new feature",
+        "Follow up with client regarding requirements"
+      ];
+
+      const randomText = sampleTexts[Math.floor(Math.random() * sampleTexts.length)];
+      resolve(randomText);
+    }, 1500);
+  });
 };

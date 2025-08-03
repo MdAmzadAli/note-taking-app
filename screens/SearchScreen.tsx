@@ -25,7 +25,7 @@ export default function SearchScreen() {
     searchIntent: 'general'
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [profession, setProfession] = useState<ProfessionType>('doctor');
+  
   const [isVoiceSearch, setIsVoiceSearch] = useState(false);
   const [showResults, setShowResults] = useState(false);
 
@@ -64,12 +64,12 @@ export default function SearchScreen() {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [searchQuery, profession]);
+  }, [searchQuery]);
 
   const loadUserSettings = async () => {
     try {
       const settings = await getUserSettings();
-      setProfession(settings.profession);
+      // Settings loaded for future use
     } catch (error) {
       console.error('Error loading user settings:', error);
     }

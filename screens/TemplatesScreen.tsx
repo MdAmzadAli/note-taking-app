@@ -16,13 +16,12 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import VoiceInput from '@/components/VoiceInput';
 import { CustomTemplate, FieldType } from '@/types';
 import { getCustomTemplates, saveCustomTemplate, deleteCustomTemplate, getUserSettings } from '@/utils/storage';
-import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 import { eventBus, EVENTS } from '@/utils/eventBus';
 
 
 export default function TemplatesScreen() {
   const [templates, setTemplates] = useState<CustomTemplate[]>([]);
-  const [profession, setProfession] = useState<ProfessionType>('doctor');
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -43,12 +42,8 @@ export default function TemplatesScreen() {
 
   const loadTemplatesAndSettings = async () => {
     try {
-      const [templatesData, settings] = await Promise.all([
-        getCustomTemplates(),
-        getUserSettings(),
-      ]);
+      const templatesData = await getCustomTemplates();
       setTemplates(templatesData);
-      setProfession(settings.profession);
     } catch (error) {
       console.error('Error loading templates:', error);
     }
@@ -92,7 +87,6 @@ export default function TemplatesScreen() {
         name: templateName.trim(),
         description: templateDescription.trim(),
         fields,
-        profession,
         createdAt: editingTemplate?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

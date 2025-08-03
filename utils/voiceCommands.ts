@@ -1485,8 +1485,7 @@ const handleMultiItemCommand = async (
     description?: string;
     time?: string;
     content?: string;
-  }>,
-  profession: string
+  }>
 ): Promise<{ success: boolean; message: string; data?: any }> => {
   console.log('[VOICE_COMMANDS] ===== HANDLING MULTI-ITEM COMMAND =====');
   console.log('[VOICE_COMMANDS] Number of items:', items.length);
@@ -1507,13 +1506,13 @@ const handleMultiItemCommand = async (
         switch (item.type) {
           case 'task':
             console.log(`[VOICE_COMMANDS] Creating task ${i + 1}: "${item.title}" due ${item.dueDate || 'tomorrow'}`);
-            result = await handleCreateTaskCommand(item.title, item.dueDate || 'tomorrow', profession);
+            result = await handleCreateTaskCommand(item.title, item.dueDate || 'tomorrow');
             if (result.success) counts.tasks++;
             break;
 
           case 'reminder':
             console.log(`[VOICE_COMMANDS] Creating reminder ${i + 1}: "${item.title}" at ${item.time || 'tomorrow'}`);
-            result = await handleSetReminderCommand(item.title, item.time || 'tomorrow', profession);
+            result = await handleSetReminderCommand(item.title, item.time || 'tomorrow');
             if (result.success) counts.reminders++;
             break;
 

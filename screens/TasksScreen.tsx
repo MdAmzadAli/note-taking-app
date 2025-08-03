@@ -13,20 +13,17 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { Task, ProfessionType } from '@/types';
+import { Task } from '@/types';
 import { getTasks, saveTask, deleteTask, updateTask, getUserSettings } from '@/utils/storage';
 import { scheduleNotification, cancelNotification } from '@/utils/notifications';
 import { eventBus, EVENTS } from '@/utils/eventBus';
-import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 
 import SearchResultsModal from '@/components/SearchResultsModal';
 
 export default function TasksScreen() {
-  const [showProfessionModal, setShowProfessionModal] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [profession, setProfession] = useState<ProfessionType>('doctor');
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
   const [voiceSearchResults, setVoiceSearchResults] = useState<any[]>([]);
@@ -83,7 +80,7 @@ export default function TasksScreen() {
       );
     }
     setFilteredTasks(filtered);
-  }, [searchQuery, tasks, filter, profession]);
+  }, [searchQuery, tasks, filter]);
 
   function getTomorrowDate(): Date {
     const tomorrow = new Date();
@@ -94,18 +91,12 @@ export default function TasksScreen() {
 
   const loadTasksAndSettings = async () => {
     try {
-      const [tasksData, settings] = await Promise.all([
-        getTasks(),
-        getUserSettings(),
-      ]);
+      const tasksData = await getTasks();
       setTasks(tasksData);
-      setProfession(settings.profession);
     } catch (error) {
       console.error('Error loading tasks:', error);
     }
   };
-
-  const professionConfig = PROFESSIONS[profession];
 
   const createTask = async () => {
     if (!newTitle.trim()) {
@@ -121,7 +112,6 @@ export default function TasksScreen() {
         isCompleted: false,
         scheduledDate: selectedDate.toISOString(),
         createdAt: new Date().toISOString(),
-        profession,
       };
 
       // Schedule reminder if enabled
@@ -284,8 +274,6 @@ export default function TasksScreen() {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     return tasks.filter(task => {
-      if (task.profession !== profession) return false;
-
       const taskDate = new Date(task.scheduledDate || task.createdAt);
       const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
 

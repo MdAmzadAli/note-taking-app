@@ -19,14 +19,11 @@ import { getReminders, saveReminder, deleteReminder, updateReminder, getUserSett
 import { scheduleNotification, cancelNotification } from '@/utils/notifications';
 import { eventBus, EVENTS } from '@/utils/eventBus';
 import { mockSpeechToText } from '@/utils/speech';
-import { PROFESSIONS, ProfessionType } from '@/constants/professions';
-
-
 export default function RemindersScreen() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [filteredReminders, setFilteredReminders] = useState<Reminder[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [profession, setProfession] = useState<ProfessionType>('doctor');
+  
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
   const [voiceSearchResults, setVoiceSearchResults] = useState<any[]>([]);
@@ -57,7 +54,7 @@ export default function RemindersScreen() {
   }, []);
 
   useEffect(() => {
-    let filtered = reminders.filter(r => r.profession === profession);
+    let filtered = reminders;
     if (searchQuery.trim()) {
       filtered = filtered.filter(reminder =>
         reminder.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -65,27 +62,20 @@ export default function RemindersScreen() {
       );
     }
     setFilteredReminders(filtered);
-  }, [searchQuery, reminders, profession]);
+  }, [searchQuery, reminders]);
 
   const loadRemindersAndSettings = async () => {
     try {
-      const [remindersData, settings] = await Promise.all([
-        getReminders(),
-        getUserSettings(),
-      ]);
+      const remindersData = await getReminders();
       setReminders(remindersData);
-      setProfession(settings.profession);
-      const filtered = remindersData.filter(r => r.profession === settings.profession);
-      setFilteredReminders(filtered);
+      setFilteredReminders(remindersData);
     } catch (error) {
       console.error('Error loading reminders:', error);
     }
   };
 
-  const professionConfig = PROFESSIONS[profession];
-
   const handleVoiceInput = (field: 'title' | 'description') => {
-    const voiceText = mockSpeechToText(profession);
+    const voiceText = mockSpeechToText();
     Alert.alert(
       'Voice Input',
       `Simulated voice input: "${voiceText}"`,
@@ -119,7 +109,6 @@ export default function RemindersScreen() {
         dateTime: selectedDate.toISOString(),
         isCompleted: false,
         createdAt: new Date().toISOString(),
-        profession,
       };
 
       // Schedule notification

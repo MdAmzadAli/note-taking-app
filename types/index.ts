@@ -10,7 +10,6 @@ export interface Note {
   id: string;
   title: string;
   content: string;
-  profession: 'doctor' | 'lawyer' | 'engineer' | 'teacher' | 'student' | 'general';
   fields: Record<string, string>;
   writingStyle: WritingStyle;
   sections?: NoteSection[]; // For Cornell notes
@@ -27,7 +26,6 @@ export interface Reminder {
   isCompleted: boolean;
   notificationId?: string;
   createdAt: string;
-  profession: string;
 }
 
 export interface Task {
@@ -39,7 +37,6 @@ export interface Task {
   reminderTime?: string;
   notificationId?: string;
   createdAt: string;
-  profession: string;
 }
 
 export interface FieldType {
@@ -53,6 +50,7 @@ export interface FieldType {
 export interface CustomTemplate {
   id: string;
   name: string;
+  description?: string;
   fields: FieldType[];
   createdAt: string;
   updatedAt: string;
@@ -68,7 +66,16 @@ export interface TemplateEntry {
 }
 
 export interface UserSettings {
-  profession: 'doctor' | 'lawyer' | 'developer';
+  voiceLanguage: string;
+  voiceRecognitionMethod: 'assemblyai-regex' | 'assemblyai-gemini';
+  assemblyAIApiKey: string;
+  geminiApiKey: string;
+  writingStyle: string;
+  notifications: boolean;
+  darkMode: boolean;
+  notificationsEnabled: boolean;
+  theme: string;
+  autoSync: boolean;
   viewMode: 'paragraph' | 'bullet';
   isOnboardingComplete?: boolean;
 }

@@ -1,18 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Note, Task, Reminder, UserSettings, Template, TemplateEntry } from '@/types';
-import { ProfessionType } from '@/constants/professions';
 import { eventBus, EVENTS } from './eventBus';
 
 const KEYS = {
   NOTES: 'notes',
   REMINDERS: 'reminders',
   TASKS: 'tasks',
-  SELECTED_PROFESSION: 'selectedProfession',
   USER_SETTINGS: 'userSettings',
 };
 
 const DEFAULT_SETTINGS: UserSettings = {
-  profession: 'doctor',
   viewMode: 'paragraph',
   notificationsEnabled: true,
   theme: 'auto',
@@ -155,26 +152,6 @@ export const deleteTask = async (taskId: string): Promise<void> => {
     await AsyncStorage.setItem(KEYS.TASKS, JSON.stringify(filteredTasks));
   } catch (error) {
     console.error('Error deleting task:', error);
-    throw error;
-  }
-};
-
-// Profession
-export const getSelectedProfession = async (): Promise<ProfessionType | null> => {
-  try {
-    const profession = await AsyncStorage.getItem(KEYS.SELECTED_PROFESSION);
-    return profession as ProfessionType;
-  } catch (error) {
-    console.error('Error getting selected profession:', error);
-    return null;
-  }
-};
-
-export const saveSelectedProfession = async (profession: ProfessionType): Promise<void> => {
-  try {
-    await AsyncStorage.setItem(KEYS.SELECTED_PROFESSION, profession);
-  } catch (error) {
-    console.error('Error saving selected profession:', error);
     throw error;
   }
 };
@@ -326,7 +303,6 @@ export const clearAllData = async (): Promise<void> => {
       KEYS.REMINDERS,
       KEYS.TASKS,
       KEYS.USER_SETTINGS,
-      KEYS.SELECTED_PROFESSION,
       'custom_templates',
       'template_entries',
       'templates',
@@ -348,7 +324,6 @@ export class StorageService {
   }
 }
 export interface UserSettings {
-  profession: ProfessionType;
   viewMode?: 'paragraph' | 'bullet';
   notificationsEnabled?: boolean;
   theme?: 'light' | 'dark' | 'auto';
