@@ -1,7 +1,6 @@
 import { Tabs } from 'expo-router';
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Platform } from 'react-native';
-import { DeviceEventEmitter } from 'react-native';
 
 import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';

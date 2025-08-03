@@ -14,7 +14,6 @@ import {
   Dimensions,
   TouchableWithoutFeedback,
   Platform,
-  DeviceEventEmitter,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -73,32 +72,12 @@ export default function NotesScreen() {
   useEffect(() => {
     loadNotes();
     loadTemplates();
-
-    // Listen for voice command events from any screen
-    const voiceCommandListener = DeviceEventEmitter.addListener(
-      'voiceCommandExecuted',
-      async (event) => {
-        console.log('[NOTES] Received voice command event:', event);
-        if (event.type === 'voice_command_success') {
-          console.log('[NOTES] Reloading data due to voice command success...');
-          await loadNotes();
-          await loadTemplates();
-          console.log('[NOTES] Data reloaded after voice command');
-        }
-      }
-    );
-
-    // Cleanup listener on unmount
-    return () => {
-      voiceCommandListener.remove();
-    };
   }, []);
 
   // Refresh templates when screen gains focus (e.g., returning from Templates tab)
   useFocusEffect(
     React.useCallback(() => {
       loadTemplates();
-      loadNotes(); // Also reload notes when screen gains focus
     }, [])
   );
 
