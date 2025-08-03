@@ -186,7 +186,9 @@ export default function TemplatesScreen() {
   const handleVoiceCommand = async (result: any) => {
     console.log('[TEMPLATES] Voice command executed:', result);
     if (result.success) {
-      loadTemplatesAndSettings();
+      // Force reload templates to show newly created items
+      await loadTemplatesAndSettings();
+      console.log('[TEMPLATES] Templates reloaded after voice command');
     }
   };
 

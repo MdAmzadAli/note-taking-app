@@ -59,6 +59,14 @@ export default function NotesScreen() {
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
   const [currentNoteTitle, setCurrentNoteTitle] = useState('');
 
+  const handleVoiceCommand = async (result: any) => {
+    console.log('[NOTES] Voice command executed:', result);
+    if (result.success) {
+      // Force reload notes to show newly created items
+      await loadNotes();
+      console.log('[NOTES] Notes reloaded after voice command');
+    }
+  };
 
   useEffect(() => {
     loadNotes();
@@ -525,6 +533,7 @@ export default function NotesScreen() {
             checkedItems={checkedItems}
             onContentChange={handleContentChange}
             onVoiceInput={handleVoiceInput}
+            handleVoiceCommand={handleVoiceCommand}
           />
         </View>
       </SafeAreaView>

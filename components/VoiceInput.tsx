@@ -348,8 +348,7 @@ export default function VoiceInput({ onCommandExecuted, onSearchRequested, style
             console.log('[VOICE] WARNING: onCommandExecuted callback not available');
           }
 
-          // Show success toast instead of modal - close modal immediately
-          console.log('[VOICE] Showing success toast:', executionResult.message);
+          // Close modal and reset state
           setShowModal(false);
           resetState();
 
