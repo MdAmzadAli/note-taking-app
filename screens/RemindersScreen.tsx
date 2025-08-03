@@ -49,14 +49,17 @@ export default function RemindersScreen() {
   const [newTime, setNewTime] = useState(new Date());
   const [showNewTimePicker, setShowNewTimePicker] = useState(false);
 
-  // Image and alarm settings
+  // Image settings
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  const [alarmEnabled, setAlarmEnabled] = useState(false);
-  const [alarmSound, setAlarmSound] = useState('default');
-  const [vibrationEnabled, setVibrationEnabled] = useState(true);
-  const [alarmDuration, setAlarmDuration] = useState(5);
-  const [showAlarmSettings, setShowAlarmSettings] = useState(false);
   const [activeAlarmReminder, setActiveAlarmReminder] = useState<Reminder | null>(null);
+  
+  // Global alarm settings will be loaded from user settings
+  const [globalAlarmSettings, setGlobalAlarmSettings] = useState({
+    alarmEnabled: true,
+    alarmSound: 'default',
+    vibrationEnabled: true,
+    alarmDuration: 5,
+  });
 
   useEffect(() => {
     loadRemindersAndSettings();
@@ -142,6 +145,15 @@ export default function RemindersScreen() {
       const sortedReminders = remindersData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setReminders(sortedReminders);
       setFilteredReminders(sortedReminders);
+
+      // Load global alarm settings
+      const userSettings = await getUserSettings();
+      setGlobalAlarmSettings({
+        alarmEnabled: userSettings.alarmEnabled ?? true,
+        alarmSound: userSettings.alarmSound ?? 'default',
+        vibrationEnabled: userSettings.vibrationEnabled ?? true,
+        alarmDuration: userSettings.alarmDuration ?? 5,
+      });
     } catch (error) {
       console.error('Error loading reminders:', error);
     }
@@ -220,9 +232,9 @@ export default function RemindersScreen() {
         recurringDays: isRecurring ? selectedDays : undefined,
         recurringTimes: isRecurring ? selectedTimes : undefined,
         imageUri: selectedImageUri || undefined,
-        alarmSound: alarmEnabled ? alarmSound : undefined,
-        vibrationEnabled: alarmEnabled ? vibrationEnabled : undefined,
-        alarmDuration: alarmEnabled ? alarmDuration : undefined,
+        alarmSound: globalAlarmSettings.alarmEnabled ? globalAlarmSettings.alarmSound : undefined,
+        vibrationEnabled: globalAlarmSettings.alarmEnabled ? globalAlarmSettings.vibrationEnabled : undefined,
+        alarmDuration: globalAlarmSettings.alarmEnabled ? globalAlarmSettings.alarmDuration : undefined,
       };
 
       if (isRecurring) {
@@ -244,12 +256,12 @@ export default function RemindersScreen() {
               notificationDate.setDate(notificationDate.getDate() + 7);
             }
 
-            const notificationId = alarmEnabled 
+            const notificationId = globalAlarmSettings.alarmEnabled 
               ? await scheduleAlarmNotification({
                   ...reminder,
-                  alarmSound,
-                  vibrationEnabled,
-                  alarmDuration,
+                  alarmSound: globalAlarmSettings.alarmSound,
+                  vibrationEnabled: globalAlarmSettings.vibrationEnabled,
+                  alarmDuration: globalAlarmSettings.alarmDuration,
                 }, notificationDate)
               : await scheduleNotification(
                   `Recurring Reminder`,
@@ -257,8 +269,8 @@ export default function RemindersScreen() {
                   notificationDate,
                   {
                     imageUri: selectedImageUri || undefined,
-                    sound: alarmSound,
-                    vibration: vibrationEnabled,
+                    sound: globalAlarmSettings.alarmSound,
+                    vibration: globalAlarmSettings.vibrationEnabled,
                   }
                 );
 
@@ -271,12 +283,12 @@ export default function RemindersScreen() {
         reminder.notificationIds = notificationIds;
       } else {
         // Schedule single notification for non-recurring reminders
-        const notificationId = alarmEnabled 
+        const notificationId = globalAlarmSettings.alarmEnabled 
           ? await scheduleAlarmNotification({
               ...reminder,
-              alarmSound,
-              vibrationEnabled,
-              alarmDuration,
+              alarmSound: globalAlarmSettings.alarmSound,
+              vibrationEnabled: globalAlarmSettings.vibrationEnabled,
+              alarmDuration: globalAlarmSettings.alarmDuration,
             }, selectedDate)
           : await scheduleNotification(
               `Reminder`,
@@ -284,8 +296,8 @@ export default function RemindersScreen() {
               selectedDate,
               {
                 imageUri: selectedImageUri || undefined,
-                sound: alarmSound,
-                vibration: vibrationEnabled,
+                sound: globalAlarmSettings.alarmSound,
+                vibration: globalAlarmSettings.vibrationEnabled,
               }
             );
 
@@ -307,10 +319,6 @@ export default function RemindersScreen() {
       setSelectedTimes([]);
       setNewTime(new Date());
       setSelectedImageUri(null);
-      setAlarmEnabled(true);
-      setAlarmSound('default');
-      setVibrationEnabled(true);
-      setAlarmDuration(5);
       setIsCreating(false);
     } catch (error) {
       console.error('Error creating reminder:', error);
@@ -607,8 +615,6 @@ export default function RemindersScreen() {
                 setSelectedTimes([]);
                 setNewTime(new Date());
                 setSelectedImageUri(null);
-                setAlarmEnabled(true);
-                setAlarmSound('default');
               }}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -804,27 +810,7 @@ export default function RemindersScreen() {
             </View>
           </View>
 
-          <View style={styles.inputGroup}>
-            <View style={styles.alarmToggleContainer}>
-              <Text style={styles.label}>Alarm Notification</Text>
-              <TouchableOpacity
-                style={[styles.toggleButton, alarmEnabled && styles.toggleButtonActive]}
-                onPress={() => setAlarmEnabled(!alarmEnabled)}
-              >
-                <Text style={[styles.toggleButtonText, alarmEnabled && styles.toggleButtonTextActive]}>
-                  {alarmEnabled ? 'ON' : 'OFF'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            {alarmEnabled && (
-              <TouchableOpacity
-                style={styles.alarmSettingsButton}
-                onPress={() => setShowAlarmSettings(true)}
-              >
-                <Text style={styles.alarmSettingsText}>⚙️ Alarm Settings</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          
 
           {showTimePicker && (
             <DateTimePicker
@@ -836,91 +822,7 @@ export default function RemindersScreen() {
           )}
         </View>
 
-        {/* Alarm Settings Modal */}
-        <Modal
-          visible={showAlarmSettings}
-          animationType="slide"
-          presentationStyle="pageSheet"
-        >
-          <SafeAreaView style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Alarm Settings</Text>
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => setShowAlarmSettings(false)}
-              >
-                <Text style={styles.modalCloseText}>Done</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalContent}>
-              <View style={styles.settingGroup}>
-                <Text style={styles.settingLabel}>Alarm Sound</Text>
-                <View style={styles.soundOptions}>
-                  {[
-                    { label: 'Default', value: 'default' },
-                    { label: 'Bell', value: 'bell' },
-                    { label: 'Chime', value: 'chime' },
-                    { label: 'Alert', value: 'alert' }
-                  ].map((sound) => (
-                    <TouchableOpacity
-                      key={sound.value}
-                      style={[
-                        styles.soundOption,
-                        alarmSound === sound.value && styles.soundOptionSelected
-                      ]}
-                      onPress={() => setAlarmSound(sound.value)}
-                    >
-                      <Text style={[
-                        styles.soundOptionText,
-                        alarmSound === sound.value && styles.soundOptionTextSelected
-                      ]}>
-                        {sound.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.settingGroup}>
-                <View style={styles.settingToggle}>
-                  <Text style={styles.settingLabel}>Vibration</Text>
-                  <TouchableOpacity
-                    style={[styles.toggleButton, vibrationEnabled && styles.toggleButtonActive]}
-                    onPress={() => setVibrationEnabled(!vibrationEnabled)}
-                  >
-                    <Text style={[styles.toggleButtonText, vibrationEnabled && styles.toggleButtonTextActive]}>
-                      {vibrationEnabled ? 'ON' : 'OFF'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={styles.settingGroup}>
-                <Text style={styles.settingLabel}>Alarm Duration: {alarmDuration} minutes</Text>
-                <View style={styles.durationButtons}>
-                  {[1, 2, 5, 10, 15].map((duration) => (
-                    <TouchableOpacity
-                      key={duration}
-                      style={[
-                        styles.durationButton,
-                        alarmDuration === duration && styles.durationButtonSelected
-                      ]}
-                      onPress={() => setAlarmDuration(duration)}
-                    >
-                      <Text style={[
-                        styles.durationButtonText,
-                        alarmDuration === duration && styles.durationButtonTextSelected
-                      ]}>
-                        {duration}m
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </View>
-          </SafeAreaView>
-        </Modal>
+        
 
         <AlarmManager
           visible={!!activeAlarmReminder}

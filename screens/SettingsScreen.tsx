@@ -10,6 +10,7 @@ import {
   Platform,
   SafeAreaView,
   TextInput,
+  Modal,
 } from 'react-native';
 import { getUserSettings, saveUserSettings, UserSettings } from '@/utils/storage';
 import { clearAllData } from '@/utils/storage';
@@ -49,8 +50,12 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
     autoSync: true,
     viewMode: 'paragraph',
     isOnboardingComplete: true,
+    alarmSound: 'default',
+    vibrationEnabled: true,
+    alarmDuration: 5,
   });
   const [showVoiceCommands, setShowVoiceCommands] = useState(false);
+  const [showAlarmManager, setShowAlarmManager] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -286,6 +291,17 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
           </View>
         </View>
 
+        {/* Alarm Manager Setting */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Alarm</Text>
+          <TouchableOpacity 
+            style={styles.helpButton}
+            onPress={() => setShowAlarmManager(true)}
+          >
+            <Text style={styles.helpButtonText}>Alarm Manager</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Help & Info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Help & Information</Text>
@@ -315,6 +331,93 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Alarm Manager Modal */}
+      <Modal
+        visible={showAlarmManager}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Alarm Manager</Text>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setShowAlarmManager(false)}
+            >
+              <Text style={styles.modalCloseText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.modalContent}>
+            <View style={styles.settingGroup}>
+              <Text style={styles.settingLabel}>Alarm Sound</Text>
+              <View style={styles.soundOptions}>
+                {[
+                  { label: 'Default', value: 'default' },
+                  { label: 'Bell', value: 'bell' },
+                  { label: 'Chime', value: 'chime' },
+                  { label: 'Alert', value: 'alert' }
+                ].map((sound) => (
+                  <TouchableOpacity
+                    key={sound.value}
+                    style={[
+                      styles.soundOption,
+                      settings.alarmSound === sound.value && styles.soundOptionSelected
+                    ]}
+                    onPress={() => updateSettings({ alarmSound: sound.value })}
+                  >
+                    <Text style={[
+                      styles.soundOptionText,
+                      settings.alarmSound === sound.value && styles.soundOptionTextSelected
+                    ]}>
+                      {sound.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.settingGroup}>
+              <View style={styles.settingToggle}>
+                <Text style={styles.settingLabel}>Vibration</Text>
+                <Switch
+                  value={settings.vibrationEnabled}
+                  onValueChange={(value) => updateSettings({ vibrationEnabled: value })}
+                  trackColor={{
+                    false: '#E5E7EB',
+                    true: '#000000',
+                  }}
+                  thumbColor={settings.vibrationEnabled ? '#FFFFFF' : '#6B7280'}
+                />
+              </View>
+            </View>
+
+            <View style={styles.settingGroup}>
+              <Text style={styles.settingLabel}>Alarm Duration: {settings.alarmDuration} minutes</Text>
+              <View style={styles.durationButtons}>
+                {[1, 2, 5, 10, 15].map((duration) => (
+                  <TouchableOpacity
+                    key={duration}
+                    style={[
+                      styles.durationButton,
+                      settings.alarmDuration === duration && styles.durationButtonSelected
+                    ]}
+                    onPress={() => updateSettings({ alarmDuration: duration })}
+                  >
+                    <Text style={[
+                      styles.durationButtonText,
+                      settings.alarmDuration === duration && styles.durationButtonTextSelected
+                    ]}>
+                      {duration}m
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -622,5 +725,111 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     marginTop: 4,
     fontFamily: 'Inter',
+  },
+
+  // Modal Styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000000',
+    fontFamily: 'Inter',
+  },
+  modalCloseButton: {
+    padding: 8,
+  },
+  modalCloseText: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontFamily: 'Inter',
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  settingGroup: {
+    marginBottom: 24,
+  },
+  settingLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000000',
+    fontFamily: 'Inter',
+    marginBottom: 8,
+  },
+  settingToggle: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  soundOptions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  soundOption: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  soundOptionSelected: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  soundOptionText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontFamily: 'Inter',
+    textAlign: 'center',
+  },
+  soundOptionTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  durationButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  durationButton: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    minWidth: 50,
+    alignItems: 'center',
+  },
+  durationButtonSelected: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  durationButtonText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontFamily: 'Inter',
+    textAlign: 'center',
+  },
+  durationButtonTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '500',
   },
 });

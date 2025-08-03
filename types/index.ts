@@ -86,6 +86,10 @@ export interface UserSettings {
   autoSync: boolean;
   viewMode: 'paragraph' | 'bullet';
   isOnboardingComplete?: boolean;
+  alarmEnabled?: boolean;
+  alarmSound?: string;
+  vibrationEnabled?: boolean;
+  alarmDuration?: number;
 }
 
 export interface SearchFilters {

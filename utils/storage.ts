@@ -17,6 +17,10 @@ const DEFAULT_SETTINGS: UserSettings = {
   isOnboardingComplete: false,
   voiceRecognitionMethod: 'assemblyai-regex',
   voiceLanguage: 'en-US',
+  alarmEnabled: true,
+  alarmSound: 'default',
+  vibrationEnabled: true,
+  alarmDuration: 5,
 };
 
 // Notes
