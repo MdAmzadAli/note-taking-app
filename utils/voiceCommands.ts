@@ -1310,10 +1310,10 @@ const handleCreateTemplateCommand = async (
   console.log('[VOICE_COMMANDS] Profession:', profession);
 
   try {
-    const { saveTemplate, getTemplates } = await import('./storage');
+    const { saveCustomTemplate, getCustomTemplates } = await import('./storage');
 
     // Check if template with same name exists
-    const existingTemplates = await getTemplates();
+    const existingTemplates = await getCustomTemplates();
     const existingTemplate = existingTemplates.find(t => t.name.toLowerCase() === name.toLowerCase());
 
     if (existingTemplate) {
@@ -1327,10 +1327,10 @@ const handleCreateTemplateCommand = async (
     const template = {
       id: Date.now().toString(),
       name,
-      profession: profession as any,
+      description: '',
       fields: fields.map((field, index) => ({
         id: `field_${index + 1}`,
-        name: field.name,
+        label: field.name,
         type: field.type as any,
         required: false,
         options: field.options || undefined
@@ -1339,11 +1339,8 @@ const handleCreateTemplateCommand = async (
       updatedAt: now,
     };
 
-    await saveTemplate(template);
+    await saveCustomTemplate(template);
     console.log('[VOICE_COMMANDS] Template created successfully:', template.id);
-
-    // Emit event for real-time updates
-    eventBus.emit(EVENTS.TEMPLATE_CREATED, template);
 
     return {
       success: true,
