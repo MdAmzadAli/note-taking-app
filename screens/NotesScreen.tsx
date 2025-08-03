@@ -992,8 +992,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    backgroundColor:Fix syntax errors in the styles section of the NotesScreen.tsx file by correcting the template literals.```text
- '#FFFFFF',
+    backgroundColor: '#FFFFFF',
     fontFamily: 'Inter',
     color: '#000000',
     marginBottom: 16,

@@ -585,7 +585,7 @@ const VoiceInput = ({ profession, voiceRecognitionMethod, onCommandExecuted, onS
   };
 
 
-  
+
 
   // Sync voice method with props when settings change
   useEffect(() => {
@@ -893,7 +893,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   warningContainer: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#FEFF3C7',
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
