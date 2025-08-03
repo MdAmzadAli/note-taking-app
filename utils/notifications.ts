@@ -174,6 +174,17 @@ export const scheduleAlarmNotification = async (
       throw new Error('Notification permissions not granted');
     }
 
+    // Ensure we're scheduling for the future
+    const now = new Date();
+    const scheduledTime = new Date(dateTime);
+    
+    if (scheduledTime <= now) {
+      console.warn('Attempted to schedule notification in the past or now. Adjusting to 1 minute from now.');
+      scheduledTime.setTime(now.getTime() + 60000); // Add 1 minute
+    }
+
+    console.log(`Scheduling alarm for: ${scheduledTime.toISOString()} (Current time: ${now.toISOString()})`);
+
     // Map alarm sounds to system sounds
     const soundMap: { [key: string]: string | boolean } = {
       'default': 'default',
@@ -201,7 +212,7 @@ export const scheduleAlarmNotification = async (
         originalTitle: reminder.title,
         description: reminder.description,
         imageUri: reminder.imageUri,
-        scheduledTime: dateTime.toISOString(),
+        scheduledTime: scheduledTime.toISOString(),
       },
     };
 
@@ -226,12 +237,12 @@ export const scheduleAlarmNotification = async (
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: notificationContent,
       trigger: {
-        date: dateTime,
+        date: scheduledTime,
         repeats: false,
       },
     });
 
-    console.log(`Alarm notification scheduled with ID: ${notificationId} for ${dateTime}`);
+    console.log(`Alarm notification scheduled with ID: ${notificationId} for ${scheduledTime.toISOString()}`);
     return notificationId;
   } catch (error) {
     console.error('Error scheduling alarm notification:', error);

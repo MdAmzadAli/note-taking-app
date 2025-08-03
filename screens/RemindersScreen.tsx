@@ -41,7 +41,7 @@ export default function RemindersScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [isSearchVisible, setIsSearchVisible] = useState(false);
-  
+
   // New recurring reminder states
   const [isRecurring, setIsRecurring] = useState(false);
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
@@ -73,12 +73,12 @@ export default function RemindersScreen() {
       async (response) => {
         const { data } = response.notification.request.content;
         console.log('Notification response received:', response.actionIdentifier, data);
-        
+
         if (data?.isAlarm && data?.reminderId) {
           // Find the reminder
           const reminders = await getReminders();
           const reminder = reminders.find(r => r.id === data.reminderId);
-          
+
           if (reminder) {
             if (response.actionIdentifier === 'STOP_ALARM') {
               console.log('Stopping alarm from notification action');
@@ -102,7 +102,7 @@ export default function RemindersScreen() {
     const foregroundListener = Notifications.addNotificationReceivedListener((notification) => {
       const { data } = notification.request.content;
       console.log('Received foreground notification:', data);
-      
+
       if (data?.isAlarm && data?.reminderId) {
         // Show alarm screen immediately for foreground alarms
         getReminders().then(reminders => {
@@ -228,22 +228,22 @@ export default function RemindersScreen() {
       if (isRecurring) {
         // Schedule multiple notifications for recurring reminders
         const notificationIds: string[] = [];
-        
+
         for (const dayOfWeek of selectedDays) {
           for (const timeStr of selectedTimes) {
             const [hours, minutes] = timeStr.split(':').map(Number);
             const notificationDate = new Date();
-            
+
             // Find the next occurrence of this day of week
             const daysUntilTarget = (dayOfWeek - notificationDate.getDay() + 7) % 7;
             notificationDate.setDate(notificationDate.getDate() + daysUntilTarget);
             notificationDate.setHours(hours, minutes, 0, 0);
-            
+
             // If the time has passed today and it's the same day, schedule for next week
             if (daysUntilTarget === 0 && notificationDate <= new Date()) {
               notificationDate.setDate(notificationDate.getDate() + 7);
             }
-            
+
             const notificationId = alarmEnabled 
               ? await scheduleAlarmNotification({
                   ...reminder,
@@ -261,13 +261,13 @@ export default function RemindersScreen() {
                     vibration: vibrationEnabled,
                   }
                 );
-            
+
             if (notificationId) {
               notificationIds.push(notificationId);
             }
           }
         }
-        
+
         reminder.notificationIds = notificationIds;
       } else {
         // Schedule single notification for non-recurring reminders
@@ -307,7 +307,7 @@ export default function RemindersScreen() {
       setSelectedTimes([]);
       setNewTime(new Date());
       setSelectedImageUri(null);
-      setAlarmEnabled(false);
+      setAlarmEnabled(true);
       setAlarmSound('default');
       setVibrationEnabled(true);
       setAlarmDuration(5);
@@ -458,7 +458,7 @@ export default function RemindersScreen() {
 
   const addTime = () => {
     const timeString = newTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-    
+
     if (selectedTimes.includes(timeString)) {
       Alert.alert('Error', 'This time is already added');
       return;
@@ -606,6 +606,9 @@ export default function RemindersScreen() {
                 setSelectedDays([]);
                 setSelectedTimes([]);
                 setNewTime(new Date());
+                setSelectedImageUri(null);
+                setAlarmEnabled(true);
+                setAlarmSound('default');
               }}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -708,7 +711,7 @@ export default function RemindersScreen() {
                     </View>
                   ))}
                 </View>
-                
+
                 <View style={styles.addTimeContainer}>
                   <TouchableOpacity
                     style={styles.timePickerButton}

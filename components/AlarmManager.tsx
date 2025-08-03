@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,9 @@ import {
   Image,
   Vibration,
   Platform,
+  Animated,
 } from 'react-native';
+import { Audio } from 'expo-av';
 import * as Notifications from 'expo-notifications';
 import { stopAlarm, snoozeAlarm } from '@/utils/notifications';
 import { Reminder } from '@/types';
@@ -28,25 +30,68 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
   reminder
 }) => {
   const [isRinging, setIsRinging] = useState(false);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     let autoStopTimeout: NodeJS.Timeout;
     let vibrationInterval: NodeJS.Timeout;
+    let soundInterval: NodeJS.Timeout;
     
-    if (visible && reminder) {
+    const startAlarmRinging = async () => {
+      if (!visible || !reminder) return;
+      
       setIsRinging(true);
       console.log('Starting alarm for reminder:', reminder.id);
+      
+      // Start pulsing animation
+      const startPulseAnimation = () => {
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(pulseAnim, {
+              toValue: 1.2,
+              duration: 500,
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 500,
+              useNativeDriver: true,
+            }),
+          ])
+        ).start();
+      };
+      
+      startPulseAnimation();
+
+      // Use system notification sounds for alarm ringing
+      console.log('Starting alarm sound with system notifications');
+      soundInterval = setInterval(async () => {
+        try {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: '🚨 ALARM RINGING! 🚨',
+              body: reminder.title,
+              sound: reminder.alarmSound || 'default',
+              priority: 'max',
+            },
+            trigger: null,
+          });
+        } catch (error) {
+          console.warn('Could not play alarm sound:', error);
+        }
+      }, 1500); // Play sound every 1.5 seconds
       
       // Start continuous vibration pattern if enabled
       if (reminder.vibrationEnabled !== false) {
         const startVibration = () => {
-          // Alarm-style vibration pattern: short bursts with pauses
-          const pattern = [0, 500, 200, 500, 200, 500, 1000]; // More aggressive pattern
+          // Aggressive alarm-style vibration pattern
+          const pattern = [0, 300, 100, 300, 100, 300, 100, 300, 500]; 
           Vibration.vibrate(pattern);
         };
         
         startVibration(); // Start immediately
-        vibrationInterval = setInterval(startVibration, 3000); // Repeat every 3 seconds
+        vibrationInterval = setInterval(startVibration, 2000); // Repeat every 2 seconds
       }
 
       // Auto-stop alarm after duration
@@ -57,26 +102,53 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
         console.log('Auto-stopping alarm after', reminder.alarmDuration || 5, 'minutes');
         handleStopAlarm();
       }, duration);
+    };
 
-      return () => {
-        if (autoStopTimeout) {
-          clearTimeout(autoStopTimeout);
-        }
-        if (vibrationInterval) {
-          clearInterval(vibrationInterval);
-        }
-        Vibration.cancel();
-        console.log('Cleaned up alarm effects');
-      };
-    } else {
+    const stopAlarmRinging = async () => {
       setIsRinging(false);
+      pulseAnim.stopAnimation();
+      pulseAnim.setValue(1);
+      
+      if (sound) {
+        await sound.stopAsync();
+        await sound.unloadAsync();
+        setSound(null);
+      }
+      
+      if (autoStopTimeout) {
+        clearTimeout(autoStopTimeout);
+      }
+      if (vibrationInterval) {
+        clearInterval(vibrationInterval);
+      }
+      if (soundInterval) {
+        clearInterval(soundInterval);
+      }
       Vibration.cancel();
+      console.log('Cleaned up alarm effects');
+    };
+
+    if (visible && reminder) {
+      startAlarmRinging();
+    } else {
+      stopAlarmRinging();
     }
+
+    return () => {
+      stopAlarmRinging();
+    };
   }, [visible, reminder]);
 
   const handleStopAlarm = async () => {
     setIsRinging(false);
     Vibration.cancel();
+    
+    // Stop and cleanup sound
+    if (sound) {
+      await sound.stopAsync();
+      await sound.unloadAsync();
+      setSound(null);
+    }
     
     if (reminder) {
       await stopAlarm(reminder.id);
@@ -88,6 +160,13 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
   const handleSnoozeAlarm = async () => {
     setIsRinging(false);
     Vibration.cancel();
+    
+    // Stop and cleanup sound
+    if (sound) {
+      await sound.stopAsync();
+      await sound.unloadAsync();
+      setSound(null);
+    }
     
     if (reminder) {
       await snoozeAlarm(reminder.id, 5);
@@ -145,9 +224,14 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
           </View>
 
           {isRinging && (
-            <View style={styles.ringingIndicator}>
-              <Text style={styles.ringingText}>🔔 Ringing...</Text>
-            </View>
+            <Animated.View 
+              style={[
+                styles.ringingIndicator,
+                { transform: [{ scale: pulseAnim }] }
+              ]}
+            >
+              <Text style={styles.ringingText}>🚨 ALARM RINGING! 🚨</Text>
+            </Animated.View>
           )}
         </View>
       </SafeAreaView>
@@ -246,15 +330,18 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
   ringingIndicator: {
-    padding: 12,
-    backgroundColor: '#FEF3C7',
-    borderRadius: 8,
+    padding: 16,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 12,
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#EF4444',
   },
   ringingText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#92400E',
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#DC2626',
     fontFamily: 'Inter',
+    textAlign: 'center',
   },
 });
