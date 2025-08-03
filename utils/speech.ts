@@ -1,7 +1,7 @@
 import * as Speech from 'expo-speech';
 import { Alert } from 'react-native';
 import { Audio } from 'expo-av';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '@google-generative-ai';
 
 export interface SpeechResult {
   text: string;
@@ -476,11 +476,16 @@ DIRECT PROCESSING: Convert voice transcription to executable tasks.
 Input transcription: "${transcription}"
 
 TASK TYPES:
-- create_note: For recording information
-- set_reminder: For time-based alerts  
-- create_task: For actionable items
-- search: For finding existing content
-- show_help: For capability requests
+- create_task: Create a task with title (ALWAYS required) and due date
+- set_reminder: Set a reminder with title (ALWAYS required) and time  
+- create_note: Create a note with title (ALWAYS required) and content
+- search: Search through user's data
+
+TITLE EXTRACTION RULES:
+- For "create task to visit lawyer" → extract "Visit lawyer" as title
+- For "remind me about doctor appointment" → extract "Doctor appointment" as title  
+- For "note about best restaurants" → extract "Best restaurants" as title
+- Always generate meaningful, concise titles from user descriptions
 
 OUTPUT: JSON array of tasks with exact parameters needed for execution.
 
@@ -601,7 +606,22 @@ Return ONLY valid JSON in this exact format:
   ]
 }
 
+CRITICAL TITLE REQUIREMENTS:
+- ALWAYS provide a "title" field for create_task, set_reminder, and create_note
+- Extract the main action/subject as the title from the user's description
+- Examples:
+  * "create task to visit lawyer" → title: "Visit lawyer"
+  * "remind me about meeting" → title: "Meeting"
+  * "note about best lawyers" → title: "Best lawyers"
+- Use present tense for task titles
+- Keep titles concise but descriptive
+- If no explicit title is given, create one from the content/description
+
 Examples:
+// For task: {"title": "task title (REQUIRED - extract from content if not explicit)", "dueDate": "when due", "description": "optional details"}
+    // For reminder: {"title": "reminder title (REQUIRED - extract from content if not explicit)", "time": "when to remind", "description": "optional details"}  
+    // For note: {"title": "note title (REQUIRED - extract from content if not explicit)", "content": "note content"}
+
 - "Create note about meeting" → Single task: create_note
 - "Create two tasks: exercise and shopping" → Multiple tasks: create_task (exercise), create_task (shopping)
 - "Set reminder and create note about project" → Multiple tasks: set_reminder, create_note

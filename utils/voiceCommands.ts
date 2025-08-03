@@ -412,7 +412,7 @@ export const executeVoiceCommand = async (
   try {
     if (processingMethod === 'gemini' && isGeminiInitialized()) {
       console.log('[VOICE_COMMANDS] DIRECT FLOW: AssemblyAI → Gemini → Execute');
-      
+
       // DIRECT FLOW: Send transcription directly to Gemini for task processing
       const geminiResult = await processWithGeminiDirect(command.originalText, profession);
       console.log('[VOICE_COMMANDS] Gemini processed tasks:', geminiResult);
@@ -423,7 +423,7 @@ export const executeVoiceCommand = async (
           // Search commands always go last
           if (a.type === 'search' && b.type !== 'search') return 1;
           if (b.type === 'search' && a.type !== 'search') return -1;
-          
+
           // If both are search commands or both are non-search, maintain original order
           return 0;
         });
@@ -434,7 +434,7 @@ export const executeVoiceCommand = async (
 
         for (const task of sortedTasks) {
           console.log('[VOICE_COMMANDS] Executing Gemini task:', task);
-          
+
           let result;
           switch (task.type) {
             case 'create_note':
@@ -448,8 +448,13 @@ export const executeVoiceCommand = async (
               result = await handleSetReminderCommand(task.parameters.title, task.parameters.time || 'tomorrow', profession);
               break;
             case 'create_task':
-              result = await handleCreateTaskCommand(task.parameters.title, task.parameters.dueDate || 'tomorrow', profession);
-              break;
+            result = await handleCreateTaskCommand(
+              task.parameters.title || task.parameters.content,
+              task.parameters.dueDate || 'tomorrow',
+              profession
+            );
+            if (result.success) counts.tasks++;
+            break;
             case 'search':
               result = await handleSearchCommand(task.parameters.query);
               if (result.success && result.data) {
@@ -530,17 +535,17 @@ export const executeVoiceCommand = async (
 
       default:
         console.log('[VOICE_COMMANDS] UNKNOWN command intent:', parsedCommand.intent);
-        
+
         // Check if this might be a help request that wasn't caught
         const lowerText = command.originalText.toLowerCase();
         const helpKeywords = ['what', 'can', 'do', 'help', 'capabilities', 'features', 'functions', 'commands'];
         const hasHelpKeywords = helpKeywords.some(keyword => lowerText.includes(keyword));
-        
+
         if (hasHelpKeywords) {
           console.log('[VOICE_COMMANDS] Treating as help request due to help keywords');
           return handleShowHelpCommand();
         }
-        
+
         return {
           success: false,
           message: `I didn't understand the command: "${command.originalText}". Try saying "create note", "set reminder", "create task", "search for", or "what can you do" for help.`
@@ -983,7 +988,7 @@ const processComplexCommand = async (text: string, profession: string): Promise<
   const lowerText = text.toLowerCase();
   const helpKeywords = ['what can you do', 'tell me what', 'your capabilities', 'what all can', 'show me features', 'help', 'what are your'];
   const isHelpRequest = helpKeywords.some(keyword => lowerText.includes(keyword));
-  
+
   if (isHelpRequest) {
     console.log('[VOICE_COMMANDS] Detected help request, skipping complex command processing');
     return { isComplexCommand: false, executionPlan: [], reasoning: 'Help request detected' };
@@ -1343,12 +1348,12 @@ const handleComplexCommand = async (
       // Search commands always go last regardless of original priority
       if (a.type === 'search' && b.type !== 'search') return 1;
       if (b.type === 'search' && a.type !== 'search') return -1;
-      
+
       // If both are search commands, maintain their relative order
       if (a.type === 'search' && b.type === 'search') {
         return a.step - b.step;
       }
-      
+
       // For non-search commands, sort by priority then step
       return a.priority - b.priority || a.step - b.step;
     });
