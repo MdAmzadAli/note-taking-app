@@ -13,10 +13,10 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import VoiceInput from '@/components/VoiceInput';
-import { Task } from '@/types';
-import { getTasks, saveTask, deleteTask, getUserSettings } from '@/utils/storage';
+import { Task, ProfessionType } from '@/types';
+import { getTasks, saveTask, deleteTask, updateTask, getUserSettings } from '@/utils/storage';
 import { scheduleNotification, cancelNotification } from '@/utils/notifications';
+import { eventBus, EVENTS } from '@/utils/eventBus';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 
 import SearchResultsModal from '@/components/SearchResultsModal';
@@ -45,6 +45,33 @@ export default function TasksScreen() {
 
   useEffect(() => {
     loadTasksAndSettings();
+  }, []);
+
+  useEffect(() => {
+    const taskCreatedListener = (task: Task) => {
+      setTasks(prevTasks => [...prevTasks, task]);
+    };
+
+    const taskUpdatedListener = (updatedTask: Task) => {
+      setTasks(prevTasks =>
+        prevTasks.map(task => (task.id === updatedTask.id ? updatedTask : task))
+      );
+    };
+
+    const taskDeletedListener = (taskId: string) => {
+      setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+    };
+
+
+    eventBus.on(EVENTS.TASK_CREATED, taskCreatedListener);
+    eventBus.on(EVENTS.TASK_UPDATED, taskUpdatedListener);
+    eventBus.on(EVENTS.TASK_DELETED, taskDeletedListener);
+
+    return () => {
+      eventBus.off(EVENTS.TASK_CREATED, taskCreatedListener);
+      eventBus.off(EVENTS.TASK_UPDATED, taskUpdatedListener);
+      eventBus.off(EVENTS.TASK_DELETED, taskDeletedListener);
+    };
   }, []);
 
   useEffect(() => {
@@ -116,6 +143,7 @@ export default function TasksScreen() {
       }
 
       await saveTask(task);
+      eventBus.emit(EVENTS.TASK_CREATED, task);
       await loadTasksAndSettings();
 
       // Reset form
@@ -185,6 +213,7 @@ export default function TasksScreen() {
       }
 
       await saveTask(updatedTask);
+      eventBus.emit(EVENTS.TASK_UPDATED, updatedTask);
       await loadTasksAndSettings();
 
       // Reset form
@@ -213,6 +242,7 @@ export default function TasksScreen() {
       }
 
       await saveTask(updatedTask);
+      eventBus.emit(EVENTS.TASK_UPDATED, updatedTask);
       await loadTasksAndSettings();
     } catch (error) {
       console.error('Error updating task:', error);
@@ -235,6 +265,7 @@ export default function TasksScreen() {
                 await cancelNotification(task.notificationId);
               }
               await deleteTask(task.id);
+              eventBus.emit(EVENTS.TASK_DELETED, task.id);
               await loadTasksAndSettings();
             } catch (error) {
               console.error('Error deleting task:', error);
@@ -505,31 +536,6 @@ export default function TasksScreen() {
     );
   }
 
-  const handleVoiceCommand = async (result: any) => {
-    console.log('[TASKS] Voice command executed:', result);
-    if (result.success) {
-      // Force reload tasks to show newly created items
-      console.log('[TASKS] Reloading tasks after voice command...');
-      await loadTasksAndSettings();
-      console.log('[TASKS] Tasks reloaded successfully after voice command');
-    }
-  };
-
-  const handleVoiceSearchRequested = (query: string, results: any[]) => {
-    console.log('[TASKS] Voice search results received:', results.length, 'items');
-
-    // Format results for SearchResultsModal
-    const formattedResults = results.map(result => ({
-      type: result.type,
-      item: result.item,
-      relevance: result.relevance || 0
-    }));
-
-    setVoiceSearchQuery(query);
-    setVoiceSearchResults(formattedResults);
-    setShowSearchModal(true);
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -541,14 +547,7 @@ export default function TasksScreen() {
           >
             <IconSymbol size={20} name="magnifyingglass" color="#FFFFFF" />
           </TouchableOpacity>
-          
-          <VoiceInput
-            profession={profession}
-            onCommandExecuted={handleVoiceCommand}
-            onSearchRequested={handleVoiceSearchRequested}
-            style={styles.voiceInputButton}
-          />
-          
+
           <TouchableOpacity
             style={styles.addButton}
             onPress={() => setIsCreating(true)}
@@ -602,7 +601,6 @@ export default function TasksScreen() {
         onClose={() => setShowSearchModal(false)}
         searchQuery={voiceSearchQuery}
         results={voiceSearchResults}
-        onItemUpdated={loadTasksAndSettings}
       />
     </SafeAreaView>
   );

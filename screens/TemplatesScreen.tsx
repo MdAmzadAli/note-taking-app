@@ -17,6 +17,7 @@ import VoiceInput from '@/components/VoiceInput';
 import { CustomTemplate, FieldType } from '@/types';
 import { getCustomTemplates, saveCustomTemplate, deleteCustomTemplate, getUserSettings } from '@/utils/storage';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
+import { eventBus, EVENTS } from '@/utils/eventBus';
 
 
 export default function TemplatesScreen() {
@@ -143,7 +144,7 @@ export default function TemplatesScreen() {
     );
   };
 
-  
+
 
   const renderTemplateItem = ({ item }: { item: CustomTemplate }) => (
     <TouchableOpacity
@@ -190,7 +191,7 @@ export default function TemplatesScreen() {
       console.log('[TEMPLATES] Reloading templates after voice command...');
       await loadTemplatesAndSettings();
       console.log('[TEMPLATES] Templates reloaded successfully after voice command');
-      
+
       // Force a re-render by updating the search state
       const currentQuery = searchQuery;
       setSearchQuery('');
@@ -373,7 +374,7 @@ export default function TemplatesScreen() {
         }
       />
 
-      
+
     </SafeAreaView>
   );
 }

@@ -20,8 +20,8 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSection } from '@/types';
 import { saveNote, saveTemplate, getNotes, getTemplates, deleteNote, updateNote, getUserSettings, UserSettings } from '@/utils/storage';
-import { mockSpeechToText } from '@/utils/speech';
 import TemplateEntriesScreen from './TemplateEntriesScreen';
+import { eventBus, EVENTS } from '@/utils/eventBus';
 
 import WritingStyleSelector from '@/components/WritingStyleSelector';
 import WritingStyleEditor from '@/components/WritingStyleEditor';
@@ -74,27 +74,6 @@ export default function NotesScreen() {
   const [checkedItems, setCheckedItems] = useState<boolean[]>([]);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
   const [currentNoteTitle, setCurrentNoteTitle] = useState('');
-
-  const handleVoiceCommand = async (result: any) => {
-    console.log('[NOTES] Voice command executed:', result);
-    if (result.success) {
-      // Force reload notes to show newly created items
-      console.log('[NOTES] Reloading notes after voice command...');
-      await loadNotes();
-      console.log('[NOTES] Notes reloaded successfully after voice command');
-      
-      // Force refresh filtered notes state
-      const currentQuery = searchQuery;
-      setSearchQuery('');
-      setTimeout(() => setSearchQuery(currentQuery), 100);
-    }
-  };
-
-  const handleVoiceSearchRequested = (query: string, results: any[]) => {
-    console.log('[NOTES] Voice search requested:', query, 'Results:', results.length);
-    setSearchQuery(query);
-    setIsSearchVisible(true);
-  };
 
   useEffect(() => {
     loadNotes();
@@ -176,18 +155,6 @@ export default function NotesScreen() {
       setFilteredTemplates(templatesData);
     } catch (error) {
       console.error('Error loading templates:', error);
-    }
-  };
-
-  const handleVoiceInput = async () => {
-    setIsListening(true);
-    try {
-      const speechText = await mockSpeechToText();
-      setCurrentNoteText(prev => prev + (prev ? '\n' : '') + speechText);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to convert speech to text');
-    } finally {
-      setIsListening(false);
     }
   };
 
@@ -477,6 +444,28 @@ export default function NotesScreen() {
     }
   };
 
+  useEffect(() => {
+    loadNotes();
+
+    // Subscribe to real-time events from other screens
+    const unsubscribeNoteCreated = eventBus.subscribe(EVENTS.NOTE_CREATED, (newNote: Note) => {
+      console.log('[NOTES] Real-time: Note created from external source');
+      setNotes(prevNotes => [...prevNotes, newNote]);
+    });
+
+    const unsubscribeNoteUpdated = eventBus.subscribe(EVENTS.NOTE_UPDATED, (updatedNote: Note) => {
+      console.log('[NOTES] Real-time: Note updated from external source');
+      setNotes(prevNotes => 
+        prevNotes.map(note => note.id === updatedNote.id ? updatedNote : note)
+      );
+    });
+
+    return () => {
+      unsubscribeNoteCreated();
+      unsubscribeNoteUpdated();
+    };
+  }, []);
+
   if (currentView === 'template' && selectedTemplateId) {
     return (
       <TemplateEntriesScreen
@@ -524,15 +513,6 @@ export default function NotesScreen() {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>{isEditing ? 'Edit Note' : 'New Note'}</Text>
           <View style={styles.headerButtons}>
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={handleVoiceInput}
-              disabled={isListening}
-            >
-              <Text style={styles.iconButtonText}>
-                {isListening ? 'Listening...' : 'Voice'}
-              </Text>
-            </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton} onPress={saveCurrentNote}>
               <Text style={styles.iconButtonText}>Save</Text>
             </TouchableOpacity>
@@ -564,12 +544,6 @@ export default function NotesScreen() {
           <WritingStyleSelector
             selectedStyle={selectedWritingStyle}
             onStyleChange={handleWritingStyleChange}
-          />
-          <VoiceInput
-            profession={profession}
-            voiceRecognitionMethod={settings.voiceRecognitionMethod}
-            onCommandExecuted={handleVoiceCommand}
-            onSearchRequested={handleVoiceSearchRequested}
           />
           <WritingStyleEditor
             style={selectedWritingStyle}

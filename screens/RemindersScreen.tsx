@@ -15,8 +15,9 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import VoiceInput from '@/components/VoiceInput';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Reminder } from '@/types';
-import { getReminders, saveReminder, deleteReminder, getUserSettings } from '@/utils/storage';
+import { getReminders, saveReminder, deleteReminder, updateReminder, getUserSettings } from '@/utils/storage';
 import { scheduleNotification, cancelNotification } from '@/utils/notifications';
+import { eventBus, EVENTS } from '@/utils/eventBus';
 import { mockSpeechToText } from '@/utils/speech';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 
@@ -41,6 +42,18 @@ export default function RemindersScreen() {
 
   useEffect(() => {
     loadRemindersAndSettings();
+
+    // Subscribe to reminder updates
+    const reminderUpdateListener = () => {
+      loadRemindersAndSettings();
+    };
+
+    eventBus.on(EVENTS.REMINDER_UPDATED, reminderUpdateListener);
+
+    // Clean up subscription on unmount
+    return () => {
+      eventBus.off(EVENTS.REMINDER_UPDATED, reminderUpdateListener);
+    };
   }, []);
 
   useEffect(() => {
@@ -121,6 +134,7 @@ export default function RemindersScreen() {
       }
 
       await saveReminder(reminder);
+      eventBus.emit(EVENTS.REMINDER_UPDATED);
       await loadRemindersAndSettings();
 
       // Reset form
@@ -173,6 +187,7 @@ export default function RemindersScreen() {
       }
 
       await saveReminder(updatedReminder);
+      eventBus.emit(EVENTS.REMINDER_UPDATED);
       await loadRemindersAndSettings();
 
       // Reset form
@@ -199,6 +214,7 @@ export default function RemindersScreen() {
       }
 
       await saveReminder(updatedReminder);
+      eventBus.emit(EVENTS.REMINDER_UPDATED);
       await loadRemindersAndSettings();
     } catch (error) {
       console.error('Error updating reminder:', error);
@@ -221,6 +237,7 @@ export default function RemindersScreen() {
                 await cancelNotification(reminder.notificationId);
               }
               await deleteReminder(reminder.id);
+              eventBus.emit(EVENTS.REMINDER_UPDATED);
               await loadRemindersAndSettings();
             } catch (error) {
               console.error('Error deleting reminder:', error);
@@ -309,7 +326,7 @@ export default function RemindersScreen() {
     );
   };
 
-  
+
 
   const handleVoiceCommand = async (result: any) => {
     console.log('[REMINDERS] Voice command executed:', result);
@@ -465,12 +482,7 @@ export default function RemindersScreen() {
           >
             <IconSymbol size={20} name="magnifyingglass" color="#FFFFFF" />
           </TouchableOpacity>
-          <VoiceInput
-            profession={profession}
-            onCommandExecuted={handleVoiceCommand}
-            onSearchRequested={handleVoiceSearchRequested}
-            style={styles.voiceInputButton}
-          />
+          
           <TouchableOpacity
             style={styles.addButton}
             onPress={() => setIsCreating(true)}

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Note, Task, Reminder, UserSettings, Template, TemplateEntry } from '@/types';
 import { ProfessionType } from '@/constants/professions';
+import { eventBus, EVENTS } from './eventBus';
 
 const KEYS = {
   NOTES: 'notes',
@@ -50,8 +51,10 @@ export const saveNote = async (note: Note): Promise<void> => {
 
     if (existingIndex >= 0) {
       notes[existingIndex] = note;
+      eventBus.emit(EVENTS.NOTE_UPDATED, note);
     } else {
       notes.push(note);
+      eventBus.emit(EVENTS.NOTE_CREATED, note);
     }
 
     await AsyncStorage.setItem(KEYS.NOTES, JSON.stringify(notes));
@@ -90,8 +93,10 @@ export const saveReminder = async (reminder: Reminder): Promise<void> => {
 
     if (existingIndex >= 0) {
       reminders[existingIndex] = reminder;
+      eventBus.emit(EVENTS.REMINDER_UPDATED, reminder);
     } else {
       reminders.push(reminder);
+      eventBus.emit(EVENTS.REMINDER_CREATED, reminder);
     }
 
     await AsyncStorage.setItem(KEYS.REMINDERS, JSON.stringify(reminders));
@@ -130,8 +135,10 @@ export const saveTask = async (task: Task): Promise<void> => {
 
     if (existingIndex >= 0) {
       tasks[existingIndex] = task;
+      eventBus.emit(EVENTS.TASK_UPDATED, task);
     } else {
       tasks.push(task);
+      eventBus.emit(EVENTS.TASK_CREATED, task);
     }
 
     await AsyncStorage.setItem(KEYS.TASKS, JSON.stringify(tasks));
@@ -214,8 +221,10 @@ export const saveCustomTemplate = async (template: CustomTemplate): Promise<void
 
     if (existingIndex >= 0) {
       templates[existingIndex] = template;
+      eventBus.emit(EVENTS.TEMPLATE_UPDATED, template);
     } else {
       templates.push(template);
+      eventBus.emit(EVENTS.TEMPLATE_CREATED, template);
     }
 
     await AsyncStorage.setItem('custom_templates', JSON.stringify(templates));
