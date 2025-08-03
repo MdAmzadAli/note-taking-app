@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   Image,
   Vibration,
+  Platform,
 } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { stopAlarm, snoozeAlarm } from '@/utils/notifications';
@@ -29,6 +30,8 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
   const [isRinging, setIsRinging] = useState(false);
 
   useEffect(() => {
+    let autoStopTimeout: NodeJS.Timeout;
+    
     if (visible && reminder) {
       setIsRinging(true);
       
@@ -40,14 +43,20 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
 
       // Auto-stop alarm after duration
       const duration = (reminder.alarmDuration || 5) * 60 * 1000; // Convert to milliseconds
-      const timeout = setTimeout(() => {
+      autoStopTimeout = setTimeout(() => {
+        console.log('Auto-stopping alarm after', reminder.alarmDuration || 5, 'minutes');
         handleStopAlarm();
       }, duration);
 
       return () => {
-        clearTimeout(timeout);
+        if (autoStopTimeout) {
+          clearTimeout(autoStopTimeout);
+        }
         Vibration.cancel();
       };
+    } else {
+      setIsRinging(false);
+      Vibration.cancel();
     }
   }, [visible, reminder]);
 

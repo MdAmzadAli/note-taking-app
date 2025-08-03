@@ -4,10 +4,10 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import * as Notifications from 'expo-notifications';
+import 'react-native-reanimated/lib/reanimated2/core/Reanimated2';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
-import 'react-native-reanimated';
+import { initializeNotificationSystem } from '@/utils/notifications';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -22,16 +22,9 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded) {
       SplashScreen.hideAsync();
+      // Initialize notification system
+      initializeNotificationSystem();
     }
-
-    // Configure notifications
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: false,
-      }),
-    });
   }, [loaded]);
 
   if (!loaded) {

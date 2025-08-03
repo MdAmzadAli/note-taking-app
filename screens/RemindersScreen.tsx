@@ -23,6 +23,7 @@ import { scheduleNotification, scheduleAlarmNotification, cancelNotification, st
 import { eventBus, EVENTS } from '@/utils/eventBus';
 import { mockSpeechToText } from '@/utils/speech';
 import { AlarmManager } from '@/components/AlarmManager';
+import * as Notifications from 'expo-notifications';
 export default function RemindersScreen() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [filteredReminders, setFilteredReminders] = useState<Reminder[]>([]);
@@ -71,6 +72,7 @@ export default function RemindersScreen() {
     const notificationResponseListener = Notifications.addNotificationResponseReceivedListener(
       async (response) => {
         const { data } = response.notification.request.content;
+        console.log('Notification response received:', response.actionIdentifier, data);
         
         if (data?.isAlarm && data?.reminderId) {
           // Find the reminder
@@ -79,11 +81,16 @@ export default function RemindersScreen() {
           
           if (reminder) {
             if (response.actionIdentifier === 'STOP_ALARM') {
+              console.log('Stopping alarm from notification action');
               await stopAlarm(reminder.id);
+              setActiveAlarmReminder(null);
             } else if (response.actionIdentifier === 'SNOOZE_ALARM') {
+              console.log('Snoozing alarm from notification action');
               await snoozeAlarm(reminder.id, 5);
+              setActiveAlarmReminder(null);
             } else {
               // Default action - show alarm screen
+              console.log('Showing full-screen alarm interface');
               setActiveAlarmReminder(reminder);
             }
           }
@@ -91,10 +98,29 @@ export default function RemindersScreen() {
       }
     );
 
+    // Handle foreground notifications for alarms
+    const foregroundListener = Notifications.addNotificationReceivedListener((notification) => {
+      const { data } = notification.request.content;
+      console.log('Received foreground notification:', data);
+      
+      if (data?.isAlarm && data?.reminderId) {
+        // Show alarm screen immediately for foreground alarms
+        getReminders().then(reminders => {
+          const reminder = reminders.find(r => r.id === data.reminderId);
+          if (reminder) {
+            setActiveAlarmReminder(reminder);
+          }
+        });
+      }
+    });
+
     // Clean up subscription on unmount
     return () => {
       eventBus.off(EVENTS.REMINDER_UPDATED, reminderUpdateListener);
       notificationResponseListener.remove();
+      if (foregroundListener) {
+        foregroundListener.remove();
+      }
     };
   }, []);
 

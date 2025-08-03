@@ -1,14 +1,67 @@
+
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
+
+// Initialize notification system
+export const initializeNotificationSystem = async (): Promise<void> => {
+  try {
+    // Set up notification categories
+    await setupNotificationCategories();
+    
+    // Request permissions
+    await requestNotificationPermissions();
+    
+    console.log('Notification system initialized successfully');
+  } catch (error) {
+    console.error('Error initializing notification system:', error);
+  }
+};
+
+
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 // Configure notification handler
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async (notification) => {
+    const isAlarm = notification.request.content.data?.isAlarm;
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      priority: isAlarm ? 'max' : 'default',
+    };
+  },
 });
+
+// Set up notification categories on app start
+const setupNotificationCategories = async () => {
+  try {
+    await Notifications.setNotificationCategoryAsync('ALARM_CATEGORY', [
+      {
+        identifier: 'STOP_ALARM',
+        buttonTitle: 'Stop Alarm',
+        options: {
+          foreground: true,
+          destructive: false,
+        },
+      },
+      {
+        identifier: 'SNOOZE_ALARM',
+        buttonTitle: 'Snooze (5 min)',
+        options: {
+          foreground: false,
+          destructive: false,
+        },
+      }
+    ]);
+  } catch (error) {
+    console.error('Error setting up notification categories:', error);
+  }
+};
+
+// Call this function when the app starts
+setupNotificationCategories();
 
 export const requestNotificationPermissions = async (): Promise<boolean> => {
   try {
@@ -105,24 +158,6 @@ export const scheduleAlarmNotification = async (
       throw new Error('Notification permissions not granted');
     }
 
-    // Set up alarm notification category with actions
-    await Notifications.setNotificationCategoryAsync('ALARM_CATEGORY', [
-      {
-        identifier: 'STOP_ALARM',
-        buttonTitle: 'Stop Alarm',
-        options: {
-          foreground: true,
-        },
-      },
-      {
-        identifier: 'SNOOZE_ALARM',
-        buttonTitle: 'Snooze (5 min)',
-        options: {
-          foreground: false,
-        },
-      }
-    ]);
-
     const notificationContent: any = {
       title: '⏰ Reminder Alarm',
       body: reminder.title,
@@ -131,10 +166,13 @@ export const scheduleAlarmNotification = async (
       categoryIdentifier: 'ALARM_CATEGORY',
       sticky: true,
       autoDismiss: false,
+      badge: 1,
       data: {
         reminderId: reminder.id,
         isAlarm: true,
         vibrationEnabled: reminder.vibrationEnabled !== false,
+        alarmDuration: reminder.alarmDuration || 5,
+        scheduledTime: dateTime.toISOString(),
       },
     };
 
@@ -145,6 +183,23 @@ export const scheduleAlarmNotification = async (
         url: reminder.imageUri,
         type: 'image'
       }];
+    }
+
+    // Configure for Android critical notifications
+    if (Platform.OS === 'android') {
+      notificationContent.channelId = 'alarm-channel';
+      
+      // Create alarm channel if it doesn't exist
+      await Notifications.setNotificationChannelAsync('alarm-channel', {
+        name: 'Alarm Notifications',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        bypassDnd: true,
+        enableVibrate: true,
+        showBadge: true,
+      });
     }
 
     const notificationId = await Notifications.scheduleNotificationAsync({
@@ -180,28 +235,38 @@ export const stopAlarm = async (reminderId: string): Promise<void> => {
 
 export const snoozeAlarm = async (reminderId: string, snoozeMinutes: number = 5): Promise<void> => {
   try {
-    // Get the original reminder data (you'll need to implement this)
+    // First stop the current alarm
+    await stopAlarm(reminderId);
+    
+    // Calculate snooze time
     const snoozeTime = new Date();
     snoozeTime.setMinutes(snoozeTime.getMinutes() + snoozeMinutes);
     
     // Reschedule the alarm for snooze time
-    await Notifications.scheduleNotificationAsync({
+    const notificationId = await Notifications.scheduleNotificationAsync({
       content: {
         title: '⏰ Snoozed Reminder',
-        body: `Reminder snoozed for ${snoozeMinutes} minutes`,
-        sound: true,
+        body: `Your reminder is snoozed for ${snoozeMinutes} minutes`,
+        sound: 'default',
         priority: 'max',
         categoryIdentifier: 'ALARM_CATEGORY',
+        sticky: true,
+        autoDismiss: false,
+        badge: 1,
         data: {
           reminderId,
           isAlarm: true,
           isSnoozed: true,
+          vibrationEnabled: true,
+          alarmDuration: 5,
         },
       },
       trigger: {
         date: snoozeTime,
       },
     });
+
+    console.log(`Alarm snoozed for ${snoozeMinutes} minutes. New notification ID: ${notificationId}`);
   } catch (error) {
     console.error('Error snoozing alarm:', error);
   }
