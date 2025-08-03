@@ -23,6 +23,22 @@ class EventBus {
     };
   }
 
+  // Alias for subscribe to match expected interface
+  on(event: string, callback: EventCallback): () => void {
+    return this.subscribe(event, callback);
+  }
+
+  // Method to remove specific callback
+  off(event: string, callback: EventCallback): void {
+    const callbacks = this.events.get(event);
+    if (callbacks) {
+      const index = callbacks.indexOf(callback);
+      if (index > -1) {
+        callbacks.splice(index, 1);
+      }
+    }
+  }
+
   emit(event: string, data?: any): void {
     const callbacks = this.events.get(event);
     if (callbacks) {
