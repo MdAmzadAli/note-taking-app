@@ -1,7 +1,7 @@
 import * as Speech from 'expo-speech';
 import { Alert } from 'react-native';
 import { Audio } from 'expo-av';
-import { GoogleGenerativeAI } from '@google-generative-ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export interface SpeechResult {
   text: string;
