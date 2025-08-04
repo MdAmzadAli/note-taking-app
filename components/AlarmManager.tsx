@@ -65,8 +65,22 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
           playThroughEarpieceAndroid: false,
         });
 
+        // Determine sound source
+        let soundSource;
+        const alarmSoundSetting = reminder.alarmSound || 'default';
+        
+        if (alarmSoundSetting.startsWith('file://') || alarmSoundSetting.startsWith('http')) {
+          // Custom sound file
+          soundSource = { uri: alarmSoundSetting };
+          console.log('🔊 Loading custom alarm sound:', alarmSoundSetting);
+        } else {
+          // Default sound
+          soundSource = require('@/assets/sounds/alarm.mp3');
+          console.log('🔊 Loading default alarm sound');
+        }
+
         const { sound: alarmSound } = await Audio.Sound.createAsync(
-          require('@/assets/sounds/alarm.mp3'),
+          soundSource,
           {
             shouldPlay: true,
             isLooping: true,
@@ -78,6 +92,23 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
         console.log('🔊 Alarm sound loaded and playing');
       } catch (error) {
         console.warn('Could not load alarm sound:', error);
+        // Fallback to default sound if custom sound fails
+        if (reminder.alarmSound && reminder.alarmSound !== 'default') {
+          try {
+            const { sound: fallbackSound } = await Audio.Sound.createAsync(
+              require('@/assets/sounds/alarm.mp3'),
+              {
+                shouldPlay: true,
+                isLooping: true,
+                volume: 1.0,
+              }
+            );
+            setSound(fallbackSound);
+            console.log('🔊 Fallback alarm sound loaded and playing');
+          } catch (fallbackError) {
+            console.warn('Could not load fallback alarm sound:', fallbackError);
+          }
+        }
       }
 
       // Start vibration if enabled

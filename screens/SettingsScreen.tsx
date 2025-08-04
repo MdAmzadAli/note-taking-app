@@ -11,11 +11,15 @@ import {
   SafeAreaView,
   TextInput,
   Modal,
+  FlatList,
 } from 'react-native';
 import { getUserSettings, saveUserSettings, UserSettings } from '@/utils/storage';
 import { clearAllData } from '@/utils/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { VoiceRecognitionMethod } from '@/utils/speech';
 import VoiceCommandsScreen from './VoiceCommandsScreen';
+import * as DocumentPicker from 'expo-document-picker';
+import { Audio } from 'expo-av';
 
 interface SettingsScreenProps {
   onBack?: () => void;
@@ -56,18 +60,130 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
   });
   const [showVoiceCommands, setShowVoiceCommands] = useState(false);
   const [showAlarmManager, setShowAlarmManager] = useState(false);
+  const [customAlarmSounds, setCustomAlarmSounds] = useState<Array<{uri: string, name: string}>>([]);
+  const [previewSound, setPreviewSound] = useState<Audio.Sound | null>(null);
 
   useEffect(() => {
     loadSettings();
+    
+    // Cleanup preview sound on unmount
+    return () => {
+      if (previewSound) {
+        previewSound.stopAsync().then(() => {
+          previewSound.unloadAsync();
+        }).catch(console.warn);
+      }
+    };
   }, []);
 
   const loadSettings = async () => {
     try {
       const userSettings = await getUserSettings();
       setSettings(userSettings);
+      // Load custom alarm sounds from storage
+      const savedSounds = await AsyncStorage.getItem('customAlarmSounds');
+      if (savedSounds) {
+        setCustomAlarmSounds(JSON.parse(savedSounds));
+      }
     } catch (error) {
       console.error('Error loading settings:', error);
     }
+  };
+
+  const pickAudioFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'audio/*',
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        const newSound = {
+          uri: asset.uri,
+          name: asset.name || 'Custom Sound'
+        };
+
+        const updatedSounds = [...customAlarmSounds, newSound];
+        setCustomAlarmSounds(updatedSounds);
+        
+        // Save to storage
+        await AsyncStorage.setItem('customAlarmSounds', JSON.stringify(updatedSounds));
+        
+        Alert.alert('Success', `Added "${newSound.name}" as custom alarm sound`);
+      }
+    } catch (error) {
+      console.error('Error picking audio file:', error);
+      Alert.alert('Error', 'Failed to add custom alarm sound');
+    }
+  };
+
+  const previewAlarmSound = async (soundUri: string) => {
+    try {
+      // Stop any currently playing preview
+      if (previewSound) {
+        await previewSound.stopAsync();
+        await previewSound.unloadAsync();
+        setPreviewSound(null);
+      }
+
+      // Set audio mode
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        staysActiveInBackground: false,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+
+      // Load and play the sound
+      const { sound } = await Audio.Sound.createAsync(
+        soundUri.startsWith('http') || soundUri.startsWith('file') 
+          ? { uri: soundUri }
+          : require('@/assets/sounds/alarm.mp3'),
+        {
+          shouldPlay: true,
+          volume: 0.5,
+          isLooping: false,
+        }
+      );
+
+      setPreviewSound(sound);
+
+      // Auto-stop after 3 seconds
+      setTimeout(async () => {
+        try {
+          await sound.stopAsync();
+          await sound.unloadAsync();
+          setPreviewSound(null);
+        } catch (error) {
+          console.warn('Error stopping preview sound:', error);
+        }
+      }, 3000);
+
+    } catch (error) {
+      console.error('Error playing preview sound:', error);
+      Alert.alert('Error', 'Cannot preview this sound file');
+    }
+  };
+
+  const deleteCustomSound = async (index: number) => {
+    Alert.alert(
+      'Delete Sound',
+      'Are you sure you want to delete this custom alarm sound?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const updatedSounds = customAlarmSounds.filter((_, i) => i !== index);
+            setCustomAlarmSounds(updatedSounds);
+            await AsyncStorage.setItem('customAlarmSounds', JSON.stringify(updatedSounds));
+          }
+        }
+      ]
+    );
   };
 
   const updateSettings = async (newSettings: Partial<UserSettings>) => {
@@ -351,7 +467,18 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
 
           <View style={styles.modalContent}>
             <View style={styles.settingGroup}>
-              <Text style={styles.settingLabel}>Alarm Sound</Text>
+              <View style={styles.soundHeader}>
+                <Text style={styles.settingLabel}>Alarm Sound</Text>
+                <TouchableOpacity
+                  style={styles.addSoundButton}
+                  onPress={pickAudioFile}
+                >
+                  <Text style={styles.addSoundButtonText}>+ Add Custom</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Default Sounds */}
+              <Text style={styles.soundSectionTitle}>Default Sounds</Text>
               <View style={styles.soundOptions}>
                 {[
                   { label: 'Default', value: 'default' },
@@ -366,6 +493,7 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
                       settings.alarmSound === sound.value && styles.soundOptionSelected
                     ]}
                     onPress={() => updateSettings({ alarmSound: sound.value })}
+                    onLongPress={() => previewAlarmSound(sound.value)}
                   >
                     <Text style={[
                       styles.soundOptionText,
@@ -376,6 +504,55 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
                   </TouchableOpacity>
                 ))}
               </View>
+
+              {/* Custom Sounds */}
+              {customAlarmSounds.length > 0 && (
+                <>
+                  <Text style={styles.soundSectionTitle}>Custom Sounds</Text>
+                  <FlatList
+                    data={customAlarmSounds}
+                    keyExtractor={(item, index) => `${item.uri}_${index}`}
+                    renderItem={({ item, index }) => (
+                      <View style={styles.customSoundItem}>
+                        <TouchableOpacity
+                          style={[
+                            styles.customSoundOption,
+                            settings.alarmSound === item.uri && styles.customSoundOptionSelected
+                          ]}
+                          onPress={() => updateSettings({ alarmSound: item.uri })}
+                        >
+                          <Text style={[
+                            styles.customSoundText,
+                            settings.alarmSound === item.uri && styles.customSoundTextSelected
+                          ]} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity
+                          style={styles.previewButton}
+                          onPress={() => previewAlarmSound(item.uri)}
+                        >
+                          <Text style={styles.previewButtonText}>▶️</Text>
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity
+                          style={styles.deleteButton}
+                          onPress={() => deleteCustomSound(index)}
+                        >
+                          <Text style={styles.deleteButtonText}>🗑️</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    style={styles.customSoundsList}
+                    showsVerticalScrollIndicator={false}
+                  />
+                </>
+              )}
+
+              <Text style={styles.soundHelpText}>
+                💡 Long press default sounds to preview. Supported formats: MP3, WAV, M4A
+              </Text>
             </View>
 
             <View style={styles.settingGroup}>
@@ -774,10 +951,37 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  soundHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  addSoundButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  addSoundButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  soundSectionTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    fontFamily: 'Inter',
+    marginBottom: 8,
+    marginTop: 8,
+  },
   soundOptions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 8,
+    marginBottom: 16,
   },
   soundOption: {
     backgroundColor: '#F3F4F6',
@@ -802,6 +1006,68 @@ const styles = StyleSheet.create({
   soundOptionTextSelected: {
     color: '#FFFFFF',
     fontWeight: '500',
+  },
+  customSoundsList: {
+    maxHeight: 150,
+  },
+  customSoundItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  customSoundOption: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginRight: 8,
+  },
+  customSoundOptionSelected: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  customSoundText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontFamily: 'Inter',
+  },
+  customSoundTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  previewButton: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginRight: 4,
+    minWidth: 36,
+    alignItems: 'center',
+  },
+  previewButtonText: {
+    fontSize: 12,
+  },
+  deleteButton: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 6,
+    minWidth: 36,
+    alignItems: 'center',
+  },
+  deleteButtonText: {
+    fontSize: 12,
+  },
+  soundHelpText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontFamily: 'Inter',
+    fontStyle: 'italic',
+    marginTop: 8,
+    textAlign: 'center',
   },
   durationButtons: {
     flexDirection: 'row',
