@@ -107,13 +107,21 @@ export default function RemindersScreen() {
       console.log('Received foreground notification:', data);
 
       if (data?.isAlarm && data?.reminderId) {
-        // Show alarm screen immediately for foreground alarms
-        getReminders().then(reminders => {
-          const reminder = reminders.find(r => r.id === data.reminderId);
-          if (reminder) {
-            setActiveAlarmReminder(reminder);
-          }
-        });
+        // Only show alarm screen if the notification is actually due
+        const now = new Date();
+        const scheduledTime = data.scheduledTime ? new Date(data.scheduledTime) : now;
+        
+        if (now >= scheduledTime) {
+          console.log('Alarm notification received at scheduled time, showing alarm screen');
+          getReminders().then(reminders => {
+            const reminder = reminders.find(r => r.id === data.reminderId);
+            if (reminder) {
+              setActiveAlarmReminder(reminder);
+            }
+          });
+        } else {
+          console.log('Alarm notification received too early, ignoring');
+        }
       }
     });
 
@@ -221,6 +229,8 @@ export default function RemindersScreen() {
     }
 
     try {
+      // Clear any active alarm when creating new reminder
+      setActiveAlarmReminder(null);
       const reminder: Reminder = {
         id: Date.now().toString(),
         title: newTitle.trim(),
@@ -847,7 +857,10 @@ export default function RemindersScreen() {
 
           <TouchableOpacity
             style={styles.addButton}
-            onPress={() => setIsCreating(true)}
+            onPress={() => {
+              setActiveAlarmReminder(null); // Clear any active alarm
+              setIsCreating(true);
+            }}
           >
             <Text style={styles.addButtonText}>New Reminder</Text>
           </TouchableOpacity>

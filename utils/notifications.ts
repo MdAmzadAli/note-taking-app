@@ -180,9 +180,13 @@ export const scheduleAlarmNotification = async (
     const scheduledTime = new Date(dateTime);
     const timeDiff = scheduledTime.getTime() - now.getTime();
     
-    if (timeDiff < 5000) { // If less than 5 seconds in future
-      console.warn('Scheduled time too close to current time. Adding 5 second buffer.');
-      scheduledTime.setTime(now.getTime() + 5000); // Add 5 seconds buffer
+    if (timeDiff <= 0) {
+      throw new Error('Cannot schedule notification for past time');
+    }
+    
+    if (timeDiff < 10000) { // If less than 10 seconds in future
+      console.warn('Scheduled time too close to current time. Adding 10 second buffer.');
+      scheduledTime.setTime(now.getTime() + 10000); // Add 10 seconds buffer
     }
 
     console.log(`Scheduling alarm for: ${scheduledTime.toISOString()} (Current time: ${now.toISOString()})`);
