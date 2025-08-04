@@ -5,11 +5,13 @@ import { Platform } from 'react-native';
 // Initialize notification system
 export const initializeNotificationSystem = async (): Promise<void> => {
   try {
-    // Set up notification categories
-    await setupNotificationCategories();
-    
-    // Request permissions
+    // Request permissions first
     await requestNotificationPermissions();
+    
+    // Set up notification categories for mobile platforms only
+    if (Platform.OS !== 'web') {
+      await setupNotificationCategories();
+    }
     
     console.log('Notification system initialized successfully');
   } catch (error) {
@@ -33,9 +35,14 @@ Notifications.setNotificationHandler({
   },
 });
 
-// Set up notification categories on app start
+// Set up notification categories for mobile platforms
 const setupNotificationCategories = async () => {
   try {
+    if (Platform.OS === 'web') {
+      console.log('Skipping notification categories setup on web platform');
+      return;
+    }
+
     await Notifications.setNotificationCategoryAsync('ALARM_CATEGORY', [
       {
         identifier: 'STOP_ALARM',
@@ -74,16 +81,25 @@ const setupNotificationCategories = async () => {
         sound: 'default',
       });
     }
+    
+    console.log('Notification categories set up successfully');
   } catch (error) {
     console.error('Error setting up notification categories:', error);
   }
 };
 
-// Call this function when the app starts
-setupNotificationCategories();
+// Initialize categories when module loads (for mobile platforms only)
+if (Platform.OS !== 'web') {
+  setupNotificationCategories();
+}
 
 export const requestNotificationPermissions = async (): Promise<boolean> => {
   try {
+    if (Platform.OS === 'web') {
+      console.log('Notification permissions not available on web');
+      return false;
+    }
+
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
 
@@ -106,87 +122,11 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
       });
     }
 
+    console.log('Notification permissions granted successfully');
     return true;
   } catch (error) {
     console.error('Error requesting notification permissions:', error);
     return false;
-  }
-};
-
-export const scheduleNotification = async (
-  title: string,
-  body: string,
-  dateTime: Date,
-  alarmOptions?: {
-    sound?: string;
-    vibration?: boolean;
-    imageUri?: string;
-    isAlarm?: boolean;
-  }
-): Promise<string | null> => {
-  try {
-    const hasPermission = await requestNotificationPermissions();
-    if (!hasPermission) {
-      throw new Error('Notification permissions not granted');
-    }
-
-    // Get current time in device timezone
-    const now = new Date();
-    const scheduledTime = new Date(dateTime);
-    
-    console.log('Current device time:', now.toLocaleString());
-    console.log('Scheduled notification time:', scheduledTime.toLocaleString());
-    
-    // Ensure we're scheduling for the future
-    if (scheduledTime <= now) {
-      throw new Error(`Cannot schedule notification for past time. Current: ${now.toLocaleString()}, Scheduled: ${scheduledTime.toLocaleString()}`);
-    }
-
-    const notificationContent: any = {
-      title,
-      body,
-      sound: alarmOptions?.sound || true,
-      priority: alarmOptions?.isAlarm ? 'max' : 'default',
-    };
-
-    // Add image if provided
-    if (alarmOptions?.imageUri) {
-      notificationContent.attachments = [{
-        identifier: 'image',
-        url: alarmOptions.imageUri,
-        type: 'image'
-      }];
-    }
-
-    // Configure for alarm-style notifications
-    if (alarmOptions?.isAlarm) {
-      notificationContent.categoryIdentifier = 'ALARM_CATEGORY';
-      notificationContent.sticky = true;
-      notificationContent.autoDismiss = false;
-    }
-
-    // Calculate seconds from now to scheduled time
-    const secondsFromNow = Math.floor((scheduledTime.getTime() - now.getTime()) / 1000);
-    
-    if (secondsFromNow <= 0) {
-      throw new Error('Cannot schedule notification for past time');
-    }
-
-    console.log(`Scheduling notification to trigger in ${secondsFromNow} seconds`);
-
-    const notificationId = await Notifications.scheduleNotificationAsync({
-      content: notificationContent,
-      trigger: {
-        seconds: secondsFromNow,
-        repeats: false,
-      },
-    });
-
-    console.log(`Notification scheduled with ID: ${notificationId} for ${scheduledTime.toLocaleString()}`);
-    return notificationId;
-  } catch (error) {
-    console.error('Error scheduling notification:', error);
-    return null;
   }
 };
 
@@ -195,22 +135,41 @@ export const scheduleAlarmNotification = async (
   dateTime: Date
 ): Promise<string | null> => {
   try {
+    if (Platform.OS === 'web') {
+      console.log('Alarm notifications not supported on web platform');
+      return null;
+    }
+
     const hasPermission = await requestNotificationPermissions();
     if (!hasPermission) {
       throw new Error('Notification permissions not granted');
     }
 
-    // Get current device time
+    // Get current time and ensure proper timezone handling
     const now = new Date();
     const scheduledTime = new Date(dateTime);
     
-    console.log('Current device time:', now.toLocaleString());
-    console.log('Scheduling alarm for:', scheduledTime.toLocaleString());
-    console.log('Time difference (minutes):', (scheduledTime.getTime() - now.getTime()) / (1000 * 60));
-
+    console.log('=== ALARM SCHEDULING DEBUG ===');
+    console.log('Current time:', now.toLocaleString());
+    console.log('Scheduled time:', scheduledTime.toLocaleString());
+    console.log('Current timestamp:', now.getTime());
+    console.log('Scheduled timestamp:', scheduledTime.getTime());
+    
+    // Calculate exact time difference in milliseconds
+    const timeDifference = scheduledTime.getTime() - now.getTime();
+    const secondsFromNow = Math.floor(timeDifference / 1000);
+    
+    console.log('Time difference (ms):', timeDifference);
+    console.log('Seconds from now:', secondsFromNow);
+    
     // Ensure we're scheduling for the future
-    if (scheduledTime <= now) {
+    if (secondsFromNow <= 0) {
       throw new Error(`Cannot schedule alarm for past time. Current: ${now.toLocaleString()}, Scheduled: ${scheduledTime.toLocaleString()}`);
+    }
+
+    // Minimum 5 seconds buffer to ensure proper scheduling
+    if (secondsFromNow < 5) {
+      throw new Error('Alarm must be scheduled at least 5 seconds in the future');
     }
 
     const notificationContent: any = {
@@ -234,6 +193,7 @@ export const scheduleAlarmNotification = async (
         imageUri: reminder.imageUri,
         scheduledTime: scheduledTime.toISOString(),
         scheduledTimeLocal: scheduledTime.toLocaleString(),
+        actualScheduledTimestamp: scheduledTime.getTime(),
       },
     };
 
@@ -255,14 +215,86 @@ export const scheduleAlarmNotification = async (
       notificationContent.channelId = 'alarm-channel';
     }
 
-    // Calculate seconds from now to scheduled time
+    console.log('Scheduling notification with content:', {
+      title: notificationContent.title,
+      body: notificationContent.body,
+      scheduledFor: scheduledTime.toLocaleString(),
+      secondsFromNow: secondsFromNow
+    });
+
+    // Use exact seconds-based scheduling
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: notificationContent,
+      trigger: {
+        seconds: secondsFromNow,
+        repeats: false,
+      },
+    });
+
+    console.log('=== ALARM SCHEDULED SUCCESSFULLY ===');
+    console.log('Notification ID:', notificationId);
+    console.log('Will trigger in:', secondsFromNow, 'seconds');
+    console.log('Scheduled for:', scheduledTime.toLocaleString());
+    console.log('Reminder ID:', reminder.id);
+    console.log('=====================================');
+    
+    return notificationId;
+  } catch (error) {
+    console.error('Error scheduling alarm notification:', error);
+    throw error;
+  }
+};
+
+export const scheduleNotification = async (
+  title: string,
+  body: string,
+  dateTime: Date,
+  options?: {
+    sound?: string;
+    vibration?: boolean;
+    imageUri?: string;
+    isAlarm?: boolean;
+  }
+): Promise<string | null> => {
+  try {
+    if (Platform.OS === 'web') {
+      console.log('Regular notifications not fully supported on web platform');
+      return null;
+    }
+
+    const hasPermission = await requestNotificationPermissions();
+    if (!hasPermission) {
+      throw new Error('Notification permissions not granted');
+    }
+
+    const now = new Date();
+    const scheduledTime = new Date(dateTime);
     const secondsFromNow = Math.floor((scheduledTime.getTime() - now.getTime()) / 1000);
     
     if (secondsFromNow <= 0) {
       throw new Error('Cannot schedule notification for past time');
     }
 
-    console.log(`Scheduling notification to trigger in ${secondsFromNow} seconds`);
+    const notificationContent: any = {
+      title,
+      body,
+      sound: options?.sound || 'default',
+      priority: options?.isAlarm ? 'max' : 'default',
+    };
+
+    if (options?.imageUri) {
+      notificationContent.attachments = [{
+        identifier: 'image',
+        url: options.imageUri,
+        type: 'image'
+      }];
+    }
+
+    if (options?.isAlarm) {
+      notificationContent.categoryIdentifier = 'ALARM_CATEGORY';
+      notificationContent.sticky = true;
+      notificationContent.autoDismiss = false;
+    }
 
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: notificationContent,
@@ -272,14 +304,10 @@ export const scheduleAlarmNotification = async (
       },
     });
 
-    console.log(`Alarm notification scheduled successfully!`);
-    console.log(`- Notification ID: ${notificationId}`);
-    console.log(`- Scheduled for: ${scheduledTime.toLocaleString()}`);
-    console.log(`- Reminder ID: ${reminder.id}`);
-    
+    console.log(`Regular notification scheduled for ${scheduledTime.toLocaleString()}, ID: ${notificationId}`);
     return notificationId;
   } catch (error) {
-    console.error('Error scheduling alarm notification:', error);
+    console.error('Error scheduling notification:', error);
     return null;
   }
 };
@@ -306,6 +334,11 @@ export const snoozeAlarm = async (reminderId: string, snoozeMinutes: number = 5)
   try {
     console.log(`Snoozing alarm for reminder: ${reminderId} for ${snoozeMinutes} minutes`);
     
+    if (Platform.OS === 'web') {
+      console.log('Snooze not supported on web platform');
+      return;
+    }
+    
     // Get the original reminder data before stopping
     const presentedNotifications = await Notifications.getPresentedNotificationsAsync();
     let originalReminderData = null;
@@ -320,13 +353,14 @@ export const snoozeAlarm = async (reminderId: string, snoozeMinutes: number = 5)
     // Stop the current alarm
     await stopAlarm(reminderId);
     
-    // Calculate snooze time using device local time
+    // Calculate snooze time
     const snoozeTime = new Date();
     snoozeTime.setMinutes(snoozeTime.getMinutes() + snoozeMinutes);
+    const secondsFromNow = Math.floor((snoozeTime.getTime() - new Date().getTime()) / 1000);
     
-    console.log(`Snoozing alarm until: ${snoozeTime.toLocaleString()}`);
+    console.log(`Snoozing alarm until: ${snoozeTime.toLocaleString()} (${secondsFromNow} seconds)`);
     
-    // Reschedule the alarm for snooze time with original data
+    // Reschedule the alarm for snooze time
     const notificationContent: any = {
       title: '⏰ Snoozed Reminder',
       body: originalReminderData?.originalTitle || `Reminder snoozed for ${snoozeMinutes} minutes`,
@@ -349,6 +383,7 @@ export const snoozeAlarm = async (reminderId: string, snoozeMinutes: number = 5)
         snoozeCount: (originalReminderData?.snoozeCount || 0) + 1,
         scheduledTime: snoozeTime.toISOString(),
         scheduledTimeLocal: snoozeTime.toLocaleString(),
+        actualScheduledTimestamp: snoozeTime.getTime(),
       },
     };
 
@@ -359,7 +394,7 @@ export const snoozeAlarm = async (reminderId: string, snoozeMinutes: number = 5)
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: notificationContent,
       trigger: {
-        date: snoozeTime,
+        seconds: secondsFromNow,
         repeats: false,
       },
     });

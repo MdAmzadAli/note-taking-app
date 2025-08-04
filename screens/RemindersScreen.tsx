@@ -104,23 +104,31 @@ export default function RemindersScreen() {
     // Handle foreground notifications for alarms
     const foregroundListener = Notifications.addNotificationReceivedListener((notification) => {
       const { data } = notification.request.content;
-      console.log('Received foreground notification at:', new Date().toLocaleString());
+      const now = new Date();
+      
+      console.log('=== FOREGROUND NOTIFICATION RECEIVED ===');
+      console.log('Received at:', now.toLocaleString());
+      console.log('Received timestamp:', now.getTime());
       console.log('Notification data:', data);
 
       // Only process alarm notifications that have valid data
       if (data?.isAlarm && data?.reminderId) {
-        const now = new Date();
-        const scheduledTime = data.scheduledTime ? new Date(data.scheduledTime) : now;
-        const timeDiff = Math.abs(now.getTime() - scheduledTime.getTime()) / 1000; // in seconds
+        // Use the actual scheduled timestamp for accurate comparison
+        const scheduledTimestamp = data.actualScheduledTimestamp || new Date(data.scheduledTime).getTime();
+        const currentTimestamp = now.getTime();
+        const timeDiffMs = Math.abs(currentTimestamp - scheduledTimestamp);
+        const timeDiffSeconds = timeDiffMs / 1000;
         
-        console.log('Alarm notification received');
-        console.log('Current time:', now.toLocaleString());
-        console.log('Scheduled time:', scheduledTime.toLocaleString());
-        console.log('Time difference:', timeDiff, 'seconds');
+        console.log('Alarm notification details:');
+        console.log('- Current timestamp:', currentTimestamp);
+        console.log('- Scheduled timestamp:', scheduledTimestamp);
+        console.log('- Time difference (ms):', timeDiffMs);
+        console.log('- Time difference (seconds):', timeDiffSeconds);
         
-        // Only show alarm if we're within 30 seconds of the scheduled time (accounting for slight delays)
-        if (timeDiff <= 30) {
-          console.log('Alarm is on time, showing alarm screen');
+        // Accept notifications that are within 60 seconds of scheduled time (handles delays/early triggers)
+        if (timeDiffSeconds <= 60) {
+          console.log('✅ Alarm timing is acceptable, showing alarm screen');
+          
           getReminders().then(reminders => {
             const reminder = reminders.find(r => r.id === data.reminderId || r.id === data.originalReminderId);
             if (reminder) {
@@ -145,11 +153,13 @@ export default function RemindersScreen() {
             }
           });
         } else {
-          console.log('Alarm notification received too early/late, ignoring. Time difference:', timeDiff, 'seconds');
+          console.log('❌ Alarm timing is off, ignoring. Time difference:', timeDiffSeconds, 'seconds');
         }
-      } else if (data === undefined) {
-        console.log('Ignoring notification without alarm data');
+      } else {
+        console.log('ℹ️  Non-alarm notification or missing data, ignoring');
       }
+      
+      console.log('=========================================');
     });
 
     // Clean up subscription on unmount

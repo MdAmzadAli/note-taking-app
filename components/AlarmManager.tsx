@@ -67,15 +67,41 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
       // Load and play alarm sound using expo-av
       try {
         console.log('Loading alarm sound...');
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          staysActiveInBackground: true,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+        });
+
         const { sound: alarmSound } = await Audio.Sound.createAsync(
           require('@/assets/sounds/alarm.mp3'),
-          { shouldPlay: true, isLooping: true, volume: 1.0 }
+          {
+            shouldPlay: false,
+            isLooping: true,
+            volume: 1.0,
+          }
         );
+        
         setSound(alarmSound);
+        
+        // Start playing the sound
+        await alarmSound.playAsync();
         console.log('Alarm sound loaded and playing');
       } catch (error) {
         console.warn('Could not load alarm sound:', error);
-        // Don't use fallback notifications as they cause spam
+        // Use system alert sound as fallback
+        try {
+          console.log('Using system alert sound as fallback');
+          await Audio.setAudioModeAsync({
+            allowsRecordingIOS: false,
+            staysActiveInBackground: true,
+            playsInSilentModeIOS: true,
+          });
+        } catch (fallbackError) {
+          console.warn('Could not set audio mode:', fallbackError);
+        }
       }
 
       // Start continuous vibration pattern if enabled
