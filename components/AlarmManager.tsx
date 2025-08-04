@@ -40,17 +40,9 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
     const startAlarmRinging = async () => {
       if (!visible || !reminder) return;
 
-      // Only start ringing if the current time is at or after the scheduled time
-      const now = new Date();
-      const scheduledTime = new Date(reminder.dateTime);
-      
-      if (now < scheduledTime) {
-        console.log('Alarm not yet due. Scheduled for:', scheduledTime.toISOString(), 'Current time:', now.toISOString());
-        return;
-      }
-
       setIsRinging(true);
       console.log('Starting alarm for reminder:', reminder.id);
+      console.log('Alarm started at:', new Date().toLocaleString());
 
       // Start pulsing animation
       const startPulseAnimation = () => {

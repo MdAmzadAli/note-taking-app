@@ -104,24 +104,34 @@ export default function RemindersScreen() {
     // Handle foreground notifications for alarms
     const foregroundListener = Notifications.addNotificationReceivedListener((notification) => {
       const { data } = notification.request.content;
-      console.log('Received foreground notification:', data);
+      console.log('Received foreground notification at:', new Date().toLocaleString());
+      console.log('Notification data:', data);
 
       if (data?.isAlarm && data?.reminderId) {
-        // Only show alarm screen if the notification is actually due
-        const now = new Date();
-        const scheduledTime = data.scheduledTime ? new Date(data.scheduledTime) : now;
-        
-        if (now >= scheduledTime) {
-          console.log('Alarm notification received at scheduled time, showing alarm screen');
-          getReminders().then(reminders => {
-            const reminder = reminders.find(r => r.id === data.reminderId);
-            if (reminder) {
-              setActiveAlarmReminder(reminder);
-            }
-          });
-        } else {
-          console.log('Alarm notification received too early, ignoring');
-        }
+        console.log('Alarm notification received! Showing alarm screen immediately');
+        getReminders().then(reminders => {
+          const reminder = reminders.find(r => r.id === data.reminderId || r.id === data.originalReminderId);
+          if (reminder) {
+            console.log('Found reminder for alarm, showing alarm screen');
+            setActiveAlarmReminder(reminder);
+          } else {
+            console.log('Reminder not found, creating temporary reminder for alarm');
+            // Create a temporary reminder object for the alarm
+            const tempReminder = {
+              id: data.reminderId,
+              title: data.originalTitle || 'Reminder',
+              description: data.description || '',
+              dateTime: data.scheduledTime || new Date().toISOString(),
+              isCompleted: false,
+              createdAt: new Date().toISOString(),
+              alarmSound: data.alarmSound,
+              vibrationEnabled: data.vibrationEnabled,
+              alarmDuration: data.alarmDuration,
+              imageUri: data.imageUri,
+            };
+            setActiveAlarmReminder(tempReminder);
+          }
+        });
       }
     });
 
@@ -266,23 +276,23 @@ export default function RemindersScreen() {
               notificationDate.setDate(notificationDate.getDate() + 7);
             }
 
-            const notificationId = globalAlarmSettings.alarmEnabled 
+            const notificationId = globalAlarmSettings.alarmEnabled
               ? await scheduleAlarmNotification({
-                  ...reminder,
-                  alarmSound: globalAlarmSettings.alarmSound,
-                  vibrationEnabled: globalAlarmSettings.vibrationEnabled,
-                  alarmDuration: globalAlarmSettings.alarmDuration,
-                }, notificationDate)
+                ...reminder,
+                alarmSound: globalAlarmSettings.alarmSound,
+                vibrationEnabled: globalAlarmSettings.vibrationEnabled,
+                alarmDuration: globalAlarmSettings.alarmDuration,
+              }, notificationDate)
               : await scheduleNotification(
-                  `Recurring Reminder`,
-                  reminder.title,
-                  notificationDate,
-                  {
-                    imageUri: selectedImageUri || undefined,
-                    sound: globalAlarmSettings.alarmSound,
-                    vibration: globalAlarmSettings.vibrationEnabled,
-                  }
-                );
+                `Recurring Reminder`,
+                reminder.title,
+                notificationDate,
+                {
+                  imageUri: selectedImageUri || undefined,
+                  sound: globalAlarmSettings.alarmSound,
+                  vibration: globalAlarmSettings.vibrationEnabled,
+                }
+              );
 
             if (notificationId) {
               notificationIds.push(notificationId);
@@ -293,23 +303,23 @@ export default function RemindersScreen() {
         reminder.notificationIds = notificationIds;
       } else {
         // Schedule single notification for non-recurring reminders
-        const notificationId = globalAlarmSettings.alarmEnabled 
+        const notificationId = globalAlarmSettings.alarmEnabled
           ? await scheduleAlarmNotification({
-              ...reminder,
-              alarmSound: globalAlarmSettings.alarmSound,
-              vibrationEnabled: globalAlarmSettings.vibrationEnabled,
-              alarmDuration: globalAlarmSettings.alarmDuration,
-            }, selectedDate)
+            ...reminder,
+            alarmSound: globalAlarmSettings.alarmSound,
+            vibrationEnabled: globalAlarmSettings.vibrationEnabled,
+            alarmDuration: globalAlarmSettings.alarmDuration,
+          }, selectedDate)
           : await scheduleNotification(
-              `Reminder`,
-              reminder.title,
-              selectedDate,
-              {
-                imageUri: selectedImageUri || undefined,
-                sound: globalAlarmSettings.alarmSound,
-                vibration: globalAlarmSettings.vibrationEnabled,
-              }
-            );
+            `Reminder`,
+            reminder.title,
+            selectedDate,
+            {
+              imageUri: selectedImageUri || undefined,
+              sound: globalAlarmSettings.alarmSound,
+              vibration: globalAlarmSettings.vibrationEnabled,
+            }
+          );
 
         if (notificationId) {
           reminder.notificationId = notificationId;
@@ -467,8 +477,8 @@ export default function RemindersScreen() {
   };
 
   const toggleDay = (dayIndex: number) => {
-    setSelectedDays(prev => 
-      prev.includes(dayIndex) 
+    setSelectedDays(prev =>
+      prev.includes(dayIndex)
         ? prev.filter(d => d !== dayIndex)
         : [...prev, dayIndex].sort()
     );
@@ -507,7 +517,7 @@ export default function RemindersScreen() {
     const isOverdue = new Date(item.dateTime) < new Date() && !item.isCompleted;
 
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[
           styles.reminderItem,
           item.isCompleted && styles.completedReminder,
@@ -550,8 +560,8 @@ export default function RemindersScreen() {
             </Text>
 
             {item.imageUri && (
-              <Image 
-                source={{ uri: item.imageUri }} 
+              <Image
+                source={{ uri: item.imageUri }}
                 style={styles.reminderImage}
                 resizeMode="cover"
               />
@@ -821,7 +831,6 @@ export default function RemindersScreen() {
           </View>
 
 
-
           {showTimePicker && (
             <DateTimePicker
               value={selectedDate}
@@ -831,7 +840,6 @@ export default function RemindersScreen() {
             />
           )}
         </View>
-
 
 
         <AlarmManager
@@ -1002,7 +1010,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: '#FFFFFF',
     fontSize: 16,
-    fontFamily: 'Inter',
+    fontFamily:'Inter',
     color: '#000000',
   },
   formContainer: {
