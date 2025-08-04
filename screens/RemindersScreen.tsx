@@ -19,11 +19,12 @@ import VoiceInput from '@/components/VoiceInput';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Reminder } from '@/types';
 import { getReminders, saveReminder, deleteReminder, updateReminder, getUserSettings } from '@/utils/storage';
-import { scheduleNotification, scheduleAlarmNotification, cancelNotification, stopAlarm, snoozeAlarm } from '@/utils/notifications';
+import { scheduleNotification, scheduleAlarmNotification, scheduleRecurringAlarms, cancelNotification, stopAlarm, snoozeAlarm } from '@/utils/notifications';
 import { eventBus, EVENTS } from '@/utils/eventBus';
 import { mockSpeechToText } from '@/utils/speech';
 import { AlarmManager } from '@/components/AlarmManager';
 import * as Notifications from 'expo-notifications';
+
 export default function RemindersScreen() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [filteredReminders, setFilteredReminders] = useState<Reminder[]>([]);
@@ -101,65 +102,46 @@ export default function RemindersScreen() {
       }
     );
 
-    // Handle foreground notifications for alarms
+    // Handle foreground notifications - only trigger alarm when notification is actually received
     const foregroundListener = Notifications.addNotificationReceivedListener((notification) => {
       const { data } = notification.request.content;
-      const now = new Date();
-      
-      console.log('=== FOREGROUND NOTIFICATION RECEIVED ===');
-      console.log('Received at:', now.toLocaleString());
-      console.log('Received timestamp:', now.getTime());
+
+      console.log('=== NOTIFICATION RECEIVED ===');
+      console.log('Received at:', new Date().toLocaleString());
       console.log('Notification data:', data);
 
-      // Only process alarm notifications that have valid data
+      // Only process alarm notifications
       if (data?.isAlarm && data?.reminderId) {
-        // Use the actual scheduled timestamp for accurate comparison
-        const scheduledTimestamp = data.actualScheduledTimestamp || new Date(data.scheduledTime).getTime();
-        const currentTimestamp = now.getTime();
-        const timeDiffMs = Math.abs(currentTimestamp - scheduledTimestamp);
-        const timeDiffSeconds = timeDiffMs / 1000;
-        
-        console.log('Alarm notification details:');
-        console.log('- Current timestamp:', currentTimestamp);
-        console.log('- Scheduled timestamp:', scheduledTimestamp);
-        console.log('- Time difference (ms):', timeDiffMs);
-        console.log('- Time difference (seconds):', timeDiffSeconds);
-        
-        // Accept notifications that are within 60 seconds of scheduled time (handles delays/early triggers)
-        if (timeDiffSeconds <= 60) {
-          console.log('✅ Alarm timing is acceptable, showing alarm screen');
-          
-          getReminders().then(reminders => {
-            const reminder = reminders.find(r => r.id === data.reminderId || r.id === data.originalReminderId);
-            if (reminder) {
-              console.log('Found reminder for alarm, showing alarm screen');
-              setActiveAlarmReminder(reminder);
-            } else {
-              console.log('Reminder not found, creating temporary reminder for alarm');
-              // Create a temporary reminder object for the alarm
-              const tempReminder = {
-                id: data.reminderId,
-                title: data.originalTitle || 'Reminder',
-                description: data.description || '',
-                dateTime: data.scheduledTime || new Date().toISOString(),
-                isCompleted: false,
-                createdAt: new Date().toISOString(),
-                alarmSound: data.alarmSound,
-                vibrationEnabled: data.vibrationEnabled,
-                alarmDuration: data.alarmDuration,
-                imageUri: data.imageUri,
-              };
-              setActiveAlarmReminder(tempReminder);
-            }
-          });
-        } else {
-          console.log('❌ Alarm timing is off, ignoring. Time difference:', timeDiffSeconds, 'seconds');
-        }
+        console.log('✅ Alarm notification received, showing alarm screen');
+
+        // Find the reminder or create a temporary one
+        getReminders().then(reminders => {
+          let reminder = reminders.find(r => r.id === data.reminderId);
+
+          if (!reminder) {
+            // Create temporary reminder object for the alarm
+            reminder = {
+              id: data.reminderId,
+              title: data.originalTitle || 'Reminder',
+              description: data.description || '',
+              dateTime: new Date().toISOString(),
+              isCompleted: false,
+              createdAt: new Date().toISOString(),
+              alarmSound: data.alarmSound,
+              vibrationEnabled: data.vibrationEnabled,
+              alarmDuration: data.alarmDuration,
+              imageUri: data.imageUri,
+            };
+          }
+
+          console.log('Showing alarm for reminder:', reminder.title);
+          setActiveAlarmReminder(reminder);
+        });
       } else {
-        console.log('ℹ️  Non-alarm notification or missing data, ignoring');
+        console.log('ℹ️ Non-alarm notification, ignoring');
       }
-      
-      console.log('=========================================');
+
+      console.log('=============================');
     });
 
     // Clean up subscription on unmount
@@ -266,8 +248,6 @@ export default function RemindersScreen() {
     }
 
     try {
-      // Clear any active alarm when creating new reminder
-      setActiveAlarmReminder(null);
       const reminder: Reminder = {
         id: Date.now().toString(),
         title: newTitle.trim(),
@@ -286,57 +266,15 @@ export default function RemindersScreen() {
 
       if (isRecurring) {
         // Schedule multiple notifications for recurring reminders
-        const notificationIds: string[] = [];
-
-        for (const dayOfWeek of selectedDays) {
-          for (const timeStr of selectedTimes) {
-            const [hours, minutes] = timeStr.split(':').map(Number);
-            const notificationDate = new Date();
-
-            // Find the next occurrence of this day of week
-            const daysUntilTarget = (dayOfWeek - notificationDate.getDay() + 7) % 7;
-            notificationDate.setDate(notificationDate.getDate() + daysUntilTarget);
-            notificationDate.setHours(hours, minutes, 0, 0);
-
-            // If the time has passed today and it's the same day, schedule for next week
-            if (daysUntilTarget === 0 && notificationDate <= new Date()) {
-              notificationDate.setDate(notificationDate.getDate() + 7);
-            }
-
-            const notificationId = globalAlarmSettings.alarmEnabled
-              ? await scheduleAlarmNotification({
-                ...reminder,
-                alarmSound: globalAlarmSettings.alarmSound,
-                vibrationEnabled: globalAlarmSettings.vibrationEnabled,
-                alarmDuration: globalAlarmSettings.alarmDuration,
-              }, notificationDate)
-              : await scheduleNotification(
-                `Recurring Reminder`,
-                reminder.title,
-                notificationDate,
-                {
-                  imageUri: selectedImageUri || undefined,
-                  sound: globalAlarmSettings.alarmSound,
-                  vibration: globalAlarmSettings.vibrationEnabled,
-                }
-              );
-
-            if (notificationId) {
-              notificationIds.push(notificationId);
-            }
-          }
-        }
+        const notificationIds = globalAlarmSettings.alarmEnabled
+          ? await scheduleRecurringAlarms(reminder, selectedDays, selectedTimes)
+          : [];
 
         reminder.notificationIds = notificationIds;
       } else {
         // Schedule single notification for non-recurring reminders
         const notificationId = globalAlarmSettings.alarmEnabled
-          ? await scheduleAlarmNotification({
-            ...reminder,
-            alarmSound: globalAlarmSettings.alarmSound,
-            vibrationEnabled: globalAlarmSettings.vibrationEnabled,
-            alarmDuration: globalAlarmSettings.alarmDuration,
-          }, selectedDate)
+          ? await scheduleAlarmNotification(reminder, selectedDate)
           : await scheduleNotification(
             `Reminder`,
             reminder.title,
@@ -606,8 +544,6 @@ export default function RemindersScreen() {
     );
   };
 
-
-
   const handleVoiceCommand = async (result: any) => {
     console.log('[REMINDERS] Voice command executed:', result);
     if (result.success) {
@@ -856,24 +792,7 @@ export default function RemindersScreen() {
               )}
             </View>
           </View>
-
-
-          {showTimePicker && (
-            <DateTimePicker
-              value={selectedDate}
-              mode="time"
-              display="default"
-              onChange={onTimeChange}
-            />
-          )}
         </View>
-
-
-        <AlarmManager
-          visible={!!activeAlarmReminder}
-          onClose={() => setActiveAlarmReminder(null)}
-          reminder={activeAlarmReminder || undefined}
-        />
       </SafeAreaView>
     );
   }
@@ -892,10 +811,7 @@ export default function RemindersScreen() {
 
           <TouchableOpacity
             style={styles.addButton}
-            onPress={() => {
-              setActiveAlarmReminder(null); // Clear any active alarm
-              setIsCreating(true);
-            }}
+            onPress={() => setIsCreating(true)}
           >
             <Text style={styles.addButtonText}>New Reminder</Text>
           </TouchableOpacity>
@@ -927,6 +843,12 @@ export default function RemindersScreen() {
             </Text>
           </View>
         }
+      />
+
+      <AlarmManager
+        visible={!!activeAlarmReminder}
+        onClose={() => setActiveAlarmReminder(null)}
+        reminder={activeAlarmReminder || undefined}
       />
     </SafeAreaView>
   );
@@ -1363,127 +1285,6 @@ input: {
     fontSize: 12,
     fontWeight: '500',
     fontFamily: 'Inter',
-  },
-  alarmToggleContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  alarmSettingsButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    alignItems: 'center',
-  },
-  alarmSettingsText: {
-    fontSize: 14,
-    color: '#000000',
-    fontWeight: '500',
-    fontFamily: 'Inter',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000000',
-    fontFamily: 'Inter',
-  },
-  modalCloseButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  modalCloseText: {
-    fontSize: 16,
-    color: '#000000',
-    fontWeight: '500',
-    fontFamily: 'Inter',
-  },
-  modalContent: {
-    flex: 1,
-    padding: 16,
-  },
-  settingGroup: {
-    marginBottom: 24,
-  },
-  settingLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#000000',
-    fontFamily: 'Inter',
-    marginBottom: 8,
-  },
-  settingToggle: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  soundOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  soundOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
-  },
-  soundOptionSelected: {
-    backgroundColor: '#000000',
-    borderColor: '#000000',
-  },
-  soundOptionText: {
-    fontSize: 14,
-    color: '#000000',
-    fontWeight: '500',
-    fontFamily: 'Inter',
-  },
-  soundOptionTextSelected: {
-    color: '#FFFFFF',
-  },
-  durationButtons: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
-  },
-  durationButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
-  },
-  durationButtonSelected: {
-    backgroundColor: '#000000',
-    borderColor: '#000000',
-  },
-  durationButtonText: {
-    fontSize: 14,
-    color: '#000000',
-    fontWeight: '500',
-    fontFamily: 'Inter',
-  },
-  durationButtonTextSelected: {
-    color: '#FFFFFF',
   },
   reminderImage: {
     width: '100%',

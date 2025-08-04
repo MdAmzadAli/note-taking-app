@@ -12,10 +12,8 @@ import {
   Animated,
 } from 'react-native';
 import { Audio } from 'expo-av';
-import * as Notifications from 'expo-notifications';
 import { stopAlarm, snoozeAlarm } from '@/utils/notifications';
 import { Reminder } from '@/types';
-import { getReminders } from '@/utils/storage';
 
 interface AlarmManagerProps {
   visible: boolean;
@@ -28,45 +26,37 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
   onClose,
   reminder
 }) => {
-  const [isRinging, setIsRinging] = useState(false);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     let autoStopTimeout: NodeJS.Timeout;
     let vibrationInterval: NodeJS.Timeout;
-    let soundInterval: NodeJS.Timeout;
 
-    const startAlarmRinging = async () => {
+    const startAlarmEffects = async () => {
       if (!visible || !reminder) return;
 
-      setIsRinging(true);
-      console.log('Starting alarm for reminder:', reminder.id);
+      console.log('🚨 ALARM MANAGER ACTIVATED for:', reminder.title);
       console.log('Alarm started at:', new Date().toLocaleString());
 
       // Start pulsing animation
-      const startPulseAnimation = () => {
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(pulseAnim, {
-              toValue: 1.2,
-              duration: 500,
-              useNativeDriver: true,
-            }),
-            Animated.timing(pulseAnim, {
-              toValue: 1,
-              duration: 500,
-              useNativeDriver: true,
-            }),
-          ])
-        ).start();
-      };
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.2,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
 
-      startPulseAnimation();
-
-      // Load and play alarm sound using expo-av
+      // Load and play alarm sound
       try {
-        console.log('Loading alarm sound...');
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: false,
           staysActiveInBackground: true,
@@ -78,56 +68,38 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
         const { sound: alarmSound } = await Audio.Sound.createAsync(
           require('@/assets/sounds/alarm.mp3'),
           {
-            shouldPlay: false,
+            shouldPlay: true,
             isLooping: true,
             volume: 1.0,
           }
         );
-        
+
         setSound(alarmSound);
-        
-        // Start playing the sound
-        await alarmSound.playAsync();
-        console.log('Alarm sound loaded and playing');
+        console.log('🔊 Alarm sound loaded and playing');
       } catch (error) {
         console.warn('Could not load alarm sound:', error);
-        // Use system alert sound as fallback
-        try {
-          console.log('Using system alert sound as fallback');
-          await Audio.setAudioModeAsync({
-            allowsRecordingIOS: false,
-            staysActiveInBackground: true,
-            playsInSilentModeIOS: true,
-          });
-        } catch (fallbackError) {
-          console.warn('Could not set audio mode:', fallbackError);
-        }
       }
 
-      // Start continuous vibration pattern if enabled
+      // Start vibration if enabled
       if (reminder.vibrationEnabled !== false) {
         const startVibration = () => {
-          // Aggressive alarm-style vibration pattern
           const pattern = [0, 300, 100, 300, 100, 300, 100, 300, 500]; 
           Vibration.vibrate(pattern);
         };
 
-        startVibration(); // Start immediately
-        vibrationInterval = setInterval(startVibration, 2000); // Repeat every 2 seconds
+        startVibration();
+        vibrationInterval = setInterval(startVibration, 2000);
       }
 
-      // Auto-stop alarm after duration
-      const duration = (reminder.alarmDuration || 5) * 60 * 1000; // Convert to milliseconds
-      console.log(`Setting auto-stop timer for ${reminder.alarmDuration || 5} minutes`);
-
+      // Auto-stop after duration
+      const duration = (reminder.alarmDuration || 5) * 60 * 1000;
       autoStopTimeout = setTimeout(() => {
-        console.log('Auto-stopping alarm after', reminder.alarmDuration || 5, 'minutes');
+        console.log('⏰ Auto-stopping alarm after', reminder.alarmDuration || 5, 'minutes');
         handleStopAlarm();
       }, duration);
     };
 
-    const stopAlarmRinging = async () => {
-      setIsRinging(false);
+    const stopAlarmEffects = async () => {
       pulseAnim.stopAnimation();
       pulseAnim.setValue(1);
 
@@ -136,41 +108,30 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
           await sound.stopAsync();
           await sound.unloadAsync();
           setSound(null);
-          console.log('Stopped and unloaded alarm sound');
         } catch (error) {
           console.warn('Error stopping sound:', error);
         }
       }
 
-      if (autoStopTimeout) {
-        clearTimeout(autoStopTimeout);
-      }
-      if (vibrationInterval) {
-        clearInterval(vibrationInterval);
-      }
-      if (soundInterval) {
-        clearInterval(soundInterval);
-      }
+      if (autoStopTimeout) clearTimeout(autoStopTimeout);
+      if (vibrationInterval) clearInterval(vibrationInterval);
       Vibration.cancel();
-      console.log('Cleaned up alarm effects');
     };
 
     if (visible && reminder) {
-      startAlarmRinging();
+      startAlarmEffects();
     } else {
-      stopAlarmRinging();
+      stopAlarmEffects();
     }
 
     return () => {
-      stopAlarmRinging();
+      stopAlarmEffects();
     };
   }, [visible, reminder]);
 
   const handleStopAlarm = async () => {
-    setIsRinging(false);
     Vibration.cancel();
 
-    // Stop and cleanup sound
     if (sound) {
       await sound.stopAsync();
       await sound.unloadAsync();
@@ -185,10 +146,8 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
   };
 
   const handleSnoozeAlarm = async () => {
-    setIsRinging(false);
     Vibration.cancel();
 
-    // Stop and cleanup sound
     if (sound) {
       await sound.stopAsync();
       await sound.unloadAsync();
@@ -250,16 +209,14 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
             </TouchableOpacity>
           </View>
 
-          {isRinging && (
-            <Animated.View 
-              style={[
-                styles.ringingIndicator,
-                { transform: [{ scale: pulseAnim }] }
-              ]}
-            >
-              <Text style={styles.ringingText}>🚨 ALARM RINGING! 🚨</Text>
-            </Animated.View>
-          )}
+          <Animated.View 
+            style={[
+              styles.ringingIndicator,
+              { transform: [{ scale: pulseAnim }] }
+            ]}
+          >
+            <Text style={styles.ringingText}>🚨 ALARM RINGING! 🚨</Text>
+          </Animated.View>
         </View>
       </SafeAreaView>
     </Modal>

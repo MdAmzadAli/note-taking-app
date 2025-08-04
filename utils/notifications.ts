@@ -145,34 +145,38 @@ export const scheduleAlarmNotification = async (
       throw new Error('Notification permissions not granted');
     }
 
-    // Get current time and ensure proper timezone handling
+    // Create a new Date object to avoid timezone issues
     const now = new Date();
-    const scheduledTime = new Date(dateTime);
+    const scheduledDateTime = new Date(dateTime);
     
-    console.log('=== ALARM SCHEDULING DEBUG ===');
-    console.log('Current time:', now.toLocaleString());
-    console.log('Scheduled time:', scheduledTime.toLocaleString());
-    console.log('Current timestamp:', now.getTime());
-    console.log('Scheduled timestamp:', scheduledTime.getTime());
+    console.log('=== NEW ALARM SCHEDULING SYSTEM ===');
+    console.log('Reminder ID:', reminder.id);
+    console.log('Reminder Title:', reminder.title);
+    console.log('Current Local Time:', now.toString());
+    console.log('Scheduled Local Time:', scheduledDateTime.toString());
+    console.log('Current Timestamp:', now.getTime());
+    console.log('Scheduled Timestamp:', scheduledDateTime.getTime());
     
-    // Calculate exact time difference in milliseconds
-    const timeDifference = scheduledTime.getTime() - now.getTime();
-    const secondsFromNow = Math.floor(timeDifference / 1000);
+    // Calculate the delay in milliseconds
+    const delayMs = scheduledDateTime.getTime() - now.getTime();
+    const delaySeconds = Math.floor(delayMs / 1000);
     
-    console.log('Time difference (ms):', timeDifference);
-    console.log('Seconds from now:', secondsFromNow);
+    console.log('Delay in milliseconds:', delayMs);
+    console.log('Delay in seconds:', delaySeconds);
     
-    // Ensure we're scheduling for the future
-    if (secondsFromNow <= 0) {
-      throw new Error(`Cannot schedule alarm for past time. Current: ${now.toLocaleString()}, Scheduled: ${scheduledTime.toLocaleString()}`);
+    // Validate timing
+    if (delayMs <= 0) {
+      console.error('❌ Cannot schedule alarm for past time');
+      throw new Error(`Cannot schedule alarm for past time. Current: ${now.toLocaleString()}, Scheduled: ${scheduledDateTime.toLocaleString()}`);
     }
 
-    // Minimum 5 seconds buffer to ensure proper scheduling
-    if (secondsFromNow < 5) {
+    if (delaySeconds < 5) {
+      console.error('❌ Alarm must be at least 5 seconds in the future');
       throw new Error('Alarm must be scheduled at least 5 seconds in the future');
     }
 
-    const notificationContent: any = {
+    // Prepare notification content
+    const notificationContent = {
       title: '⏰ Reminder Alarm',
       body: reminder.title,
       sound: 'default',
@@ -185,19 +189,17 @@ export const scheduleAlarmNotification = async (
       data: {
         reminderId: reminder.id,
         isAlarm: true,
+        scheduledAt: scheduledDateTime.getTime(),
+        originalTitle: reminder.title,
+        description: reminder.description || '',
+        imageUri: reminder.imageUri || null,
+        alarmSound: reminder.alarmSound || 'default',
         vibrationEnabled: reminder.vibrationEnabled !== false,
         alarmDuration: reminder.alarmDuration || 5,
-        alarmSound: reminder.alarmSound || 'default',
-        originalTitle: reminder.title,
-        description: reminder.description,
-        imageUri: reminder.imageUri,
-        scheduledTime: scheduledTime.toISOString(),
-        scheduledTimeLocal: scheduledTime.toLocaleString(),
-        actualScheduledTimestamp: scheduledTime.getTime(),
       },
     };
 
-    // Add image if provided
+    // Add image attachment if provided
     if (reminder.imageUri) {
       notificationContent.attachments = [{
         identifier: 'reminder_image',
@@ -210,38 +212,110 @@ export const scheduleAlarmNotification = async (
       }];
     }
 
-    // Configure for Android critical notifications
+    // Configure Android-specific settings
     if (Platform.OS === 'android') {
       notificationContent.channelId = 'alarm-channel';
     }
 
-    console.log('Scheduling notification with content:', {
+    console.log('Scheduling notification with:', {
       title: notificationContent.title,
       body: notificationContent.body,
-      scheduledFor: scheduledTime.toLocaleString(),
-      secondsFromNow: secondsFromNow
+      delaySeconds: delaySeconds,
+      willTriggerAt: scheduledDateTime.toLocaleString()
     });
 
-    // Use exact seconds-based scheduling
+    // Schedule the notification
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: notificationContent,
       trigger: {
-        seconds: secondsFromNow,
+        seconds: delaySeconds,
         repeats: false,
       },
     });
 
-    console.log('=== ALARM SCHEDULED SUCCESSFULLY ===');
+    console.log('✅ ALARM SCHEDULED SUCCESSFULLY');
     console.log('Notification ID:', notificationId);
-    console.log('Will trigger in:', secondsFromNow, 'seconds');
-    console.log('Scheduled for:', scheduledTime.toLocaleString());
-    console.log('Reminder ID:', reminder.id);
-    console.log('=====================================');
+    console.log('Will trigger at:', scheduledDateTime.toLocaleString());
+    console.log('Will trigger in:', delaySeconds, 'seconds');
+    console.log('====================================');
     
     return notificationId;
   } catch (error) {
-    console.error('Error scheduling alarm notification:', error);
+    console.error('❌ Error scheduling alarm notification:', error);
     throw error;
+  }
+};
+
+// Schedule multiple alarms for recurring reminders
+export const scheduleRecurringAlarms = async (
+  reminder: any,
+  recurringDays: number[],
+  recurringTimes: string[]
+): Promise<string[]> => {
+  try {
+    if (Platform.OS === 'web') {
+      console.log('Recurring alarms not supported on web platform');
+      return [];
+    }
+
+    console.log('=== SCHEDULING RECURRING ALARMS ===');
+    console.log('Reminder:', reminder.title);
+    console.log('Days:', recurringDays);
+    console.log('Times:', recurringTimes);
+
+    const notificationIds: string[] = [];
+    const now = new Date();
+
+    for (const dayOfWeek of recurringDays) {
+      for (const timeStr of recurringTimes) {
+        try {
+          const [hours, minutes] = timeStr.split(':').map(Number);
+          
+          // Create the target date/time
+          const targetDate = new Date();
+          targetDate.setHours(hours, minutes, 0, 0);
+          
+          // Calculate days until the target day of week
+          const currentDay = now.getDay();
+          let daysUntilTarget = (dayOfWeek - currentDay + 7) % 7;
+          
+          // If it's the same day but the time has passed, schedule for next week
+          if (daysUntilTarget === 0 && targetDate <= now) {
+            daysUntilTarget = 7;
+          }
+          
+          // Set the target date
+          targetDate.setDate(now.getDate() + daysUntilTarget);
+          
+          console.log(`Scheduling for day ${dayOfWeek} at ${timeStr}:`);
+          console.log(`- Target date/time: ${targetDate.toLocaleString()}`);
+          console.log(`- Days until target: ${daysUntilTarget}`);
+
+          // Create a unique reminder for this occurrence
+          const uniqueReminder = {
+            ...reminder,
+            id: `${reminder.id}_${dayOfWeek}_${timeStr.replace(':', '')}`,
+          };
+
+          const notificationId = await scheduleAlarmNotification(uniqueReminder, targetDate);
+          
+          if (notificationId) {
+            notificationIds.push(notificationId);
+            console.log(`✅ Scheduled alarm for ${targetDate.toLocaleString()}`);
+          }
+        } catch (error) {
+          console.error(`❌ Error scheduling alarm for day ${dayOfWeek} at ${timeStr}:`, error);
+        }
+      }
+    }
+
+    console.log(`✅ Scheduled ${notificationIds.length} recurring alarms`);
+    console.log('===================================');
+    
+    return notificationIds;
+  } catch (error) {
+    console.error('❌ Error scheduling recurring alarms:', error);
+    return [];
   }
 };
 
@@ -339,67 +413,27 @@ export const snoozeAlarm = async (reminderId: string, snoozeMinutes: number = 5)
       return;
     }
     
-    // Get the original reminder data before stopping
-    const presentedNotifications = await Notifications.getPresentedNotificationsAsync();
-    let originalReminderData = null;
-    
-    for (const notification of presentedNotifications) {
-      if (notification.request.content.data?.reminderId === reminderId) {
-        originalReminderData = notification.request.content.data;
-        break;
-      }
-    }
-    
-    // Stop the current alarm
-    await stopAlarm(reminderId);
-    
     // Calculate snooze time
     const snoozeTime = new Date();
     snoozeTime.setMinutes(snoozeTime.getMinutes() + snoozeMinutes);
-    const secondsFromNow = Math.floor((snoozeTime.getTime() - new Date().getTime()) / 1000);
     
-    console.log(`Snoozing alarm until: ${snoozeTime.toLocaleString()} (${secondsFromNow} seconds)`);
+    // Stop the current alarm first
+    await stopAlarm(reminderId);
     
-    // Reschedule the alarm for snooze time
-    const notificationContent: any = {
-      title: '⏰ Snoozed Reminder',
-      body: originalReminderData?.originalTitle || `Reminder snoozed for ${snoozeMinutes} minutes`,
-      sound: originalReminderData?.alarmSound || 'default',
-      priority: Platform.OS === 'android' ? 'max' : 'high',
-      categoryIdentifier: 'ALARM_CATEGORY',
-      sticky: true,
-      autoDismiss: false,
-      badge: 1,
-      interruptionLevel: Platform.OS === 'ios' ? 'critical' : undefined,
-      data: {
-        reminderId: `${reminderId}_snoozed_${Date.now()}`,
-        originalReminderId: reminderId,
-        isAlarm: true,
-        isSnoozed: true,
-        vibrationEnabled: originalReminderData?.vibrationEnabled !== false,
-        alarmDuration: originalReminderData?.alarmDuration || 5,
-        alarmSound: originalReminderData?.alarmSound || 'default',
-        originalTitle: originalReminderData?.originalTitle || 'Snoozed Reminder',
-        snoozeCount: (originalReminderData?.snoozeCount || 0) + 1,
-        scheduledTime: snoozeTime.toISOString(),
-        scheduledTimeLocal: snoozeTime.toLocaleString(),
-        actualScheduledTimestamp: snoozeTime.getTime(),
-      },
+    // Create a snooze reminder
+    const snoozeReminder = {
+      id: `${reminderId}_snooze_${Date.now()}`,
+      title: `Snoozed Reminder`,
+      description: `Snoozed for ${snoozeMinutes} minutes`,
+      alarmSound: 'default',
+      vibrationEnabled: true,
+      alarmDuration: 5,
     };
-
-    if (Platform.OS === 'android') {
-      notificationContent.channelId = 'alarm-channel';
-    }
     
-    const notificationId = await Notifications.scheduleNotificationAsync({
-      content: notificationContent,
-      trigger: {
-        seconds: secondsFromNow,
-        repeats: false,
-      },
-    });
-
-    console.log(`Alarm snoozed for ${snoozeMinutes} minutes. New notification ID: ${notificationId}`);
+    // Schedule the snooze alarm
+    const notificationId = await scheduleAlarmNotification(snoozeReminder, snoozeTime);
+    
+    console.log(`Alarm snoozed until: ${snoozeTime.toLocaleString()}, notification ID: ${notificationId}`);
   } catch (error) {
     console.error('Error snoozing alarm:', error);
   }
