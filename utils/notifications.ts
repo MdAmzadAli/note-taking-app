@@ -22,8 +22,40 @@ export const initializeNotificationSystem = async (): Promise<void> => {
 // Configure notification handler
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
-    const isAlarm = notification.request.content.data?.isAlarm;
-    console.log('Notification handler called for:', notification.request.identifier, 'isAlarm:', isAlarm);
+    const data = notification.request.content.data;
+    const isAlarm = data?.isAlarm;
+    
+    console.log('=== NOTIFICATION HANDLER ===');
+    console.log('Notification ID:', notification.request.identifier);
+    console.log('Is Alarm:', isAlarm);
+    console.log('Handler called at:', new Date().toLocaleString());
+    
+    // For alarms, check if it's actually time to show the notification
+    if (isAlarm && data?.scheduledAt) {
+      const now = new Date().getTime();
+      const scheduledTime = data.scheduledAt;
+      const timeDiff = Math.abs(now - scheduledTime);
+      
+      console.log('Scheduled for:', new Date(scheduledTime).toLocaleString());
+      console.log('Current time:', new Date(now).toLocaleString());
+      console.log('Time diff (ms):', timeDiff);
+      
+      // Only allow the notification to show if we're within 10 seconds of scheduled time
+      if (timeDiff > 10000) {
+        console.log('❌ Notification triggered too early, suppressing');
+        console.log('=============================');
+        return {
+          shouldShowBanner: false,
+          shouldShowList: false,
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+        };
+      }
+      
+      console.log('✅ Notification triggered at correct time');
+    }
+    
+    console.log('=============================');
     
     return {
       shouldShowBanner: true,
