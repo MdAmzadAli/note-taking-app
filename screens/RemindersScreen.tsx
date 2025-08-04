@@ -52,7 +52,7 @@ export default function RemindersScreen() {
   // Image settings
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [activeAlarmReminder, setActiveAlarmReminder] = useState<Reminder | null>(null);
-  
+
   // Global alarm settings will be loaded from user settings
   const [globalAlarmSettings, setGlobalAlarmSettings] = useState({
     alarmEnabled: true,
@@ -810,7 +810,7 @@ export default function RemindersScreen() {
             </View>
           </View>
 
-          
+
 
           {showTimePicker && (
             <DateTimePicker
@@ -822,7 +822,7 @@ export default function RemindersScreen() {
           )}
         </View>
 
-        
+
 
         <AlarmManager
           visible={!!activeAlarmReminder}
@@ -1024,7 +1024,7 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontFamily: 'Inter',
   },
-  input: {
+input: {
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 8,

@@ -22,7 +22,8 @@ Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
     const isAlarm = notification.request.content.data?.isAlarm;
     return {
-      shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: false,
       priority: isAlarm ? 'max' : 'default',
@@ -174,13 +175,14 @@ export const scheduleAlarmNotification = async (
       throw new Error('Notification permissions not granted');
     }
 
-    // Ensure we're scheduling for the future
+    // Ensure we're scheduling for the future with proper buffer
     const now = new Date();
     const scheduledTime = new Date(dateTime);
+    const timeDiff = scheduledTime.getTime() - now.getTime();
     
-    if (scheduledTime <= now) {
-      console.warn('Attempted to schedule notification in the past or now. Adjusting to 1 minute from now.');
-      scheduledTime.setTime(now.getTime() + 60000); // Add 1 minute
+    if (timeDiff < 5000) { // If less than 5 seconds in future
+      console.warn('Scheduled time too close to current time. Adding 5 second buffer.');
+      scheduledTime.setTime(now.getTime() + 5000); // Add 5 seconds buffer
     }
 
     console.log(`Scheduling alarm for: ${scheduledTime.toISOString()} (Current time: ${now.toISOString()})`);
@@ -254,25 +256,13 @@ export const stopAlarm = async (reminderId: string): Promise<void> => {
   try {
     console.log(`Stopping alarm for reminder: ${reminderId}`);
     
-    // Cancel any scheduled notifications for this reminder
-    const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
-    for (const notification of scheduledNotifications) {
-      if (notification.content.data?.reminderId === reminderId || 
-          notification.content.data?.originalReminderId === reminderId) {
-        await Notifications.cancelScheduledNotificationAsync(notification.identifier);
-        console.log(`Cancelled scheduled notification: ${notification.identifier}`);
-      }
-    }
+    // Cancel ALL notifications to ensure clean state
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    console.log('Cancelled all scheduled notifications for clean state');
     
-    // Dismiss any currently displayed notifications for this reminder
-    const presentedNotifications = await Notifications.getPresentedNotificationsAsync();
-    for (const notification of presentedNotifications) {
-      if (notification.request.content.data?.reminderId === reminderId ||
-          notification.request.content.data?.originalReminderId === reminderId) {
-        await Notifications.dismissNotificationAsync(notification.request.identifier);
-        console.log(`Dismissed presented notification: ${notification.request.identifier}`);
-      }
-    }
+    // Dismiss all currently displayed notifications
+    await Notifications.dismissAllNotificationsAsync();
+    console.log('Dismissed all presented notifications');
     
     console.log(`Alarm stopped successfully for reminder: ${reminderId}`);
   } catch (error) {

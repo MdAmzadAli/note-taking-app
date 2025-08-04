@@ -63,23 +63,34 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
 
       startPulseAnimation();
 
-      // Use system notification sounds for alarm ringing
-      console.log('Starting alarm sound with system notifications');
-      soundInterval = setInterval(async () => {
-        try {
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: '🚨 ALARM RINGING! 🚨',
-              body: reminder.title,
-              sound: reminder.alarmSound || 'default',
-              priority: 'max',
-            },
-            trigger: null,
-          });
-        } catch (error) {
-          console.warn('Could not play alarm sound:', error);
-        }
-      }, 1500); // Play sound every 1.5 seconds
+      // Load and play alarm sound using expo-av
+      try {
+        console.log('Loading alarm sound...');
+        const { sound: alarmSound } = await Audio.Sound.createAsync(
+          require('@/assets/sounds/alarm.mp3'),
+          { shouldPlay: true, isLooping: true, volume: 1.0 }
+        );
+        setSound(alarmSound);
+        console.log('Alarm sound loaded and playing');
+      } catch (error) {
+        console.warn('Could not load alarm sound, falling back to system notifications:', error);
+        // Fallback to system notification sounds
+        soundInterval = setInterval(async () => {
+          try {
+            await Notifications.scheduleNotificationAsync({
+              content: {
+                title: '🚨 ALARM RINGING! 🚨',
+                body: reminder.title,
+                sound: reminder.alarmSound || 'default',
+                priority: 'max',
+              },
+              trigger: null,
+            });
+          } catch (error) {
+            console.warn('Could not play notification sound:', error);
+          }
+        }, 2000);
+      }
 
       // Start continuous vibration pattern if enabled
       if (reminder.vibrationEnabled !== false) {
@@ -109,9 +120,14 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
       pulseAnim.setValue(1);
 
       if (sound) {
-        await sound.stopAsync();
-        await sound.unloadAsync();
-        setSound(null);
+        try {
+          await sound.stopAsync();
+          await sound.unloadAsync();
+          setSound(null);
+          console.log('Stopped and unloaded alarm sound');
+        } catch (error) {
+          console.warn('Error stopping sound:', error);
+        }
       }
 
       if (autoStopTimeout) {
