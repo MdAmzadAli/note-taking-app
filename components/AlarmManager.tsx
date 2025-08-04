@@ -74,23 +74,8 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
         setSound(alarmSound);
         console.log('Alarm sound loaded and playing');
       } catch (error) {
-        console.warn('Could not load alarm sound, falling back to system notifications:', error);
-        // Fallback to system notification sounds
-        soundInterval = setInterval(async () => {
-          try {
-            await Notifications.scheduleNotificationAsync({
-              content: {
-                title: '🚨 ALARM RINGING! 🚨',
-                body: reminder.title,
-                sound: reminder.alarmSound || 'default',
-                priority: 'max',
-              },
-              trigger: null,
-            });
-          } catch (error) {
-            console.warn('Could not play notification sound:', error);
-          }
-        }, 2000);
+        console.warn('Could not load alarm sound:', error);
+        // Don't use fallback notifications as they cause spam
       }
 
       // Start continuous vibration pattern if enabled

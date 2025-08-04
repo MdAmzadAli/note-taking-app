@@ -107,31 +107,48 @@ export default function RemindersScreen() {
       console.log('Received foreground notification at:', new Date().toLocaleString());
       console.log('Notification data:', data);
 
+      // Only process alarm notifications that have valid data
       if (data?.isAlarm && data?.reminderId) {
-        console.log('Alarm notification received! Showing alarm screen immediately');
-        getReminders().then(reminders => {
-          const reminder = reminders.find(r => r.id === data.reminderId || r.id === data.originalReminderId);
-          if (reminder) {
-            console.log('Found reminder for alarm, showing alarm screen');
-            setActiveAlarmReminder(reminder);
-          } else {
-            console.log('Reminder not found, creating temporary reminder for alarm');
-            // Create a temporary reminder object for the alarm
-            const tempReminder = {
-              id: data.reminderId,
-              title: data.originalTitle || 'Reminder',
-              description: data.description || '',
-              dateTime: data.scheduledTime || new Date().toISOString(),
-              isCompleted: false,
-              createdAt: new Date().toISOString(),
-              alarmSound: data.alarmSound,
-              vibrationEnabled: data.vibrationEnabled,
-              alarmDuration: data.alarmDuration,
-              imageUri: data.imageUri,
-            };
-            setActiveAlarmReminder(tempReminder);
-          }
-        });
+        const now = new Date();
+        const scheduledTime = data.scheduledTime ? new Date(data.scheduledTime) : now;
+        const timeDiff = Math.abs(now.getTime() - scheduledTime.getTime()) / 1000; // in seconds
+        
+        console.log('Alarm notification received');
+        console.log('Current time:', now.toLocaleString());
+        console.log('Scheduled time:', scheduledTime.toLocaleString());
+        console.log('Time difference:', timeDiff, 'seconds');
+        
+        // Only show alarm if we're within 30 seconds of the scheduled time (accounting for slight delays)
+        if (timeDiff <= 30) {
+          console.log('Alarm is on time, showing alarm screen');
+          getReminders().then(reminders => {
+            const reminder = reminders.find(r => r.id === data.reminderId || r.id === data.originalReminderId);
+            if (reminder) {
+              console.log('Found reminder for alarm, showing alarm screen');
+              setActiveAlarmReminder(reminder);
+            } else {
+              console.log('Reminder not found, creating temporary reminder for alarm');
+              // Create a temporary reminder object for the alarm
+              const tempReminder = {
+                id: data.reminderId,
+                title: data.originalTitle || 'Reminder',
+                description: data.description || '',
+                dateTime: data.scheduledTime || new Date().toISOString(),
+                isCompleted: false,
+                createdAt: new Date().toISOString(),
+                alarmSound: data.alarmSound,
+                vibrationEnabled: data.vibrationEnabled,
+                alarmDuration: data.alarmDuration,
+                imageUri: data.imageUri,
+              };
+              setActiveAlarmReminder(tempReminder);
+            }
+          });
+        } else {
+          console.log('Alarm notification received too early/late, ignoring. Time difference:', timeDiff, 'seconds');
+        }
+      } else if (data === undefined) {
+        console.log('Ignoring notification without alarm data');
       }
     });
 

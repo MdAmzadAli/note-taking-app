@@ -165,10 +165,20 @@ export const scheduleNotification = async (
       notificationContent.autoDismiss = false;
     }
 
+    // Calculate seconds from now to scheduled time
+    const secondsFromNow = Math.floor((scheduledTime.getTime() - now.getTime()) / 1000);
+    
+    if (secondsFromNow <= 0) {
+      throw new Error('Cannot schedule notification for past time');
+    }
+
+    console.log(`Scheduling notification to trigger in ${secondsFromNow} seconds`);
+
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: notificationContent,
       trigger: {
-        date: scheduledTime,
+        seconds: secondsFromNow,
+        repeats: false,
       },
     });
 
@@ -245,10 +255,19 @@ export const scheduleAlarmNotification = async (
       notificationContent.channelId = 'alarm-channel';
     }
 
+    // Calculate seconds from now to scheduled time
+    const secondsFromNow = Math.floor((scheduledTime.getTime() - now.getTime()) / 1000);
+    
+    if (secondsFromNow <= 0) {
+      throw new Error('Cannot schedule notification for past time');
+    }
+
+    console.log(`Scheduling notification to trigger in ${secondsFromNow} seconds`);
+
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: notificationContent,
       trigger: {
-        date: scheduledTime,
+        seconds: secondsFromNow,
         repeats: false,
       },
     });
