@@ -111,34 +111,50 @@ export default function RemindersScreen() {
       console.log('Notification data:', data);
 
       // Only process alarm notifications
-      if (data?.isAlarm && data?.reminderId) {
-        console.log('✅ Alarm notification received, showing alarm screen');
+      if (data?.isAlarm && data?.reminderId && data?.scheduledAt) {
+        const now = new Date().getTime();
+        const scheduledTime = data.scheduledAt;
+        const timeDifference = Math.abs(now - scheduledTime);
+        const fiveMinutesInMs = 5 * 60 * 1000; // 5 minutes tolerance
 
-        // Find the reminder or create a temporary one
-        getReminders().then(reminders => {
-          let reminder = reminders.find(r => r.id === data.reminderId);
+        console.log('Current time:', now);
+        console.log('Scheduled time:', scheduledTime);
+        console.log('Time difference (ms):', timeDifference);
+        console.log('Is within 5 minutes of scheduled time:', timeDifference <= fiveMinutesInMs);
 
-          if (!reminder) {
-            // Create temporary reminder object for the alarm
-            reminder = {
-              id: data.reminderId,
-              title: data.originalTitle || 'Reminder',
-              description: data.description || '',
-              dateTime: new Date().toISOString(),
-              isCompleted: false,
-              createdAt: new Date().toISOString(),
-              alarmSound: data.alarmSound,
-              vibrationEnabled: data.vibrationEnabled,
-              alarmDuration: data.alarmDuration,
-              imageUri: data.imageUri,
-            };
-          }
+        // Only show alarm if we're within 5 minutes of the scheduled time
+        // This prevents development environment from showing alarms immediately
+        if (timeDifference <= fiveMinutesInMs) {
+          console.log('✅ Alarm notification received at correct time, showing alarm screen');
 
-          console.log('Showing alarm for reminder:', reminder.title);
-          setActiveAlarmReminder(reminder);
-        });
+          // Find the reminder or create a temporary one
+          getReminders().then(reminders => {
+            let reminder = reminders.find(r => r.id === data.reminderId);
+
+            if (!reminder) {
+              // Create temporary reminder object for the alarm
+              reminder = {
+                id: data.reminderId,
+                title: data.originalTitle || 'Reminder',
+                description: data.description || '',
+                dateTime: new Date().toISOString(),
+                isCompleted: false,
+                createdAt: new Date().toISOString(),
+                alarmSound: data.alarmSound,
+                vibrationEnabled: data.vibrationEnabled,
+                alarmDuration: data.alarmDuration,
+                imageUri: data.imageUri,
+              };
+            }
+
+            console.log('Showing alarm for reminder:', reminder.title);
+            setActiveAlarmReminder(reminder);
+          });
+        } else {
+          console.log('❌ Notification received too early, ignoring. Will wait for proper time.');
+        }
       } else {
-        console.log('ℹ️ Non-alarm notification, ignoring');
+        console.log('ℹ️ Non-alarm notification or missing data, ignoring');
       }
 
       console.log('=============================');
