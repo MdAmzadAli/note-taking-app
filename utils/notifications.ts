@@ -30,29 +30,9 @@ Notifications.setNotificationHandler({
     console.log('Is Alarm:', isAlarm);
     console.log('Handler called at:', new Date().toLocaleString());
     
-    // For alarms, check if it's actually time to show the notification
     if (isAlarm && data?.scheduledAt) {
-      const now = new Date().getTime();
-      const scheduledTime = data.scheduledAt;
-      const timeDiff = Math.abs(now - scheduledTime);
-      
-      console.log('Scheduled for:', new Date(scheduledTime).toLocaleString());
-      console.log('Current time:', new Date(now).toLocaleString());
-      console.log('Time diff (ms):', timeDiff);
-      
-      // Only allow the notification to show if we're within 10 seconds of scheduled time
-      if (timeDiff > 10000) {
-        console.log('❌ Notification triggered too early, suppressing');
-        console.log('=============================');
-        return {
-          shouldShowBanner: false,
-          shouldShowList: false,
-          shouldPlaySound: false,
-          shouldSetBadge: false,
-        };
-      }
-      
-      console.log('✅ Notification triggered at correct time');
+      console.log('Scheduled for:', new Date(data.scheduledAt).toLocaleString());
+      console.log('✅ Alarm notification - allowing to show');
     }
     
     console.log('=============================');

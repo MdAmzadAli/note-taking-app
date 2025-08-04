@@ -102,7 +102,7 @@ export default function RemindersScreen() {
       }
     );
 
-    // Handle foreground notifications - only trigger alarm when notification is actually received
+    // Handle foreground notifications - trigger alarm when notification is received
     const foregroundListener = Notifications.addNotificationReceivedListener((notification) => {
       const { data } = notification.request.content;
 
@@ -111,48 +111,32 @@ export default function RemindersScreen() {
       console.log('Notification data:', data);
 
       // Only process alarm notifications
-      if (data?.isAlarm && data?.reminderId && data?.scheduledAt) {
-        const now = new Date().getTime();
-        const scheduledTime = data.scheduledAt;
-        const timeDiff = Math.abs(now - scheduledTime);
-        
-        console.log('Current time:', now);
-        console.log('Scheduled time:', scheduledTime);
-        console.log('Time difference (ms):', timeDiff);
-        
-        // Only show alarm if we're within 10 seconds of the scheduled time
-        // This accounts for small timing variations
-        if (timeDiff <= 10000) {
-          console.log('✅ Alarm notification received at correct time, showing alarm screen');
+      if (data?.isAlarm && data?.reminderId) {
+        console.log('✅ Alarm notification received, showing alarm screen');
 
-          // Find the reminder or create a temporary one
-          getReminders().then(reminders => {
-            let reminder = reminders.find(r => r.id === data.reminderId);
+        // Find the reminder or create a temporary one
+        getReminders().then(reminders => {
+          let reminder = reminders.find(r => r.id === data.reminderId);
 
-            if (!reminder) {
-              // Create temporary reminder object for the alarm
-              reminder = {
-                id: data.reminderId,
-                title: data.originalTitle || 'Reminder',
-                description: data.description || '',
-                dateTime: new Date().toISOString(),
-                isCompleted: false,
-                createdAt: new Date().toISOString(),
-                alarmSound: data.alarmSound,
-                vibrationEnabled: data.vibrationEnabled,
-                alarmDuration: data.alarmDuration,
-                imageUri: data.imageUri,
-              };
-            }
+          if (!reminder) {
+            // Create temporary reminder object for the alarm
+            reminder = {
+              id: data.reminderId,
+              title: data.originalTitle || 'Reminder',
+              description: data.description || '',
+              dateTime: new Date().toISOString(),
+              isCompleted: false,
+              createdAt: new Date().toISOString(),
+              alarmSound: data.alarmSound,
+              vibrationEnabled: data.vibrationEnabled,
+              alarmDuration: data.alarmDuration,
+              imageUri: data.imageUri,
+            };
+          }
 
-            console.log('Showing alarm for reminder:', reminder.title);
-            setActiveAlarmReminder(reminder);
-          });
-        } else {
-          console.log('❌ Alarm notification received too early/late, ignoring');
-          console.log('Expected at:', new Date(scheduledTime).toLocaleString());
-          console.log('Received at:', new Date(now).toLocaleString());
-        }
+          console.log('Showing alarm for reminder:', reminder.title);
+          setActiveAlarmReminder(reminder);
+        });
       } else {
         console.log('ℹ️ Non-alarm notification, ignoring');
       }
