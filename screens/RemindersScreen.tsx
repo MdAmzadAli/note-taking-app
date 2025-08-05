@@ -93,7 +93,12 @@ export default function RemindersScreen() {
               await snoozeAlarm(reminder.id, 5);
               setActiveAlarmReminder(null);
             } else if (response.actionIdentifier === 'DISMISS_SNOOZE') {
-              console.log('Dismissing snooze alarm');
+              console.log('Dismissing snooze alarm permanently');
+              // Cancel the pending snooze alarm
+              if (data?.originalAlarmId) {
+                await cancelNotification(data.originalAlarmId);
+                console.log('Cancelled pending snooze alarm:', data.originalAlarmId);
+              }
               await stopAlarm(reminder.id);
               setActiveAlarmReminder(null);
             } else {
@@ -113,6 +118,13 @@ export default function RemindersScreen() {
       console.log('=== NOTIFICATION RECEIVED ===');
       console.log('Received at:', new Date().toLocaleString());
       console.log('Notification data:', data);
+
+      // Handle snooze notifications differently
+      if (data?.isSnoozeNotification) {
+        console.log('📱 Snooze notification received - showing dismissible notification');
+        // This is just the dismissible notification, don't trigger alarm screen
+        return;
+      }
 
       // Only process alarm notifications
       if (data?.isAlarm && data?.reminderId && data?.scheduledAt) {

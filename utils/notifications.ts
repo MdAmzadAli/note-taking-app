@@ -77,6 +77,22 @@ const setupNotificationCategories = async () => {
       categorySummaryFormat: '%u more alarm notifications',
     });
 
+    // Add snooze notification category
+    await Notifications.setNotificationCategoryAsync('SNOOZE_CATEGORY', [
+      {
+        identifier: 'DISMISS_SNOOZE',
+        buttonTitle: 'Dismiss Alarm',
+        options: {
+          foreground: true,
+          destructive: true,
+        },
+      }
+    ], {
+      intentIdentifiers: ['DISMISS_SNOOZE'],
+      hiddenPreviewsBodyPlaceholder: 'Snooze notification',
+      categorySummaryFormat: '%u more snooze notifications',
+    });
+
     // Create high priority alarm channel for Android
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('alarm-channel', {
@@ -431,9 +447,9 @@ export const snoozeAlarm = async (reminderId: string, snoozeMinutes: number = 5)
     // Stop the current alarm first
     await stopAlarm(reminderId);
 
-    // Create a snooze reminder
+    // Create a snooze reminder with original reminder ID for continuity
     const snoozeReminder = {
-      id: `${reminderId}_snooze_${Date.now()}`,
+      id: reminderId, // Keep original ID for tracking
       title: `Snoozed Reminder`,
       description: `Snoozed for ${snoozeMinutes} minutes`,
       alarmSound: 'default',
@@ -441,47 +457,43 @@ export const snoozeAlarm = async (reminderId: string, snoozeMinutes: number = 5)
       alarmDuration: 5,
     };
 
-    // Schedule the snooze alarm
-    const notificationId = await scheduleAlarmNotification(snoozeReminder, snoozeTime);
+    // Schedule the snooze alarm notification
+    const snoozeAlarmId = await scheduleAlarmNotification(snoozeReminder, snoozeTime);
 
-    // Optionally, schedule a notification to prompt dismissal of snooze
+    // Schedule immediate dismissible notification
     const dismissNotificationContent = {
       title: 'Alarm Snoozed',
-      body: `Alarm will resume in ${snoozeMinutes} minutes. Dismiss to stop.`,
+      body: `Alarm will resume in ${snoozeMinutes} minutes. Tap to dismiss.`,
       sound: 'default',
       priority: 'high',
+      categoryIdentifier: 'SNOOZE_CATEGORY',
+      sticky: true,
+      autoDismiss: false,
       data: {
-        reminderId: reminder.id, // Use the original reminder ID
-        isAlarm: true,
-        scheduledAt: snoozeTime.getTime(),
+        reminderId: reminderId,
         isSnoozeNotification: true,
+        snoozeTime: snoozeTime.getTime(),
+        originalAlarmId: snoozeAlarmId,
       },
-      categoryIdentifier: 'ALARM_CATEGORY', // Reuse alarm category
-      actions: [
-        {
-          identifier: 'DISMISS_SNOOZE',
-          buttonTitle: 'Dismiss Alarm',
-          options: {
-            foreground: true,
-            destructive: true,
-          },
-        },
-      ],
     };
 
     if (Platform.OS === 'android') {
-      notificationContent.channelId = 'alarm-channel';
+      dismissNotificationContent.channelId = 'alarm-channel';
     }
 
-    await Notifications.scheduleNotificationAsync({
-      content: notificationContent,
+    // Show immediate dismissible notification
+    const dismissNotificationId = await Notifications.scheduleNotificationAsync({
+      content: dismissNotificationContent,
       trigger: {
-        seconds: snoozeMinutes * 60,
+        seconds: 1, // Show immediately
         repeats: false,
       },
     });
 
-    console.log(`Alarm snoozed until: ${snoozeTime.toLocaleString()}, notification ID: ${notificationId}`);
+    console.log(`✅ Snooze system activated:`);
+    console.log(`- Dismissible notification ID: ${dismissNotificationId}`);
+    console.log(`- Alarm will resume at: ${snoozeTime.toLocaleString()}`);
+    console.log(`- Snooze alarm notification ID: ${snoozeAlarmId}`);
   } catch (error) {
     console.error('Error snoozing alarm:', error);
   }
