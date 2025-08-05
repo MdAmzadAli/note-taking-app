@@ -164,19 +164,22 @@ export default function RemindersScreen() {
       console.log('=============================');
     });
 
-    // Handle notification dismissed (swiped away) - this stops the alarm
-    const notificationDismissedListener = Notifications.addNotificationDismissedListener(
-      async (notification) => {
-        const { data } = notification.request.content;
-        console.log('Notification dismissed (swiped away):', data);
+    // Handle notification dismissed (swiped away) - this stops the alarm (mobile only)
+    let notificationDismissedListener = null;
+    if (Platform.OS !== 'web') {
+      notificationDismissedListener = Notifications.addNotificationDismissedListener(
+        async (notification) => {
+          const { data } = notification.request.content;
+          console.log('Notification dismissed (swiped away):', data);
 
-        if (data?.isAlarm && data?.reminderId) {
-          console.log('Alarm notification dismissed - stopping alarm');
-          await stopAlarm(data.reminderId);
-          setActiveAlarmReminder(null);
+          if (data?.isAlarm && data?.reminderId) {
+            console.log('Alarm notification dismissed - stopping alarm');
+            await stopAlarm(data.reminderId);
+            setActiveAlarmReminder(null);
+          }
         }
-      }
-    );
+      );
+    }
 
     // Clean up subscription on unmount
     return () => {
