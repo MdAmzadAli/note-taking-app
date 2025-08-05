@@ -256,7 +256,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
 
     // Stop the alarm notification system
     if (reminder) {
-      await stopAlarm(reminder.id);
+      await stopAlarm(reminder.id, 'stop_button');
     }
 
     // Close the alarm screen

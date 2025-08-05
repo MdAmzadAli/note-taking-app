@@ -560,21 +560,24 @@ export const scheduleNotification = async (
   }
 };
 
-export const stopAlarm = async (reminderId: string): Promise<void> => {
+export const stopAlarm = async (reminderId: string, reason: string = 'manual'): Promise<void> => {
   try {
-    console.log(`Stopping alarm for reminder: ${reminderId}`);
+    console.log(`=== STOPPING ALARM ===`);
+    console.log(`Reminder ID: ${reminderId}`);
+    console.log(`Stop reason: ${reason}`);
 
     // Cancel ALL notifications to ensure clean state
     await Notifications.cancelAllScheduledNotificationsAsync();
-    console.log('Cancelled all scheduled notifications for clean state');
+    console.log('✅ Cancelled all scheduled notifications for clean state');
 
     // Dismiss all currently displayed notifications
     await Notifications.dismissAllNotificationsAsync();
-    console.log('Dismissed all presented notifications');
+    console.log('✅ Dismissed all presented notifications');
 
-    console.log(`Alarm stopped successfully for reminder: ${reminderId}`);
+    console.log(`✅ Alarm stopped successfully for reminder: ${reminderId} (${reason})`);
+    console.log('=======================');
   } catch (error) {
-    console.error('Error stopping alarm:', error);
+    console.error('❌ Error stopping alarm:', error);
   }
 };
 
@@ -720,23 +723,32 @@ export const snoozeAlarm = async (
 };
 
 // Function to dismiss snooze alarm permanently
-export const dismissSnoozeAlarm = async (reminderId: string, resumeAlarmId?: string): Promise<void> => {
+export const dismissSnoozeAlarm = async (reminderId: string, resumeAlarmId?: string, reason: string = 'manual'): Promise<void> => {
   try {
     console.log(`=== DISMISSING SNOOZE ALARM ===`);
     console.log(`Reminder ID: ${reminderId}`);
     console.log(`Resume Alarm ID: ${resumeAlarmId}`);
+    console.log(`Dismiss reason: ${reason}`);
 
-    // Cancel the scheduled resume alarm
+    // Cancel the scheduled resume alarm if provided
     if (resumeAlarmId) {
-      await Notifications.cancelScheduledNotificationAsync(resumeAlarmId);
-      console.log(`✅ Cancelled scheduled resume alarm: ${resumeAlarmId}`);
+      try {
+        await Notifications.cancelScheduledNotificationAsync(resumeAlarmId);
+        console.log(`✅ Cancelled scheduled resume alarm: ${resumeAlarmId}`);
+      } catch (cancelError) {
+        console.log(`⚠️ Resume alarm ${resumeAlarmId} may have already been cancelled or triggered`);
+      }
+    } else {
+      // If no specific resume alarm ID, cancel all scheduled notifications as fallback
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      console.log(`✅ Cancelled all scheduled notifications (no specific resume alarm ID provided)`);
     }
 
     // Dismiss all current notifications
     await Notifications.dismissAllNotificationsAsync();
     console.log(`✅ Dismissed all current notifications`);
 
-    console.log(`=== SNOOZE ALARM DISMISSED PERMANENTLY ===`);
+    console.log(`=== SNOOZE ALARM DISMISSED PERMANENTLY (${reason}) ===`);
   } catch (error) {
     console.error('❌ Error dismissing snooze alarm:', error);
   }

@@ -89,7 +89,7 @@ export default function RemindersScreen() {
           if (reminder) {
             if (response.actionIdentifier === 'STOP_ALARM') {
               console.log('STOP_ALARM action - stopping alarm from notification');
-              await stopAlarm(reminder.id);
+              await stopAlarm(reminder.id, 'notification_action');
               setActiveAlarmReminder(null);
             } else if (response.actionIdentifier === 'SNOOZE_ALARM') {
               console.log('SNOOZE_ALARM action - snoozing alarm from notification');
@@ -105,7 +105,7 @@ export default function RemindersScreen() {
           // Handle snooze notification actions
           if (response.actionIdentifier === 'DISMISS_ALARM') {
             console.log('DISMISS_ALARM action - dismissing snooze alarm permanently');
-            await dismissSnoozeAlarm(data.reminderId, data.resumeAlarmId);
+            await dismissSnoozeAlarm(data.reminderId, data.resumeAlarmId, 'notification_action');
             setActiveAlarmReminder(null);
           }
         } else if (data?.isAutoDismiss) {
@@ -214,15 +214,38 @@ export default function RemindersScreen() {
           notificationDismissedListener = Notifications.addNotificationDismissedListener(
             async (notification) => {
               const { data } = notification.request.content;
-              console.log('Notification dismissed (swiped away):', data);
+              console.log('=== NOTIFICATION DISMISSED (SWIPED AWAY) ===');
+              console.log('Dismissed notification data:', data);
 
+              // Handle alarm notification dismissal
               if (data?.isAlarm && data?.reminderId) {
-                console.log('Alarm notification dismissed - stopping alarm');
+                console.log('🚨 ALARM notification dismissed - STOPPING alarm immediately');
+                
+                // Stop the alarm completely
                 await stopAlarm(data.reminderId);
+                
+                // Close alarm screen if it's open
                 setActiveAlarmReminder(null);
+                
+                console.log('✅ Alarm stopped due to notification dismissal');
+              } 
+              // Handle snooze notification dismissal
+              else if (data?.isSnoozeNotification && data?.reminderId) {
+                console.log('😴 SNOOZE notification dismissed - STOPPING snooze alarm permanently');
+                
+                // Dismiss the snooze and cancel the scheduled resume alarm
+                await dismissSnoozeAlarm(data.reminderId, data.resumeAlarmId);
+                
+                // Close alarm screen if it's open
+                setActiveAlarmReminder(null);
+                
+                console.log('✅ Snooze alarm dismissed permanently due to notification dismissal');
               }
+              
+              console.log('===============================================');
             }
           );
+          console.log('✅ Notification dismissed listener set up successfully');
         } else {
           console.log('Notification dismissed listener not available in Expo Go environment');
         }
