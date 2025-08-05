@@ -544,7 +544,6 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
 
           <View style={styles.modalContent}>
             <View style={styles.settingGroup}>
-              <Text style={styles.settingLabel}>Alarm Sound</Text>
               <TouchableOpacity
                 style={styles.ringtoneButton}
                 onPress={() => setShowAlarmRingtone(true)}
