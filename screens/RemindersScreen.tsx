@@ -128,25 +128,20 @@ export default function RemindersScreen() {
       console.log('Received at:', new Date().toLocaleString());
       console.log('Notification data:', data);
 
-      // Handle snooze notifications differently
+      // Handle snooze notifications differently - NEVER trigger alarm screen for these
       if (data?.isSnoozeNotification) {
-        console.log('📱 Snooze notification received - showing dismissible notification only');
-        // This is the dismissible notification (notification 2), don't trigger alarm screen
+        console.log('📱 Snooze notification received - showing dismissible notification only, NO alarm screen');
         return;
       }
 
-      // Handle auto-dismiss notifications
+      // Handle auto-dismiss notifications - these should not exist anymore but just in case
       if (data?.isAutoDismiss) {
-        console.log('🔄 Auto-dismiss notification received');
-        if (data.targetNotificationId) {
-          Notifications.dismissNotificationAsync(data.targetNotificationId);
-          console.log('✅ Snooze notification auto-dismissed');
-        }
+        console.log('🔄 Auto-dismiss notification received - silently dismissing');
         return;
       }
 
-      // Only process alarm notifications (notification 1)
-      if (data?.isAlarm && data?.reminderId && data?.scheduledAt) {
+      // Only process actual alarm notifications (notification 1) - NOT snooze notifications
+      if (data?.isAlarm && data?.reminderId && data?.scheduledAt && !data?.isSnoozeNotification) {
         const now = new Date().getTime();
         const scheduledTime = data.scheduledAt;
         const timeDifference = Math.abs(now - scheduledTime);
@@ -159,7 +154,7 @@ export default function RemindersScreen() {
 
         // Only show alarm if we're within 5 minutes of the scheduled time
         if (timeDifference <= fiveMinutesInMs) {
-          console.log('✅ Alarm notification received at correct time, showing alarm screen');
+          console.log('✅ ACTUAL alarm notification received at correct time, showing alarm screen');
 
           // Find the reminder or create a temporary one
           getReminders().then(reminders => {
@@ -188,7 +183,7 @@ export default function RemindersScreen() {
           console.log('❌ Notification received too early, ignoring. Will wait for proper time.');
         }
       } else {
-        console.log('ℹ️ Non-alarm notification or missing data, ignoring');
+        console.log('ℹ️ Non-alarm notification, snooze notification, or missing data - not showing alarm screen');
       }
 
       console.log('=============================');

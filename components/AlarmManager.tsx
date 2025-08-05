@@ -215,19 +215,26 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
     Vibration.cancel();
 
     if (sound) {
-      await sound.stopAsync();
-      await sound.unloadAsync();
-      setSound(null);
+      try {
+        await sound.stopAsync();
+        await sound.unloadAsync();
+        setSound(null);
+        console.log('✅ Alarm sound stopped and unloaded');
+      } catch (error) {
+        console.log('Sound stop error (expected):', error);
+        setSound(null);
+      }
     }
 
-    // Execute snooze functionality
+    // Close the alarm screen immediately (same as stop)
+    onClose();
+    console.log('✅ Alarm screen closed immediately');
+
+    // Execute snooze functionality after closing
     if (reminder) {
       await snoozeAlarm(reminder.id, 5, reminder.title, reminder.description);
+      console.log('✅ Snooze functionality completed');
     }
-
-    // Close the alarm screen (same as stop)
-    onClose();
-    console.log('✅ Alarm snoozed and screen closed');
   };
 
   if (!reminder) return null;

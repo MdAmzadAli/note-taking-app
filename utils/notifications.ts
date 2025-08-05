@@ -476,7 +476,7 @@ export const snoozeAlarm = async (
     const resumeAlarmId = await scheduleAlarmNotification(snoozeReminder, snoozeTime);
     console.log(`✅ Alarm scheduled to resume at: ${snoozeTime.toLocaleString()}, ID: ${resumeAlarmId}`);
 
-    // STEP 4: Show immediate snooze notification (notification 2)
+    // STEP 4: Show immediate snooze notification (notification 2) - THIS IS THE ONLY VISIBLE NOTIFICATION
     console.log('STEP 4: Showing immediate snooze notification...');
     const snoozeNotificationContent = {
       title: `🔔 Snoozed: ${originalTitle || 'Reminder'}`,
@@ -505,39 +505,30 @@ export const snoozeAlarm = async (
     const snoozeNotificationId = await Notifications.scheduleNotificationAsync({
       content: snoozeNotificationContent,
       trigger: {
-        seconds: 1, // Show immediately
+        seconds: 2, // Show after 2 seconds to ensure original is dismissed
         repeats: false,
       },
     });
 
-    console.log(`✅ Snooze notification shown, ID: ${snoozeNotificationId}`);
+    console.log(`✅ Snooze notification scheduled, ID: ${snoozeNotificationId}`);
 
-    // STEP 5: Schedule auto-dismiss of snooze notification after 5 minutes
-    console.log('STEP 5: Scheduling auto-dismiss of snooze notification...');
-    const autoDismissId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Auto Dismiss Snooze',
-        body: 'Internal notification to dismiss snooze',
-        sound: null,
-        priority: 'low',
-        data: {
-          isAutoDismiss: true,
-          targetNotificationId: snoozeNotificationId,
-        },
-      },
-      trigger: {
-        seconds: snoozeMinutes * 60, // Dismiss after snooze period
-        repeats: false,
-      },
-    });
+    // STEP 5: Schedule silent auto-dismiss of snooze notification after 5 minutes (hidden from user)
+    console.log('STEP 5: Scheduling silent auto-dismiss of snooze notification...');
+    setTimeout(async () => {
+      try {
+        await Notifications.dismissNotificationAsync(snoozeNotificationId);
+        console.log('✅ Snooze notification auto-dismissed silently');
+      } catch (error) {
+        console.log('Auto-dismiss error (expected):', error);
+      }
+    }, snoozeMinutes * 60 * 1000);
 
-    console.log(`✅ Auto-dismiss scheduled, ID: ${autoDismissId}`);
     console.log(`=== SNOOZE SYSTEM FULLY ACTIVATED ===`);
     console.log(`- Original alarm stopped immediately`);
-    console.log(`- Snooze notification displayed: ID ${snoozeNotificationId}`);
+    console.log(`- Snooze notification will show in 2 seconds: ID ${snoozeNotificationId}`);
     console.log(`- Alarm will resume at: ${snoozeTime.toLocaleString()}`);
     console.log(`- Resume alarm ID: ${resumeAlarmId}`);
-    console.log(`- Auto-dismiss scheduled: ID ${autoDismissId}`);
+    console.log(`- Auto-dismiss will happen silently after ${snoozeMinutes} minutes`);
     console.log(`=====================================`);
 
   } catch (error) {
