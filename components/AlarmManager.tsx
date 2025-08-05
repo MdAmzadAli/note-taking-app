@@ -74,9 +74,33 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
           soundSource = { uri: alarmSoundSetting };
           console.log('🔊 Loading custom alarm sound:', alarmSoundSetting);
         } else {
-          // Default sound (all default options use the same alarm.mp3 for now)
-          // In a real app, you would have different sound files for each default option
-          soundSource = require('@/assets/sounds/alarm.mp3');
+          // Default sound - use specific sound file for each option
+          switch (alarmSoundSetting) {
+            case 'bell':
+              soundSource = require('@/assets/sounds/bell.mp3');
+              break;
+            case 'chime':
+              soundSource = require('@/assets/sounds/chime.mp3');
+              break;
+            case 'alert':
+              soundSource = require('@/assets/sounds/alert.mp3');
+              break;
+            case 'gentle_wake':
+              soundSource = require('@/assets/sounds/gentle_wake.mp3');
+              break;
+            case 'morning':
+              soundSource = require('@/assets/sounds/morning.mp3');
+              break;
+            case 'classic':
+              soundSource = require('@/assets/sounds/classic.mp3');
+              break;
+            case 'digital':
+              soundSource = require('@/assets/sounds/digital.mp3');
+              break;
+            default:
+              soundSource = require('@/assets/sounds/alarm.mp3');
+              break;
+          }
           console.log('🔊 Loading default alarm sound:', alarmSoundSetting);
         }
 

@@ -96,6 +96,27 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
     }
   };
 
+  const getDefaultSoundFile = (soundValue: string) => {
+    switch (soundValue) {
+      case 'bell':
+        return require('@/assets/sounds/bell.mp3');
+      case 'chime':
+        return require('@/assets/sounds/chime.mp3');
+      case 'alert':
+        return require('@/assets/sounds/alert.mp3');
+      case 'gentle_wake':
+        return require('@/assets/sounds/gentle_wake.mp3');
+      case 'morning':
+        return require('@/assets/sounds/morning.mp3');
+      case 'classic':
+        return require('@/assets/sounds/classic.mp3');
+      case 'digital':
+        return require('@/assets/sounds/digital.mp3');
+      default:
+        return require('@/assets/sounds/alarm.mp3');
+    }
+  };
+
   const previewAlarmSound = async (soundUri: string) => {
     try {
       if (previewSound) {
@@ -112,10 +133,17 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
         playThroughEarpieceAndroid: false,
       });
 
+      let soundSource;
+      if (soundUri.startsWith('http') || soundUri.startsWith('file')) {
+        // Custom sound file
+        soundSource = { uri: soundUri };
+      } else {
+        // Default sound file
+        soundSource = getDefaultSoundFile(soundUri);
+      }
+
       const { sound } = await Audio.Sound.createAsync(
-        soundUri.startsWith('http') || soundUri.startsWith('file') 
-          ? { uri: soundUri }
-          : require('@/assets/sounds/alarm.mp3'),
+        soundSource,
         {
           shouldPlay: true,
           volume: 0.5,
