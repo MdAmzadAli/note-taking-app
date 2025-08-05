@@ -243,25 +243,38 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
   }, [visible, reminder]);
 
   const handleStopAlarm = async () => {
-    console.log('STOP button pressed - stopping alarm immediately');
+    console.log('🛑 STOP button pressed - stopping alarm immediately');
+    console.log('🛑 Alarm stop initiated at:', new Date().toLocaleString());
+    console.log('🛑 Reminder being stopped:', reminder?.title, 'ID:', reminder?.id);
     
     // Stop all alarm effects immediately
+    console.log('🔇 Stopping vibration...');
     Vibration.cancel();
 
     if (sound) {
-      await sound.stopAsync();
-      await sound.unloadAsync();
-      setSound(null);
+      console.log('🔇 Stopping and unloading alarm sound...');
+      try {
+        await sound.stopAsync();
+        await sound.unloadAsync();
+        setSound(null);
+        console.log('✅ Alarm sound stopped and unloaded successfully');
+      } catch (soundError) {
+        console.error('❌ Error stopping alarm sound:', soundError);
+      }
     }
 
     // Stop the alarm notification system
     if (reminder) {
+      console.log('🔔 Stopping alarm notification system...');
       await stopAlarm(reminder.id, 'stop_button');
+      console.log('✅ Alarm notification system stopped');
     }
 
     // Close the alarm screen
+    console.log('🚪 Closing alarm screen...');
     onClose();
-    console.log('✅ Alarm stopped and screen closed');
+    console.log('✅ Alarm completely stopped and screen closed');
+    console.log('🛑 Total stop process completed at:', new Date().toLocaleString());
   };
 
   const handleSnoozeAlarm = async () => {

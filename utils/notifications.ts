@@ -565,6 +565,35 @@ export const stopAlarm = async (reminderId: string, reason: string = 'manual'): 
     console.log(`=== STOPPING ALARM ===`);
     console.log(`Reminder ID: ${reminderId}`);
     console.log(`Stop reason: ${reason}`);
+    console.log(`Timestamp: ${new Date().toLocaleString()}`);
+
+    // Get current notifications before cleanup for logging
+    try {
+      const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+      const presentedNotifications = await Notifications.getPresentedNotificationsAsync();
+      
+      console.log(`📊 Before cleanup - Scheduled: ${scheduledNotifications.length}, Presented: ${presentedNotifications.length}`);
+      
+      if (scheduledNotifications.length > 0) {
+        console.log('📋 Scheduled notifications:', scheduledNotifications.map(n => ({
+          id: n.identifier,
+          title: n.content.title,
+          isAlarm: n.content.data?.isAlarm,
+          reminderId: n.content.data?.reminderId
+        })));
+      }
+      
+      if (presentedNotifications.length > 0) {
+        console.log('📋 Presented notifications:', presentedNotifications.map(n => ({
+          id: n.request.identifier,
+          title: n.request.content.title,
+          isAlarm: n.request.content.data?.isAlarm,
+          reminderId: n.request.content.data?.reminderId
+        })));
+      }
+    } catch (logError) {
+      console.log('⚠️ Could not log notification status:', logError);
+    }
 
     // Cancel ALL notifications to ensure clean state
     await Notifications.cancelAllScheduledNotificationsAsync();
@@ -574,10 +603,29 @@ export const stopAlarm = async (reminderId: string, reason: string = 'manual'): 
     await Notifications.dismissAllNotificationsAsync();
     console.log('✅ Dismissed all presented notifications');
 
+    // Verify cleanup
+    try {
+      const remainingScheduled = await Notifications.getAllScheduledNotificationsAsync();
+      const remainingPresented = await Notifications.getPresentedNotificationsAsync();
+      console.log(`📊 After cleanup - Scheduled: ${remainingScheduled.length}, Presented: ${remainingPresented.length}`);
+      
+      if (remainingScheduled.length > 0 || remainingPresented.length > 0) {
+        console.log('⚠️ Some notifications may still be active after cleanup');
+      }
+    } catch (verifyError) {
+      console.log('⚠️ Could not verify cleanup:', verifyError);
+    }
+
     console.log(`✅ Alarm stopped successfully for reminder: ${reminderId} (${reason})`);
     console.log('=======================');
   } catch (error) {
     console.error('❌ Error stopping alarm:', error);
+    console.error('❌ Error details:', {
+      message: error.message,
+      stack: error.stack,
+      reminderId,
+      reason
+    });
   }
 };
 

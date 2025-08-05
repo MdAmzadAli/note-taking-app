@@ -125,8 +125,12 @@ export default function RemindersScreen() {
       const { data } = notification.request.content;
 
       console.log('=== NOTIFICATION RECEIVED ===');
+      console.log('Notification ID:', notification.request.identifier);
       console.log('Received at:', new Date().toLocaleString());
       console.log('Notification data:', data);
+
+      // Track this notification for dismissal detection
+      trackNotification(notification.request.identifier, data);
 
       // Handle snooze notifications differently - NEVER trigger alarm screen for these
       if (data?.isSnoozeNotification) {
@@ -202,68 +206,159 @@ export default function RemindersScreen() {
       console.log('=============================');
     });
 
-    // Handle notification dismissed (swiped away) - this stops the alarm (mobile only, not in Expo Go)
+    // Enhanced notification dismissal handling with multiple detection methods
     let notificationDismissedListener = null;
+    let dismissalCheckInterval = null;
+    const activeNotificationIds = new Set();
+
+    // Track active alarm notifications
+    const trackNotification = (notificationId: string, data: any) => {
+      if (data?.isAlarm || data?.isSnoozeNotification) {
+        activeNotificationIds.add(notificationId);
+        console.log('📋 Tracking notification:', notificationId, 'Total tracked:', activeNotificationIds.size);
+      }
+    };
+
+    // Check for dismissed notifications periodically
+    const checkDismissedNotifications = async () => {
+      try {
+        if (activeNotificationIds.size === 0) return;
+
+        const presentedNotifications = await Notifications.getPresentedNotificationsAsync();
+        const presentedIds = new Set(presentedNotifications.map(n => n.request.identifier));
+        
+        console.log('🔍 DISMISSAL CHECK - Active tracked:', Array.from(activeNotificationIds));
+        console.log('🔍 DISMISSAL CHECK - Currently presented:', Array.from(presentedIds));
+
+        // Check if any tracked notifications are no longer presented (i.e., dismissed)
+        for (const trackedId of activeNotificationIds) {
+          if (!presentedIds.has(trackedId)) {
+            console.log('🚨 NOTIFICATION DISMISSED DETECTED:', trackedId);
+            
+            // Find the reminder associated with this notification
+            const reminders = await getReminders();
+            const dismissedReminder = reminders.find(r => 
+              r.notificationId === trackedId || 
+              (r.notificationIds && r.notificationIds.includes(trackedId))
+            );
+
+            if (dismissedReminder) {
+              console.log('🛑 STOPPING ALARM due to notification dismissal - Reminder:', dismissedReminder.title);
+              
+              // Stop the alarm completely
+              await stopAlarm(dismissedReminder.id, 'notification_dismissed');
+              
+              // Close alarm screen if it's open
+              setActiveAlarmReminder(null);
+              
+              console.log('✅ Alarm stopped successfully due to notification dismissal');
+            }
+
+            // Remove from tracking
+            activeNotificationIds.delete(trackedId);
+            console.log('📋 Removed from tracking:', trackedId, 'Remaining:', activeNotificationIds.size);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error checking dismissed notifications:', error);
+      }
+    };
+
     if (Platform.OS !== 'web') {
       try {
-        // Check if we're in Expo Go (where this function is not available)
+        // Method 1: Try to set up native dismissal listener
         const Constants = require('expo-constants');
         const isExpoGo = Constants.appOwnership === 'expo';
+
+        console.log('🔧 Setting up notification dismissal detection...');
+        console.log('Platform:', Platform.OS);
+        console.log('Is Expo Go:', isExpoGo);
+        console.log('Dismissal listener available:', !!Notifications.addNotificationDismissedListener);
 
         if (!isExpoGo && Notifications.addNotificationDismissedListener) {
           notificationDismissedListener = Notifications.addNotificationDismissedListener(
             async (notification) => {
               const { data } = notification.request.content;
-              console.log('=== NOTIFICATION DISMISSED (SWIPED AWAY) ===');
+              console.log('=== NATIVE NOTIFICATION DISMISSED (SWIPED AWAY) ===');
+              console.log('Dismissed notification ID:', notification.request.identifier);
               console.log('Dismissed notification data:', data);
 
               // Handle alarm notification dismissal
               if (data?.isAlarm && data?.reminderId) {
-                console.log('🚨 ALARM notification dismissed - STOPPING alarm immediately');
+                console.log('🚨 ALARM notification dismissed via NATIVE listener - STOPPING alarm immediately');
                 
                 // Stop the alarm completely
-                await stopAlarm(data.reminderId);
+                await stopAlarm(data.reminderId, 'native_dismissal');
                 
                 // Close alarm screen if it's open
                 setActiveAlarmReminder(null);
                 
-                console.log('✅ Alarm stopped due to notification dismissal');
+                console.log('✅ Alarm stopped due to NATIVE notification dismissal');
               } 
               // Handle snooze notification dismissal
               else if (data?.isSnoozeNotification && data?.reminderId) {
-                console.log('😴 SNOOZE notification dismissed - STOPPING snooze alarm permanently');
+                console.log('😴 SNOOZE notification dismissed via NATIVE listener - STOPPING snooze alarm permanently');
                 
                 // Dismiss the snooze and cancel the scheduled resume alarm
-                await dismissSnoozeAlarm(data.reminderId, data.resumeAlarmId);
+                await dismissSnoozeAlarm(data.reminderId, data.resumeAlarmId, 'native_dismissal');
                 
                 // Close alarm screen if it's open
                 setActiveAlarmReminder(null);
                 
-                console.log('✅ Snooze alarm dismissed permanently due to notification dismissal');
+                console.log('✅ Snooze alarm dismissed permanently due to NATIVE notification dismissal');
               }
+
+              // Remove from tracking if it was being tracked
+              activeNotificationIds.delete(notification.request.identifier);
               
-              console.log('===============================================');
+              console.log('===========================================================');
             }
           );
-          console.log('✅ Notification dismissed listener set up successfully');
+          console.log('✅ NATIVE notification dismissed listener set up successfully');
         } else {
-          console.log('Notification dismissed listener not available in Expo Go environment');
+          console.log('⚠️ NATIVE notification dismissed listener not available - using fallback method');
         }
+
+        // Method 2: Always set up polling-based dismissal detection as fallback
+        console.log('🔧 Setting up POLLING-based dismissal detection as backup...');
+        dismissalCheckInterval = setInterval(checkDismissedNotifications, 1000); // Check every second
+        console.log('✅ POLLING dismissal detection started (1 second intervals)');
+
       } catch (error) {
-        console.log('Could not set up notification dismissed listener:', error);
+        console.error('❌ Error setting up notification dismissal detection:', error);
+        
+        // Still try to set up polling as last resort
+        console.log('🔧 Setting up POLLING dismissal detection as last resort...');
+        dismissalCheckInterval = setInterval(checkDismissedNotifications, 1000);
+        console.log('✅ Last resort POLLING dismissal detection started');
       }
     }
 
     // Clean up subscription on unmount
     return () => {
+      console.log('🧹 Cleaning up notification listeners and intervals...');
+      
       eventBus.off(EVENTS.REMINDER_UPDATED, reminderUpdateListener);
       notificationResponseListener.remove();
+      
       if (notificationDismissedListener) {
         notificationDismissedListener.remove();
+        console.log('✅ Native dismissal listener removed');
       }
+      
+      if (dismissalCheckInterval) {
+        clearInterval(dismissalCheckInterval);
+        console.log('✅ Polling dismissal detection stopped');
+      }
+      
       if (foregroundListener) {
         foregroundListener.remove();
+        console.log('✅ Foreground listener removed');
       }
+      
+      // Clear tracking
+      activeNotificationIds.clear();
+      console.log('✅ Notification tracking cleared');
     };
   }, []);
 
