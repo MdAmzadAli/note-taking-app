@@ -336,6 +336,26 @@ export default function RemindersScreen() {
       return;
     }
 
+    // Validate for time conflicts
+    if (isRecurring && selectedTimes.length > 1) {
+      const sortedTimes = [...selectedTimes].sort();
+      for (let i = 0; i < sortedTimes.length - 1; i++) {
+        const time1 = sortedTimes[i];
+        const time2 = sortedTimes[i + 1];
+        
+        const [h1, m1] = time1.split(':').map(Number);
+        const [h2, m2] = time2.split(':').map(Number);
+        
+        const minutes1 = h1 * 60 + m1;
+        const minutes2 = h2 * 60 + m2;
+        
+        if (Math.abs(minutes2 - minutes1) < 5) {
+          Alert.alert('Error', `Times ${time1} and ${time2} are too close together. Please ensure at least 5 minutes between reminders.`);
+          return;
+        }
+      }
+    }
+
     try {
       const reminder: Reminder = {
         id: Date.now().toString(),
@@ -353,7 +373,23 @@ export default function RemindersScreen() {
         alarmDuration: globalAlarmSettings.alarmEnabled ? globalAlarmSettings.alarmDuration : undefined,
       };
 
+      // NEW: Create occurrence tracking for recurring reminders
       if (isRecurring) {
+        const occurrences: any[] = [];
+        selectedDays.forEach(dayOfWeek => {
+          selectedTimes.forEach(time => {
+            occurrences.push({
+              id: `${reminder.id}_${dayOfWeek}_${time.replace(':', '')}`,
+              parentReminderId: reminder.id,
+              dayOfWeek,
+              time,
+              isCompleted: false,
+              nextScheduled: new Date().toISOString(), // Will be updated when scheduled
+            });
+          });
+        });
+        reminder.occurrences = occurrences;
+
         // Schedule multiple notifications for recurring reminders
         const notificationIds = globalAlarmSettings.alarmEnabled
           ? await scheduleRecurringAlarms(reminder, selectedDays, selectedTimes)
@@ -504,15 +540,47 @@ export default function RemindersScreen() {
 
   const toggleReminderComplete = async (reminder: Reminder) => {
     try {
-      // For recurring reminders, ask user if they want to complete just this occurrence or the entire series
+      // For recurring reminders, show more sophisticated options
       if (reminder.isRecurring && !reminder.isCompleted) {
-        Alert.alert(
-          'Complete Recurring Reminder',
-          'This is a recurring reminder. What would you like to do?',
-          [
+        const now = new Date();
+        const currentDay = now.getDay();
+        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        
+        // Find today's occurrences
+        const todayOccurrences = reminder.occurrences?.filter(occ => 
+          occ.dayOfWeek === currentDay && !occ.isCompleted
+        ) || [];
+
+        if (todayOccurrences.length > 0) {
+          // Show options to mark today's occurrence(s) or complete entire series
+          const options = [
             { text: 'Cancel', style: 'cancel' },
             {
-              text: 'Complete Series',
+              text: 'Mark Today Complete',
+              onPress: async () => {
+                const updatedReminder = { ...reminder };
+                
+                // Mark today's occurrences as complete
+                if (updatedReminder.occurrences) {
+                  updatedReminder.occurrences = updatedReminder.occurrences.map(occ => {
+                    if (occ.dayOfWeek === currentDay) {
+                      return {
+                        ...occ,
+                        isCompleted: true,
+                        completedAt: new Date().toISOString()
+                      };
+                    }
+                    return occ;
+                  });
+                }
+
+                await saveReminder(updatedReminder);
+                eventBus.emit(EVENTS.REMINDER_UPDATED);
+                await loadRemindersAndSettings();
+              },
+            },
+            {
+              text: 'Complete Entire Series',
               onPress: async () => {
                 const updatedReminder = {
                   ...reminder,
@@ -531,21 +599,43 @@ export default function RemindersScreen() {
                 await loadRemindersAndSettings();
               },
             },
-            {
-              text: 'Just Mark Done',
-              onPress: async () => {
-                const updatedReminder = {
-                  ...reminder,
-                  isCompleted: true,
-                };
+          ];
 
-                await saveReminder(updatedReminder);
-                eventBus.emit(EVENTS.REMINDER_UPDATED);
-                await loadRemindersAndSettings();
+          Alert.alert(
+            'Complete Recurring Reminder',
+            `This is a recurring reminder. You have ${todayOccurrences.length} occurrence(s) scheduled for today.`,
+            options
+          );
+        } else {
+          // No today occurrences, just allow completing entire series
+          Alert.alert(
+            'Complete Recurring Reminder',
+            'This will complete the entire recurring series.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Complete Series',
+                onPress: async () => {
+                  const updatedReminder = {
+                    ...reminder,
+                    isCompleted: true,
+                  };
+
+                  // Cancel all recurring notifications
+                  if (reminder.notificationIds) {
+                    for (const notificationId of reminder.notificationIds) {
+                      await cancelNotification(notificationId);
+                    }
+                  }
+
+                  await saveReminder(updatedReminder);
+                  eventBus.emit(EVENTS.REMINDER_UPDATED);
+                  await loadRemindersAndSettings();
+                },
               },
-            },
-          ]
-        );
+            ]
+          );
+        }
         return;
       }
 
@@ -645,6 +735,23 @@ export default function RemindersScreen() {
       return;
     }
 
+    // Check for conflicts with existing times (within 5 minutes)
+    const [newHours, newMinutes] = timeString.split(':').map(Number);
+    const newTotalMinutes = newHours * 60 + newMinutes;
+
+    for (const existingTime of selectedTimes) {
+      const [existingHours, existingMinutes] = existingTime.split(':').map(Number);
+      const existingTotalMinutes = existingHours * 60 + existingMinutes;
+      
+      if (Math.abs(newTotalMinutes - existingTotalMinutes) < 5) {
+        Alert.alert(
+          'Time Conflict', 
+          `The time ${timeString} is too close to ${existingTime}. Please ensure at least 5 minutes between reminders.`
+        );
+        return;
+      }
+    }
+
     setSelectedTimes(prev => [...prev, timeString].sort());
     setNewTime(new Date()); // Reset to current time
   };
@@ -711,6 +818,12 @@ export default function RemindersScreen() {
                   🔄 Recurring:{' '}
                   {item.recurringDays?.map(day => dayNames[day]).join(', ')} at{' '}
                   {item.recurringTimes?.join(', ')}
+                  {item.occurrences && (
+                    <>
+                      {'\n'}
+                      📊 Progress: {item.occurrences.filter(occ => occ.isCompleted).length}/{item.occurrences.length} occurrences completed
+                    </>
+                  )}
                 </>
               ) : (
                 <>

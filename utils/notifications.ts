@@ -33,6 +33,12 @@ Notifications.setNotificationHandler({
     if (isAlarm && data?.scheduledAt) {
       console.log('Scheduled for:', new Date(data.scheduledAt).toLocaleString());
       console.log('✅ Alarm notification - allowing to show');
+
+      // Check if this is a recurring reminder that needs rescheduling
+      if (data?.isRecurring && data?.recurringData) {
+        console.log('🔄 Recurring alarm triggered - scheduling next occurrence');
+        await scheduleNextRecurringOccurrence(data);
+      }
     }
 
     console.log('=============================');
@@ -226,6 +232,13 @@ export const scheduleAlarmNotification = async (
         vibrationEnabled: reminder.vibrationEnabled !== false,
         alarmDuration: reminder.alarmDuration || 5,
         isCustomSound: reminder.alarmSound && !['default', 'bell', 'chime', 'alert', 'gentle_wake', 'morning', 'classic', 'digital'].includes(reminder.alarmSound),
+        isRecurring: reminder.isRecurring,
+        recurringData: reminder.isRecurring ? {
+          recurringDays: reminder.recurringDays,
+          recurringTimes: reminder.recurringTimes,
+          currentDay: scheduledDateTime.getDay(),
+          currentTime: `${scheduledDateTime.getHours().toString().padStart(2, '0')}:${scheduledDateTime.getMinutes().toString().padStart(2, '0')}`
+        } : null,
       },
     };
 
@@ -282,7 +295,72 @@ export const scheduleAlarmNotification = async (
   }
 };
 
-// Schedule multiple alarms for recurring reminders
+// NEW: Function to calculate next occurrence for a specific day/time combination
+const calculateNextOccurrence = (dayOfWeek: number, timeStr: string): Date => {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const now = new Date();
+  const targetDate = new Date();
+  
+  targetDate.setHours(hours, minutes, 0, 0);
+  
+  // Calculate days until the target day of week
+  const currentDay = now.getDay();
+  let daysUntilTarget = (dayOfWeek - currentDay + 7) % 7;
+  
+  // If it's the same day, check if time has passed
+  if (daysUntilTarget === 0) {
+    if (targetDate <= now) {
+      // Time has passed today, schedule for next week
+      daysUntilTarget = 7;
+    }
+    // If time hasn't passed today, keep daysUntilTarget = 0 (schedule for today)
+  }
+  
+  targetDate.setDate(now.getDate() + daysUntilTarget);
+  return targetDate;
+};
+
+// NEW: Function to schedule next occurrence after an alarm triggers
+const scheduleNextRecurringOccurrence = async (notificationData: any): Promise<void> => {
+  try {
+    const { reminderId, recurringData } = notificationData;
+    
+    if (!recurringData) return;
+    
+    const { recurringDays, recurringTimes, currentDay, currentTime } = recurringData;
+    
+    console.log('🔄 Scheduling next occurrence for recurring reminder:', reminderId);
+    console.log('Current triggered: Day', currentDay, 'at', currentTime);
+    
+    // Calculate next occurrence for this specific day/time combination
+    const nextOccurrence = calculateNextOccurrence(currentDay, currentTime);
+    
+    console.log('Next occurrence calculated:', nextOccurrence.toLocaleString());
+    
+    // Create reminder object for next occurrence
+    const nextReminder = {
+      id: `${reminderId}_${currentDay}_${currentTime.replace(':', '')}`,
+      title: notificationData.originalTitle,
+      description: notificationData.description,
+      isRecurring: true,
+      recurringDays,
+      recurringTimes,
+      imageUri: notificationData.imageUri,
+      alarmSound: notificationData.alarmSound,
+      vibrationEnabled: notificationData.vibrationEnabled,
+      alarmDuration: notificationData.alarmDuration,
+    };
+    
+    // Schedule the next occurrence
+    await scheduleAlarmNotification(nextReminder, nextOccurrence);
+    
+    console.log('✅ Next occurrence scheduled successfully');
+  } catch (error) {
+    console.error('❌ Error scheduling next recurring occurrence:', error);
+  }
+};
+
+// FIXED: Schedule multiple alarms for recurring reminders with proper occurrence tracking
 export const scheduleRecurringAlarms = async (
   reminder: any,
   recurringDays: number[],
@@ -294,50 +372,41 @@ export const scheduleRecurringAlarms = async (
       return [];
     }
 
-    console.log('=== SCHEDULING RECURRING ALARMS ===');
+    console.log('=== SCHEDULING RECURRING ALARMS (FIXED) ===');
     console.log('Reminder:', reminder.title);
     console.log('Days:', recurringDays);
     console.log('Times:', recurringTimes);
 
+    // Validate for conflicts (overlapping times on same day)
+    const conflicts = validateRecurringSchedule(recurringDays, recurringTimes);
+    if (conflicts.length > 0) {
+      console.warn('⚠️ Time conflicts detected:', conflicts);
+      // You could throw an error here or handle conflicts as needed
+    }
+
     const notificationIds: string[] = [];
-    const now = new Date();
 
     for (const dayOfWeek of recurringDays) {
       for (const timeStr of recurringTimes) {
         try {
-          const [hours, minutes] = timeStr.split(':').map(Number);
-
-          // Create the target date/time
-          const targetDate = new Date();
-          targetDate.setHours(hours, minutes, 0, 0);
-
-          // Calculate days until the target day of week
-          const currentDay = now.getDay();
-          let daysUntilTarget = (dayOfWeek - currentDay + 7) % 7;
-
-          // If it's the same day but the time has passed, schedule for next week
-          if (daysUntilTarget === 0 && targetDate <= now) {
-            daysUntilTarget = 7;
-          }
-
-          // Set the target date
-          targetDate.setDate(now.getDate() + daysUntilTarget);
+          const nextOccurrence = calculateNextOccurrence(dayOfWeek, timeStr);
 
           console.log(`Scheduling for day ${dayOfWeek} at ${timeStr}:`);
-          console.log(`- Target date/time: ${targetDate.toLocaleString()}`);
-          console.log(`- Days until target: ${daysUntilTarget}`);
+          console.log(`- Next occurrence: ${nextOccurrence.toLocaleString()}`);
 
-          // Create a unique reminder for this occurrence
-          const uniqueReminder = {
+          // Create occurrence-specific reminder (but don't save as separate reminder)
+          const occurrenceReminder = {
             ...reminder,
-            id: `${reminder.id}_${dayOfWeek}_${timeStr.replace(':', '')}`,
+            // Use original ID for tracking but unique scheduling identifier
+            id: reminder.id,
+            schedulingId: `${reminder.id}_${dayOfWeek}_${timeStr.replace(':', '')}`,
           };
 
-          const notificationId = await scheduleAlarmNotification(uniqueReminder, targetDate);
+          const notificationId = await scheduleAlarmNotification(occurrenceReminder, nextOccurrence);
 
           if (notificationId) {
             notificationIds.push(notificationId);
-            console.log(`✅ Scheduled alarm for ${targetDate.toLocaleString()}`);
+            console.log(`✅ Scheduled alarm for ${nextOccurrence.toLocaleString()}`);
           }
         } catch (error) {
           console.error(`❌ Error scheduling alarm for day ${dayOfWeek} at ${timeStr}:`, error);
@@ -353,6 +422,43 @@ export const scheduleRecurringAlarms = async (
     console.error('❌ Error scheduling recurring alarms:', error);
     return [];
   }
+};
+
+// NEW: Validate recurring schedule for conflicts
+const validateRecurringSchedule = (recurringDays: number[], recurringTimes: string[]): string[] => {
+  const conflicts: string[] = [];
+  
+  // Check for duplicate times (conflicts)
+  const timeOccurrences = new Map<string, number>();
+  
+  recurringTimes.forEach(time => {
+    timeOccurrences.set(time, (timeOccurrences.get(time) || 0) + 1);
+  });
+  
+  timeOccurrences.forEach((count, time) => {
+    if (count > 1) {
+      conflicts.push(`Time ${time} appears ${count} times`);
+    }
+  });
+  
+  // Check for times too close together (within 5 minutes)
+  const sortedTimes = [...recurringTimes].sort();
+  for (let i = 0; i < sortedTimes.length - 1; i++) {
+    const time1 = sortedTimes[i];
+    const time2 = sortedTimes[i + 1];
+    
+    const [h1, m1] = time1.split(':').map(Number);
+    const [h2, m2] = time2.split(':').map(Number);
+    
+    const minutes1 = h1 * 60 + m1;
+    const minutes2 = h2 * 60 + m2;
+    
+    if (Math.abs(minutes2 - minutes1) < 5) {
+      conflicts.push(`Times ${time1} and ${time2} are too close together (less than 5 minutes)`);
+    }
+  }
+  
+  return conflicts;
 };
 
 export const scheduleNotification = async (

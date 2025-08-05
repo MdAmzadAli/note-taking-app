@@ -1,3 +1,4 @@
+
 export type WritingStyle = 'bullet' | 'journal' | 'cornell' | 'mind_dump' | 'checklist';
 
 export interface NoteSection {
@@ -18,6 +19,18 @@ export interface Note {
   updatedAt: string;
 }
 
+// NEW: Interface for tracking individual occurrences of recurring reminders
+export interface ReminderOccurrence {
+  id: string; // Format: reminderId_dayOfWeek_time
+  parentReminderId: string;
+  dayOfWeek: number; // 0-6 (Sunday-Saturday)
+  time: string; // HH:MM format
+  isCompleted: boolean;
+  completedAt?: string;
+  lastTriggered?: string;
+  nextScheduled?: string;
+}
+
 export interface Reminder {
   id: string;
   title: string;
@@ -30,6 +43,8 @@ export interface Reminder {
   isRecurring?: boolean;
   recurringDays?: number[];
   recurringTimes?: string[];
+  // NEW: Track individual occurrences for recurring reminders
+  occurrences?: ReminderOccurrence[];
   imageUri?: string;
   alarmSound?: string;
   vibrationEnabled?: boolean;
