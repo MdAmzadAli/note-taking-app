@@ -408,6 +408,7 @@ export default function RemindersScreen() {
     setIsRecurring(reminder.isRecurring || false);
     setSelectedDays(reminder.recurringDays || []);
     setSelectedTimes(reminder.recurringTimes || []);
+    setSelectedImageUri(reminder.imageUri || null);
     setIsEditing(true);
   };
 
@@ -417,10 +418,25 @@ export default function RemindersScreen() {
       return;
     }
 
+    if (isRecurring && selectedDays.length === 0) {
+      Alert.alert('Error', 'Please select at least one day for recurring reminder');
+      return;
+    }
+
+    if (isRecurring && selectedTimes.length === 0) {
+      Alert.alert('Error', 'Please add at least one time for recurring reminder');
+      return;
+    }
+
     try {
-      // Cancel old notification if exists
+      // Cancel old notifications
       if (editingReminder.notificationId) {
         await cancelNotification(editingReminder.notificationId);
+      }
+      if (editingReminder.notificationIds) {
+        for (const notificationId of editingReminder.notificationIds) {
+          await cancelNotification(notificationId);
+        }
       }
 
       const updatedReminder: Reminder = {
@@ -428,17 +444,41 @@ export default function RemindersScreen() {
         title: newTitle.trim(),
         description: newDescription.trim(),
         dateTime: selectedDate.toISOString(),
+        isRecurring: isRecurring,
+        recurringDays: isRecurring ? selectedDays : undefined,
+        recurringTimes: isRecurring ? selectedTimes : undefined,
+        imageUri: selectedImageUri || editingReminder.imageUri,
+        alarmSound: globalAlarmSettings.alarmEnabled ? globalAlarmSettings.alarmSound : undefined,
+        vibrationEnabled: globalAlarmSettings.alarmEnabled ? globalAlarmSettings.vibrationEnabled : undefined,
+        alarmDuration: globalAlarmSettings.alarmEnabled ? globalAlarmSettings.alarmDuration : undefined,
       };
 
-      // Schedule new notification
-      const notificationId = await scheduleNotification(
-        `Reminder`,
-        updatedReminder.title,
-        selectedDate
-      );
+      if (isRecurring) {
+        // Schedule multiple notifications for recurring reminders
+        const notificationIds = globalAlarmSettings.alarmEnabled
+          ? await scheduleRecurringAlarms(updatedReminder, selectedDays, selectedTimes)
+          : [];
+        updatedReminder.notificationIds = notificationIds;
+        updatedReminder.notificationId = undefined; // Clear single notification ID
+      } else {
+        // Schedule single notification for non-recurring reminders
+        const notificationId = globalAlarmSettings.alarmEnabled
+          ? await scheduleAlarmNotification(updatedReminder, selectedDate)
+          : await scheduleNotification(
+            `Reminder`,
+            updatedReminder.title,
+            selectedDate,
+            {
+              imageUri: selectedImageUri || updatedReminder.imageUri,
+              sound: globalAlarmSettings.alarmSound,
+              vibration: globalAlarmSettings.vibrationEnabled,
+            }
+          );
 
-      if (notificationId) {
-        updatedReminder.notificationId = notificationId;
+        if (notificationId) {
+          updatedReminder.notificationId = notificationId;
+        }
+        updatedReminder.notificationIds = undefined; // Clear recurring notification IDs
       }
 
       await saveReminder(updatedReminder);
@@ -449,6 +489,11 @@ export default function RemindersScreen() {
       setNewTitle('');
       setNewDescription('');
       setSelectedDate(new Date());
+      setIsRecurring(false);
+      setSelectedDays([]);
+      setSelectedTimes([]);
+      setNewTime(new Date());
+      setSelectedImageUri(null);
       setIsEditing(false);
       setEditingReminder(null);
     } catch (error) {
@@ -459,13 +504,67 @@ export default function RemindersScreen() {
 
   const toggleReminderComplete = async (reminder: Reminder) => {
     try {
+      // For recurring reminders, ask user if they want to complete just this occurrence or the entire series
+      if (reminder.isRecurring && !reminder.isCompleted) {
+        Alert.alert(
+          'Complete Recurring Reminder',
+          'This is a recurring reminder. What would you like to do?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Complete Series',
+              onPress: async () => {
+                const updatedReminder = {
+                  ...reminder,
+                  isCompleted: true,
+                };
+
+                // Cancel all recurring notifications
+                if (reminder.notificationIds) {
+                  for (const notificationId of reminder.notificationIds) {
+                    await cancelNotification(notificationId);
+                  }
+                }
+
+                await saveReminder(updatedReminder);
+                eventBus.emit(EVENTS.REMINDER_UPDATED);
+                await loadRemindersAndSettings();
+              },
+            },
+            {
+              text: 'Just Mark Done',
+              onPress: async () => {
+                const updatedReminder = {
+                  ...reminder,
+                  isCompleted: true,
+                };
+
+                await saveReminder(updatedReminder);
+                eventBus.emit(EVENTS.REMINDER_UPDATED);
+                await loadRemindersAndSettings();
+              },
+            },
+          ]
+        );
+        return;
+      }
+
+      // For non-recurring reminders or toggling back to incomplete
       const updatedReminder = {
         ...reminder,
         isCompleted: !reminder.isCompleted,
       };
 
-      if (updatedReminder.isCompleted && reminder.notificationId) {
-        await cancelNotification(reminder.notificationId);
+      if (updatedReminder.isCompleted) {
+        // Cancel notifications when completing
+        if (reminder.notificationId) {
+          await cancelNotification(reminder.notificationId);
+        }
+        if (reminder.notificationIds) {
+          for (const notificationId of reminder.notificationIds) {
+            await cancelNotification(notificationId);
+          }
+        }
       }
 
       await saveReminder(updatedReminder);
@@ -607,9 +706,19 @@ export default function RemindersScreen() {
             )}
 
             <Text style={[styles.reminderDateTime, isOverdue && styles.overdueText]}>
-              {new Date(item.dateTime).toLocaleDateString()} at{' '}
-              {new Date(item.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              {isOverdue && ' (Overdue)'}
+              {item.isRecurring ? (
+                <>
+                  🔄 Recurring:{' '}
+                  {item.recurringDays?.map(day => dayNames[day]).join(', ')} at{' '}
+                  {item.recurringTimes?.join(', ')}
+                </>
+              ) : (
+                <>
+                  {new Date(item.dateTime).toLocaleDateString()} at{' '}
+                  {new Date(item.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {isOverdue && ' (Overdue)'}
+                </>
+              )}
               {item.alarmSound && ' ⏰'}
             </Text>
 
