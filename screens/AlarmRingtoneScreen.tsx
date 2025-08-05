@@ -153,15 +153,44 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
 
       setPreviewSound(sound);
 
-      setTimeout(async () => {
-        try {
-          await sound.stopAsync();
-          await sound.unloadAsync();
-          setPreviewSound(null);
-        } catch (error) {
-          console.warn('Error stopping preview sound:', error);
+      // Get sound duration and set preview timeout
+      sound.getStatusAsync().then((status) => {
+        if (status.isLoaded && status.durationMillis) {
+          const previewDuration = Math.min(status.durationMillis, 60000); // 1 minute max
+          
+          setTimeout(async () => {
+            try {
+              await sound.stopAsync();
+              await sound.unloadAsync();
+              setPreviewSound(null);
+            } catch (error) {
+              console.warn('Error stopping preview sound:', error);
+            }
+          }, previewDuration);
+        } else {
+          // Fallback to 1 minute if duration can't be determined
+          setTimeout(async () => {
+            try {
+              await sound.stopAsync();
+              await sound.unloadAsync();
+              setPreviewSound(null);
+            } catch (error) {
+              console.warn('Error stopping preview sound:', error);
+            }
+          }, 60000);
         }
-      }, 3000);
+      }).catch(() => {
+        // Fallback to 1 minute if status check fails
+        setTimeout(async () => {
+          try {
+            await sound.stopAsync();
+            await sound.unloadAsync();
+            setPreviewSound(null);
+          } catch (error) {
+            console.warn('Error stopping preview sound:', error);
+          }
+        }, 60000);
+      });
 
     } catch (error) {
       console.error('Error playing preview sound:', error);
