@@ -231,15 +231,21 @@ export const scheduleAlarmNotification = async (
 
     // Add image attachment if provided
     if (reminder.imageUri) {
-      notificationContent.attachments = [{
-        identifier: 'reminder_image',
-        url: reminder.imageUri,
-        type: 'image',
-        options: {
-          thumbnailHidden: false,
-          thumbnailClippingRect: { x: 0, y: 0, width: 1, height: 0.5 }
-        }
-      }];
+      if (Platform.OS === 'ios') {
+        notificationContent.attachments = [{
+          identifier: 'reminder_image',
+          url: reminder.imageUri,
+          type: 'image',
+          options: {
+            thumbnailHidden: false,
+            thumbnailClippingRect: { x: 0, y: 0, width: 1, height: 0.5 }
+          }
+        }];
+      } else {
+        // For Android, use the body text and data to include image info
+        notificationContent.body = `${reminder.title}\n📷 Image attached`;
+        // Image URI is already in data, which will be used by AlarmManager
+      }
     }
 
     // Configure Android-specific settings
@@ -387,11 +393,25 @@ export const scheduleNotification = async (
     };
 
     if (options?.imageUri) {
-      notificationContent.attachments = [{
-        identifier: 'image',
-        url: options.imageUri,
-        type: 'image'
-      }];
+      if (Platform.OS === 'ios') {
+        notificationContent.attachments = [{
+          identifier: 'image',
+          url: options.imageUri,
+          type: 'image',
+          options: {
+            thumbnailHidden: false,
+            thumbnailClippingRect: { x: 0, y: 0, width: 1, height: 0.5 }
+          }
+        }];
+      } else {
+        // For Android, modify the notification body to indicate image presence
+        notificationContent.body = `${body}\n📷 Image attached`;
+        // Store image URI in data for later use
+        notificationContent.data = {
+          ...notificationContent.data,
+          imageUri: options.imageUri
+        };
+      }
     }
 
     if (options?.isAlarm) {

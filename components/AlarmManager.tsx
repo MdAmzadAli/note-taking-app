@@ -317,11 +317,16 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
           </View>
 
           {reminder.imageUri && (
-            <Image 
-              source={{ uri: reminder.imageUri }} 
-              style={styles.alarmImage}
-              resizeMode="cover"
-            />
+            <View style={styles.imageContainer}>
+              <Image 
+                source={{ uri: reminder.imageUri }} 
+                style={styles.alarmImage}
+                resizeMode="cover"
+                onError={(error) => {
+                  console.warn('Error loading alarm image:', error);
+                }}
+              />
+            </View>
           )}
 
           <View style={styles.reminderDetails}>
@@ -399,11 +404,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
   },
+  imageContainer: {
+    width: '100%',
+    marginBottom: 20,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
   alarmImage: {
     width: '100%',
     height: 150,
     borderRadius: 12,
-    marginBottom: 20,
   },
   reminderDetails: {
     alignItems: 'center',
