@@ -146,14 +146,24 @@ export default function RemindersScreen() {
         const scheduledTime = data.scheduledAt;
         const timeDifference = Math.abs(now - scheduledTime);
         const fiveMinutesInMs = 5 * 60 * 1000; // 5 minutes tolerance
+        const oneMinuteInMs = 60 * 1000; // 1 minute tolerance for snooze resume
 
         console.log('Current time:', now);
         console.log('Scheduled time:', scheduledTime);
         console.log('Time difference (ms):', timeDifference);
+        console.log('Is snooze resume:', data?.isSnoozeResume);
         console.log('Is within 5 minutes of scheduled time:', timeDifference <= fiveMinutesInMs);
 
-        // Only show alarm if we're within 5 minutes of the scheduled time
-        if (timeDifference <= fiveMinutesInMs) {
+        // For snooze resume alarms, use tighter timing tolerance and only trigger when close to scheduled time
+        const timeThreshold = data?.isSnoozeResume ? oneMinuteInMs : fiveMinutesInMs;
+        const shouldTrigger = data?.isSnoozeResume ? 
+          (scheduledTime - now) <= oneMinuteInMs && (scheduledTime - now) >= -30000 : // Within 1 minute before and 30 seconds after
+          timeDifference <= fiveMinutesInMs;
+
+        console.log('Should trigger alarm:', shouldTrigger);
+
+        // Only show alarm based on timing criteria
+        if (shouldTrigger) {
           console.log('✅ ACTUAL alarm notification received at correct time, showing alarm screen');
 
           // Find the reminder or create a temporary one

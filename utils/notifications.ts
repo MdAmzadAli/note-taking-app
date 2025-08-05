@@ -473,7 +473,45 @@ export const snoozeAlarm = async (
       alarmDuration: 5,
     };
 
-    const resumeAlarmId = await scheduleAlarmNotification(snoozeReminder, snoozeTime);
+    // Calculate delay in seconds for proper scheduling
+    const delaySeconds = Math.floor((snoozeTime.getTime() - new Date().getTime()) / 1000);
+    
+    // Schedule the resume alarm notification manually to avoid immediate triggering
+    const resumeNotificationContent = {
+      title: '⏰ Reminder Alarm',
+      body: snoozeReminder.title,
+      sound: 'default',
+      priority: Platform.OS === 'android' ? 'max' : 'high',
+      categoryIdentifier: 'ALARM_CATEGORY',
+      sticky: true,
+      autoDismiss: false,
+      badge: 1,
+      interruptionLevel: Platform.OS === 'ios' ? 'critical' : undefined,
+      data: {
+        reminderId: reminderId,
+        isAlarm: true,
+        scheduledAt: snoozeTime.getTime(),
+        originalTitle: originalTitle || 'Reminder',
+        description: originalDescription || '',
+        imageUri: null,
+        alarmSound: 'default',
+        vibrationEnabled: true,
+        alarmDuration: 5,
+        isSnoozeResume: true, // Flag to identify this as a snooze resume
+      },
+    };
+
+    if (Platform.OS === 'android') {
+      resumeNotificationContent.channelId = 'alarm-channel';
+    }
+
+    const resumeAlarmId = await Notifications.scheduleNotificationAsync({
+      content: resumeNotificationContent,
+      trigger: {
+        seconds: delaySeconds,
+        repeats: false,
+      },
+    });
     console.log(`✅ Alarm scheduled to resume at: ${snoozeTime.toLocaleString()}, ID: ${resumeAlarmId}`);
 
     // STEP 4: Show immediate snooze notification (notification 2) - THIS IS THE ONLY VISIBLE NOTIFICATION
