@@ -136,12 +136,16 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
       });
 
       let soundSource;
-      if (soundUri.startsWith('http') || soundUri.startsWith('file')) {
-        // Custom sound file
+      const builtInSounds = ['default', 'bell', 'chime', 'alert', 'gentle_wake', 'morning', 'classic', 'digital'];
+      
+      if (!builtInSounds.includes(soundUri)) {
+        // Custom sound file - any URI that's not a built-in sound
         soundSource = { uri: soundUri };
+        console.log('🔊 Previewing custom sound:', soundUri);
       } else {
         // Default sound file
         soundSource = getDefaultSoundFile(soundUri);
+        console.log('🔊 Previewing default sound:', soundUri);
       }
 
       const { sound } = await Audio.Sound.createAsync(

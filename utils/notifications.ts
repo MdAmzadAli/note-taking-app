@@ -225,6 +225,7 @@ export const scheduleAlarmNotification = async (
         alarmSound: reminder.alarmSound || 'default',
         vibrationEnabled: reminder.vibrationEnabled !== false,
         alarmDuration: reminder.alarmDuration || 5,
+        isCustomSound: reminder.alarmSound && !['default', 'bell', 'chime', 'alert', 'gentle_wake', 'morning', 'classic', 'digital'].includes(reminder.alarmSound),
       },
     };
 

@@ -121,17 +121,12 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
         let soundSource;
         const alarmSoundSetting = reminder.alarmSound || 'default';
         
-        // Check if it's a custom sound (contains file path or URI that's not a default sound)
-        const isCustomSound = alarmSoundSetting && 
-          !['default', 'bell', 'chime', 'alert', 'gentle_wake', 'morning', 'classic', 'digital'].includes(alarmSoundSetting) &&
-          (alarmSoundSetting.includes('file://') || 
-           alarmSoundSetting.includes('content://') || 
-           alarmSoundSetting.includes('DocumentPicker') ||
-           alarmSoundSetting.includes('cache') ||
-           alarmSoundSetting.startsWith('http'));
+        // Check if it's a custom sound - any URI/file path that's not a built-in sound
+        const builtInSounds = ['default', 'bell', 'chime', 'alert', 'gentle_wake', 'morning', 'classic', 'digital'];
+        const isCustomSound = alarmSoundSetting && !builtInSounds.includes(alarmSoundSetting);
         
         if (isCustomSound) {
-          // Custom sound file
+          // Custom sound file - use the URI directly
           soundSource = { uri: alarmSoundSetting };
           console.log('🔊 Loading custom alarm sound:', alarmSoundSetting);
         } else {
@@ -178,22 +173,23 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
         console.log('🔊 Alarm sound loaded and playing');
       } catch (error) {
         console.warn('Could not load alarm sound:', error);
-        // Fallback to default sound if custom sound fails
-        if (reminder.alarmSound && reminder.alarmSound !== 'default') {
-          try {
-            const { sound: fallbackSound } = await Audio.Sound.createAsync(
-              require('../assets/sounds/alarm.mp3'),
-              {
-                shouldPlay: true,
-                isLooping: true,
-                volume: 1.0,
-              }
-            );
-            setSound(fallbackSound);
-            console.log('🔊 Fallback alarm sound loaded and playing');
-          } catch (fallbackError) {
-            console.warn('Could not load fallback alarm sound:', fallbackError);
-          }
+        console.warn('Failed sound source:', soundSource);
+        
+        // Always try fallback to default sound when any sound fails
+        try {
+          console.log('🔊 Attempting fallback to default alarm sound...');
+          const { sound: fallbackSound } = await Audio.Sound.createAsync(
+            require('../assets/sounds/alarm.mp3'),
+            {
+              shouldPlay: true,
+              isLooping: true,
+              volume: 1.0,
+            }
+          );
+          setSound(fallbackSound);
+          console.log('🔊 Fallback alarm sound loaded and playing successfully');
+        } catch (fallbackError) {
+          console.error('❌ Could not load fallback alarm sound:', fallbackError);
         }
       }
 

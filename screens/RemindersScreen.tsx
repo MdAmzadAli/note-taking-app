@@ -153,11 +153,16 @@ export default function RemindersScreen() {
         console.log('Is snooze resume:', data?.isSnoozeResume);
         console.log('Is within 5 minutes of scheduled time:', timeDifference <= fiveMinutesInMs);
 
-        // For snooze resume alarms, only trigger when we're very close to the actual scheduled time
-        // This prevents immediate triggering for both regular and snooze alarms
-        const shouldTrigger = Math.abs(scheduledTime - now) <= 30000; // Within 30 seconds for all alarms
+        // Check if this is a development environment where notifications fire immediately
+        const isDevelopment = __DEV__;
+        
+        // For development: allow more lenient timing, for production: strict timing
+        const timeToleranceMs = isDevelopment ? 300000 : 30000; // 5 minutes in dev, 30 seconds in production
+        const shouldTrigger = Math.abs(scheduledTime - now) <= timeToleranceMs;
 
         console.log('Should trigger alarm:', shouldTrigger);
+        console.log('Is development environment:', isDevelopment);
+        console.log('Time tolerance (ms):', timeToleranceMs);
 
         // Only show alarm based on timing criteria
         if (shouldTrigger) {
