@@ -1,4 +1,3 @@
-
 export type WritingStyle = 'bullet' | 'journal' | 'cornell' | 'mind_dump' | 'checklist';
 
 export interface NoteSection {
@@ -62,6 +61,7 @@ export interface Reminder {
   alarmSound?: string;
   vibrationEnabled?: boolean;
   alarmDuration?: number; // in minutes
+  isActive?: boolean; // For toggling recurring reminders on/off
 }
 
 export interface Task {

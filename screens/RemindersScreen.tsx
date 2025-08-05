@@ -555,6 +555,7 @@ export default function RemindersScreen() {
       // FIXED: Create proper occurrence tracking for recurring reminders
       if (isRecurring) {
         reminder.occurrences = createOccurrences(reminder.id, selectedDays, selectedTimes);
+        reminder.isActive = true; // Set recurring reminders as active by default
         
         // Initialize occurrence statistics
         reminder.occurrenceStats = {
@@ -679,6 +680,7 @@ export default function RemindersScreen() {
         alarmSound: globalAlarmSettings.alarmEnabled ? globalAlarmSettings.alarmSound : undefined,
         vibrationEnabled: globalAlarmSettings.alarmEnabled ? globalAlarmSettings.vibrationEnabled : undefined,
         alarmDuration: globalAlarmSettings.alarmEnabled ? globalAlarmSettings.alarmDuration : undefined,
+        isActive: isRecurring ? (editingReminder.isActive !== false) : undefined, // Preserve active state for recurring reminders
       };
 
       if (isRecurring) {
@@ -698,17 +700,23 @@ export default function RemindersScreen() {
           updatedReminder.occurrenceStats.totalOccurrences = updatedReminder.occurrences.length;
         }
 
-        // Schedule multiple notifications for recurring reminders
-        try {
-          const notificationIds = globalAlarmSettings.alarmEnabled
-            ? await scheduleRecurringAlarms(updatedReminder, selectedDays, selectedTimes)
-            : [];
-          updatedReminder.notificationIds = notificationIds;
-          updatedReminder.notificationId = undefined; // Clear single notification ID
-        } catch (error) {
-          console.error('❌ Error scheduling recurring alarms during update:', error);
-          Alert.alert('Scheduling Error', `Failed to schedule some recurring alarms: ${error.message}`);
-          return;
+        // Schedule multiple notifications for recurring reminders only if active
+        if (updatedReminder.isActive !== false) {
+          try {
+            const notificationIds = globalAlarmSettings.alarmEnabled
+              ? await scheduleRecurringAlarms(updatedReminder, selectedDays, selectedTimes)
+              : [];
+            updatedReminder.notificationIds = notificationIds;
+            updatedReminder.notificationId = undefined; // Clear single notification ID
+          } catch (error) {
+            console.error('❌ Error scheduling recurring alarms during update:', error);
+            Alert.alert('Scheduling Error', `Failed to schedule some recurring alarms: ${error.message}`);
+            return;
+          }
+        } else {
+          // If inactive, clear notification IDs
+          updatedReminder.notificationIds = [];
+          updatedReminder.notificationId = undefined;
         }
       } else {
         // Schedule single notification for non-recurring reminders
@@ -1026,6 +1034,53 @@ export default function RemindersScreen() {
 
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+  const toggleRecurringReminder = async (reminder: Reminder) => {
+    try {
+      const updatedReminder = {
+        ...reminder,
+        isActive: !reminder.isActive,
+      };
+
+      if (updatedReminder.isActive) {
+        // Reactivate: Schedule new notifications
+        if (reminder.recurringDays && reminder.recurringTimes) {
+          try {
+            const notificationIds = globalAlarmSettings.alarmEnabled
+              ? await scheduleRecurringAlarms(updatedReminder, reminder.recurringDays, reminder.recurringTimes)
+              : [];
+            updatedReminder.notificationIds = notificationIds;
+          } catch (error) {
+            console.error('❌ Error reactivating recurring reminder:', error);
+            Alert.alert('Error', `Failed to reactivate reminder: ${error.message}`);
+            return;
+          }
+        }
+      } else {
+        // Deactivate: Cancel all notifications
+        if (reminder.notificationIds) {
+          for (const notificationId of reminder.notificationIds) {
+            await cancelNotification(notificationId);
+          }
+        }
+        updatedReminder.notificationIds = [];
+      }
+
+      await saveReminder(updatedReminder);
+      eventBus.emit(EVENTS.REMINDER_UPDATED);
+      await loadRemindersAndSettings();
+
+      Alert.alert(
+        'Success',
+        updatedReminder.isActive 
+          ? 'Recurring reminder activated successfully' 
+          : 'Recurring reminder paused successfully'
+      );
+    } catch (error) {
+      console.error('Error toggling recurring reminder:', error);
+      Alert.alert('Error', 'Failed to toggle recurring reminder');
+    }
+  };
+
   const renderReminderItem = ({ item }: { item: Reminder }) => {
     const isOverdue = new Date(item.dateTime) < new Date() && !item.isCompleted;
 
@@ -1071,6 +1126,7 @@ export default function RemindersScreen() {
                   🔄 Recurring:{' '}
                   {item.recurringDays?.map(day => dayNames[day]).join(', ')} at{' '}
                   {item.recurringTimes?.join(', ')}
+                  {item.isActive === false && ' (PAUSED)'}
                   {item.occurrenceStats && (
                     <>
                       {'\n'}
@@ -1088,6 +1144,31 @@ export default function RemindersScreen() {
               )}
               {item.alarmSound && ' ⏰'}
             </Text>
+
+            {item.isRecurring && (
+              <View style={styles.recurringControls}>
+                <TouchableOpacity
+                  style={[
+                    styles.toggleButton,
+                    item.isActive !== false ? styles.toggleButtonActive : styles.toggleButtonInactive
+                  ]}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    toggleRecurringReminder(item);
+                  }}
+                >
+                  <Text style={[
+                    styles.toggleButtonText,
+                    item.isActive !== false ? styles.toggleButtonTextActive : styles.toggleButtonTextInactive
+                  ]}>
+                    {item.isActive !== false ? 'ON' : 'OFF'}
+                  </Text>
+                </TouchableOpacity>
+                <Text style={styles.toggleLabel}>
+                  {item.isActive !== false ? 'Active' : 'Paused'}
+                </Text>
+              </View>
+            )}
 
             {item.imageUri && (
               <Image
@@ -1856,5 +1937,44 @@ input: {
     height: 120,
     borderRadius: 8,
     marginTop: 8,
+  },
+  recurringControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 8,
+  },
+  toggleButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    minWidth: 50,
+  },
+  toggleButtonActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  toggleButtonInactive: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
+  },
+  toggleButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    fontFamily: 'Inter',
+  },
+  toggleButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  toggleButtonTextInactive: {
+    color: '#6B7280',
+  },
+  toggleLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontFamily: 'Inter',
+    fontWeight: '500',
   },
 });
