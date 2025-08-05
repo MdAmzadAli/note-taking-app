@@ -551,18 +551,31 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
                 <View style={styles.ringtoneInfo}>
                   <Text style={styles.ringtoneLabel}>Alarm Ringtone</Text>
                   <Text style={styles.ringtoneValue}>
-                    {settings.alarmSound === 'default' ? 'Default' :
-                     settings.alarmSound === 'bell' ? 'Bell' :
-                     settings.alarmSound === 'chime' ? 'Chime' :
-                     settings.alarmSound === 'alert' ? 'Alert' :
-                     settings.alarmSound === 'gentle_wake' ? 'Gentle Wake' :
-                     settings.alarmSound === 'morning' ? 'Morning' :
-                     settings.alarmSound === 'classic' ? 'Classic' :
-                     settings.alarmSound === 'digital' ? 'Digital' :
-                     (() => {
-                       const customSound = customAlarmSounds.find(sound => sound.uri === settings.alarmSound);
-                       return customSound ? customSound.name : 'Custom Sound';
-                     })()}
+                    {(() => {
+                      switch (settings.alarmSound) {
+                        case 'default': return 'Default';
+                        case 'bell': return 'Bell';
+                        case 'chime': return 'Chime';
+                        case 'alert': return 'Alert';
+                        case 'gentle_wake': return 'Gentle Wake';
+                        case 'morning': return 'Morning';
+                        case 'classic': return 'Classic';
+                        case 'digital': return 'Digital';
+                        default: {
+                          // Check if it's a custom sound
+                          const customSound = customAlarmSounds.find(sound => sound.uri === settings.alarmSound);
+                          if (customSound) {
+                            return customSound.name;
+                          }
+                          // If no custom sound found but it's not a default sound, show filename
+                          if (settings.alarmSound && settings.alarmSound !== 'default') {
+                            const filename = settings.alarmSound.split('/').pop() || settings.alarmSound;
+                            return filename.length > 20 ? filename.substring(0, 20) + '...' : filename;
+                          }
+                          return 'Default';
+                        }
+                      }
+                    })()}
                   </Text>
                 </View>
                 <Text style={styles.ringtoneArrow}>›</Text>

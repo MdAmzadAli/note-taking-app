@@ -13,6 +13,7 @@ import {
   Animated,
 } from 'react-native';
 import { Audio } from 'expo-av';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { stopAlarm, snoozeAlarm } from '@/utils/notifications';
 import { Reminder } from '@/types';
 
@@ -22,13 +23,36 @@ interface AlarmManagerProps {
   reminder?: Reminder;
 }
 
+interface CustomSound {
+  uri: string;
+  name: string;
+}
+
 export const AlarmManager: React.FC<AlarmManagerProps> = ({
   visible,
   onClose,
   reminder
 }) => {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [customAlarmSounds, setCustomAlarmSounds] = useState<CustomSound[]>([]);
+  const [currentRingtoneName, setCurrentRingtoneName] = useState<string>('');
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    // Load custom sounds when component mounts
+    const loadCustomSounds = async () => {
+      try {
+        const savedSounds = await AsyncStorage.getItem('customAlarmSounds');
+        if (savedSounds) {
+          setCustomAlarmSounds(JSON.parse(savedSounds));
+        }
+      } catch (error) {
+        console.error('Error loading custom sounds:', error);
+      }
+    };
+
+    loadCustomSounds();
+  }, []);
 
   useEffect(() => {
     let autoStopTimeout: NodeJS.Timeout;
@@ -39,6 +63,33 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
 
       console.log('🚨 ALARM MANAGER ACTIVATED for:', reminder.title);
       console.log('Alarm started at:', new Date().toLocaleString());
+
+      // Determine and set current ringtone name
+      const alarmSoundSetting = reminder.alarmSound || 'default';
+      let ringtoneName = 'Default';
+
+      switch (alarmSoundSetting) {
+        case 'bell': ringtoneName = 'Bell'; break;
+        case 'chime': ringtoneName = 'Chime'; break;
+        case 'alert': ringtoneName = 'Alert'; break;
+        case 'gentle_wake': ringtoneName = 'Gentle Wake'; break;
+        case 'morning': ringtoneName = 'Morning'; break;
+        case 'classic': ringtoneName = 'Classic'; break;
+        case 'digital': ringtoneName = 'Digital'; break;
+        default: {
+          // Check if it's a custom sound
+          const customSound = customAlarmSounds.find(sound => sound.uri === alarmSoundSetting);
+          if (customSound) {
+            ringtoneName = customSound.name;
+          } else if (alarmSoundSetting && alarmSoundSetting !== 'default') {
+            // Extract filename from URI
+            const filename = alarmSoundSetting.split('/').pop() || alarmSoundSetting;
+            ringtoneName = filename.length > 25 ? filename.substring(0, 25) + '...' : filename;
+          }
+        }
+      }
+
+      setCurrentRingtoneName(ringtoneName);
 
       // Start pulsing animation
       Animated.loop(
@@ -70,7 +121,16 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
         let soundSource;
         const alarmSoundSetting = reminder.alarmSound || 'default';
         
-        if (alarmSoundSetting.startsWith('file://') || alarmSoundSetting.startsWith('http')) {
+        // Check if it's a custom sound (contains file path or URI that's not a default sound)
+        const isCustomSound = alarmSoundSetting && 
+          !['default', 'bell', 'chime', 'alert', 'gentle_wake', 'morning', 'classic', 'digital'].includes(alarmSoundSetting) &&
+          (alarmSoundSetting.includes('file://') || 
+           alarmSoundSetting.includes('content://') || 
+           alarmSoundSetting.includes('DocumentPicker') ||
+           alarmSoundSetting.includes('cache') ||
+           alarmSoundSetting.startsWith('http'));
+        
+        if (isCustomSound) {
           // Custom sound file
           soundSource = { uri: alarmSoundSetting };
           console.log('🔊 Loading custom alarm sound:', alarmSoundSetting);
@@ -253,6 +313,11 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
             <Text style={styles.currentTime}>
               {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
+            {currentRingtoneName && (
+              <Text style={styles.ringtoneName}>
+                🎵 {currentRingtoneName}
+              </Text>
+            )}
           </View>
 
           {reminder.imageUri && (
@@ -330,6 +395,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#6B7280',
     fontFamily: 'Inter',
+  },
+  ringtoneName: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    fontFamily: 'Inter',
+    marginTop: 4,
+    textAlign: 'center',
   },
   alarmImage: {
     width: '100%',

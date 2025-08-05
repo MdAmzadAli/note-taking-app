@@ -232,6 +232,14 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
 
   const handleSave = async () => {
     try {
+      // Stop any playing preview sound before saving
+      if (previewSound) {
+        await previewSound.stopAsync();
+        await previewSound.unloadAsync();
+        setPreviewSound(null);
+        setCurrentlyPlayingSound(null);
+      }
+
       const settings = await getUserSettings();
       const updatedSettings = { ...settings, alarmSound: selectedSound };
       await saveUserSettings(updatedSettings);
@@ -246,10 +254,25 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
     }
   };
 
+  const handleBack = async () => {
+    // Stop any playing preview sound before going back
+    if (previewSound) {
+      try {
+        await previewSound.stopAsync();
+        await previewSound.unloadAsync();
+        setPreviewSound(null);
+        setCurrentlyPlayingSound(null);
+      } catch (error) {
+        console.warn('Error stopping preview sound on back:', error);
+      }
+    }
+    onBack();
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Text style={styles.backButtonText}>← Cancel</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Alarm Ringtone</Text>
