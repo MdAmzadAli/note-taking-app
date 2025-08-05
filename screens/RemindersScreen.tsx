@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -19,7 +20,7 @@ import VoiceInput from '@/components/VoiceInput';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Reminder } from '@/types';
 import { getReminders, saveReminder, deleteReminder, updateReminder, getUserSettings } from '@/utils/storage';
-import { scheduleNotification, scheduleAlarmNotification, scheduleRecurringAlarms, cancelNotification, stopAlarm, snoozeAlarm } from '@/utils/notifications';
+import { scheduleNotification, scheduleAlarmNotification, scheduleRecurringAlarms, cancelNotification, stopAlarm, snoozeAlarm, dismissSnoozeAlarm } from '@/utils/notifications';
 import { eventBus, EVENTS } from '@/utils/eventBus';
 import { mockSpeechToText } from '@/utils/speech';
 import { AlarmManager } from '@/components/AlarmManager';
@@ -76,7 +77,9 @@ export default function RemindersScreen() {
     const notificationResponseListener = Notifications.addNotificationResponseReceivedListener(
       async (response) => {
         const { data } = response.notification.request.content;
-        console.log('Notification response received:', response.actionIdentifier, data);
+        console.log('=== NOTIFICATION RESPONSE RECEIVED ===');
+        console.log('Action:', response.actionIdentifier);
+        console.log('Data:', data);
 
         if (data?.isAlarm && data?.reminderId) {
           // Find the reminder
@@ -85,29 +88,35 @@ export default function RemindersScreen() {
 
           if (reminder) {
             if (response.actionIdentifier === 'STOP_ALARM') {
-              console.log('Stopping alarm from notification action');
+              console.log('STOP_ALARM action - stopping alarm from notification');
               await stopAlarm(reminder.id);
               setActiveAlarmReminder(null);
             } else if (response.actionIdentifier === 'SNOOZE_ALARM') {
-              console.log('Snoozing alarm from notification action');
-              await snoozeAlarm(reminder.id, 5);
-              setActiveAlarmReminder(null);
-            } else if (response.actionIdentifier === 'DISMISS_SNOOZE') {
-              console.log('Dismissing snooze alarm permanently');
-              // Cancel the pending snooze alarm
-              if (data?.originalAlarmId) {
-                await cancelNotification(data.originalAlarmId);
-                console.log('Cancelled pending snooze alarm:', data.originalAlarmId);
-              }
-              await stopAlarm(reminder.id);
+              console.log('SNOOZE_ALARM action - snoozing alarm from notification');
+              await snoozeAlarm(reminder.id, 5, reminder.title, reminder.description);
               setActiveAlarmReminder(null);
             } else {
               // Default action - show alarm screen
-              console.log('Showing full-screen alarm interface');
+              console.log('Default action - showing full-screen alarm interface');
               setActiveAlarmReminder(reminder);
             }
           }
+        } else if (data?.isSnoozeNotification && data?.reminderId) {
+          // Handle snooze notification actions
+          if (response.actionIdentifier === 'DISMISS_ALARM') {
+            console.log('DISMISS_ALARM action - dismissing snooze alarm permanently');
+            await dismissSnoozeAlarm(data.reminderId, data.resumeAlarmId);
+            setActiveAlarmReminder(null);
+          }
+        } else if (data?.isAutoDismiss) {
+          // Handle auto-dismiss of snooze notifications
+          console.log('Auto-dismiss notification received - dismissing snooze notification');
+          if (data.targetNotificationId) {
+            await Notifications.dismissNotificationAsync(data.targetNotificationId);
+          }
         }
+
+        console.log('=====================================');
       }
     );
 
@@ -121,12 +130,22 @@ export default function RemindersScreen() {
 
       // Handle snooze notifications differently
       if (data?.isSnoozeNotification) {
-        console.log('📱 Snooze notification received - showing dismissible notification');
-        // This is just the dismissible notification, don't trigger alarm screen
+        console.log('📱 Snooze notification received - showing dismissible notification only');
+        // This is the dismissible notification (notification 2), don't trigger alarm screen
         return;
       }
 
-      // Only process alarm notifications
+      // Handle auto-dismiss notifications
+      if (data?.isAutoDismiss) {
+        console.log('🔄 Auto-dismiss notification received');
+        if (data.targetNotificationId) {
+          Notifications.dismissNotificationAsync(data.targetNotificationId);
+          console.log('✅ Snooze notification auto-dismissed');
+        }
+        return;
+      }
+
+      // Only process alarm notifications (notification 1)
       if (data?.isAlarm && data?.reminderId && data?.scheduledAt) {
         const now = new Date().getTime();
         const scheduledTime = data.scheduledAt;
@@ -139,7 +158,6 @@ export default function RemindersScreen() {
         console.log('Is within 5 minutes of scheduled time:', timeDifference <= fiveMinutesInMs);
 
         // Only show alarm if we're within 5 minutes of the scheduled time
-        // This prevents development environment from showing alarms immediately
         if (timeDifference <= fiveMinutesInMs) {
           console.log('✅ Alarm notification received at correct time, showing alarm screen');
 

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
@@ -186,6 +187,9 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
   }, [visible, reminder]);
 
   const handleStopAlarm = async () => {
+    console.log('STOP button pressed - stopping alarm immediately');
+    
+    // Stop all alarm effects immediately
     Vibration.cancel();
 
     if (sound) {
@@ -194,14 +198,20 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
       setSound(null);
     }
 
+    // Stop the alarm notification system
     if (reminder) {
       await stopAlarm(reminder.id);
     }
 
+    // Close the alarm screen
     onClose();
+    console.log('✅ Alarm stopped and screen closed');
   };
 
   const handleSnoozeAlarm = async () => {
+    console.log('SNOOZE button pressed - snoozing alarm');
+    
+    // Stop all alarm effects immediately (same as stop)
     Vibration.cancel();
 
     if (sound) {
@@ -210,11 +220,14 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
       setSound(null);
     }
 
+    // Execute snooze functionality
     if (reminder) {
-      await snoozeAlarm(reminder.id, 5);
+      await snoozeAlarm(reminder.id, 5, reminder.title, reminder.description);
     }
 
+    // Close the alarm screen (same as stop)
     onClose();
+    console.log('✅ Alarm snoozed and screen closed');
   };
 
   if (!reminder) return null;
