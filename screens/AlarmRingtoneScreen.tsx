@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -45,10 +44,12 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
   const [selectedSound, setSelectedSound] = useState(currentAlarmSound);
   const [customAlarmSounds, setCustomAlarmSounds] = useState<CustomSound[]>([]);
   const [previewSound, setPreviewSound] = useState<Audio.Sound | null>(null);
+  const [currentlyPlayingSound, setCurrentlyPlayingSound] = useState<string | null>(null);
+
 
   useEffect(() => {
     loadCustomSounds();
-    
+
     return () => {
       if (previewSound) {
         previewSound.stopAsync().then(() => {
@@ -85,9 +86,9 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
 
         const updatedSounds = [...customAlarmSounds, newSound];
         setCustomAlarmSounds(updatedSounds);
-        
+
         await AsyncStorage.setItem('customAlarmSounds', JSON.stringify(updatedSounds));
-        
+
         Alert.alert('Success', `Added "${newSound.name}" as custom alarm sound`);
       }
     } catch (error) {
@@ -123,6 +124,7 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
         await previewSound.stopAsync();
         await previewSound.unloadAsync();
         setPreviewSound(null);
+        setCurrentlyPlayingSound(null);
       }
 
       await Audio.setAudioModeAsync({
@@ -152,17 +154,20 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
       );
 
       setPreviewSound(sound);
+      setCurrentlyPlayingSound(soundUri);
+
 
       // Get sound duration and set preview timeout
       sound.getStatusAsync().then((status) => {
         if (status.isLoaded && status.durationMillis) {
           const previewDuration = Math.min(status.durationMillis, 60000); // 1 minute max
-          
+
           setTimeout(async () => {
             try {
               await sound.stopAsync();
               await sound.unloadAsync();
               setPreviewSound(null);
+              setCurrentlyPlayingSound(null);
             } catch (error) {
               console.warn('Error stopping preview sound:', error);
             }
@@ -174,6 +179,7 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
               await sound.stopAsync();
               await sound.unloadAsync();
               setPreviewSound(null);
+              setCurrentlyPlayingSound(null);
             } catch (error) {
               console.warn('Error stopping preview sound:', error);
             }
@@ -186,6 +192,7 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
             await sound.stopAsync();
             await sound.unloadAsync();
             setPreviewSound(null);
+            setCurrentlyPlayingSound(null);
           } catch (error) {
             console.warn('Error stopping preview sound:', error);
           }
@@ -211,7 +218,7 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
             const updatedSounds = customAlarmSounds.filter((_, i) => i !== index);
             setCustomAlarmSounds(updatedSounds);
             await AsyncStorage.setItem('customAlarmSounds', JSON.stringify(updatedSounds));
-            
+
             // If the deleted sound was selected, reset to default
             const deletedSound = customAlarmSounds[index];
             if (selectedSound === deletedSound.uri) {
@@ -228,7 +235,7 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
       const settings = await getUserSettings();
       const updatedSettings = { ...settings, alarmSound: selectedSound };
       await saveUserSettings(updatedSettings);
-      
+
       onSave(selectedSound);
       Alert.alert('Success', 'Alarm ringtone saved successfully!', [
         { text: 'OK', onPress: onBack }
@@ -274,7 +281,7 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
                   </Text>
                   <Text style={styles.soundType}>Built-in</Text>
                 </View>
-                
+
                 <View style={styles.soundActions}>
                   <TouchableOpacity
                     style={styles.previewButton}
@@ -282,8 +289,8 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
                   >
                     <Text style={styles.previewButtonText}>▶️</Text>
                   </TouchableOpacity>
-                  
-                  {previewSound && (
+
+                  {currentlyPlayingSound === sound.value && (
                     <TouchableOpacity
                       style={styles.stopButton}
                       onPress={async () => {
@@ -291,6 +298,7 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
                           await previewSound.stopAsync();
                           await previewSound.unloadAsync();
                           setPreviewSound(null);
+                          setCurrentlyPlayingSound(null);
                         }
                       }}
                     >
@@ -326,7 +334,7 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
                     </Text>
                     <Text style={styles.soundType}>Custom</Text>
                   </View>
-                  
+
                   <View style={styles.soundActions}>
                     <TouchableOpacity
                       style={styles.previewButton}
@@ -334,8 +342,8 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
                     >
                       <Text style={styles.previewButtonText}>▶️</Text>
                     </TouchableOpacity>
-                    
-                    {previewSound && (
+
+                    {currentlyPlayingSound === sound.uri && (
                       <TouchableOpacity
                         style={styles.stopButton}
                         onPress={async () => {
@@ -343,13 +351,14 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
                             await previewSound.stopAsync();
                             await previewSound.unloadAsync();
                             setPreviewSound(null);
+                            setCurrentlyPlayingSound(null);
                           }
                         }}
                       >
                         <Text style={styles.stopButtonText}>⏸️</Text>
                       </TouchableOpacity>
                     )}
-                    
+
                     <TouchableOpacity
                       style={styles.deleteButton}
                       onPress={() => deleteCustomSound(index)}

@@ -64,6 +64,7 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
   const [showAlarmRingtone, setShowAlarmRingtone] = useState(false);
   const [customAlarmSounds, setCustomAlarmSounds] = useState<Array<{uri: string, name: string}>>([]);
   const [previewSound, setPreviewSound] = useState<Audio.Sound | null>(null);
+  const [currentlyPlayingSound, setCurrentlyPlayingSound] = useState<string | null>(null); // State to track the currently playing sound
 
   useEffect(() => {
     loadSettings();
@@ -148,6 +149,7 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
         await previewSound.stopAsync();
         await previewSound.unloadAsync();
         setPreviewSound(null);
+        setCurrentlyPlayingSound(null); // Clear currently playing sound
       }
 
       // Set audio mode
@@ -179,6 +181,7 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
       );
 
       setPreviewSound(sound);
+      setCurrentlyPlayingSound(soundUri); // Set the currently playing sound
 
       // Get sound duration and set preview timeout
       sound.getStatusAsync().then((status) => {
@@ -190,6 +193,7 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
               await sound.stopAsync();
               await sound.unloadAsync();
               setPreviewSound(null);
+              setCurrentlyPlayingSound(null); // Clear currently playing sound
             } catch (error) {
               console.warn('Error stopping preview sound:', error);
             }
@@ -201,6 +205,7 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
               await sound.stopAsync();
               await sound.unloadAsync();
               setPreviewSound(null);
+              setCurrentlyPlayingSound(null); // Clear currently playing sound
             } catch (error) {
               console.warn('Error stopping preview sound:', error);
             }
@@ -213,6 +218,7 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
             await sound.stopAsync();
             await sound.unloadAsync();
             setPreviewSound(null);
+            setCurrentlyPlayingSound(null); // Clear currently playing sound
           } catch (error) {
             console.warn('Error stopping preview sound:', error);
           }
@@ -600,6 +606,112 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
                   </TouchableOpacity>
                 ))}
               </View>
+            </View>
+
+            {/* Sound Selection for Alarm */}
+            <View style={styles.settingGroup}>
+              <View style={styles.soundHeader}>
+                <Text style={styles.settingLabel}>Alarm Sound</Text>
+                <TouchableOpacity style={styles.addSoundButton} onPress={pickAudioFile}>
+                  <Text style={styles.addSoundButtonText}>+ Add Sound</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View>
+                <Text style={styles.soundSectionTitle}>Default Sounds</Text>
+                <View style={styles.soundOptions}>
+                  {['default', 'bell', 'chime', 'alert', 'gentle_wake', 'morning', 'classic', 'digital'].map((soundName) => (
+                    <TouchableOpacity
+                      key={soundName}
+                      style={[
+                        styles.soundOption,
+                        settings.alarmSound === soundName && styles.soundOptionSelected
+                      ]}
+                      onPress={() => {
+                        updateSettings({ alarmSound: soundName });
+                        previewAlarmSound(soundName);
+                      }}
+                    >
+                      <Text style={[
+                        styles.soundOptionText,
+                        settings.alarmSound === soundName && styles.soundOptionTextSelected
+                      ]}>
+                        {soundName.charAt(0).toUpperCase() + soundName.slice(1)}
+                      </Text>
+                      {settings.alarmSound === soundName && (
+                        <TouchableOpacity
+                          style={styles.stopButton}
+                          onPress={() => {
+                            if (previewSound) {
+                              previewSound.stopAsync().then(() => {
+                                previewSound.unloadAsync();
+                                setPreviewSound(null);
+                                setCurrentlyPlayingSound(null);
+                              }).catch(console.warn);
+                            }
+                          }}
+                        >
+                          <Text style={styles.stopButtonText}>Stop</Text>
+                        </TouchableOpacity>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {customAlarmSounds.length > 0 && (
+                <View>
+                  <Text style={styles.soundSectionTitle}>Custom Sounds</Text>
+                  <FlatList
+                    data={customAlarmSounds}
+                    keyExtractor={(item, index) => `${item.uri}-${index}`}
+                    style={styles.customSoundsList}
+                    renderItem={({ item, index }) => (
+                      <View style={styles.customSoundItem}>
+                        <TouchableOpacity
+                          style={[
+                            styles.customSoundOption,
+                            settings.alarmSound === item.uri && styles.customSoundOptionSelected
+                          ]}
+                          onPress={() => {
+                            updateSettings({ alarmSound: item.uri });
+                            previewAlarmSound(item.uri);
+                          }}
+                        >
+                          <Text style={[
+                            styles.customSoundText,
+                            settings.alarmSound === item.uri && styles.customSoundTextSelected
+                          ]}>
+                            {item.name}
+                          </Text>
+                          {settings.alarmSound === item.uri && (
+                            <TouchableOpacity
+                              style={styles.stopButton}
+                              onPress={() => {
+                                if (previewSound) {
+                                  previewSound.stopAsync().then(() => {
+                                    previewSound.unloadAsync();
+                                    setPreviewSound(null);
+                                    setCurrentlyPlayingSound(null);
+                                  }).catch(console.warn);
+                                }
+                              }}
+                            >
+                              <Text style={styles.stopButtonText}>Stop</Text>
+                            </TouchableOpacity>
+                          )}
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.deleteButton} onPress={() => deleteCustomSound(index)}>
+                          <Text style={styles.deleteButtonText}>X</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  />
+                </View>
+              )}
+              <Text style={styles.soundHelpText}>
+                Tap a sound to preview. The currently playing sound will have a "Stop" button.
+              </Text>
             </View>
           </View>
         </SafeAreaView>
