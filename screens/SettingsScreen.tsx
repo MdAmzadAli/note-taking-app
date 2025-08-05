@@ -124,21 +124,21 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
   const getDefaultSoundFile = (soundValue: string) => {
     switch (soundValue) {
       case 'bell':
-        return require('../assets/sounds/bell.mp3');
+        return require('@/assets/sounds/bell.mp3');
       case 'chime':
-        return require('../assets/sounds/chime.mp3');
+        return require('@/assets/sounds/chime.mp3');
       case 'alert':
-        return require('../assets/sounds/alert.mp3');
+        return require('@/assets/sounds/alert.mp3');
       case 'gentle_wake':
-        return require('../assets/sounds/gentle_wake.mp3');
+        return require('@/assets/sounds/gentle_wake.mp3');
       case 'morning':
-        return require('../assets/sounds/morning.mp3');
+        return require('@/assets/sounds/morning.mp3');
       case 'classic':
-        return require('../assets/sounds/classic.mp3');
+        return require('@/assets/sounds/classic.mp3');
       case 'digital':
-        return require('../assets/sounds/digital.mp3');
+        return require('@/assets/sounds/digital.mp3');
       default:
-        return require('../assets/sounds/alarm.mp3');
+        return require('@/assets/sounds/alarm.mp3');
     }
   };
 
