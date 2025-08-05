@@ -253,12 +253,6 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
                   >
                     <Text style={styles.previewButtonText}>▶️</Text>
                   </TouchableOpacity>
-                  
-                  {selectedSound === sound.value && (
-                    <View style={styles.selectedIndicator}>
-                      <Text style={styles.selectedText}>✓</Text>
-                    </View>
-                  )}
                 </View>
               </TouchableOpacity>
             ))}
@@ -303,12 +297,6 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
                     >
                       <Text style={styles.deleteButtonText}>🗑️</Text>
                     </TouchableOpacity>
-                    
-                    {selectedSound === sound.uri && (
-                      <View style={styles.selectedIndicator}>
-                        <Text style={styles.selectedText}>✓</Text>
-                      </View>
-                    )}
                   </View>
                 </TouchableOpacity>
               ))}
