@@ -18,6 +18,7 @@ import { clearAllData } from '@/utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { VoiceRecognitionMethod } from '@/utils/speech';
 import VoiceCommandsScreen from './VoiceCommandsScreen';
+import AlarmRingtoneScreen from './AlarmRingtoneScreen';
 import * as DocumentPicker from 'expo-document-picker';
 import { Audio } from 'expo-av';
 
@@ -60,6 +61,7 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
   });
   const [showVoiceCommands, setShowVoiceCommands] = useState(false);
   const [showAlarmManager, setShowAlarmManager] = useState(false);
+  const [showAlarmRingtone, setShowAlarmRingtone] = useState(false);
   const [customAlarmSounds, setCustomAlarmSounds] = useState<Array<{uri: string, name: string}>>([]);
   const [previewSound, setPreviewSound] = useState<Audio.Sound | null>(null);
 
@@ -231,6 +233,19 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
 
   if (showVoiceCommands) {
     return <VoiceCommandsScreen onBack={() => setShowVoiceCommands(false)} />;
+  }
+
+  if (showAlarmRingtone) {
+    return (
+      <AlarmRingtoneScreen
+        onBack={() => setShowAlarmRingtone(false)}
+        currentAlarmSound={settings.alarmSound}
+        onSave={(selectedSound) => {
+          setSettings(prev => ({ ...prev, alarmSound: selectedSound }));
+          setShowAlarmRingtone(false);
+        }}
+      />
+    );
   }
 
   return (
@@ -467,92 +482,27 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
 
           <View style={styles.modalContent}>
             <View style={styles.settingGroup}>
-              <View style={styles.soundHeader}>
-                <Text style={styles.settingLabel}>Alarm Sound</Text>
-                <TouchableOpacity
-                  style={styles.addSoundButton}
-                  onPress={pickAudioFile}
-                >
-                  <Text style={styles.addSoundButtonText}>+ Add Custom</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Default Sounds */}
-              <Text style={styles.soundSectionTitle}>Default Sounds</Text>
-              <View style={styles.soundOptions}>
-                {[
-                  { label: 'Default', value: 'default' },
-                  { label: 'Bell', value: 'bell' },
-                  { label: 'Chime', value: 'chime' },
-                  { label: 'Alert', value: 'alert' }
-                ].map((sound) => (
-                  <TouchableOpacity
-                    key={sound.value}
-                    style={[
-                      styles.soundOption,
-                      settings.alarmSound === sound.value && styles.soundOptionSelected
-                    ]}
-                    onPress={() => updateSettings({ alarmSound: sound.value })}
-                    onLongPress={() => previewAlarmSound(sound.value)}
-                  >
-                    <Text style={[
-                      styles.soundOptionText,
-                      settings.alarmSound === sound.value && styles.soundOptionTextSelected
-                    ]}>
-                      {sound.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Custom Sounds */}
-              {customAlarmSounds.length > 0 && (
-                <>
-                  <Text style={styles.soundSectionTitle}>Custom Sounds</Text>
-                  <FlatList
-                    data={customAlarmSounds}
-                    keyExtractor={(item, index) => `${item.uri}_${index}`}
-                    renderItem={({ item, index }) => (
-                      <View style={styles.customSoundItem}>
-                        <TouchableOpacity
-                          style={[
-                            styles.customSoundOption,
-                            settings.alarmSound === item.uri && styles.customSoundOptionSelected
-                          ]}
-                          onPress={() => updateSettings({ alarmSound: item.uri })}
-                        >
-                          <Text style={[
-                            styles.customSoundText,
-                            settings.alarmSound === item.uri && styles.customSoundTextSelected
-                          ]} numberOfLines={1}>
-                            {item.name}
-                          </Text>
-                        </TouchableOpacity>
-                        
-                        <TouchableOpacity
-                          style={styles.previewButton}
-                          onPress={() => previewAlarmSound(item.uri)}
-                        >
-                          <Text style={styles.previewButtonText}>▶️</Text>
-                        </TouchableOpacity>
-                        
-                        <TouchableOpacity
-                          style={styles.deleteButton}
-                          onPress={() => deleteCustomSound(index)}
-                        >
-                          <Text style={styles.deleteButtonText}>🗑️</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                    style={styles.customSoundsList}
-                    showsVerticalScrollIndicator={false}
-                  />
-                </>
-              )}
-
-              <Text style={styles.soundHelpText}>
-                💡 Long press default sounds to preview. Supported formats: MP3, WAV, M4A
-              </Text>
+              <Text style={styles.settingLabel}>Alarm Sound</Text>
+              <TouchableOpacity
+                style={styles.ringtoneButton}
+                onPress={() => setShowAlarmRingtone(true)}
+              >
+                <View style={styles.ringtoneInfo}>
+                  <Text style={styles.ringtoneLabel}>Alarm Ringtone</Text>
+                  <Text style={styles.ringtoneValue}>
+                    {settings.alarmSound === 'default' ? 'Default' :
+                     settings.alarmSound === 'bell' ? 'Bell' :
+                     settings.alarmSound === 'chime' ? 'Chime' :
+                     settings.alarmSound === 'alert' ? 'Alert' :
+                     settings.alarmSound === 'gentle_wake' ? 'Gentle Wake' :
+                     settings.alarmSound === 'morning' ? 'Morning' :
+                     settings.alarmSound === 'classic' ? 'Classic' :
+                     settings.alarmSound === 'digital' ? 'Digital' :
+                     'Custom Sound'}
+                  </Text>
+                </View>
+                <Text style={styles.ringtoneArrow}>›</Text>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.settingGroup}>
@@ -1097,5 +1047,36 @@ const styles = StyleSheet.create({
   durationButtonTextSelected: {
     color: '#FFFFFF',
     fontWeight: '500',
+  },
+  ringtoneButton: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginTop: 8,
+  },
+  ringtoneInfo: {
+    flex: 1,
+  },
+  ringtoneLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000000',
+    fontFamily: 'Inter',
+  },
+  ringtoneValue: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontFamily: 'Inter',
+    marginTop: 2,
+  },
+  ringtoneArrow: {
+    fontSize: 18,
+    color: '#6B7280',
+    fontFamily: 'Inter',
   },
 });

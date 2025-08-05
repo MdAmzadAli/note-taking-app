@@ -65,7 +65,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
           playThroughEarpieceAndroid: false,
         });
 
-        // Determine sound source
+        // Determine sound source based on alarm sound setting
         let soundSource;
         const alarmSoundSetting = reminder.alarmSound || 'default';
         
@@ -74,9 +74,10 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
           soundSource = { uri: alarmSoundSetting };
           console.log('🔊 Loading custom alarm sound:', alarmSoundSetting);
         } else {
-          // Default sound
+          // Default sound (all default options use the same alarm.mp3 for now)
+          // In a real app, you would have different sound files for each default option
           soundSource = require('@/assets/sounds/alarm.mp3');
-          console.log('🔊 Loading default alarm sound');
+          console.log('🔊 Loading default alarm sound:', alarmSoundSetting);
         }
 
         const { sound: alarmSound } = await Audio.Sound.createAsync(
