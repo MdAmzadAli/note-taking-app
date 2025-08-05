@@ -67,7 +67,7 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
 
   useEffect(() => {
     loadSettings();
-    
+
     // Cleanup preview sound on unmount
     return () => {
       if (previewSound) {
@@ -108,10 +108,10 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
 
         const updatedSounds = [...customAlarmSounds, newSound];
         setCustomAlarmSounds(updatedSounds);
-        
+
         // Save to storage
         await AsyncStorage.setItem('customAlarmSounds', JSON.stringify(updatedSounds));
-        
+
         Alert.alert('Success', `Added "${newSound.name}" as custom alarm sound`);
       }
     } catch (error) {
@@ -184,7 +184,7 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
       sound.getStatusAsync().then((status) => {
         if (status.isLoaded && status.durationMillis) {
           const previewDuration = Math.min(status.durationMillis, 60000); // 1 minute max
-          
+
           setTimeout(async () => {
             try {
               await sound.stopAsync();
@@ -340,7 +340,7 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
                 styles.apiStatusValue,
                 { color: process.env.EXPO_PUBLIC_GEMINI_API_KEY ? '#10B981' : '#F59E0B' }
               ]}>
-                {process.env.EXPO_PUBLIC_GEMini_API_KEY ? '✓ Configured' : '⚠ Optional'}
+                {process.env.EXPO_PUBLIC_GEMINI_API_KEY ? '✓ Configured' : '⚠ Optional'}
               </Text>
             </View>
           </View>
@@ -1057,6 +1057,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   previewButtonText: {
+    fontSize: 12,
+  },
+  stopButton: {
+    backgroundColor: '#007AFF', // Changed color to blue for distinction
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginRight: 4,
+    minWidth: 36,
+    alignItems: 'center',
+  },
+  stopButtonText: {
     fontSize: 12,
   },
   deleteButton: {

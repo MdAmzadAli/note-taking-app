@@ -282,6 +282,21 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
                   >
                     <Text style={styles.previewButtonText}>▶️</Text>
                   </TouchableOpacity>
+                  
+                  {previewSound && (
+                    <TouchableOpacity
+                      style={styles.stopButton}
+                      onPress={async () => {
+                        if (previewSound) {
+                          await previewSound.stopAsync();
+                          await previewSound.unloadAsync();
+                          setPreviewSound(null);
+                        }
+                      }}
+                    >
+                      <Text style={styles.stopButtonText}>⏸️</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </TouchableOpacity>
             ))}
@@ -319,6 +334,21 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
                     >
                       <Text style={styles.previewButtonText}>▶️</Text>
                     </TouchableOpacity>
+                    
+                    {previewSound && (
+                      <TouchableOpacity
+                        style={styles.stopButton}
+                        onPress={async () => {
+                          if (previewSound) {
+                            await previewSound.stopAsync();
+                            await previewSound.unloadAsync();
+                            setPreviewSound(null);
+                          }
+                        }}
+                      >
+                        <Text style={styles.stopButtonText}>⏸️</Text>
+                      </TouchableOpacity>
+                    )}
                     
                     <TouchableOpacity
                       style={styles.deleteButton}
@@ -453,6 +483,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   previewButtonText: {
+    fontSize: 12,
+  },
+  stopButton: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 6,
+    minWidth: 36,
+    alignItems: 'center',
+  },
+  stopButtonText: {
     fontSize: 12,
   },
   deleteButton: {
