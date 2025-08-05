@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -10,7 +11,10 @@ import {
   Switch,
   Platform,
   SafeAreaView,
+  Animated,
+  ScrollView,
 } from 'react-native';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Task } from '@/types';
@@ -39,6 +43,12 @@ export default function TasksScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [filter, setFilter] = useState<'all' | 'today' | 'tomorrow' | 'overdue'>('all');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
+  
+  // New state for tabs and undo functionality
+  const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
+  const [undoTaskId, setUndoTaskId] = useState<string | null>(null);
+  const [undoTimeout, setUndoTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [celebrationTaskId, setCelebrationTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     loadTasksAndSettings();
@@ -58,7 +68,6 @@ export default function TasksScreen() {
     const taskDeletedListener = (taskId: string) => {
       setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
     };
-
 
     eventBus.on(EVENTS.TASK_CREATED, taskCreatedListener);
     eventBus.on(EVENTS.TASK_UPDATED, taskUpdatedListener);
@@ -80,7 +89,16 @@ export default function TasksScreen() {
       );
     }
     setFilteredTasks(filtered);
-  }, [searchQuery, tasks, filter]);
+  }, [searchQuery, tasks, filter, activeTab]);
+
+  // Clear undo timeout on component unmount
+  useEffect(() => {
+    return () => {
+      if (undoTimeout) {
+        clearTimeout(undoTimeout);
+      }
+    };
+  }, [undoTimeout]);
 
   function getTomorrowDate(): Date {
     const tomorrow = new Date();
@@ -222,8 +240,9 @@ export default function TasksScreen() {
     }
   };
 
-  const toggleTaskComplete = async (task: Task) => {
+  const toggleTaskComplete = async (task: Task, showCelebration = true) => {
     try {
+      const wasCompleted = task.isCompleted;
       const updatedTask = {
         ...task,
         isCompleted: !task.isCompleted,
@@ -236,9 +255,55 @@ export default function TasksScreen() {
       await saveTask(updatedTask);
       eventBus.emit(EVENTS.TASK_UPDATED, updatedTask);
       await loadTasksAndSettings();
+
+      // Show celebration animation when task is completed
+      if (!wasCompleted && updatedTask.isCompleted && showCelebration) {
+        setCelebrationTaskId(task.id);
+        setTimeout(() => setCelebrationTaskId(null), 2000);
+      }
     } catch (error) {
       console.error('Error updating task:', error);
       Alert.alert('Error', 'Failed to update task');
+    }
+  };
+
+  const handleSwipeComplete = (task: Task) => {
+    if (task.isCompleted) return;
+
+    // Complete the task
+    toggleTaskComplete(task, true);
+
+    // Show undo option
+    setUndoTaskId(task.id);
+
+    // Clear any existing timeout
+    if (undoTimeout) {
+      clearTimeout(undoTimeout);
+    }
+
+    // Set new timeout to hide undo option
+    const timeout = setTimeout(() => {
+      setUndoTaskId(null);
+    }, 4000);
+
+    setUndoTimeout(timeout);
+  };
+
+  const handleUndo = async (taskId: string) => {
+    try {
+      const task = tasks.find(t => t.id === taskId);
+      if (task && task.isCompleted) {
+        await toggleTaskComplete(task, false);
+      }
+
+      // Clear undo state
+      setUndoTaskId(null);
+      if (undoTimeout) {
+        clearTimeout(undoTimeout);
+        setUndoTimeout(null);
+      }
+    } catch (error) {
+      console.error('Error undoing task completion:', error);
     }
   };
 
@@ -275,7 +340,11 @@ export default function TasksScreen() {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    return tasks.filter(task => {
+    let filtered = tasks.filter(task => {
+      // First filter by completion status based on active tab
+      if (activeTab === 'active' && task.isCompleted) return false;
+      if (activeTab === 'completed' && !task.isCompleted) return false;
+
       const taskDate = new Date(task.scheduledDate || task.createdAt);
       const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
 
@@ -290,6 +359,34 @@ export default function TasksScreen() {
           return true;
       }
     });
+
+    // Group completed tasks by date if showing completed tab
+    if (activeTab === 'completed') {
+      filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+
+    return filtered;
+  };
+
+  const getTaskStats = () => {
+    const completedTasks = tasks.filter(task => task.isCompleted);
+    const totalTasks = tasks.length;
+    const completionRate = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;
+
+    // Group by dates
+    const tasksByDate = completedTasks.reduce((acc, task) => {
+      const date = new Date(task.createdAt).toDateString();
+      if (!acc[date]) acc[date] = [];
+      acc[date].push(task);
+      return acc;
+    }, {} as Record<string, Task[]>);
+
+    return {
+      totalCompleted: completedTasks.length,
+      totalTasks,
+      completionRate,
+      tasksByDate,
+    };
   };
 
   const onDateChange = (event: any, selectedDate?: Date) => {
@@ -324,71 +421,182 @@ export default function TasksScreen() {
     return { icon: '📅', color: '#000000', text: 'Upcoming' };
   };
 
-  const renderTaskItem = ({ item }: { item: Task }) => {
+  const SwipeableTaskItem = ({ item }: { item: Task }) => {
+    const translateX = new Animated.Value(0);
     const status = getTaskStatus(item);
 
-    return (
-      <TouchableOpacity 
-        style={[
-          styles.taskItem,
-          item.isCompleted && styles.completedTask,
-        ]}
-        onPress={() => startEditingTask(item)}
-      >
-        <View style={styles.taskHeader}>
+    const onGestureEvent = Animated.event(
+      [{ nativeEvent: { translationX: translateX } }],
+      { useNativeDriver: false }
+    );
+
+    const onHandlerStateChange = (event: any) => {
+      if (event.nativeEvent.state === State.END) {
+        const { translationX } = event.nativeEvent;
+        
+        if (Math.abs(translationX) > 120 && !item.isCompleted) {
+          // Trigger completion
+          handleSwipeComplete(item);
+          
+          // Animate out
+          Animated.timing(translateX, {
+            toValue: translationX > 0 ? 300 : -300,
+            duration: 300,
+            useNativeDriver: false,
+          }).start(() => {
+            translateX.setValue(0);
+          });
+        } else {
+          // Snap back
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: false,
+          }).start();
+        }
+      }
+    };
+
+    // Show undo interface if this task has undo active
+    if (undoTaskId === item.id) {
+      return (
+        <View style={styles.undoContainer}>
+          <Text style={styles.undoText}>Task completed!</Text>
           <TouchableOpacity
-            style={styles.checkboxContainer}
-            onPress={(e) => {
-              e.stopPropagation();
-              toggleTaskComplete(item);
-            }}
+            style={styles.undoButton}
+            onPress={() => handleUndo(item.id)}
           >
-            <Text style={styles.checkbox}>
-              {item.isCompleted ? '✅' : '⭕'}
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.taskInfo}>
-            <Text style={[
-              styles.taskTitle,
-              item.isCompleted && styles.completedText,
-            ]}>
-              {item.title}
-            </Text>
-
-            {item.description && (
-              <Text style={[styles.taskDescription, item.isCompleted && styles.completedText]}>
-                {item.description}
-              </Text>
-            )}
-
-            <View style={styles.taskMeta}>
-              <Text style={[styles.statusBadge, { color: status.color }]}>
-                {status.icon} {status.text}
-              </Text>
-
-              {item.scheduledDate && (
-                <Text style={styles.taskDate}>
-                  📅 {new Date(item.scheduledDate).toLocaleDateString()}
-                </Text>
-              )}
-
-              {item.reminderTime && !item.isCompleted && (
-                <Text style={styles.reminderTime}>
-                  🔔 {new Date(item.reminderTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              )}
-            </View>
-          </View>
-
-          <TouchableOpacity onPress={(e) => {
-            e.stopPropagation();
-            deleteTaskById(item);
-          }}>
-            <Text style={styles.deleteButton}>Delete</Text>
+            <Text style={styles.undoButtonText}>Undo</Text>
           </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+      );
+    }
+
+    return (
+      <PanGestureHandler
+        onGestureEvent={onGestureEvent}
+        onHandlerStateChange={onHandlerStateChange}
+        enabled={!item.isCompleted}
+      >
+        <Animated.View style={[{ transform: [{ translateX }] }]}>
+          <TouchableOpacity 
+            style={[
+              styles.taskItem,
+              item.isCompleted && styles.completedTask,
+              celebrationTaskId === item.id && styles.celebrationTask,
+            ]}
+            onPress={() => startEditingTask(item)}
+          >
+            <View style={styles.taskHeader}>
+              <TouchableOpacity
+                style={styles.checkboxContainer}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  toggleTaskComplete(item);
+                }}
+              >
+                <View style={[
+                  styles.checkbox,
+                  item.isCompleted && styles.checkboxCompleted
+                ]}>
+                  {item.isCompleted && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+              </TouchableOpacity>
+
+              <View style={styles.taskInfo}>
+                <Text style={[
+                  styles.taskTitle,
+                  item.isCompleted && styles.completedText,
+                ]}>
+                  {item.title}
+                </Text>
+
+                {item.description && (
+                  <Text style={[styles.taskDescription, item.isCompleted && styles.completedText]}>
+                    {item.description}
+                  </Text>
+                )}
+
+                <View style={styles.taskMeta}>
+                  <Text style={[styles.statusBadge, { color: status.color }]}>
+                    {status.icon} {status.text}
+                  </Text>
+
+                  {item.scheduledDate && (
+                    <Text style={styles.taskDate}>
+                      📅 {new Date(item.scheduledDate).toLocaleDateString()}
+                    </Text>
+                  )}
+
+                  {item.reminderTime && !item.isCompleted && (
+                    <Text style={styles.reminderTime}>
+                      🔔 {new Date(item.reminderTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              <TouchableOpacity onPress={(e) => {
+                e.stopPropagation();
+                deleteTaskById(item);
+              }}>
+                <Text style={styles.deleteButton}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+
+            {celebrationTaskId === item.id && (
+              <Animated.View style={styles.celebrationOverlay}>
+                <Text style={styles.celebrationText}>🎉 Great job! 🎉</Text>
+              </Animated.View>
+            )}
+          </TouchableOpacity>
+        </Animated.View>
+      </PanGestureHandler>
+    );
+  };
+
+  const renderCompletedTasksByDate = () => {
+    const stats = getTaskStats();
+    const { tasksByDate } = stats;
+    const dates = Object.keys(tasksByDate).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+
+    return (
+      <View>
+        {/* Statistics Section */}
+        <View style={styles.statsContainer}>
+          <Text style={styles.statsTitle}>Task Statistics</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{stats.totalCompleted}</Text>
+              <Text style={styles.statLabel}>Completed</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{stats.totalTasks}</Text>
+              <Text style={styles.statLabel}>Total Tasks</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{stats.completionRate}%</Text>
+              <Text style={styles.statLabel}>Success Rate</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Tasks by Date */}
+        {dates.map(date => (
+          <View key={date} style={styles.dateSection}>
+            <Text style={styles.dateHeader}>
+              {new Date(date).toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </Text>
+            {tasksByDate[date].map(task => (
+              <SwipeableTaskItem key={task.id} item={task} />
+            ))}
+          </View>
+        ))}
+      </View>
     );
   };
 
@@ -403,6 +611,23 @@ export default function TasksScreen() {
       <Text style={[
         styles.filterButtonText,
         filter === filterType && styles.filterButtonTextActive,
+      ]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderTabButton = (tabType: 'active' | 'completed', label: string) => (
+    <TouchableOpacity
+      style={[
+        styles.tabButton,
+        activeTab === tabType && styles.tabButtonActive,
+      ]}
+      onPress={() => setActiveTab(tabType)}
+    >
+      <Text style={[
+        styles.tabButtonText,
+        activeTab === tabType && styles.tabButtonTextActive,
       ]}>
         {label}
       </Text>
@@ -559,32 +784,52 @@ export default function TasksScreen() {
         </View>
       )}
 
-      <View style={styles.filtersContainer}>
-        {renderFilterButton('all', 'All')}
-        {renderFilterButton('today', 'Today')}
-        {renderFilterButton('tomorrow', 'Tomorrow')}
-        {renderFilterButton('overdue', 'Overdue')}
+      {/* Tabs */}
+      <View style={styles.tabsContainer}>
+        {renderTabButton('active', 'Active')}
+        {renderTabButton('completed', 'History')}
       </View>
 
-      <FlatList
-        data={filteredTasks}
-        keyExtractor={(item) => item.id}
-        renderItem={renderTaskItem}
-        contentContainerStyle={styles.tasksList}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>
-              {searchQuery.trim() 
-                ? 'No tasks found for your search.'
-                : filter === 'all' 
-                ? "No tasks yet. Tap 'New Task' to create your first task."
-                : `No ${filter} tasks found.`
-              }
-            </Text>
-          </View>
-        }
-      />
+      {activeTab === 'active' && (
+        <View style={styles.filtersContainer}>
+          {renderFilterButton('all', 'All')}
+          {renderFilterButton('today', 'Today')}
+          {renderFilterButton('tomorrow', 'Tomorrow')}
+          {renderFilterButton('overdue', 'Overdue')}
+        </View>
+      )}
+
+      {activeTab === 'active' ? (
+        <FlatList
+          data={filteredTasks}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => <SwipeableTaskItem item={item} />}
+          contentContainerStyle={styles.tasksList}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>
+                {searchQuery.trim() 
+                  ? 'No tasks found for your search.'
+                  : filter === 'all' 
+                  ? "No active tasks. Tap 'New Task' to create your first task."
+                  : `No ${filter} tasks found.`
+                }
+              </Text>
+            </View>
+          }
+        />
+      ) : (
+        <ScrollView style={styles.tasksList} showsVerticalScrollIndicator={false}>
+          {filteredTasks.length > 0 ? (
+            renderCompletedTasksByDate()
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>No completed tasks yet.</Text>
+            </View>
+          )}
+        </ScrollView>
+      )}
 
       <SearchResultsModal
         visible={showSearchModal}
@@ -633,12 +878,6 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  searchButtonText: {
-    fontSize: 13,
-    color: '#FFFFFF',
-    fontFamily: 'Inter',
-    fontWeight: '500',
   },
   addButton: {
     backgroundColor: '#000000',
@@ -704,6 +943,39 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     color: '#000000',
   },
+  tabsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    gap: 8,
+  },
+  tabButton: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+  },
+  tabButtonActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  tabButtonText: {
+    fontSize: 14,
+    color: '#000000',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  tabButtonTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
   filtersContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
@@ -745,9 +1017,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    position: 'relative',
   },
-  taskItemCompleted: {
-    opacity: 0.7,
+  celebrationTask: {
+    borderColor: '#10B981',
+    backgroundColor: '#F0FDF4',
   },
   taskHeader: {
     flexDirection: 'row',
@@ -763,15 +1037,28 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontFamily: 'Inter',
   },
-  taskTitleCompleted: {
-    textDecorationLine: 'line-through',
-  },
   checkboxContainer: {
     marginRight: 12,
     padding: 4,
   },
   checkbox: {
-    fontSize: 20,
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxCompleted: {
+    backgroundColor: '#10B981',
+    borderColor: '#10B981',
+  },
+  checkmark: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   taskInfo: {
     flex: 1,
@@ -822,6 +1109,96 @@ const styles = StyleSheet.create({
   completedText: {
     textDecorationLine: 'line-through',
     opacity: 0.6,
+  },
+  undoContainer: {
+    backgroundColor: '#10B981',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  undoText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  undoButton: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  undoButtonText: {
+    color: '#10B981',
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: 'Inter',
+  },
+  celebrationOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(16, 185, 129, 0.9)',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  celebrationText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+    fontFamily: 'Inter',
+  },
+  statsContainer: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  statsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
+    fontFamily: 'Inter',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#10B981',
+    fontFamily: 'Inter',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontFamily: 'Inter',
+    marginTop: 4,
+  },
+  dateSection: {
+    marginBottom: 24,
+  },
+  dateHeader: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    fontFamily: 'Inter',
+    marginBottom: 12,
+    paddingLeft: 8,
   },
   formContainer: {
     padding: 16,
@@ -908,8 +1285,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'Inter',
     lineHeight: 25.6,
-  },
-  voiceInputButton: {
-    marginHorizontal: 4,
   },
 });
