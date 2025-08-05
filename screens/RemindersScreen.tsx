@@ -164,21 +164,33 @@ export default function RemindersScreen() {
       console.log('=============================');
     });
 
-    // Handle notification dismissed (swiped away) - this stops the alarm (mobile only)
+    // Handle notification dismissed (swiped away) - this stops the alarm (mobile only, not in Expo Go)
     let notificationDismissedListener = null;
     if (Platform.OS !== 'web') {
-      notificationDismissedListener = Notifications.addNotificationDismissedListener(
-        async (notification) => {
-          const { data } = notification.request.content;
-          console.log('Notification dismissed (swiped away):', data);
+      try {
+        // Check if we're in Expo Go (where this function is not available)
+        const Constants = require('expo-constants');
+        const isExpoGo = Constants.appOwnership === 'expo';
+        
+        if (!isExpoGo && Notifications.addNotificationDismissedListener) {
+          notificationDismissedListener = Notifications.addNotificationDismissedListener(
+            async (notification) => {
+              const { data } = notification.request.content;
+              console.log('Notification dismissed (swiped away):', data);
 
-          if (data?.isAlarm && data?.reminderId) {
-            console.log('Alarm notification dismissed - stopping alarm');
-            await stopAlarm(data.reminderId);
-            setActiveAlarmReminder(null);
-          }
+              if (data?.isAlarm && data?.reminderId) {
+                console.log('Alarm notification dismissed - stopping alarm');
+                await stopAlarm(data.reminderId);
+                setActiveAlarmReminder(null);
+              }
+            }
+          );
+        } else {
+          console.log('Notification dismissed listener not available in Expo Go environment');
         }
-      );
+      } catch (error) {
+        console.log('Could not set up notification dismissed listener:', error);
+      }
     }
 
     // Clean up subscription on unmount
