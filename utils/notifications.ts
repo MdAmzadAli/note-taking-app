@@ -1,4 +1,3 @@
-
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
@@ -7,12 +6,12 @@ export const initializeNotificationSystem = async (): Promise<void> => {
   try {
     // Request permissions first
     await requestNotificationPermissions();
-    
+
     // Set up notification categories for mobile platforms only
     if (Platform.OS !== 'web') {
       await setupNotificationCategories();
     }
-    
+
     console.log('Notification system initialized successfully');
   } catch (error) {
     console.error('Error initializing notification system:', error);
@@ -24,19 +23,19 @@ Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
     const data = notification.request.content.data;
     const isAlarm = data?.isAlarm;
-    
+
     console.log('=== NOTIFICATION HANDLER ===');
     console.log('Notification ID:', notification.request.identifier);
     console.log('Is Alarm:', isAlarm);
     console.log('Handler called at:', new Date().toLocaleString());
-    
+
     if (isAlarm && data?.scheduledAt) {
       console.log('Scheduled for:', new Date(data.scheduledAt).toLocaleString());
       console.log('✅ Alarm notification - allowing to show');
     }
-    
+
     console.log('=============================');
-    
+
     return {
       shouldShowBanner: true,
       shouldShowList: true,
@@ -93,7 +92,7 @@ const setupNotificationCategories = async () => {
         sound: 'default',
       });
     }
-    
+
     console.log('Notification categories set up successfully');
   } catch (error) {
     console.error('Error setting up notification categories:', error);
@@ -160,7 +159,7 @@ export const scheduleAlarmNotification = async (
     // Create a new Date object to avoid timezone issues
     const now = new Date();
     const scheduledDateTime = new Date(dateTime);
-    
+
     console.log('=== NEW ALARM SCHEDULING SYSTEM ===');
     console.log('Reminder ID:', reminder.id);
     console.log('Reminder Title:', reminder.title);
@@ -168,14 +167,14 @@ export const scheduleAlarmNotification = async (
     console.log('Scheduled Local Time:', scheduledDateTime.toString());
     console.log('Current Timestamp:', now.getTime());
     console.log('Scheduled Timestamp:', scheduledDateTime.getTime());
-    
+
     // Calculate the delay in milliseconds
     const delayMs = scheduledDateTime.getTime() - now.getTime();
     const delaySeconds = Math.floor(delayMs / 1000);
-    
+
     console.log('Delay in milliseconds:', delayMs);
     console.log('Delay in seconds:', delaySeconds);
-    
+
     // Validate timing
     if (delayMs <= 0) {
       console.error('❌ Cannot schedule alarm for past time');
@@ -250,7 +249,7 @@ export const scheduleAlarmNotification = async (
     console.log('Will trigger at:', scheduledDateTime.toLocaleString());
     console.log('Will trigger in:', delaySeconds, 'seconds');
     console.log('====================================');
-    
+
     return notificationId;
   } catch (error) {
     console.error('❌ Error scheduling alarm notification:', error);
@@ -282,23 +281,23 @@ export const scheduleRecurringAlarms = async (
       for (const timeStr of recurringTimes) {
         try {
           const [hours, minutes] = timeStr.split(':').map(Number);
-          
+
           // Create the target date/time
           const targetDate = new Date();
           targetDate.setHours(hours, minutes, 0, 0);
-          
+
           // Calculate days until the target day of week
           const currentDay = now.getDay();
           let daysUntilTarget = (dayOfWeek - currentDay + 7) % 7;
-          
+
           // If it's the same day but the time has passed, schedule for next week
           if (daysUntilTarget === 0 && targetDate <= now) {
             daysUntilTarget = 7;
           }
-          
+
           // Set the target date
           targetDate.setDate(now.getDate() + daysUntilTarget);
-          
+
           console.log(`Scheduling for day ${dayOfWeek} at ${timeStr}:`);
           console.log(`- Target date/time: ${targetDate.toLocaleString()}`);
           console.log(`- Days until target: ${daysUntilTarget}`);
@@ -310,7 +309,7 @@ export const scheduleRecurringAlarms = async (
           };
 
           const notificationId = await scheduleAlarmNotification(uniqueReminder, targetDate);
-          
+
           if (notificationId) {
             notificationIds.push(notificationId);
             console.log(`✅ Scheduled alarm for ${targetDate.toLocaleString()}`);
@@ -323,7 +322,7 @@ export const scheduleRecurringAlarms = async (
 
     console.log(`✅ Scheduled ${notificationIds.length} recurring alarms`);
     console.log('===================================');
-    
+
     return notificationIds;
   } catch (error) {
     console.error('❌ Error scheduling recurring alarms:', error);
@@ -356,7 +355,7 @@ export const scheduleNotification = async (
     const now = new Date();
     const scheduledTime = new Date(dateTime);
     const secondsFromNow = Math.floor((scheduledTime.getTime() - now.getTime()) / 1000);
-    
+
     if (secondsFromNow <= 0) {
       throw new Error('Cannot schedule notification for past time');
     }
@@ -401,15 +400,15 @@ export const scheduleNotification = async (
 export const stopAlarm = async (reminderId: string): Promise<void> => {
   try {
     console.log(`Stopping alarm for reminder: ${reminderId}`);
-    
+
     // Cancel ALL notifications to ensure clean state
     await Notifications.cancelAllScheduledNotificationsAsync();
     console.log('Cancelled all scheduled notifications for clean state');
-    
+
     // Dismiss all currently displayed notifications
     await Notifications.dismissAllNotificationsAsync();
     console.log('Dismissed all presented notifications');
-    
+
     console.log(`Alarm stopped successfully for reminder: ${reminderId}`);
   } catch (error) {
     console.error('Error stopping alarm:', error);
@@ -419,19 +418,19 @@ export const stopAlarm = async (reminderId: string): Promise<void> => {
 export const snoozeAlarm = async (reminderId: string, snoozeMinutes: number = 5): Promise<void> => {
   try {
     console.log(`Snoozing alarm for reminder: ${reminderId} for ${snoozeMinutes} minutes`);
-    
+
     if (Platform.OS === 'web') {
       console.log('Snooze not supported on web platform');
       return;
     }
-    
+
     // Calculate snooze time
     const snoozeTime = new Date();
     snoozeTime.setMinutes(snoozeTime.getMinutes() + snoozeMinutes);
-    
+
     // Stop the current alarm first
     await stopAlarm(reminderId);
-    
+
     // Create a snooze reminder
     const snoozeReminder = {
       id: `${reminderId}_snooze_${Date.now()}`,
@@ -441,10 +440,47 @@ export const snoozeAlarm = async (reminderId: string, snoozeMinutes: number = 5)
       vibrationEnabled: true,
       alarmDuration: 5,
     };
-    
+
     // Schedule the snooze alarm
     const notificationId = await scheduleAlarmNotification(snoozeReminder, snoozeTime);
-    
+
+    // Optionally, schedule a notification to prompt dismissal of snooze
+    const dismissNotificationContent = {
+      title: 'Alarm Snoozed',
+      body: `Alarm will resume in ${snoozeMinutes} minutes. Dismiss to stop.`,
+      sound: 'default',
+      priority: 'high',
+      data: {
+        reminderId: reminder.id, // Use the original reminder ID
+        isAlarm: true,
+        scheduledAt: snoozeTime.getTime(),
+        isSnoozeNotification: true,
+      },
+      categoryIdentifier: 'ALARM_CATEGORY', // Reuse alarm category
+      actions: [
+        {
+          identifier: 'DISMISS_SNOOZE',
+          buttonTitle: 'Dismiss Alarm',
+          options: {
+            foreground: true,
+            destructive: true,
+          },
+        },
+      ],
+    };
+
+    if (Platform.OS === 'android') {
+      notificationContent.channelId = 'alarm-channel';
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      content: notificationContent,
+      trigger: {
+        seconds: snoozeMinutes * 60,
+        repeats: false,
+      },
+    });
+
     console.log(`Alarm snoozed until: ${snoozeTime.toLocaleString()}, notification ID: ${notificationId}`);
   } catch (error) {
     console.error('Error snoozing alarm:', error);

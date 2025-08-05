@@ -92,6 +92,10 @@ export default function RemindersScreen() {
               console.log('Snoozing alarm from notification action');
               await snoozeAlarm(reminder.id, 5);
               setActiveAlarmReminder(null);
+            } else if (response.actionIdentifier === 'DISMISS_SNOOZE') {
+              console.log('Dismissing snooze alarm');
+              await stopAlarm(reminder.id);
+              setActiveAlarmReminder(null);
             } else {
               // Default action - show alarm screen
               console.log('Showing full-screen alarm interface');
@@ -160,10 +164,27 @@ export default function RemindersScreen() {
       console.log('=============================');
     });
 
+    // Handle notification dismissed (swiped away) - this stops the alarm
+    const notificationDismissedListener = Notifications.addNotificationDismissedListener(
+      async (notification) => {
+        const { data } = notification.request.content;
+        console.log('Notification dismissed (swiped away):', data);
+
+        if (data?.isAlarm && data?.reminderId) {
+          console.log('Alarm notification dismissed - stopping alarm');
+          await stopAlarm(data.reminderId);
+          setActiveAlarmReminder(null);
+        }
+      }
+    );
+
     // Clean up subscription on unmount
     return () => {
       eventBus.off(EVENTS.REMINDER_UPDATED, reminderUpdateListener);
       notificationResponseListener.remove();
+      if (notificationDismissedListener) {
+        notificationDismissedListener.remove();
+      }
       if (foregroundListener) {
         foregroundListener.remove();
       }
