@@ -19,16 +19,20 @@ export interface Note {
   updatedAt: string;
 }
 
-// NEW: Interface for tracking individual occurrences of recurring reminders
+// FIXED: Complete interface for tracking individual occurrences of recurring reminders
 export interface ReminderOccurrence {
-  id: string; // Format: reminderId_dayOfWeek_time
+  id: string; // Format: reminderId_dayOfWeek_timeHHMM
   parentReminderId: string;
   dayOfWeek: number; // 0-6 (Sunday-Saturday)
   time: string; // HH:MM format
   isCompleted: boolean;
   completedAt?: string;
   lastTriggered?: string;
-  nextScheduled?: string;
+  nextScheduled: string; // ISO string of next scheduled occurrence
+  notificationId?: string; // Individual notification ID for this occurrence
+  consecutiveCompletions?: number; // Track completion streaks
+  totalScheduled?: number; // Total times this occurrence has been scheduled
+  totalCompleted?: number; // Total times this occurrence has been completed
 }
 
 export interface Reminder {
@@ -43,8 +47,17 @@ export interface Reminder {
   isRecurring?: boolean;
   recurringDays?: number[];
   recurringTimes?: string[];
-  // NEW: Track individual occurrences for recurring reminders
+  // FIXED: Properly track individual occurrences for recurring reminders
   occurrences?: ReminderOccurrence[];
+  // FIXED: Add occurrence completion statistics
+  occurrenceStats?: {
+    totalOccurrences: number;
+    completedOccurrences: number;
+    completionRate: number; // percentage
+    lastCompletedDate?: string;
+    currentStreak: number; // consecutive completed occurrences
+    longestStreak: number;
+  };
   imageUri?: string;
   alarmSound?: string;
   vibrationEnabled?: boolean;

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -17,7 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import VoiceInput from '@/components/VoiceInput';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { Reminder } from '@/types';
+import { Reminder, ReminderOccurrence } from '@/types';
 import { getReminders, saveReminder, deleteReminder, updateReminder, getUserSettings } from '@/utils/storage';
 import { scheduleNotification, scheduleAlarmNotification, scheduleRecurringAlarms, cancelNotification, stopAlarm, snoozeAlarm, dismissSnoozeAlarm } from '@/utils/notifications';
 import { eventBus, EVENTS } from '@/utils/eventBus';
@@ -320,25 +321,28 @@ export default function RemindersScreen() {
     }
   };
 
-  const createReminder = async () => {
-    if (!newTitle.trim()) {
-      Alert.alert('Error', 'Please enter a reminder title');
-      return;
+  // FIXED: Strict validation function that prevents creation with conflicts
+  const validateRecurringSchedule = (days: number[], times: string[]): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+    
+    if (days.length === 0) {
+      errors.push('Please select at least one day for recurring reminder');
     }
-
-    if (isRecurring && selectedDays.length === 0) {
-      Alert.alert('Error', 'Please select at least one day for recurring reminder');
-      return;
+    
+    if (times.length === 0) {
+      errors.push('Please add at least one time for recurring reminder');
     }
-
-    if (isRecurring && selectedTimes.length === 0) {
-      Alert.alert('Error', 'Please add at least one time for recurring reminder');
-      return;
+    
+    // Check for duplicate times (exact conflicts)
+    const uniqueTimes = new Set(times);
+    if (uniqueTimes.size !== times.length) {
+      const duplicates = times.filter((time, index) => times.indexOf(time) !== index);
+      errors.push(`Duplicate times found: ${[...new Set(duplicates)].join(', ')}`);
     }
-
-    // Validate for time conflicts
-    if (isRecurring && selectedTimes.length > 1) {
-      const sortedTimes = [...selectedTimes].sort();
+    
+    // Check for times too close together (within 2 minutes minimum)
+    if (times.length > 1) {
+      const sortedTimes = [...times].sort();
       for (let i = 0; i < sortedTimes.length - 1; i++) {
         const time1 = sortedTimes[i];
         const time2 = sortedTimes[i + 1];
@@ -349,10 +353,67 @@ export default function RemindersScreen() {
         const minutes1 = h1 * 60 + m1;
         const minutes2 = h2 * 60 + m2;
         
-        if (Math.abs(minutes2 - minutes1) < 5) {
-          Alert.alert('Error', `Times ${time1} and ${time2} are too close together. Please ensure at least 5 minutes between reminders.`);
-          return;
+        if (Math.abs(minutes2 - minutes1) < 2) {
+          errors.push(`Times ${time1} and ${time2} are too close together (must be at least 2 minutes apart)`);
         }
+      }
+    }
+    
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  };
+
+  // FIXED: Helper function to create proper occurrences
+  const createOccurrences = (reminderId: string, days: number[], times: string[]): ReminderOccurrence[] => {
+    const occurrences: ReminderOccurrence[] = [];
+    const now = new Date();
+    
+    days.forEach(dayOfWeek => {
+      times.forEach(time => {
+        const [hours, minutes] = time.split(':').map(Number);
+        
+        // Calculate next occurrence for this day/time
+        const nextOccurrence = new Date();
+        nextOccurrence.setHours(hours, minutes, 0, 0);
+        
+        let daysUntilTarget = (dayOfWeek - now.getDay() + 7) % 7;
+        if (daysUntilTarget === 0 && nextOccurrence <= now) {
+          daysUntilTarget = 7; // Schedule for next week if time has passed today
+        }
+        
+        nextOccurrence.setDate(now.getDate() + daysUntilTarget);
+        
+        occurrences.push({
+          id: `${reminderId}_${dayOfWeek}_${time.replace(':', '')}`,
+          parentReminderId: reminderId,
+          dayOfWeek,
+          time,
+          isCompleted: false,
+          nextScheduled: nextOccurrence.toISOString(),
+          consecutiveCompletions: 0,
+          totalScheduled: 0,
+          totalCompleted: 0,
+        });
+      });
+    });
+    
+    return occurrences;
+  };
+
+  const createReminder = async () => {
+    if (!newTitle.trim()) {
+      Alert.alert('Error', 'Please enter a reminder title');
+      return;
+    }
+
+    // FIXED: Strict validation with clear error messages
+    if (isRecurring) {
+      const validation = validateRecurringSchedule(selectedDays, selectedTimes);
+      if (!validation.valid) {
+        Alert.alert('Validation Error', validation.errors.join('\n\n'));
+        return;
       }
     }
 
@@ -373,29 +434,35 @@ export default function RemindersScreen() {
         alarmDuration: globalAlarmSettings.alarmEnabled ? globalAlarmSettings.alarmDuration : undefined,
       };
 
-      // NEW: Create occurrence tracking for recurring reminders
+      // FIXED: Create proper occurrence tracking for recurring reminders
       if (isRecurring) {
-        const occurrences: any[] = [];
-        selectedDays.forEach(dayOfWeek => {
-          selectedTimes.forEach(time => {
-            occurrences.push({
-              id: `${reminder.id}_${dayOfWeek}_${time.replace(':', '')}`,
-              parentReminderId: reminder.id,
-              dayOfWeek,
-              time,
-              isCompleted: false,
-              nextScheduled: new Date().toISOString(), // Will be updated when scheduled
-            });
-          });
-        });
-        reminder.occurrences = occurrences;
+        reminder.occurrences = createOccurrences(reminder.id, selectedDays, selectedTimes);
+        
+        // Initialize occurrence statistics
+        reminder.occurrenceStats = {
+          totalOccurrences: reminder.occurrences.length,
+          completedOccurrences: 0,
+          completionRate: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+        };
 
-        // Schedule multiple notifications for recurring reminders
-        const notificationIds = globalAlarmSettings.alarmEnabled
-          ? await scheduleRecurringAlarms(reminder, selectedDays, selectedTimes)
-          : [];
+        // FIXED: Schedule multiple notifications with proper error handling
+        try {
+          const notificationIds = globalAlarmSettings.alarmEnabled
+            ? await scheduleRecurringAlarms(reminder, selectedDays, selectedTimes)
+            : [];
 
-        reminder.notificationIds = notificationIds;
+          reminder.notificationIds = notificationIds;
+          
+          if (notificationIds.length !== selectedDays.length * selectedTimes.length) {
+            console.warn(`⚠️ Expected ${selectedDays.length * selectedTimes.length} notifications, but got ${notificationIds.length}`);
+          }
+        } catch (error) {
+          console.error('❌ Error scheduling recurring alarms:', error);
+          Alert.alert('Scheduling Error', `Failed to schedule some recurring alarms: ${error.message}`);
+          return; // Don't save reminder if scheduling fails
+        }
       } else {
         // Schedule single notification for non-recurring reminders
         const notificationId = globalAlarmSettings.alarmEnabled
@@ -430,9 +497,17 @@ export default function RemindersScreen() {
       setNewTime(new Date());
       setSelectedImageUri(null);
       setIsCreating(false);
+      
+      // Show success message
+      Alert.alert(
+        'Success', 
+        isRecurring 
+          ? `Recurring reminder created with ${selectedDays.length * selectedTimes.length} scheduled occurrences`
+          : 'Reminder created successfully'
+      );
     } catch (error) {
       console.error('Error creating reminder:', error);
-      Alert.alert('Error', 'Failed to create reminder');
+      Alert.alert('Error', `Failed to create reminder: ${error.message}`);
     }
   };
 
@@ -454,14 +529,13 @@ export default function RemindersScreen() {
       return;
     }
 
-    if (isRecurring && selectedDays.length === 0) {
-      Alert.alert('Error', 'Please select at least one day for recurring reminder');
-      return;
-    }
-
-    if (isRecurring && selectedTimes.length === 0) {
-      Alert.alert('Error', 'Please add at least one time for recurring reminder');
-      return;
+    // FIXED: Strict validation for updates too
+    if (isRecurring) {
+      const validation = validateRecurringSchedule(selectedDays, selectedTimes);
+      if (!validation.valid) {
+        Alert.alert('Validation Error', validation.errors.join('\n\n'));
+        return;
+      }
     }
 
     try {
@@ -490,12 +564,34 @@ export default function RemindersScreen() {
       };
 
       if (isRecurring) {
+        // FIXED: Update occurrences properly
+        updatedReminder.occurrences = createOccurrences(updatedReminder.id, selectedDays, selectedTimes);
+        
+        // Preserve existing occurrence stats or create new ones
+        if (!updatedReminder.occurrenceStats) {
+          updatedReminder.occurrenceStats = {
+            totalOccurrences: updatedReminder.occurrences.length,
+            completedOccurrences: 0,
+            completionRate: 0,
+            currentStreak: 0,
+            longestStreak: 0,
+          };
+        } else {
+          updatedReminder.occurrenceStats.totalOccurrences = updatedReminder.occurrences.length;
+        }
+
         // Schedule multiple notifications for recurring reminders
-        const notificationIds = globalAlarmSettings.alarmEnabled
-          ? await scheduleRecurringAlarms(updatedReminder, selectedDays, selectedTimes)
-          : [];
-        updatedReminder.notificationIds = notificationIds;
-        updatedReminder.notificationId = undefined; // Clear single notification ID
+        try {
+          const notificationIds = globalAlarmSettings.alarmEnabled
+            ? await scheduleRecurringAlarms(updatedReminder, selectedDays, selectedTimes)
+            : [];
+          updatedReminder.notificationIds = notificationIds;
+          updatedReminder.notificationId = undefined; // Clear single notification ID
+        } catch (error) {
+          console.error('❌ Error scheduling recurring alarms during update:', error);
+          Alert.alert('Scheduling Error', `Failed to schedule some recurring alarms: ${error.message}`);
+          return;
+        }
       } else {
         // Schedule single notification for non-recurring reminders
         const notificationId = globalAlarmSettings.alarmEnabled
@@ -515,6 +611,8 @@ export default function RemindersScreen() {
           updatedReminder.notificationId = notificationId;
         }
         updatedReminder.notificationIds = undefined; // Clear recurring notification IDs
+        updatedReminder.occurrences = undefined; // Clear occurrences
+        updatedReminder.occurrenceStats = undefined; // Clear occurrence stats
       }
 
       await saveReminder(updatedReminder);
@@ -532,89 +630,91 @@ export default function RemindersScreen() {
       setSelectedImageUri(null);
       setIsEditing(false);
       setEditingReminder(null);
+      
+      Alert.alert('Success', 'Reminder updated successfully');
     } catch (error) {
       console.error('Error updating reminder:', error);
-      Alert.alert('Error', 'Failed to update reminder');
+      Alert.alert('Error', `Failed to update reminder: ${error.message}`);
     }
   };
 
+  // FIXED: Improved occurrence tracking with proper state management
   const toggleReminderComplete = async (reminder: Reminder) => {
     try {
-      // For recurring reminders, show more sophisticated options
+      // For recurring reminders, provide sophisticated completion options
       if (reminder.isRecurring && !reminder.isCompleted) {
         const now = new Date();
         const currentDay = now.getDay();
-        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
         
-        // Find today's occurrences
-        const todayOccurrences = reminder.occurrences?.filter(occ => 
-          occ.dayOfWeek === currentDay && !occ.isCompleted
-        ) || [];
+        // Find today's uncompleted occurrences
+        const todayOccurrences = reminder.occurrences?.filter(occ => {
+          if (occ.dayOfWeek !== currentDay || occ.isCompleted) return false;
+          
+          // Check if the occurrence time is close to current time (within 2 hours)
+          const [occHour, occMinute] = occ.time.split(':').map(Number);
+          const occTotalMinutes = occHour * 60 + occMinute;
+          const currentTotalMinutes = currentHour * 60 + currentMinute;
+          const timeDiff = Math.abs(occTotalMinutes - currentTotalMinutes);
+          
+          return timeDiff <= 120; // Within 2 hours
+        }) || [];
 
         if (todayOccurrences.length > 0) {
-          // Show options to mark today's occurrence(s) or complete entire series
-          const options = [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Mark Today Complete',
-              onPress: async () => {
-                const updatedReminder = { ...reminder };
-                
-                // Mark today's occurrences as complete
-                if (updatedReminder.occurrences) {
-                  updatedReminder.occurrences = updatedReminder.occurrences.map(occ => {
-                    if (occ.dayOfWeek === currentDay) {
-                      return {
-                        ...occ,
-                        isCompleted: true,
-                        completedAt: new Date().toISOString()
-                      };
-                    }
-                    return occ;
-                  });
-                }
-
-                await saveReminder(updatedReminder);
-                eventBus.emit(EVENTS.REMINDER_UPDATED);
-                await loadRemindersAndSettings();
-              },
-            },
-            {
-              text: 'Complete Entire Series',
-              onPress: async () => {
-                const updatedReminder = {
-                  ...reminder,
-                  isCompleted: true,
-                };
-
-                // Cancel all recurring notifications
-                if (reminder.notificationIds) {
-                  for (const notificationId of reminder.notificationIds) {
-                    await cancelNotification(notificationId);
-                  }
-                }
-
-                await saveReminder(updatedReminder);
-                eventBus.emit(EVENTS.REMINDER_UPDATED);
-                await loadRemindersAndSettings();
-              },
-            },
-          ];
-
+          // Show options to mark specific occurrence(s) or complete entire series
+          const occurrencesList = todayOccurrences.map(occ => `${occ.time}`).join(', ');
+          
           Alert.alert(
             'Complete Recurring Reminder',
-            `This is a recurring reminder. You have ${todayOccurrences.length} occurrence(s) scheduled for today.`,
-            options
-          );
-        } else {
-          // No today occurrences, just allow completing entire series
-          Alert.alert(
-            'Complete Recurring Reminder',
-            'This will complete the entire recurring series.',
+            `Found ${todayOccurrences.length} occurrence(s) for today at: ${occurrencesList}`,
             [
               { text: 'Cancel', style: 'cancel' },
               {
-                text: 'Complete Series',
+                text: `Mark Today's Occurrences Complete`,
+                onPress: async () => {
+                  const updatedReminder = { ...reminder };
+                  const now = new Date().toISOString();
+                  
+                  // Mark today's occurrences as complete
+                  if (updatedReminder.occurrences) {
+                    updatedReminder.occurrences = updatedReminder.occurrences.map(occ => {
+                      if (todayOccurrences.some(todayOcc => todayOcc.id === occ.id)) {
+                        return {
+                          ...occ,
+                          isCompleted: true,
+                          completedAt: now,
+                          consecutiveCompletions: (occ.consecutiveCompletions || 0) + 1,
+                          totalCompleted: (occ.totalCompleted || 0) + 1,
+                        };
+                      }
+                      return occ;
+                    });
+                  }
+
+                  // Update occurrence statistics  
+                  if (updatedReminder.occurrenceStats) {
+                    const totalCompleted = updatedReminder.occurrences?.filter(occ => occ.isCompleted).length || 0;
+                    updatedReminder.occurrenceStats.completedOccurrences = totalCompleted;
+                    updatedReminder.occurrenceStats.completionRate = (totalCompleted / updatedReminder.occurrenceStats.totalOccurrences) * 100;
+                    updatedReminder.occurrenceStats.lastCompletedDate = now;
+                    
+                    // Update streaks
+                    const maxConsecutive = Math.max(...(updatedReminder.occurrences?.map(occ => occ.consecutiveCompletions || 0) || [0]));
+                    updatedReminder.occurrenceStats.longestStreak = Math.max(updatedReminder.occurrenceStats.longestStreak, maxConsecutive);
+                    updatedReminder.occurrenceStats.currentStreak = maxConsecutive;
+                  }
+
+                  await saveReminder(updatedReminder);
+                  eventBus.emit(EVENTS.REMINDER_UPDATED);
+                  await loadRemindersAndSettings();
+                  
+                  Alert.alert('Success', `Marked ${todayOccurrences.length} occurrence(s) as complete!`);
+                },
+              },
+              {
+                text: 'Complete Entire Series',
+                style: 'destructive',
                 onPress: async () => {
                   const updatedReminder = {
                     ...reminder,
@@ -631,6 +731,40 @@ export default function RemindersScreen() {
                   await saveReminder(updatedReminder);
                   eventBus.emit(EVENTS.REMINDER_UPDATED);
                   await loadRemindersAndSettings();
+                  
+                  Alert.alert('Success', 'Entire recurring series marked as complete!');
+                },
+              },
+            ]
+          );
+        } else {
+          // No today occurrences, just allow completing entire series
+          Alert.alert(
+            'Complete Recurring Reminder',
+            'No occurrences found for today. Complete the entire recurring series?',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Complete Series',
+                style: 'destructive',
+                onPress: async () => {
+                  const updatedReminder = {
+                    ...reminder,
+                    isCompleted: true,
+                  };
+
+                  // Cancel all recurring notifications
+                  if (reminder.notificationIds) {
+                    for (const notificationId of reminder.notificationIds) {
+                      await cancelNotification(notificationId);
+                    }
+                  }
+
+                  await saveReminder(updatedReminder);
+                  eventBus.emit(EVENTS.REMINDER_UPDATED);
+                  await loadRemindersAndSettings();
+                  
+                  Alert.alert('Success', 'Entire recurring series marked as complete!');
                 },
               },
             ]
@@ -727,6 +861,7 @@ export default function RemindersScreen() {
     );
   };
 
+  // FIXED: Strict time validation
   const addTime = () => {
     const timeString = newTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
@@ -735,7 +870,7 @@ export default function RemindersScreen() {
       return;
     }
 
-    // Check for conflicts with existing times (within 5 minutes)
+    // FIXED: Check for conflicts with existing times (within 2 minutes)
     const [newHours, newMinutes] = timeString.split(':').map(Number);
     const newTotalMinutes = newHours * 60 + newMinutes;
 
@@ -743,10 +878,10 @@ export default function RemindersScreen() {
       const [existingHours, existingMinutes] = existingTime.split(':').map(Number);
       const existingTotalMinutes = existingHours * 60 + existingMinutes;
       
-      if (Math.abs(newTotalMinutes - existingTotalMinutes) < 5) {
+      if (Math.abs(newTotalMinutes - existingTotalMinutes) < 2) {
         Alert.alert(
           'Time Conflict', 
-          `The time ${timeString} is too close to ${existingTime}. Please ensure at least 5 minutes between reminders.`
+          `The time ${timeString} is too close to ${existingTime}. Please ensure at least 2 minutes between reminders.`
         );
         return;
       }
@@ -765,7 +900,7 @@ export default function RemindersScreen() {
 
   const removeTime = (timeToRemove: string) => {
     if (selectedTimes.length <= 1) {
-      Alert.alert('Error', 'At least one time is required');
+      Alert.alert('Error', 'At least one time is required for recurring reminders');
       return;
     }
     setSelectedTimes(prev => prev.filter(time => time !== timeToRemove));
@@ -818,10 +953,11 @@ export default function RemindersScreen() {
                   🔄 Recurring:{' '}
                   {item.recurringDays?.map(day => dayNames[day]).join(', ')} at{' '}
                   {item.recurringTimes?.join(', ')}
-                  {item.occurrences && (
+                  {item.occurrenceStats && (
                     <>
                       {'\n'}
-                      📊 Progress: {item.occurrences.filter(occ => occ.isCompleted).length}/{item.occurrences.length} occurrences completed
+                      📊 Progress: {item.occurrenceStats.completedOccurrences}/{item.occurrenceStats.totalOccurrences} completed ({item.occurrenceStats.completionRate.toFixed(1)}%)
+                      {item.occurrenceStats.currentStreak > 0 && ` | 🔥 ${item.occurrenceStats.currentStreak} streak`}
                     </>
                   )}
                 </>
@@ -974,7 +1110,7 @@ export default function RemindersScreen() {
           {isRecurring ? (
             <>
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Select Days</Text>
+                <Text style={styles.label}>Select Days *</Text>
                 <View style={styles.daysContainer}>
                   {dayNames.map((day, index) => (
                     <TouchableOpacity
@@ -997,7 +1133,7 @@ export default function RemindersScreen() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Times</Text>
+                <Text style={styles.label}>Times * (Minimum 2 minutes apart)</Text>
                 <View style={styles.timesContainer}>
                   {selectedTimes.map((time, index) => (
                     <View key={index} style={styles.timeChip}>
