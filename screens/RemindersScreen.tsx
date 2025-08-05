@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -154,11 +153,9 @@ export default function RemindersScreen() {
         console.log('Is snooze resume:', data?.isSnoozeResume);
         console.log('Is within 5 minutes of scheduled time:', timeDifference <= fiveMinutesInMs);
 
-        // For snooze resume alarms, use tighter timing tolerance and only trigger when close to scheduled time
-        const timeThreshold = data?.isSnoozeResume ? oneMinuteInMs : fiveMinutesInMs;
-        const shouldTrigger = data?.isSnoozeResume ? 
-          (scheduledTime - now) <= oneMinuteInMs && (scheduledTime - now) >= -30000 : // Within 1 minute before and 30 seconds after
-          timeDifference <= fiveMinutesInMs;
+        // For snooze resume alarms, only trigger when we're very close to the actual scheduled time
+        // This prevents immediate triggering for both regular and snooze alarms
+        const shouldTrigger = Math.abs(scheduledTime - now) <= 30000; // Within 30 seconds for all alarms
 
         console.log('Should trigger alarm:', shouldTrigger);
 
@@ -206,7 +203,7 @@ export default function RemindersScreen() {
         // Check if we're in Expo Go (where this function is not available)
         const Constants = require('expo-constants');
         const isExpoGo = Constants.appOwnership === 'expo';
-        
+
         if (!isExpoGo && Notifications.addNotificationDismissedListener) {
           notificationDismissedListener = Notifications.addNotificationDismissedListener(
             async (notification) => {
