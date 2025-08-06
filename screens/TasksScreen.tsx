@@ -218,8 +218,36 @@ export default function TasksScreen() {
     try {
       console.log('[UNDO] Loading tasks and settings...');
       const tasksData = await getTasks();
-      // Sort tasks by creation date, newest first and remove any duplicates
-      const uniqueTasks = tasksData.reduce((acc, task) => {
+      
+      // Auto-delete completed tasks older than 60 days
+      const sixtyDaysAgo = new Date();
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+      
+      const tasksToDelete: Task[] = [];
+      const tasksToKeep: Task[] = [];
+      
+      tasksData.forEach(task => {
+        const taskDate = new Date(task.createdAt);
+        if (task.isCompleted && taskDate < sixtyDaysAgo) {
+          tasksToDelete.push(task);
+        } else {
+          tasksToKeep.push(task);
+        }
+      });
+      
+      // Delete old completed tasks from storage
+      if (tasksToDelete.length > 0) {
+        console.log('[CLEANUP] Auto-deleting', tasksToDelete.length, 'tasks older than 60 days');
+        for (const task of tasksToDelete) {
+          if (task.notificationId) {
+            await cancelNotification(task.notificationId);
+          }
+          await deleteTask(task.id);
+        }
+      }
+      
+      // Sort remaining tasks by creation date, newest first and remove any duplicates
+      const uniqueTasks = tasksToKeep.reduce((acc, task) => {
         if (!acc.find(existingTask => existingTask.id === task.id)) {
           acc.push(task);
         }
