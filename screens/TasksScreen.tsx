@@ -895,6 +895,7 @@ export default function TasksScreen() {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
+    // Start with all history tasks (completed and overdue)
     let historyTasks = tasks.filter(task => {
       const taskDate = new Date(task.scheduledDate || task.createdAt);
       const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
@@ -902,20 +903,7 @@ export default function TasksScreen() {
       return task.isCompleted || isOverdue;
     });
 
-    // Apply history filter
-    if (historyFilter === 'completed') {
-      historyTasks = historyTasks.filter(task => task.isCompleted);
-    } else if (historyFilter === 'overdue') {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      historyTasks = historyTasks.filter(task => {
-        const taskDate = new Date(task.scheduledDate || task.createdAt);
-        const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
-        return taskDay < today && !task.isCompleted;
-      });
-    }
-    
-    // Apply date range filter if both dates are set
+    // Apply date range filter first if both dates are set
     if (fromDate && toDate) {
       const fromTime = new Date(fromDate);
       fromTime.setHours(0, 0, 0, 0);
@@ -927,10 +915,11 @@ export default function TasksScreen() {
         return taskDate >= fromTime && taskDate <= toTime;
       });
     }
-    
-    const totalTasks = tasks.length;
-    const completedTasks = tasks.filter(task => task.isCompleted);
-    const overdueTasks = tasks.filter(task => {
+
+    // Calculate statistics from filtered history tasks
+    const totalTasks = historyTasks.length;
+    const completedTasks = historyTasks.filter(task => task.isCompleted);
+    const overdueTasks = historyTasks.filter(task => {
       const taskDate = new Date(task.scheduledDate || task.createdAt);
       const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
       return taskDay < today && !task.isCompleted;
@@ -938,8 +927,20 @@ export default function TasksScreen() {
     
     const completionRate = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;
 
-    // Group by dates
-    const tasksByDate = historyTasks.reduce((acc, task) => {
+    // Apply history filter for display
+    let filteredHistoryTasks = historyTasks;
+    if (historyFilter === 'completed') {
+      filteredHistoryTasks = historyTasks.filter(task => task.isCompleted);
+    } else if (historyFilter === 'overdue') {
+      filteredHistoryTasks = historyTasks.filter(task => {
+        const taskDate = new Date(task.scheduledDate || task.createdAt);
+        const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
+        return taskDay < today && !task.isCompleted;
+      });
+    }
+
+    // Group by dates for display
+    const tasksByDate = filteredHistoryTasks.reduce((acc, task) => {
       const date = new Date(task.createdAt).toDateString();
       if (!acc[date]) acc[date] = [];
       acc[date].push(task);
