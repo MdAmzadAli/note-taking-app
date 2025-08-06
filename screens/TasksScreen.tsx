@@ -113,8 +113,15 @@ export default function TasksScreen() {
   const loadTasksAndSettings = async () => {
     try {
       const tasksData = await getTasks();
-      // Sort tasks by creation date, newest first
-      const sortedTasks = tasksData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      // Sort tasks by creation date, newest first and remove any duplicates
+      const uniqueTasks = tasksData.reduce((acc, task) => {
+        if (!acc.find(existingTask => existingTask.id === task.id)) {
+          acc.push(task);
+        }
+        return acc;
+      }, [] as Task[]);
+      
+      const sortedTasks = uniqueTasks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setTasks(sortedTasks);
     } catch (error) {
       console.error('Error loading tasks:', error);
@@ -293,6 +300,9 @@ export default function TasksScreen() {
         await cancelNotification(task.notificationId);
       }
 
+      // Store the current undo task ID before any async operations
+      const currentUndoTaskId = undoTaskId;
+      
       // Show undo option BEFORE updating storage when task is completed
       if (!wasCompleted && updatedTask.isCompleted && showUndo) {
         // Clear any existing timeout first
@@ -300,10 +310,12 @@ export default function TasksScreen() {
           clearTimeout(undoTimeout);
         }
 
+        console.log('[UNDO] Setting undo task ID:', task.id);
         setUndoTaskId(task.id);
 
         // Set new timeout to hide undo option
         const timeout = setTimeout(() => {
+          console.log('[UNDO] Clearing undo task ID after 4 seconds');
           setUndoTaskId(null);
         }, 4000);
 
@@ -312,7 +324,11 @@ export default function TasksScreen() {
 
       await saveTask(updatedTask);
       eventBus.emit(EVENTS.TASK_UPDATED, updatedTask);
-      await loadTasksAndSettings();
+      
+      // Update tasks state directly instead of reloading to preserve undo state
+      setTasks(prevTasks => 
+        prevTasks.map(t => t.id === task.id ? updatedTask : t)
+      );
 
       // Show celebration animations when task is completed
       if (!wasCompleted && updatedTask.isCompleted && showCelebration) {
@@ -335,17 +351,19 @@ export default function TasksScreen() {
 
   const handleUndo = async (taskId: string) => {
     try {
-      const task = tasks.find(t => t.id === taskId);
-      if (task && task.isCompleted) {
-        // Don't show celebration or undo when undoing a task
-        await toggleTaskComplete(task, false, false);
-      }
-
-      // Clear undo state
+      console.log('[UNDO] Handling undo for task:', taskId);
+      
+      // Clear undo state first
       setUndoTaskId(null);
       if (undoTimeout) {
         clearTimeout(undoTimeout);
         setUndoTimeout(null);
+      }
+
+      const task = tasks.find(t => t.id === taskId);
+      if (task && task.isCompleted) {
+        // Don't show celebration or undo when undoing a task
+        await toggleTaskComplete(task, false, false);
       }
     } catch (error) {
       console.error('Error undoing task completion:', error);
@@ -497,6 +515,7 @@ export default function TasksScreen() {
 
     // Show undo interface if this task has undo active and is completed
     if (undoTaskId === item.id) {
+      console.log('[UNDO] Rendering undo interface for task:', item.id);
       return (
         <View style={styles.undoContainer}>
           <View style={styles.undoContent}>
