@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { v4 as uuidv4 } from 'uuid';
+// Removed uuid import - using custom ID generation for React Native compatibility
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Task } from '@/types';
 import { getTasks, saveTask, deleteTask, updateTask, getUserSettings } from '@/utils/storage';
@@ -129,7 +129,7 @@ export default function TasksScreen() {
 
     try {
       const task: Task = {
-        id: uuidv4(),
+        id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         title: newTitle.trim(),
         description: newDescription.trim(),
         isCompleted: false,
