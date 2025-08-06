@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { v4 as uuidv4 } from 'uuid';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Task } from '@/types';
 import { getTasks, saveTask, deleteTask, updateTask, getUserSettings } from '@/utils/storage';
@@ -128,7 +129,7 @@ export default function TasksScreen() {
 
     try {
       const task: Task = {
-        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: uuidv4(),
         title: newTitle.trim(),
         description: newDescription.trim(),
         isCompleted: false,
