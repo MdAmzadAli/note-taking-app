@@ -301,6 +301,11 @@ export default function TasksScreen() {
   };
 
   const startEditingTask = (task: Task) => {
+    // Prevent editing of completed tasks
+    if (task.isCompleted) {
+      return;
+    }
+    
     setEditingTask(task);
     setNewTitle(task.title);
     setNewDescription(task.description || '');
@@ -800,7 +805,18 @@ export default function TasksScreen() {
               item.isCompleted && styles.completedTask,
               celebrationTaskId === item.id && styles.celebrationTask,
             ]}
-            onPress={() => startEditingTask(item)}
+            onPress={() => {
+              if (item.isCompleted) {
+                // Show a brief alert or feedback that completed tasks cannot be edited
+                Alert.alert(
+                  'Task Completed', 
+                  'This task has been completed and cannot be modified. You can delete it if needed.',
+                  [{ text: 'OK', style: 'default' }]
+                );
+                return;
+              }
+              startEditingTask(item);
+            }}
           >
             <View style={styles.taskHeader}>
               <TouchableOpacity
