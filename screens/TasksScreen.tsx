@@ -50,6 +50,8 @@ export default function TasksScreen() {
   const [undoTimeout, setUndoTimeout] = useState<NodeJS.Timeout | null>(null);
   const [celebrationTaskId, setCelebrationTaskId] = useState<string | null>(null);
   const [showTopCelebration, setShowTopCelebration] = useState(false);
+  const [pendingCompletionTaskId, setPendingCompletionTaskId] = useState<string | null>(null);
+  const [pendingCompletionTimeout, setPendingCompletionTimeout] = useState<NodeJS.Timeout | null>(null);
   const celebrationScale = useRef(new Animated.Value(0)).current;
   const celebrationOpacity = useRef(new Animated.Value(0)).current;
 
@@ -124,20 +126,24 @@ export default function TasksScreen() {
     setFilteredTasks(filtered);
   }, [searchQuery, tasks, filter, activeTab]);
 
-  // Clear undo timeout on component unmount
+  // Clear timeouts on component unmount
   useEffect(() => {
     return () => {
       if (undoTimeout) {
         console.log('[UNDO] Component unmounting, clearing undo timeout');
         clearTimeout(undoTimeout);
       }
+      if (pendingCompletionTimeout) {
+        console.log('[UNDO] Component unmounting, clearing pending completion timeout');
+        clearTimeout(pendingCompletionTimeout);
+      }
     };
-  }, [undoTimeout]);
+  }, [undoTimeout, pendingCompletionTimeout]);
 
   // Monitor undo state changes
   useEffect(() => {
-    console.log('[UNDO] Undo state changed - undoTaskId:', undoTaskId);
-  }, [undoTaskId]);
+    console.log('[UNDO] Undo state changed - undoTaskId:', undoTaskId, 'pendingCompletionTaskId:', pendingCompletionTaskId);
+  }, [undoTaskId, pendingCompletionTaskId]);
 
   function getTomorrowDate(): Date {
     const tomorrow = new Date();
@@ -356,64 +362,92 @@ export default function TasksScreen() {
       console.log('[UNDO] toggleTaskComplete called for task:', task.id, 'wasCompleted:', task.isCompleted, 'showUndo:', showUndo);
       
       const wasCompleted = task.isCompleted;
-      const updatedTask = {
-        ...task,
-        isCompleted: !task.isCompleted,
-      };
 
-      if (updatedTask.isCompleted && task.notificationId) {
-        await cancelNotification(task.notificationId);
-        console.log('[UNDO] Cancelled notification for completed task:', task.id);
-      }
-
-      // Show undo option FIRST when task is completed (before any state updates)
-      if (!wasCompleted && updatedTask.isCompleted && showUndo) {
-        console.log('[UNDO] Task completed, setting up undo interface for task:', task.id);
+      // Handle completion (from active to completed)
+      if (!wasCompleted && showUndo) {
+        console.log('[UNDO] Task being completed, setting up delayed completion for task:', task.id);
         
-        // Clear any existing timeout first
+        // Cancel notification immediately
+        if (task.notificationId) {
+          await cancelNotification(task.notificationId);
+          console.log('[UNDO] Cancelled notification for task being completed:', task.id);
+        }
+
+        // Clear any existing timeouts
         if (undoTimeout) {
           console.log('[UNDO] Clearing previous undo timeout');
           clearTimeout(undoTimeout);
         }
+        if (pendingCompletionTimeout) {
+          console.log('[UNDO] Clearing previous pending completion timeout');
+          clearTimeout(pendingCompletionTimeout);
+        }
 
-        // Set undo state immediately BEFORE updating tasks
-        console.log('[UNDO] Setting undo task ID:', task.id);
+        // Set undo state and pending completion state
+        console.log('[UNDO] Setting undo task ID and pending completion ID:', task.id);
         setUndoTaskId(task.id);
+        setPendingCompletionTaskId(task.id);
 
-        // Set new timeout to hide undo option
-        const timeout = setTimeout(() => {
-          console.log('[UNDO] Timeout reached - clearing undo task ID for:', task.id);
-          setUndoTaskId(prev => {
-            console.log('[UNDO] Previous undo task ID was:', prev);
-            return prev === task.id ? null : prev;
-          });
+        // Show celebration immediately
+        if (showCelebration) {
+          console.log('[UNDO] Showing celebration for task being completed:', task.id);
+          setCelebrationTaskId(task.id);
+          showCelebrationAnimation();
+          setTimeout(() => {
+            console.log('[UNDO] Clearing celebration for task:', task.id);
+            setCelebrationTaskId(null);
+          }, 2000);
+        }
+
+        // Set timeout to actually complete the task after 4 seconds
+        const completionTimeout = setTimeout(async () => {
+          console.log('[UNDO] 4 seconds elapsed - actually completing task:', task.id);
+          
+          // Clear undo state
+          setUndoTaskId(prev => prev === task.id ? null : prev);
+          setPendingCompletionTaskId(prev => prev === task.id ? null : prev);
+
+          // Actually update the task state
+          const updatedTask = {
+            ...task,
+            isCompleted: true,
+          };
+
+          console.log('[UNDO] Updating task state to completed:', task.id);
+          setTasks(prevTasks => 
+            prevTasks.map(t => t.id === task.id ? updatedTask : t)
+          );
+
+          // Save to storage
+          await saveTask(updatedTask);
+          console.log('[UNDO] Task completion saved to storage:', task.id);
         }, 4000);
 
-        console.log('[UNDO] Undo timeout set for 4 seconds');
-        setUndoTimeout(timeout);
-      }
+        console.log('[UNDO] Pending completion timeout set for 4 seconds');
+        setPendingCompletionTimeout(completionTimeout);
 
-      // Update tasks state to trigger UI update
-      console.log('[UNDO] Updating tasks state for task:', task.id, 'new completion status:', updatedTask.isCompleted);
-      setTasks(prevTasks => {
-        const newTasks = prevTasks.map(t => t.id === task.id ? updatedTask : t);
-        console.log('[UNDO] Tasks state updated, task found and updated');
-        return newTasks;
-      });
+        // Also set undo timeout to clear undo state
+        const undoTimeoutId = setTimeout(() => {
+          console.log('[UNDO] Undo timeout reached - clearing undo task ID for:', task.id);
+          setUndoTaskId(prev => prev === task.id ? null : prev);
+        }, 4000);
 
-      // Save to storage (async operation) - DO NOT emit event to prevent doubles
-      console.log('[UNDO] Saving task to storage:', task.id);
-      await saveTask(updatedTask);
+        setUndoTimeout(undoTimeoutId);
 
-      // Show celebration animations when task is completed
-      if (!wasCompleted && updatedTask.isCompleted && showCelebration) {
-        console.log('[UNDO] Showing celebration for completed task:', task.id);
-        setCelebrationTaskId(task.id);
-        showCelebrationAnimation();
-        setTimeout(() => {
-          console.log('[UNDO] Clearing celebration for task:', task.id);
-          setCelebrationTaskId(null);
-        }, 2000);
+      } else {
+        // Handle uncompleting a task (from completed to active)
+        const updatedTask = {
+          ...task,
+          isCompleted: false,
+        };
+
+        console.log('[UNDO] Uncompleting task:', task.id);
+        setTasks(prevTasks => 
+          prevTasks.map(t => t.id === task.id ? updatedTask : t)
+        );
+
+        await saveTask(updatedTask);
+        console.log('[UNDO] Task uncompleted and saved:', task.id);
       }
 
       console.log('[UNDO] toggleTaskComplete completed successfully for task:', task.id);
@@ -437,25 +471,33 @@ export default function TasksScreen() {
     try {
       console.log('[UNDO] Starting undo process for task:', taskId);
       
-      // Clear undo state first
-      console.log('[UNDO] Clearing undo state');
+      // Clear all undo-related state
+      console.log('[UNDO] Clearing undo and pending completion state');
       setUndoTaskId(null);
+      setPendingCompletionTaskId(null);
+      
       if (undoTimeout) {
         console.log('[UNDO] Clearing undo timeout');
         clearTimeout(undoTimeout);
         setUndoTimeout(null);
       }
+      
+      if (pendingCompletionTimeout) {
+        console.log('[UNDO] Clearing pending completion timeout');
+        clearTimeout(pendingCompletionTimeout);
+        setPendingCompletionTimeout(null);
+      }
 
       const task = tasks.find(t => t.id === taskId);
-      console.log('[UNDO] Found task for undo:', task ? task.id : 'not found', 'isCompleted:', task?.isCompleted);
+      console.log('[UNDO] Found task for undo:', task ? task.id : 'not found');
       
-      if (task && task.isCompleted) {
-        console.log('[UNDO] Undoing task completion - calling toggleTaskComplete');
-        // Don't show celebration or undo when undoing a task
-        await toggleTaskComplete(task, false, false);
-        console.log('[UNDO] Undo process completed successfully');
+      if (task) {
+        console.log('[UNDO] Undoing task - keeping task in active state');
+        // Task should remain in its original state (not completed)
+        // No need to change anything since we prevented the completion
+        console.log('[UNDO] Undo process completed successfully - task remains active');
       } else {
-        console.log('[UNDO] Task not found or not completed, cannot undo');
+        console.log('[UNDO] Task not found, cannot undo');
       }
     } catch (error) {
       console.error('[UNDO] Error undoing task completion:', error);
@@ -504,9 +546,24 @@ export default function TasksScreen() {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     let filtered = tasks.filter(task => {
-      // First filter by completion status based on active tab
-      if (activeTab === 'active' && task.isCompleted) return false;
-      if (activeTab === 'completed' && !task.isCompleted) return false;
+      // Special handling for tasks with pending completion
+      if (activeTab === 'active') {
+        // Keep tasks that are pending completion in active tab (even if completed in state)
+        if (pendingCompletionTaskId === task.id) {
+          return true;
+        }
+        // Otherwise filter out completed tasks
+        if (task.isCompleted) return false;
+      }
+      
+      if (activeTab === 'completed') {
+        // Don't show tasks that are pending completion in completed tab
+        if (pendingCompletionTaskId === task.id) {
+          return false;
+        }
+        // Only show completed tasks
+        if (!task.isCompleted) return false;
+      }
 
       const taskDate = new Date(task.scheduledDate || task.createdAt);
       const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
