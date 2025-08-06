@@ -368,6 +368,48 @@ export default function TasksScreen() {
           console.log('[UNDO] Cancelled notification for task being completed:', task.id);
         }
 
+        // IMMEDIATELY complete all previously pending tasks when a new task is completed
+        const currentPendingTasks = Array.from(pendingCompletionTasks);
+        if (currentPendingTasks.length > 0) {
+          console.log('[UNDO] New task completed - immediately completing all previous pending tasks:', currentPendingTasks);
+          
+          for (const pendingTaskId of currentPendingTasks) {
+            // Clear timeouts for pending tasks
+            const pendingUndoTimeout = undoTimeouts.get(pendingTaskId);
+            const pendingCompletionTimeout = pendingCompletionTimeouts.get(pendingTaskId);
+            
+            if (pendingUndoTimeout) {
+              clearTimeout(pendingUndoTimeout);
+            }
+            if (pendingCompletionTimeout) {
+              clearTimeout(pendingCompletionTimeout);
+            }
+
+            // Find and complete the pending task
+            const pendingTask = tasks.find(t => t.id === pendingTaskId);
+            if (pendingTask) {
+              const completedTask = {
+                ...pendingTask,
+                isCompleted: true,
+              };
+
+              console.log('[UNDO] Immediately completing pending task:', pendingTaskId);
+              setTasks(prevTasks => 
+                prevTasks.map(t => t.id === pendingTaskId ? completedTask : t)
+              );
+
+              // Save to storage
+              await saveTask(completedTask);
+            }
+          }
+
+          // Clear all pending states
+          setUndoTasks(new Set());
+          setPendingCompletionTasks(new Set());
+          setUndoTimeouts(new Map());
+          setPendingCompletionTimeouts(new Map());
+        }
+
         // Clear any existing timeout for this specific task (if it exists)
         const existingUndoTimeout = undoTimeouts.get(task.id);
         const existingCompletionTimeout = pendingCompletionTimeouts.get(task.id);
