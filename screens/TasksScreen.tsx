@@ -21,6 +21,8 @@ import { Task } from '@/types';
 import { getTasks, saveTask, deleteTask, updateTask, getUserSettings } from '@/utils/storage';
 import { scheduleNotification, cancelNotification } from '@/utils/notifications';
 import { eventBus, EVENTS } from '@/utils/eventBus';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 import SearchResultsModal from '@/components/SearchResultsModal';
 
@@ -86,17 +88,17 @@ export default function TasksScreen() {
           console.log('[UNDO] Task not found in state, ignoring update');
           return prevTasks;
         }
-        
+
         // Check if the task is actually different
         const isTaskDifferent = existingTask.isCompleted !== updatedTask.isCompleted ||
                                existingTask.title !== updatedTask.title ||
                                existingTask.description !== updatedTask.description;
-        
+
         if (!isTaskDifferent) {
           console.log('[UNDO] Task unchanged, skipping update');
           return prevTasks;
         }
-        
+
         console.log('[UNDO] Updating task in state via event bus');
         return prevTasks.map(task => (task.id === updatedTask.id ? updatedTask : task));
       });
@@ -165,10 +167,10 @@ export default function TasksScreen() {
       console.log('[UNDO] Setting delegation timeout for 4 seconds to complete all pending tasks');
       const timeout = setTimeout(async () => {
         console.log('[UNDO] Delegation timeout reached - completing all pending operations');
-        
+
         // Get all tasks that need to be completed
         const tasksToComplete = new Set([...undoTasks, ...Array.from(temporarySuccessMessages)]);
-        
+
         // Complete all pending tasks
         for (const taskId of tasksToComplete) {
           const task = tasks.find(t => t.id === taskId);
@@ -178,12 +180,12 @@ export default function TasksScreen() {
               ...task,
               isCompleted: true,
             };
-            
+
             // Update task state
             setTasks(prevTasks => 
               prevTasks.map(t => t.id === taskId ? completedTask : t)
             );
-            
+
             // Save to storage
             try {
               await saveTask(completedTask);
@@ -192,17 +194,17 @@ export default function TasksScreen() {
             }
           }
         }
-        
+
         // Clear all states
         setTemporarySuccessMessages(new Set());
         setUndoTasks(new Set());
         setPendingCompletionTasks(new Set());
         setUndoTimeouts(new Map());
         setPendingCompletionTimeouts(new Map());
-        
+
         console.log('[UNDO] All delegation cleanup completed');
       }, 4000);
-      
+
       setAllCompletionsFinishedTimeout(timeout);
     }
   }, [undoTasks, temporarySuccessMessages, pendingCompletionTasks, tasks]);
@@ -218,14 +220,14 @@ export default function TasksScreen() {
     try {
       console.log('[UNDO] Loading tasks and settings...');
       const tasksData = await getTasks();
-      
+
       // Auto-delete completed tasks older than 60 days
       const sixtyDaysAgo = new Date();
       sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-      
+
       const tasksToDelete: Task[] = [];
       const tasksToKeep: Task[] = [];
-      
+
       tasksData.forEach(task => {
         const taskDate = new Date(task.createdAt);
         if (task.isCompleted && taskDate < sixtyDaysAgo) {
@@ -234,7 +236,7 @@ export default function TasksScreen() {
           tasksToKeep.push(task);
         }
       });
-      
+
       // Delete old completed tasks from storage
       if (tasksToDelete.length > 0) {
         console.log('[CLEANUP] Auto-deleting', tasksToDelete.length, 'tasks older than 60 days');
@@ -245,7 +247,7 @@ export default function TasksScreen() {
           await deleteTask(task.id);
         }
       }
-      
+
       // Sort remaining tasks by creation date, newest first and remove any duplicates
       const uniqueTasks = tasksToKeep.reduce((acc, task) => {
         if (!acc.find(existingTask => existingTask.id === task.id)) {
@@ -253,7 +255,29 @@ export default function TasksScreen() {
         }
         return acc;
       }, [] as Task[]);
-      
+
+      // Add sample tasks if no tasks exist (for testing history functionality)
+      if (uniqueTasks.length === 0) {
+        console.log('[SAMPLE] Adding sample tasks for testing...');
+        const sampleTasks = generateSampleTasks();
+
+        // Save sample tasks to storage individually without triggering events
+        for (const task of sampleTasks) {
+          try {
+            // Save directly to storage without using the saveTask function to avoid event emissions
+            const existingTasks = await getTasks();
+            const updatedTasks = [...existingTasks, task];
+            await AsyncStorage.setItem('tasks', JSON.stringify(updatedTasks));
+            console.log('[SAMPLE] Saved sample task:', task.id, 'completed:', task.isCompleted);
+          } catch (error) {
+            console.error('[SAMPLE] Error saving sample task:', error);
+          }
+        }
+
+        uniqueTasks.push(...sampleTasks);
+        console.log('[SAMPLE] Added sample tasks - Total:', uniqueTasks.length, 'Completed:', uniqueTasks.filter(t => t.isCompleted).length);
+      }
+
       const sortedTasks = uniqueTasks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       console.log('[UNDO] Setting tasks state with', sortedTasks.length, 'tasks');
       setTasks(sortedTasks);
@@ -301,7 +325,7 @@ export default function TasksScreen() {
 
       console.log('[TASK] Saving task to storage...');
       await saveTask(task);
-      
+
       console.log('[TASK] Adding task to state directly...');
       // Add task to state directly - DO NOT emit event to prevent double creation
       setTasks(prevTasks => {
@@ -334,7 +358,7 @@ export default function TasksScreen() {
     if (task.isCompleted) {
       return;
     }
-    
+
     setEditingTask(task);
     setNewTitle(task.title);
     setNewDescription(task.description || '');
@@ -391,7 +415,7 @@ export default function TasksScreen() {
 
       console.log('[TASK] Saving updated task to storage...');
       await saveTask(updatedTask);
-      
+
       console.log('[TASK] Updating task in state directly...');
       // Update task in state directly - DO NOT emit event to prevent double updates
       setTasks(prevTasks => 
@@ -416,7 +440,7 @@ export default function TasksScreen() {
 
   const showCelebrationAnimation = () => {
     setShowTopCelebration(true);
-    
+
     // Start animation sequence
     Animated.parallel([
       Animated.sequence([
@@ -455,13 +479,13 @@ export default function TasksScreen() {
   const toggleTaskComplete = async (task: Task, showCelebration = true, showUndo = true) => {
     try {
       console.log('[UNDO] toggleTaskComplete called for task:', task.id, 'wasCompleted:', task.isCompleted, 'showUndo:', showUndo);
-      
+
       const wasCompleted = task.isCompleted;
 
       // Handle completion (from active to completed)
       if (!wasCompleted && showUndo) {
         console.log('[UNDO] Task being completed, setting up delayed completion for task:', task.id);
-        
+
         // Cancel notification immediately
         if (task.notificationId) {
           await cancelNotification(task.notificationId);
@@ -472,7 +496,7 @@ export default function TasksScreen() {
         const currentPendingTasks = Array.from(pendingCompletionTasks);
         if (currentPendingTasks.length > 0) {
           console.log('[UNDO] New task completed - showing temporary success for previous pending tasks:', currentPendingTasks);
-          
+
           // Add temporary success messages for tasks being immediately completed
           setTemporarySuccessMessages(prev => {
             const newSet = new Set(prev);
@@ -484,7 +508,7 @@ export default function TasksScreen() {
           for (const pendingTaskId of currentPendingTasks) {
             const pendingUndoTimeout = undoTimeouts.get(pendingTaskId);
             const pendingCompletionTimeout = pendingCompletionTimeouts.get(pendingTaskId);
-            
+
             if (pendingUndoTimeout) {
               clearTimeout(pendingUndoTimeout);
             }
@@ -501,7 +525,7 @@ export default function TasksScreen() {
         // Clear any existing timeout for this specific task (if it exists)
         const existingUndoTimeout = undoTimeouts.get(task.id);
         const existingCompletionTimeout = pendingCompletionTimeouts.get(task.id);
-        
+
         if (existingUndoTimeout) {
           console.log('[UNDO] Clearing previous undo timeout for task:', task.id);
           clearTimeout(existingUndoTimeout);
@@ -550,7 +574,7 @@ export default function TasksScreen() {
     } catch (error) {
       console.error('[UNDO] Error in toggleTaskComplete:', error);
       Alert.alert('Error', 'Failed to update task');
-      
+
       // Reload tasks only on error to recover state
       await loadTasksAndSettings();
     }
@@ -599,7 +623,7 @@ export default function TasksScreen() {
 
       const task = tasks.find(t => t.id === taskId);
       console.log('[UNDO] Found task for undo:', task ? task.id : 'not found');
-      
+
       if (task) {
         console.log('[UNDO] Undo process completed successfully - task remains active');
       } else {
@@ -622,18 +646,18 @@ export default function TasksScreen() {
           onPress: async () => {
             try {
               console.log('[TASK] Deleting task:', task.id);
-              
+
               if (task.notificationId) {
                 await cancelNotification(task.notificationId);
               }
-              
+
               console.log('[TASK] Deleting from storage...');
               await deleteTask(task.id);
-              
+
               console.log('[TASK] Removing from state...');
               // Remove task from state directly - DO NOT emit event to prevent doubles
               setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
-              
+
               console.log('[TASK] Task deletion completed successfully');
             } catch (error) {
               console.error('[TASK] Error deleting task:', error);
@@ -664,18 +688,18 @@ export default function TasksScreen() {
           onPress: async () => {
             try {
               console.log('[TASK] Deleting older tasks:', tasksToDelete.length);
-              
+
               for (const task of tasksToDelete) {
                 if (task.notificationId) {
                   await cancelNotification(task.notificationId);
                 }
                 await deleteTask(task.id);
               }
-              
+
               console.log('[TASK] Removing deleted tasks from state...');
               const taskIdsToDelete = new Set(tasksToDelete.map(t => t.id));
               setTasks(prevTasks => prevTasks.filter(t => !taskIdsToDelete.has(t.id)));
-              
+
               console.log('[TASK] Older tasks deletion completed successfully');
             } catch (error) {
               console.error('[TASK] Error deleting older tasks:', error);
@@ -707,7 +731,7 @@ export default function TasksScreen() {
         // Otherwise filter out completed tasks
         if (task.isCompleted) return false;
       }
-      
+
       if (activeTab === 'completed') {
         // Don't show tasks that are pending completion in completed tab
         if (pendingCompletionTasks.has(task.id)) {
