@@ -52,6 +52,8 @@ export default function TasksScreen() {
   const [showTopCelebration, setShowTopCelebration] = useState(false);
   const [pendingCompletionTasks, setPendingCompletionTasks] = useState<Set<string>>(new Set());
   const [pendingCompletionTimeouts, setPendingCompletionTimeouts] = useState<Map<string, NodeJS.Timeout>>(new Map());
+  const [temporarySuccessMessages, setTemporarySuccessMessages] = useState<Set<string>>(new Set());
+  const [allCompletionsFinishedTimeout, setAllCompletionsFinishedTimeout] = useState<NodeJS.Timeout | null>(null);
   const celebrationScale = useRef(new Animated.Value(0)).current;
   const celebrationOpacity = useRef(new Animated.Value(0)).current;
 
@@ -132,13 +134,41 @@ export default function TasksScreen() {
       console.log('[UNDO] Component unmounting, clearing all timeouts');
       undoTimeouts.forEach((timeout) => clearTimeout(timeout));
       pendingCompletionTimeouts.forEach((timeout) => clearTimeout(timeout));
+      if (allCompletionsFinishedTimeout) {
+        clearTimeout(allCompletionsFinishedTimeout);
+      }
     };
-  }, [undoTimeouts, pendingCompletionTimeouts]);
+  }, [undoTimeouts, pendingCompletionTimeouts, allCompletionsFinishedTimeout]);
 
   // Monitor undo state changes
   useEffect(() => {
-    console.log('[UNDO] Undo state changed - undoTasks:', Array.from(undoTasks), 'pendingCompletionTasks:', Array.from(pendingCompletionTasks));
-  }, [undoTasks, pendingCompletionTasks]);
+    console.log('[UNDO] Undo state changed - undoTasks:', Array.from(undoTasks), 'pendingCompletionTasks:', Array.from(pendingCompletionTasks), 'temporarySuccessMessages:', Array.from(temporarySuccessMessages));
+  }, [undoTasks, pendingCompletionTasks, temporarySuccessMessages]);
+
+  // Handle delegation when all completions are finished
+  useEffect(() => {
+    const hasActiveUndo = undoTasks.size > 0;
+    const hasTemporaryMessages = temporarySuccessMessages.size > 0;
+
+    console.log('[UNDO] Delegation effect - hasActiveUndo:', hasActiveUndo, 'hasTemporaryMessages:', hasTemporaryMessages);
+
+    // Clear any existing timeout
+    if (allCompletionsFinishedTimeout) {
+      clearTimeout(allCompletionsFinishedTimeout);
+      setAllCompletionsFinishedTimeout(null);
+    }
+
+    // If we have an active undo task, set timeout for when it finishes
+    if (hasActiveUndo && hasTemporaryMessages) {
+      console.log('[UNDO] Setting delegation timeout for 4 seconds to clear temporary messages');
+      const timeout = setTimeout(() => {
+        console.log('[UNDO] Delegation timeout reached - clearing all temporary messages');
+        setTemporarySuccessMessages(new Set());
+      }, 4000);
+      
+      setAllCompletionsFinishedTimeout(timeout);
+    }
+  }, [undoTasks, temporarySuccessMessages, allCompletionsFinishedTimeout]);
 
   function getTomorrowDate(): Date {
     const tomorrow = new Date();
@@ -373,6 +403,13 @@ export default function TasksScreen() {
         if (currentPendingTasks.length > 0) {
           console.log('[UNDO] New task completed - immediately completing all previous pending tasks:', currentPendingTasks);
           
+          // Add temporary success messages for tasks being immediately completed
+          setTemporarySuccessMessages(prev => {
+            const newSet = new Set(prev);
+            currentPendingTasks.forEach(taskId => newSet.add(taskId));
+            return newSet;
+          });
+
           for (const pendingTaskId of currentPendingTasks) {
             // Clear timeouts for pending tasks
             const pendingUndoTimeout = undoTimeouts.get(pendingTaskId);
@@ -394,9 +431,13 @@ export default function TasksScreen() {
               };
 
               console.log('[UNDO] Immediately completing pending task:', pendingTaskId);
-              setTasks(prevTasks => 
-                prevTasks.map(t => t.id === pendingTaskId ? completedTask : t)
-              );
+              
+              // Delay the actual task state update to allow temporary message to show
+              setTimeout(() => {
+                setTasks(prevTasks => 
+                  prevTasks.map(t => t.id === pendingTaskId ? completedTask : t)
+                );
+              }, 100);
 
               // Save to storage
               await saveTask(completedTask);
@@ -644,6 +685,10 @@ export default function TasksScreen() {
         if (pendingCompletionTasks.has(task.id)) {
           return true;
         }
+        // Keep tasks that have temporary success messages
+        if (temporarySuccessMessages.has(task.id)) {
+          return true;
+        }
         // Otherwise filter out completed tasks
         if (task.isCompleted) return false;
       }
@@ -651,6 +696,10 @@ export default function TasksScreen() {
       if (activeTab === 'completed') {
         // Don't show tasks that are pending completion in completed tab
         if (pendingCompletionTasks.has(task.id)) {
+          return false;
+        }
+        // Don't show tasks with temporary success messages in completed tab
+        if (temporarySuccessMessages.has(task.id)) {
           return false;
         }
         // Only show completed tasks
@@ -761,6 +810,19 @@ export default function TasksScreen() {
         }
       }
     };
+
+    // Show temporary success message if this task has one
+    if (temporarySuccessMessages.has(item.id)) {
+      console.log('[UNDO] Rendering temporary success message for task:', item.id);
+      return (
+        <View style={styles.temporarySuccessContainer}>
+          <View style={styles.temporarySuccessContent}>
+            <Text style={styles.temporarySuccessEmoji}>✅</Text>
+            <Text style={styles.temporarySuccessText}>Task successfully completed!</Text>
+          </View>
+        </View>
+      );
+    }
 
     // Show undo interface if this task has undo active
     if (undoTasks.has(item.id)) {
@@ -1498,6 +1560,40 @@ const styles = StyleSheet.create({
     color: '#10B981',
     fontSize: 14,
     fontWeight: '600',
+    fontFamily: 'Inter',
+  },
+  temporarySuccessContainer: {
+    backgroundColor: '#059669',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#047857',
+    minHeight: 80,
+  },
+  temporarySuccessContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  temporarySuccessEmoji: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  temporarySuccessText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
     fontFamily: 'Inter',
   },
   celebrationOverlay: {
