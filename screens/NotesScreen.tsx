@@ -11,6 +11,9 @@ import {
   Alert,
   Dimensions,
   Platform,
+  Animated,
+  TouchableWithoutFeedback,
+  FlatList,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
