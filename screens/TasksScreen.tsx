@@ -145,12 +145,13 @@ export default function TasksScreen() {
     console.log('[UNDO] Undo state changed - undoTasks:', Array.from(undoTasks), 'pendingCompletionTasks:', Array.from(pendingCompletionTasks), 'temporarySuccessMessages:', Array.from(temporarySuccessMessages));
   }, [undoTasks, pendingCompletionTasks, temporarySuccessMessages]);
 
-  // Handle delegation when all completions are finished
+  // Handle delegation when all completions are finished - similar to search debouncing
   useEffect(() => {
     const hasActiveUndo = undoTasks.size > 0;
     const hasTemporaryMessages = temporarySuccessMessages.size > 0;
+    const hasPendingCompletions = pendingCompletionTasks.size > 0;
 
-    console.log('[UNDO] Delegation effect - hasActiveUndo:', hasActiveUndo, 'hasTemporaryMessages:', hasTemporaryMessages);
+    console.log('[UNDO] Delegation effect - hasActiveUndo:', hasActiveUndo, 'hasTemporaryMessages:', hasTemporaryMessages, 'hasPendingCompletions:', hasPendingCompletions);
 
     // Clear any existing timeout
     if (allCompletionsFinishedTimeout) {
@@ -158,17 +159,52 @@ export default function TasksScreen() {
       setAllCompletionsFinishedTimeout(null);
     }
 
-    // If we have an active undo task, set timeout for when it finishes
-    if (hasActiveUndo && hasTemporaryMessages) {
-      console.log('[UNDO] Setting delegation timeout for 4 seconds to clear temporary messages');
-      const timeout = setTimeout(() => {
-        console.log('[UNDO] Delegation timeout reached - clearing all temporary messages');
+    // If we have any pending operations (undo tasks or temporary messages), set a new timeout
+    if (hasActiveUndo || hasTemporaryMessages || hasPendingCompletions) {
+      console.log('[UNDO] Setting delegation timeout for 4 seconds to complete all pending tasks');
+      const timeout = setTimeout(async () => {
+        console.log('[UNDO] Delegation timeout reached - completing all pending operations');
+        
+        // Get all tasks that need to be completed
+        const tasksToComplete = new Set([...undoTasks, ...Array.from(temporarySuccessMessages)]);
+        
+        // Complete all pending tasks
+        for (const taskId of tasksToComplete) {
+          const task = tasks.find(t => t.id === taskId);
+          if (task && !task.isCompleted) {
+            console.log('[UNDO] Auto-completing task after delegation timeout:', taskId);
+            const completedTask = {
+              ...task,
+              isCompleted: true,
+            };
+            
+            // Update task state
+            setTasks(prevTasks => 
+              prevTasks.map(t => t.id === taskId ? completedTask : t)
+            );
+            
+            // Save to storage
+            try {
+              await saveTask(completedTask);
+            } catch (error) {
+              console.error('[UNDO] Error saving auto-completed task:', error);
+            }
+          }
+        }
+        
+        // Clear all states
         setTemporarySuccessMessages(new Set());
+        setUndoTasks(new Set());
+        setPendingCompletionTasks(new Set());
+        setUndoTimeouts(new Map());
+        setPendingCompletionTimeouts(new Map());
+        
+        console.log('[UNDO] All delegation cleanup completed');
       }, 4000);
       
       setAllCompletionsFinishedTimeout(timeout);
     }
-  }, [undoTasks, temporarySuccessMessages]);
+  }, [undoTasks, temporarySuccessMessages, pendingCompletionTasks, tasks]);
 
   function getTomorrowDate(): Date {
     const tomorrow = new Date();
@@ -398,10 +434,10 @@ export default function TasksScreen() {
           console.log('[UNDO] Cancelled notification for task being completed:', task.id);
         }
 
-        // IMMEDIATELY complete all previously pending tasks when a new task is completed
+        // When a new task is completed, show temporary success messages for previously pending tasks
         const currentPendingTasks = Array.from(pendingCompletionTasks);
         if (currentPendingTasks.length > 0) {
-          console.log('[UNDO] New task completed - immediately completing all previous pending tasks:', currentPendingTasks);
+          console.log('[UNDO] New task completed - showing temporary success for previous pending tasks:', currentPendingTasks);
           
           // Add temporary success messages for tasks being immediately completed
           setTemporarySuccessMessages(prev => {
@@ -410,8 +446,8 @@ export default function TasksScreen() {
             return newSet;
           });
 
+          // Clear individual timeouts but keep tasks in pending state for delegation
           for (const pendingTaskId of currentPendingTasks) {
-            // Clear timeouts for pending tasks
             const pendingUndoTimeout = undoTimeouts.get(pendingTaskId);
             const pendingCompletionTimeout = pendingCompletionTimeouts.get(pendingTaskId);
             
@@ -421,32 +457,9 @@ export default function TasksScreen() {
             if (pendingCompletionTimeout) {
               clearTimeout(pendingCompletionTimeout);
             }
-
-            // Find and complete the pending task
-            const pendingTask = tasks.find(t => t.id === pendingTaskId);
-            if (pendingTask) {
-              const completedTask = {
-                ...pendingTask,
-                isCompleted: true,
-              };
-
-              console.log('[UNDO] Immediately completing pending task:', pendingTaskId);
-              
-              // Delay the actual task state update to allow temporary message to show
-              setTimeout(() => {
-                setTasks(prevTasks => 
-                  prevTasks.map(t => t.id === pendingTaskId ? completedTask : t)
-                );
-              }, 100);
-
-              // Save to storage
-              await saveTask(completedTask);
-            }
           }
 
-          // Clear all pending states
-          setUndoTasks(new Set());
-          setPendingCompletionTasks(new Set());
+          // Clear timeout maps but keep tasks in pending sets for delegation
           setUndoTimeouts(new Map());
           setPendingCompletionTimeouts(new Map());
         }
@@ -480,69 +493,8 @@ export default function TasksScreen() {
           }, 2000);
         }
 
-        // Set timeout to actually complete the task after 4 seconds
-        const completionTimeout = setTimeout(async () => {
-          console.log('[UNDO] 4 seconds elapsed - actually completing task:', task.id);
-          
-          // Remove task from undo and pending completion sets
-          setUndoTasks(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(task.id);
-            return newSet;
-          });
-          setPendingCompletionTasks(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(task.id);
-            return newSet;
-          });
-
-          // Remove timeouts from maps
-          setUndoTimeouts(prev => {
-            const newMap = new Map(prev);
-            newMap.delete(task.id);
-            return newMap;
-          });
-          setPendingCompletionTimeouts(prev => {
-            const newMap = new Map(prev);
-            newMap.delete(task.id);
-            return newMap;
-          });
-
-          // Actually update the task state
-          const updatedTask = {
-            ...task,
-            isCompleted: true,
-          };
-
-          console.log('[UNDO] Updating task state to completed:', task.id);
-          setTasks(prevTasks => 
-            prevTasks.map(t => t.id === task.id ? updatedTask : t)
-          );
-
-          // Save to storage
-          await saveTask(updatedTask);
-          console.log('[UNDO] Task completion saved to storage:', task.id);
-        }, 4000);
-
-        console.log('[UNDO] Pending completion timeout set for 4 seconds for task:', task.id);
-        setPendingCompletionTimeouts(prev => new Map(prev).set(task.id, completionTimeout));
-
-        // Also set undo timeout to clear undo state
-        const undoTimeoutId = setTimeout(() => {
-          console.log('[UNDO] Undo timeout reached - clearing undo state for task:', task.id);
-          setUndoTasks(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(task.id);
-            return newSet;
-          });
-          setUndoTimeouts(prev => {
-            const newMap = new Map(prev);
-            newMap.delete(task.id);
-            return newMap;
-          });
-        }, 4000);
-
-        setUndoTimeouts(prev => new Map(prev).set(task.id, undoTimeoutId));
+        // No individual timeouts needed - delegation effect will handle completion
+        console.log('[UNDO] Task added to pending sets - delegation will handle completion after 4 seconds');
 
       } else {
         // Handle uncompleting a task (from completed to active)
@@ -580,24 +532,9 @@ export default function TasksScreen() {
   const handleUndo = async (taskId: string) => {
     try {
       console.log('[UNDO] Starting undo process for task:', taskId);
-      
-      // Get the timeouts for this specific task
-      const undoTimeout = undoTimeouts.get(taskId);
-      const completionTimeout = pendingCompletionTimeouts.get(taskId);
-      
-      // Clear timeouts for this specific task
-      if (undoTimeout) {
-        console.log('[UNDO] Clearing undo timeout for task:', taskId);
-        clearTimeout(undoTimeout);
-      }
-      
-      if (completionTimeout) {
-        console.log('[UNDO] Clearing pending completion timeout for task:', taskId);
-        clearTimeout(completionTimeout);
-      }
 
-      // Remove task from undo and pending completion sets
-      console.log('[UNDO] Removing task from undo and pending completion sets:', taskId);
+      // Remove task from all pending sets
+      console.log('[UNDO] Removing task from all pending sets:', taskId);
       setUndoTasks(prev => {
         const newSet = new Set(prev);
         newSet.delete(taskId);
@@ -608,8 +545,13 @@ export default function TasksScreen() {
         newSet.delete(taskId);
         return newSet;
       });
+      setTemporarySuccessMessages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
 
-      // Remove timeouts from maps
+      // Clear any existing timeouts for this task
       setUndoTimeouts(prev => {
         const newMap = new Map(prev);
         newMap.delete(taskId);
@@ -625,9 +567,6 @@ export default function TasksScreen() {
       console.log('[UNDO] Found task for undo:', task ? task.id : 'not found');
       
       if (task) {
-        console.log('[UNDO] Undoing task - keeping task in active state');
-        // Task should remain in its original state (not completed)
-        // No need to change anything since we prevented the completion
         console.log('[UNDO] Undo process completed successfully - task remains active');
       } else {
         console.log('[UNDO] Task not found, cannot undo');
