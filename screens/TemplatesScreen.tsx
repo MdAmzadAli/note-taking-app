@@ -10,6 +10,7 @@ import {
   TextInput,
   Alert,
   Platform,
+  FlatList,
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import VoiceInput from '@/components/VoiceInput';
