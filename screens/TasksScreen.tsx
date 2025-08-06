@@ -281,7 +281,7 @@ export default function TasksScreen() {
     }, 2000);
   };
 
-  const toggleTaskComplete = async (task: Task, showCelebration = true) => {
+  const toggleTaskComplete = async (task: Task, showCelebration = true, showUndo = true) => {
     try {
       const wasCompleted = task.isCompleted;
       const updatedTask = {
@@ -303,6 +303,23 @@ export default function TasksScreen() {
         showCelebrationAnimation();
         setTimeout(() => setCelebrationTaskId(null), 2000);
       }
+
+      // Show undo option when task is completed (not when uncompleted)
+      if (!wasCompleted && updatedTask.isCompleted && showUndo) {
+        setUndoTaskId(task.id);
+
+        // Clear any existing timeout
+        if (undoTimeout) {
+          clearTimeout(undoTimeout);
+        }
+
+        // Set new timeout to hide undo option
+        const timeout = setTimeout(() => {
+          setUndoTaskId(null);
+        }, 4000);
+
+        setUndoTimeout(timeout);
+      }
     } catch (error) {
       console.error('Error updating task:', error);
       Alert.alert('Error', 'Failed to update task');
@@ -312,30 +329,16 @@ export default function TasksScreen() {
   const handleSwipeComplete = (task: Task) => {
     if (task.isCompleted) return;
 
-    // Complete the task first
-    toggleTaskComplete(task, true);
-
-    // Show undo option immediately after completion
-    setUndoTaskId(task.id);
-
-    // Clear any existing timeout
-    if (undoTimeout) {
-      clearTimeout(undoTimeout);
-    }
-
-    // Set new timeout to hide undo option
-    const timeout = setTimeout(() => {
-      setUndoTaskId(null);
-    }, 4000);
-
-    setUndoTimeout(timeout);
+    // Complete the task with celebration and undo enabled
+    toggleTaskComplete(task, true, true);
   };
 
   const handleUndo = async (taskId: string) => {
     try {
       const task = tasks.find(t => t.id === taskId);
       if (task && task.isCompleted) {
-        await toggleTaskComplete(task, false);
+        // Don't show celebration or undo when undoing a task
+        await toggleTaskComplete(task, false, false);
       }
 
       // Clear undo state
@@ -530,23 +533,8 @@ export default function TasksScreen() {
                 style={styles.checkboxContainer}
                 onPress={(e) => {
                   e.stopPropagation();
-                  if (!item.isCompleted) {
-                    // Show undo option after checkbox completion
-                    setUndoTaskId(item.id);
-                    
-                    // Clear any existing timeout
-                    if (undoTimeout) {
-                      clearTimeout(undoTimeout);
-                    }
-                    
-                    // Set new timeout to hide undo option
-                    const timeout = setTimeout(() => {
-                      setUndoTaskId(null);
-                    }, 4000);
-                    
-                    setUndoTimeout(timeout);
-                  }
-                  toggleTaskComplete(item, true);
+                  // Use toggleTaskComplete which now handles undo logic internally
+                  toggleTaskComplete(item, true, true);
                 }}
               >
                 <View style={[
