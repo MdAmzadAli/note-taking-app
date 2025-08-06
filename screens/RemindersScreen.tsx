@@ -30,6 +30,7 @@ export default function RemindersScreen() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [filteredReminders, setFilteredReminders] = useState<Reminder[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
 
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
@@ -364,20 +365,79 @@ export default function RemindersScreen() {
 
   useEffect(() => {
     let filtered = reminders;
+    const now = new Date();
+    
+    // Filter based on active tab
+    if (activeTab === 'active') {
+      // Show only non-overdue reminders (active and future)
+      filtered = filtered.filter(reminder => {
+        if (reminder.isRecurring) return true; // Keep all recurring reminders in active
+        const reminderDate = new Date(reminder.dateTime);
+        return reminderDate >= now || reminder.isCompleted;
+      });
+    } else {
+      // History tab: Show only overdue simple (non-recurring) reminders
+      filtered = filtered.filter(reminder => {
+        if (reminder.isRecurring) return false; // No recurring reminders in history
+        const reminderDate = new Date(reminder.dateTime);
+        const daysDifference = Math.floor((now.getTime() - reminderDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Only show overdue reminders that are less than 30 days old
+        return reminderDate < now && !reminder.isCompleted && daysDifference <= 30;
+      });
+    }
+    
+    // Apply search filter
     if (searchQuery.trim()) {
       filtered = filtered.filter(reminder =>
         reminder.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (reminder.description && reminder.description.toLowerCase().includes(searchQuery.toLowerCase()))
       );
     }
+    
     setFilteredReminders(filtered);
-  }, [searchQuery, reminders]);
+  }, [searchQuery, reminders, activeTab]);
 
   const loadRemindersAndSettings = async () => {
     try {
       const remindersData = await getReminders();
+      const now = new Date();
+      
+      // Clean up overdue reminders older than 30 days
+      const cleanedReminders = remindersData.filter(reminder => {
+        if (reminder.isRecurring) return true; // Keep all recurring reminders
+        if (reminder.isCompleted) return true; // Keep completed reminders
+        
+        const reminderDate = new Date(reminder.dateTime);
+        const daysDifference = Math.floor((now.getTime() - reminderDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Remove overdue reminders older than 30 days
+        if (reminderDate < now && daysDifference > 30) {
+          // Cancel any notifications for this reminder
+          if (reminder.notificationId) {
+            cancelNotification(reminder.notificationId);
+          }
+          if (reminder.notificationIds) {
+            reminder.notificationIds.forEach(id => cancelNotification(id));
+          }
+          return false;
+        }
+        
+        return true;
+      });
+      
+      // If any reminders were cleaned up, save the updated list
+      if (cleanedReminders.length !== remindersData.length) {
+        // Save cleaned reminders back to storage
+        for (const reminder of remindersData) {
+          if (!cleanedReminders.find(r => r.id === reminder.id)) {
+            await deleteReminder(reminder.id);
+          }
+        }
+      }
+      
       // Sort reminders by creation date, newest first
-      const sortedReminders = remindersData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const sortedReminders = cleanedReminders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setReminders(sortedReminders);
       setFilteredReminders(sortedReminders);
 
@@ -1464,6 +1524,39 @@ export default function RemindersScreen() {
         </View>
       </View>
 
+      {/* Tabs */}
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'active' && styles.tabButtonActive,
+          ]}
+          onPress={() => setActiveTab('active')}
+        >
+          <Text style={[
+            styles.tabButtonText,
+            activeTab === 'active' && styles.tabButtonTextActive,
+          ]}>
+            Active
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'history' && styles.tabButtonActive,
+          ]}
+          onPress={() => setActiveTab('history')}
+        >
+          <Text style={[
+            styles.tabButtonText,
+            activeTab === 'history' && styles.tabButtonTextActive,
+          ]}>
+            History
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {isSearchVisible && (
         <View style={styles.searchContainer}>
           <TextInput
@@ -1485,7 +1578,12 @@ export default function RemindersScreen() {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>
-              {searchQuery.trim() ? 'No reminders found for your search.' : 'No reminders yet. Tap "New Reminder" to create your first reminder.'}
+              {searchQuery.trim() 
+                ? 'No reminders found for your search.' 
+                : activeTab === 'active'
+                  ? 'No active reminders. Tap "New Reminder" to create your first reminder.'
+                  : 'No overdue reminders in history. Overdue reminders will appear here automatically.'
+              }
             </Text>
           </View>
         }
@@ -1976,5 +2074,32 @@ input: {
     color: '#6B7280',
     fontFamily: 'Inter',
     fontWeight: '500',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabButtonActive: {
+    borderBottomColor: '#000000',
+  },
+  tabButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#6B7280',
+    fontFamily: 'Inter',
+  },
+  tabButtonTextActive: {
+    color: '#000000',
+    fontWeight: '600',
   },
 });
