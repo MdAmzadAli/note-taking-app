@@ -43,6 +43,7 @@ export default function TasksScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [filter, setFilter] = useState<'all' | 'today' | 'tomorrow' | 'overdue'>('all');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
 
   // New state for tabs and undo functionality
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
@@ -616,6 +617,48 @@ export default function TasksScreen() {
     );
   };
 
+  const deleteOlderTasks = async (targetDate: string) => {
+    const targetDateObj = new Date(targetDate);
+    const tasksToDelete = tasks.filter(task => {
+      if (!task.isCompleted) return false;
+      const taskDate = new Date(task.createdAt);
+      return taskDate <= targetDateObj;
+    });
+
+    Alert.alert(
+      'Delete Older Tasks',
+      `Are you sure you want to delete all ${tasksToDelete.length} completed tasks from ${new Date(targetDate).toLocaleDateString()} and earlier?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete All',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('[TASK] Deleting older tasks:', tasksToDelete.length);
+              
+              for (const task of tasksToDelete) {
+                if (task.notificationId) {
+                  await cancelNotification(task.notificationId);
+                }
+                await deleteTask(task.id);
+              }
+              
+              console.log('[TASK] Removing deleted tasks from state...');
+              const taskIdsToDelete = new Set(tasksToDelete.map(t => t.id));
+              setTasks(prevTasks => prevTasks.filter(t => !taskIdsToDelete.has(t.id)));
+              
+              console.log('[TASK] Older tasks deletion completed successfully');
+            } catch (error) {
+              console.error('[TASK] Error deleting older tasks:', error);
+              Alert.alert('Error', 'Failed to delete older tasks');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const getFilteredTasks = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -889,11 +932,44 @@ export default function TasksScreen() {
 
   const renderCompletedTasksByDate = () => {
     const stats = getTaskStats();
-    const { tasksByDate } = stats;
+    let { tasksByDate } = stats;
+
+    // Filter tasks by search query if provided
+    if (historySearchQuery.trim()) {
+      const filteredTasksByDate: Record<string, Task[]> = {};
+      Object.entries(tasksByDate).forEach(([date, tasks]) => {
+        const filteredTasks = tasks.filter(task =>
+          task.title.toLowerCase().includes(historySearchQuery.toLowerCase()) ||
+          (task.description && task.description.toLowerCase().includes(historySearchQuery.toLowerCase()))
+        );
+        if (filteredTasks.length > 0) {
+          filteredTasksByDate[date] = filteredTasks;
+        }
+      });
+      tasksByDate = filteredTasksByDate;
+    }
+
     const dates = Object.keys(tasksByDate).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
     return (
       <View>
+        {/* Search Bar for History */}
+        <View style={styles.historySearchContainer}>
+          <TextInput
+            style={styles.historySearchInput}
+            value={historySearchQuery}
+            onChangeText={setHistorySearchQuery}
+            placeholder="Search completed tasks..."
+            placeholderTextColor="#6B7280"
+          />
+          <TouchableOpacity
+            style={styles.historySearchIcon}
+            onPress={() => setHistorySearchQuery('')}
+          >
+            <IconSymbol size={20} name="magnifyingglass" color="#6B7280" />
+          </TouchableOpacity>
+        </View>
+
         {/* Statistics Section */}
         <View style={styles.statsContainer}>
           <Text style={styles.statsTitle}>Task Statistics</Text>
@@ -916,19 +992,33 @@ export default function TasksScreen() {
         {/* Tasks by Date */}
         {dates.map(date => (
           <View key={date} style={styles.dateSection}>
-            <Text style={styles.dateHeader}>
-              {new Date(date).toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}
-            </Text>
+            <View style={styles.dateSectionHeader}>
+              <Text style={styles.dateHeader}>
+                {new Date(date).toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </Text>
+              <TouchableOpacity
+                style={styles.deleteOlderButton}
+                onPress={() => deleteOlderTasks(date)}
+              >
+                <Text style={styles.deleteOlderButtonText}>Delete Older</Text>
+              </TouchableOpacity>
+            </View>
             {tasksByDate[date].map(task => (
               <SwipeableTaskItem key={task.id} item={task} />
             ))}
           </View>
         ))}
+
+        {dates.length === 0 && historySearchQuery.trim() && (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No completed tasks found matching "{historySearchQuery}"</Text>
+          </View>
+        )}
       </View>
     );
   };
@@ -1705,5 +1795,48 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'Inter',
     lineHeight: 25.6,
+  },
+  historySearchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#F9FAFB',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  historySearchInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Inter',
+    color: '#000000',
+    marginRight: 8,
+  },
+  historySearchIcon: {
+    padding: 8,
+  },
+  dateSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  deleteOlderButton: {
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  deleteOlderButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '500',
+    fontFamily: 'Inter',
   },
 });
