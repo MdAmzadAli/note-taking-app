@@ -1016,6 +1016,13 @@ export default function TasksScreen() {
     const translateX = new Animated.Value(0);
     const status = getTaskStatus(item);
 
+    // Check if task is overdue
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const taskDate = new Date(item.scheduledDate || item.createdAt);
+    const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
+    const isOverdue = taskDay < today && !item.isCompleted;
+
     const onGestureEvent = Animated.event(
       [{ nativeEvent: { translationX: translateX } }],
       { useNativeDriver: false }
@@ -1025,7 +1032,8 @@ export default function TasksScreen() {
       if (event.nativeEvent.state === State.END) {
         const { translationX } = event.nativeEvent;
 
-        if (Math.abs(translationX) > 120 && !item.isCompleted) {
+        // Prevent swipe completion for completed tasks and overdue tasks in history tab
+        if (Math.abs(translationX) > 120 && !item.isCompleted && !(activeTab === 'completed' && isOverdue)) {
           // Trigger completion
           handleSwipeComplete(item);
 
@@ -1082,7 +1090,7 @@ export default function TasksScreen() {
       <PanGestureHandler
         onGestureEvent={onGestureEvent}
         onHandlerStateChange={onHandlerStateChange}
-        enabled={!item.isCompleted}
+        enabled={!item.isCompleted && !(activeTab === 'completed' && isOverdue)}
       >
         <Animated.View style={[{ transform: [{ translateX }] }]}>
           <TouchableOpacity
@@ -1101,6 +1109,15 @@ export default function TasksScreen() {
                 );
                 return;
               }
+              if (activeTab === 'completed' && isOverdue) {
+                // Show alert that overdue tasks in history cannot be edited
+                Alert.alert(
+                  'Task Overdue', 
+                  'This overdue task is in history and cannot be modified. You can delete it if needed.',
+                  [{ text: 'OK', style: 'default' }]
+                );
+                return;
+              }
               startEditingTask(item);
             }}
           >
@@ -1109,6 +1126,15 @@ export default function TasksScreen() {
                 style={styles.checkboxContainer}
                 onPress={(e) => {
                   e.stopPropagation();
+                  // Prevent status changes for overdue tasks in history tab
+                  if (activeTab === 'completed' && isOverdue) {
+                    Alert.alert(
+                      'Task Overdue', 
+                      'This overdue task is in history and its status cannot be changed.',
+                      [{ text: 'OK', style: 'default' }]
+                    );
+                    return;
+                  }
                   // Use toggleTaskComplete which now handles undo logic internally
                   toggleTaskComplete(item, true, true);
                 }}
