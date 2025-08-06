@@ -59,24 +59,46 @@ export default function TasksScreen() {
 
   useEffect(() => {
     const taskCreatedListener = (task: Task) => {
-      setTasks(prevTasks => [task, ...prevTasks]);
+      console.log('[TASK] Event bus task created listener called for:', task.id);
+      setTasks(prevTasks => {
+        // Check if task already exists to prevent duplicates
+        const existingTask = prevTasks.find(t => t.id === task.id);
+        if (existingTask) {
+          console.log('[TASK] Task already exists, skipping duplicate creation');
+          return prevTasks;
+        }
+        console.log('[TASK] Adding new task to state via event bus');
+        return [task, ...prevTasks];
+      });
     };
 
     const taskUpdatedListener = (updatedTask: Task) => {
       console.log('[UNDO] Event bus task updated listener called for:', updatedTask.id);
-      // Only update if we don't already have this task updated in state
+      // Skip update if this is just an event bus echo
       setTasks(prevTasks => {
         const existingTask = prevTasks.find(t => t.id === updatedTask.id);
-        if (existingTask && existingTask.isCompleted === updatedTask.isCompleted) {
-          console.log('[UNDO] Task already up to date, skipping update');
+        if (!existingTask) {
+          console.log('[UNDO] Task not found in state, ignoring update');
           return prevTasks;
         }
+        
+        // Check if the task is actually different
+        const isTaskDifferent = existingTask.isCompleted !== updatedTask.isCompleted ||
+                               existingTask.title !== updatedTask.title ||
+                               existingTask.description !== updatedTask.description;
+        
+        if (!isTaskDifferent) {
+          console.log('[UNDO] Task unchanged, skipping update');
+          return prevTasks;
+        }
+        
         console.log('[UNDO] Updating task in state via event bus');
         return prevTasks.map(task => (task.id === updatedTask.id ? updatedTask : task));
       });
     };
 
     const taskDeletedListener = (taskId: string) => {
+      console.log('[TASK] Event bus task deleted listener called for:', taskId);
       setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
     };
 
@@ -151,6 +173,7 @@ export default function TasksScreen() {
     }
 
     try {
+      console.log('[TASK] Creating new task...');
       const task: Task = {
         id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         title: newTitle.trim(),
@@ -159,6 +182,8 @@ export default function TasksScreen() {
         scheduledDate: selectedDate.toISOString(),
         createdAt: new Date().toISOString(),
       };
+
+      console.log('[TASK] Generated task ID:', task.id);
 
       // Schedule reminder if enabled
       if (hasReminder) {
@@ -178,12 +203,22 @@ export default function TasksScreen() {
         }
       }
 
+      console.log('[TASK] Saving task to storage...');
       await saveTask(task);
       
-      // Add task to state directly instead of reloading all tasks
-      setTasks(prevTasks => [task, ...prevTasks]);
-      
-      eventBus.emit(EVENTS.TASK_CREATED, task);
+      console.log('[TASK] Adding task to state directly...');
+      // Add task to state directly - DO NOT emit event to prevent double creation
+      setTasks(prevTasks => {
+        // Double-check for duplicates
+        const existingTask = prevTasks.find(t => t.id === task.id);
+        if (existingTask) {
+          console.log('[TASK] Duplicate task detected, not adding again');
+          return prevTasks;
+        }
+        return [task, ...prevTasks];
+      });
+
+      console.log('[TASK] Task creation completed successfully');
 
       // Reset form
       setNewTitle('');
@@ -193,7 +228,7 @@ export default function TasksScreen() {
       setHasReminder(false);
       setIsCreating(false);
     } catch (error) {
-      console.error('Error creating task:', error);
+      console.error('[TASK] Error creating task:', error);
       Alert.alert('Error', 'Failed to create task');
     }
   };
@@ -219,6 +254,8 @@ export default function TasksScreen() {
     }
 
     try {
+      console.log('[TASK] Updating task:', editingTask.id);
+
       // Cancel old notification if exists
       if (editingTask.notificationId) {
         await cancelNotification(editingTask.notificationId);
@@ -251,14 +288,16 @@ export default function TasksScreen() {
         }
       }
 
+      console.log('[TASK] Saving updated task to storage...');
       await saveTask(updatedTask);
       
-      // Update task in state directly instead of reloading all tasks
+      console.log('[TASK] Updating task in state directly...');
+      // Update task in state directly - DO NOT emit event to prevent double updates
       setTasks(prevTasks => 
         prevTasks.map(t => t.id === updatedTask.id ? updatedTask : t)
       );
-      
-      eventBus.emit(EVENTS.TASK_UPDATED, updatedTask);
+
+      console.log('[TASK] Task update completed successfully');
 
       // Reset form
       setNewTitle('');
@@ -269,7 +308,7 @@ export default function TasksScreen() {
       setIsEditing(false);
       setEditingTask(null);
     } catch (error) {
-      console.error('Error updating task:', error);
+      console.error('[TASK] Error updating task:', error);
       Alert.alert('Error', 'Failed to update task');
     }
   };
@@ -362,13 +401,9 @@ export default function TasksScreen() {
         return newTasks;
       });
 
-      // Save to storage (async operation) - DO NOT reload tasks after this
+      // Save to storage (async operation) - DO NOT emit event to prevent doubles
       console.log('[UNDO] Saving task to storage:', task.id);
       await saveTask(updatedTask);
-      
-      // Emit event for other components (but don't reload tasks)
-      console.log('[UNDO] Emitting task updated event for:', task.id);
-      eventBus.emit(EVENTS.TASK_UPDATED, updatedTask);
 
       // Show celebration animations when task is completed
       if (!wasCompleted && updatedTask.isCompleted && showCelebration) {
@@ -438,17 +473,22 @@ export default function TasksScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              console.log('[TASK] Deleting task:', task.id);
+              
               if (task.notificationId) {
                 await cancelNotification(task.notificationId);
               }
+              
+              console.log('[TASK] Deleting from storage...');
               await deleteTask(task.id);
               
-              // Remove task from state directly instead of reloading all tasks
+              console.log('[TASK] Removing from state...');
+              // Remove task from state directly - DO NOT emit event to prevent doubles
               setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
               
-              eventBus.emit(EVENTS.TASK_DELETED, task.id);
+              console.log('[TASK] Task deletion completed successfully');
             } catch (error) {
-              console.error('Error deleting task:', error);
+              console.error('[TASK] Error deleting task:', error);
               Alert.alert('Error', 'Failed to delete task');
             }
           },
