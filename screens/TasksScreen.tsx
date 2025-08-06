@@ -1566,13 +1566,27 @@ export default function TasksScreen() {
       )}
 
       {/* Tabs */}
-      <View style={styles.tabsContainer}>
-        {renderTabButton('active', 'Active')}
-        {renderTabButton('completed', 'History')}
+      <View style={[styles.tabsContainer, { paddingVertical: 12 }]}>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'active' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('active')}
+        >
+          <Text style={[styles.tabButtonText, activeTab === 'active' && styles.tabButtonTextActive]}>
+            Active
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'completed' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('completed')}
+        >
+          <Text style={[styles.tabButtonText, activeTab === 'completed' && styles.tabButtonTextActive]}>
+            History
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {activeTab === 'active' && (
-        <View style={styles.filtersContainer}>
+        <View style={[styles.filtersContainer, { paddingVertical: 12 }]}>
           {renderFilterButton('all', 'All')}
           {renderFilterButton('today', 'Today')}
           {renderFilterButton('tomorrow', 'Tomorrow')}
@@ -1808,7 +1822,6 @@ const styles = StyleSheet.create({
   tabsContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingVertical: 12,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
@@ -1841,7 +1854,6 @@ const styles = StyleSheet.create({
   filtersContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingVertical: 12,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
@@ -2418,7 +2430,6 @@ const styles = StyleSheet.create({
   historyFiltersContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingVertical: 12,
     backgroundColor: '#F9FAFB',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',

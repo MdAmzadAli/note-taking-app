@@ -2083,10 +2083,11 @@ input: {
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
+    paddingVertical: 4,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 16,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: 'center',
     borderBottomWidth: 2,
