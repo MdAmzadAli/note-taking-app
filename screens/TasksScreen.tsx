@@ -63,9 +63,17 @@ export default function TasksScreen() {
     };
 
     const taskUpdatedListener = (updatedTask: Task) => {
-      setTasks(prevTasks =>
-        prevTasks.map(task => (task.id === updatedTask.id ? updatedTask : task))
-      );
+      console.log('[UNDO] Event bus task updated listener called for:', updatedTask.id);
+      // Only update if we don't already have this task updated in state
+      setTasks(prevTasks => {
+        const existingTask = prevTasks.find(t => t.id === updatedTask.id);
+        if (existingTask && existingTask.isCompleted === updatedTask.isCompleted) {
+          console.log('[UNDO] Task already up to date, skipping update');
+          return prevTasks;
+        }
+        console.log('[UNDO] Updating task in state via event bus');
+        return prevTasks.map(task => (task.id === updatedTask.id ? updatedTask : task));
+      });
     };
 
     const taskDeletedListener = (taskId: string) => {
@@ -171,8 +179,11 @@ export default function TasksScreen() {
       }
 
       await saveTask(task);
+      
+      // Add task to state directly instead of reloading all tasks
+      setTasks(prevTasks => [task, ...prevTasks]);
+      
       eventBus.emit(EVENTS.TASK_CREATED, task);
-      await loadTasksAndSettings();
 
       // Reset form
       setNewTitle('');
@@ -241,8 +252,13 @@ export default function TasksScreen() {
       }
 
       await saveTask(updatedTask);
+      
+      // Update task in state directly instead of reloading all tasks
+      setTasks(prevTasks => 
+        prevTasks.map(t => t.id === updatedTask.id ? updatedTask : t)
+      );
+      
       eventBus.emit(EVENTS.TASK_UPDATED, updatedTask);
-      await loadTasksAndSettings();
 
       // Reset form
       setNewTitle('');
@@ -311,7 +327,7 @@ export default function TasksScreen() {
         console.log('[UNDO] Cancelled notification for completed task:', task.id);
       }
 
-      // Show undo option IMMEDIATELY when task is completed
+      // Show undo option FIRST when task is completed (before any state updates)
       if (!wasCompleted && updatedTask.isCompleted && showUndo) {
         console.log('[UNDO] Task completed, setting up undo interface for task:', task.id);
         
@@ -321,7 +337,7 @@ export default function TasksScreen() {
           clearTimeout(undoTimeout);
         }
 
-        // Set undo state immediately
+        // Set undo state immediately BEFORE updating tasks
         console.log('[UNDO] Setting undo task ID:', task.id);
         setUndoTaskId(task.id);
 
@@ -338,7 +354,7 @@ export default function TasksScreen() {
         setUndoTimeout(timeout);
       }
 
-      // Update tasks state FIRST to ensure immediate UI update
+      // Update tasks state to trigger UI update
       console.log('[UNDO] Updating tasks state for task:', task.id, 'new completion status:', updatedTask.isCompleted);
       setTasks(prevTasks => {
         const newTasks = prevTasks.map(t => t.id === task.id ? updatedTask : t);
@@ -346,11 +362,11 @@ export default function TasksScreen() {
         return newTasks;
       });
 
-      // Then save to storage (async operation)
+      // Save to storage (async operation) - DO NOT reload tasks after this
       console.log('[UNDO] Saving task to storage:', task.id);
       await saveTask(updatedTask);
       
-      // Emit event for other components
+      // Emit event for other components (but don't reload tasks)
       console.log('[UNDO] Emitting task updated event for:', task.id);
       eventBus.emit(EVENTS.TASK_UPDATED, updatedTask);
 
@@ -369,6 +385,9 @@ export default function TasksScreen() {
     } catch (error) {
       console.error('[UNDO] Error in toggleTaskComplete:', error);
       Alert.alert('Error', 'Failed to update task');
+      
+      // Reload tasks only on error to recover state
+      await loadTasksAndSettings();
     }
   };
 
@@ -423,8 +442,11 @@ export default function TasksScreen() {
                 await cancelNotification(task.notificationId);
               }
               await deleteTask(task.id);
+              
+              // Remove task from state directly instead of reloading all tasks
+              setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
+              
               eventBus.emit(EVENTS.TASK_DELETED, task.id);
-              await loadTasksAndSettings();
             } catch (error) {
               console.error('Error deleting task:', error);
               Alert.alert('Error', 'Failed to delete task');
