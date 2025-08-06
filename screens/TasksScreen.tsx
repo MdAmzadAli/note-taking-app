@@ -1723,10 +1723,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: Platform.OS === 'ios' ? 56 : 36,
     backgroundColor: '#000000',
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
+    height: Platform.OS === 'ios' ? 100 : 80,
   },
   headerTitle: {
     fontSize: 20,
