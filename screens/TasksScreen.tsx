@@ -46,12 +46,12 @@ export default function TasksScreen() {
 
   // New state for tabs and undo functionality
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
-  const [undoTaskId, setUndoTaskId] = useState<string | null>(null);
-  const [undoTimeout, setUndoTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [undoTasks, setUndoTasks] = useState<Set<string>>(new Set());
+  const [undoTimeouts, setUndoTimeouts] = useState<Map<string, NodeJS.Timeout>>(new Map());
   const [celebrationTaskId, setCelebrationTaskId] = useState<string | null>(null);
   const [showTopCelebration, setShowTopCelebration] = useState(false);
-  const [pendingCompletionTaskId, setPendingCompletionTaskId] = useState<string | null>(null);
-  const [pendingCompletionTimeout, setPendingCompletionTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [pendingCompletionTasks, setPendingCompletionTasks] = useState<Set<string>>(new Set());
+  const [pendingCompletionTimeouts, setPendingCompletionTimeouts] = useState<Map<string, NodeJS.Timeout>>(new Map());
   const celebrationScale = useRef(new Animated.Value(0)).current;
   const celebrationOpacity = useRef(new Animated.Value(0)).current;
 
@@ -129,21 +129,16 @@ export default function TasksScreen() {
   // Clear timeouts on component unmount
   useEffect(() => {
     return () => {
-      if (undoTimeout) {
-        console.log('[UNDO] Component unmounting, clearing undo timeout');
-        clearTimeout(undoTimeout);
-      }
-      if (pendingCompletionTimeout) {
-        console.log('[UNDO] Component unmounting, clearing pending completion timeout');
-        clearTimeout(pendingCompletionTimeout);
-      }
+      console.log('[UNDO] Component unmounting, clearing all timeouts');
+      undoTimeouts.forEach((timeout) => clearTimeout(timeout));
+      pendingCompletionTimeouts.forEach((timeout) => clearTimeout(timeout));
     };
-  }, [undoTimeout, pendingCompletionTimeout]);
+  }, [undoTimeouts, pendingCompletionTimeouts]);
 
   // Monitor undo state changes
   useEffect(() => {
-    console.log('[UNDO] Undo state changed - undoTaskId:', undoTaskId, 'pendingCompletionTaskId:', pendingCompletionTaskId);
-  }, [undoTaskId, pendingCompletionTaskId]);
+    console.log('[UNDO] Undo state changed - undoTasks:', Array.from(undoTasks), 'pendingCompletionTasks:', Array.from(pendingCompletionTasks));
+  }, [undoTasks, pendingCompletionTasks]);
 
   function getTomorrowDate(): Date {
     const tomorrow = new Date();
@@ -373,20 +368,23 @@ export default function TasksScreen() {
           console.log('[UNDO] Cancelled notification for task being completed:', task.id);
         }
 
-        // Clear any existing timeouts
-        if (undoTimeout) {
-          console.log('[UNDO] Clearing previous undo timeout');
-          clearTimeout(undoTimeout);
+        // Clear any existing timeout for this specific task (if it exists)
+        const existingUndoTimeout = undoTimeouts.get(task.id);
+        const existingCompletionTimeout = pendingCompletionTimeouts.get(task.id);
+        
+        if (existingUndoTimeout) {
+          console.log('[UNDO] Clearing previous undo timeout for task:', task.id);
+          clearTimeout(existingUndoTimeout);
         }
-        if (pendingCompletionTimeout) {
-          console.log('[UNDO] Clearing previous pending completion timeout');
-          clearTimeout(pendingCompletionTimeout);
+        if (existingCompletionTimeout) {
+          console.log('[UNDO] Clearing previous completion timeout for task:', task.id);
+          clearTimeout(existingCompletionTimeout);
         }
 
-        // Set undo state and pending completion state
-        console.log('[UNDO] Setting undo task ID and pending completion ID:', task.id);
-        setUndoTaskId(task.id);
-        setPendingCompletionTaskId(task.id);
+        // Add task to undo and pending completion sets
+        console.log('[UNDO] Adding task to undo and pending completion sets:', task.id);
+        setUndoTasks(prev => new Set(prev).add(task.id));
+        setPendingCompletionTasks(prev => new Set(prev).add(task.id));
 
         // Show celebration immediately
         if (showCelebration) {
@@ -403,9 +401,29 @@ export default function TasksScreen() {
         const completionTimeout = setTimeout(async () => {
           console.log('[UNDO] 4 seconds elapsed - actually completing task:', task.id);
           
-          // Clear undo state
-          setUndoTaskId(prev => prev === task.id ? null : prev);
-          setPendingCompletionTaskId(prev => prev === task.id ? null : prev);
+          // Remove task from undo and pending completion sets
+          setUndoTasks(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(task.id);
+            return newSet;
+          });
+          setPendingCompletionTasks(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(task.id);
+            return newSet;
+          });
+
+          // Remove timeouts from maps
+          setUndoTimeouts(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(task.id);
+            return newMap;
+          });
+          setPendingCompletionTimeouts(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(task.id);
+            return newMap;
+          });
 
           // Actually update the task state
           const updatedTask = {
@@ -423,16 +441,25 @@ export default function TasksScreen() {
           console.log('[UNDO] Task completion saved to storage:', task.id);
         }, 4000);
 
-        console.log('[UNDO] Pending completion timeout set for 4 seconds');
-        setPendingCompletionTimeout(completionTimeout);
+        console.log('[UNDO] Pending completion timeout set for 4 seconds for task:', task.id);
+        setPendingCompletionTimeouts(prev => new Map(prev).set(task.id, completionTimeout));
 
         // Also set undo timeout to clear undo state
         const undoTimeoutId = setTimeout(() => {
-          console.log('[UNDO] Undo timeout reached - clearing undo task ID for:', task.id);
-          setUndoTaskId(prev => prev === task.id ? null : prev);
+          console.log('[UNDO] Undo timeout reached - clearing undo state for task:', task.id);
+          setUndoTasks(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(task.id);
+            return newSet;
+          });
+          setUndoTimeouts(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(task.id);
+            return newMap;
+          });
         }, 4000);
 
-        setUndoTimeout(undoTimeoutId);
+        setUndoTimeouts(prev => new Map(prev).set(task.id, undoTimeoutId));
 
       } else {
         // Handle uncompleting a task (from completed to active)
@@ -471,22 +498,45 @@ export default function TasksScreen() {
     try {
       console.log('[UNDO] Starting undo process for task:', taskId);
       
-      // Clear all undo-related state
-      console.log('[UNDO] Clearing undo and pending completion state');
-      setUndoTaskId(null);
-      setPendingCompletionTaskId(null);
+      // Get the timeouts for this specific task
+      const undoTimeout = undoTimeouts.get(taskId);
+      const completionTimeout = pendingCompletionTimeouts.get(taskId);
       
+      // Clear timeouts for this specific task
       if (undoTimeout) {
-        console.log('[UNDO] Clearing undo timeout');
+        console.log('[UNDO] Clearing undo timeout for task:', taskId);
         clearTimeout(undoTimeout);
-        setUndoTimeout(null);
       }
       
-      if (pendingCompletionTimeout) {
-        console.log('[UNDO] Clearing pending completion timeout');
-        clearTimeout(pendingCompletionTimeout);
-        setPendingCompletionTimeout(null);
+      if (completionTimeout) {
+        console.log('[UNDO] Clearing pending completion timeout for task:', taskId);
+        clearTimeout(completionTimeout);
       }
+
+      // Remove task from undo and pending completion sets
+      console.log('[UNDO] Removing task from undo and pending completion sets:', taskId);
+      setUndoTasks(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
+      setPendingCompletionTasks(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
+
+      // Remove timeouts from maps
+      setUndoTimeouts(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(taskId);
+        return newMap;
+      });
+      setPendingCompletionTimeouts(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(taskId);
+        return newMap;
+      });
 
       const task = tasks.find(t => t.id === taskId);
       console.log('[UNDO] Found task for undo:', task ? task.id : 'not found');
@@ -549,7 +599,7 @@ export default function TasksScreen() {
       // Special handling for tasks with pending completion
       if (activeTab === 'active') {
         // Keep tasks that are pending completion in active tab (even if completed in state)
-        if (pendingCompletionTaskId === task.id) {
+        if (pendingCompletionTasks.has(task.id)) {
           return true;
         }
         // Otherwise filter out completed tasks
@@ -558,7 +608,7 @@ export default function TasksScreen() {
       
       if (activeTab === 'completed') {
         // Don't show tasks that are pending completion in completed tab
-        if (pendingCompletionTaskId === task.id) {
+        if (pendingCompletionTasks.has(task.id)) {
           return false;
         }
         // Only show completed tasks
@@ -671,8 +721,8 @@ export default function TasksScreen() {
     };
 
     // Show undo interface if this task has undo active
-    if (undoTaskId === item.id) {
-      console.log('[UNDO] Rendering undo interface for task:', item.id, 'task completed:', item.isCompleted, 'undoTaskId:', undoTaskId);
+    if (undoTasks.has(item.id)) {
+      console.log('[UNDO] Rendering undo interface for task:', item.id, 'task completed:', item.isCompleted, 'in undoTasks:', undoTasks.has(item.id));
       return (
         <View style={styles.undoContainer}>
           <View style={styles.undoContent}>
@@ -692,7 +742,7 @@ export default function TasksScreen() {
       );
     }
 
-    console.log('[UNDO] Rendering normal task item for:', item.id, 'undoTaskId:', undoTaskId, 'matches:', undoTaskId === item.id);
+    console.log('[UNDO] Rendering normal task item for:', item.id, 'in undoTasks:', undoTasks.has(item.id));
 
     return (
       <PanGestureHandler
