@@ -44,6 +44,7 @@ export default function TasksScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [filter, setFilter] = useState<'all' | 'today' | 'tomorrow' | 'overdue'>('all');
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'completed' | 'overdue'>('all');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [historySearchQuery, setHistorySearchQuery] = useState('');
 
@@ -156,7 +157,7 @@ export default function TasksScreen() {
       });
     }
     setFilteredTasks(filtered);
-  }, [searchQuery, tasks, filter, activeTab]);
+  }, [searchQuery, tasks, filter, activeTab, historyFilter]);
 
   // Clear timeouts on component unmount
   useEffect(() => {
@@ -841,6 +842,10 @@ export default function TasksScreen() {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     let filtered = tasks.filter(task => {
+      const taskDate = new Date(task.scheduledDate || task.createdAt);
+      const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
+      const isOverdue = taskDay < today && !task.isCompleted;
+
       // Special handling for tasks with pending completion
       if (activeTab === 'active') {
         // Keep tasks that are pending completion in active tab (even if completed in state)
@@ -851,8 +856,8 @@ export default function TasksScreen() {
         if (temporarySuccessMessages.has(task.id)) {
           return true;
         }
-        // Otherwise filter out completed tasks
-        if (task.isCompleted) return false;
+        // Filter out completed tasks and overdue tasks (they go to history)
+        if (task.isCompleted || isOverdue) return false;
       }
 
       if (activeTab === 'completed') {
@@ -864,23 +869,18 @@ export default function TasksScreen() {
         if (temporarySuccessMessages.has(task.id)) {
           return false;
         }
-        // Only show completed tasks
-        if (!task.isCompleted) return false;
+        // Show completed tasks and overdue tasks in history tab
+        if (!task.isCompleted && !isOverdue) return false;
       }
 
-      const taskDate = new Date(task.scheduledDate || task.createdAt);
-      const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
+      const activeTabFilters = {
+        'today': taskDay.getTime() === today.getTime(),
+        'tomorrow': taskDay.getTime() === tomorrow.getTime(),
+        'overdue': isOverdue,
+        'all': true
+      };
 
-      switch (filter) {
-        case 'today':
-          return taskDay.getTime() === today.getTime();
-        case 'tomorrow':
-          return taskDay.getTime() === tomorrow.getTime();
-        case 'overdue':
-          return taskDay < today && !task.isCompleted;
-        default:
-          return true;
-      }
+      return activeTabFilters[filter] || true;
     });
 
     // Group completed tasks by date if showing completed tab
@@ -892,7 +892,28 @@ export default function TasksScreen() {
   };
 
   const getTaskStats = () => {
-    let completedTasks = tasks.filter(task => task.isCompleted);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    let historyTasks = tasks.filter(task => {
+      const taskDate = new Date(task.scheduledDate || task.createdAt);
+      const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
+      const isOverdue = taskDay < today && !task.isCompleted;
+      return task.isCompleted || isOverdue;
+    });
+
+    // Apply history filter
+    if (historyFilter === 'completed') {
+      historyTasks = historyTasks.filter(task => task.isCompleted);
+    } else if (historyFilter === 'overdue') {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      historyTasks = historyTasks.filter(task => {
+        const taskDate = new Date(task.scheduledDate || task.createdAt);
+        const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
+        return taskDay < today && !task.isCompleted;
+      });
+    }
     
     // Apply date range filter if both dates are set
     if (fromDate && toDate) {
@@ -901,17 +922,24 @@ export default function TasksScreen() {
       const toTime = new Date(toDate);
       toTime.setHours(23, 59, 59, 999);
       
-      completedTasks = completedTasks.filter(task => {
+      historyTasks = historyTasks.filter(task => {
         const taskDate = new Date(task.createdAt);
         return taskDate >= fromTime && taskDate <= toTime;
       });
     }
     
     const totalTasks = tasks.length;
+    const completedTasks = tasks.filter(task => task.isCompleted);
+    const overdueTasks = tasks.filter(task => {
+      const taskDate = new Date(task.scheduledDate || task.createdAt);
+      const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
+      return taskDay < today && !task.isCompleted;
+    });
+    
     const completionRate = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;
 
     // Group by dates
-    const tasksByDate = completedTasks.reduce((acc, task) => {
+    const tasksByDate = historyTasks.reduce((acc, task) => {
       const date = new Date(task.createdAt).toDateString();
       if (!acc[date]) acc[date] = [];
       acc[date].push(task);
@@ -920,6 +948,7 @@ export default function TasksScreen() {
 
     return {
       totalCompleted: completedTasks.length,
+      totalOverdue: overdueTasks.length,
       totalTasks,
       completionRate,
       tasksByDate,
@@ -1230,14 +1259,62 @@ export default function TasksScreen() {
               <Text style={styles.statLabel}>Completed</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{stats.totalTasks}</Text>
-              <Text style={styles.statLabel}>Total Tasks</Text>
+              <Text style={styles.statNumber}>{stats.totalOverdue}</Text>
+              <Text style={styles.statLabel}>Overdue</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>{stats.completionRate}%</Text>
               <Text style={styles.statLabel}>Success Rate</Text>
             </View>
           </View>
+        </View>
+
+        {/* History Filter Buttons */}
+        <View style={styles.historyFiltersContainer}>
+          <TouchableOpacity
+            style={[
+              styles.historyFilterButton,
+              historyFilter === 'all' && styles.historyFilterButtonActive,
+            ]}
+            onPress={() => setHistoryFilter('all')}
+          >
+            <Text style={[
+              styles.historyFilterButtonText,
+              historyFilter === 'all' && styles.historyFilterButtonTextActive,
+            ]}>
+              All
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.historyFilterButton,
+              historyFilter === 'completed' && styles.historyFilterButtonActive,
+            ]}
+            onPress={() => setHistoryFilter('completed')}
+          >
+            <Text style={[
+              styles.historyFilterButtonText,
+              historyFilter === 'completed' && styles.historyFilterButtonTextActive,
+            ]}>
+              Completed
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.historyFilterButton,
+              historyFilter === 'overdue' && styles.historyFilterButtonActive,
+            ]}
+            onPress={() => setHistoryFilter('overdue')}
+          >
+            <Text style={[
+              styles.historyFilterButtonText,
+              historyFilter === 'overdue' && styles.historyFilterButtonTextActive,
+            ]}>
+              Overdue
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Tasks by Date */}
@@ -2319,5 +2396,39 @@ const styles = StyleSheet.create({
   },
   modalButtonDisabled: {
     backgroundColor: '#9CA3AF',
+  },
+  historyFiltersContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#F9FAFB',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    gap: 8,
+  },
+  historyFilterButton: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyFilterButtonActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  historyFilterButtonText: {
+    fontSize: 14,
+    color: '#000000',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  historyFilterButtonTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
 });
