@@ -216,6 +216,68 @@ export default function TasksScreen() {
     return tomorrow;
   }
 
+  const generateSampleTasks = (): Task[] => {
+    const sampleTaskData = [
+      { title: "Complete project proposal", description: "Finish the quarterly project proposal for the marketing team", completed: true },
+      { title: "Schedule dentist appointment", description: "Call dental office to book cleaning appointment", completed: true },
+      { title: "Review team performance", description: "Conduct quarterly performance reviews for direct reports", completed: false },
+      { title: "Update website content", description: "Refresh homepage content and product descriptions", completed: true },
+      { title: "Prepare presentation slides", description: "Create slides for next week's board meeting", completed: true },
+      { title: "Order office supplies", description: "Restock printer paper, pens, and sticky notes", completed: true },
+      { title: "Plan team building event", description: "Organize quarterly team outing and activities", completed: false },
+      { title: "Fix kitchen sink leak", description: "Call plumber to repair the dripping faucet", completed: true },
+      { title: "Submit expense reports", description: "File Q1 business expense reports with accounting", completed: true },
+      { title: "Learn new programming language", description: "Start Python course on online learning platform", completed: false },
+      { title: "Organize photo albums", description: "Sort through vacation photos and create digital albums", completed: true },
+      { title: "Research vacation destinations", description: "Look into summer vacation options for the family", completed: true },
+      { title: "Clean garage", description: "Sort through boxes and donate unused items", completed: true },
+      { title: "Update resume", description: "Add recent accomplishments and skills to LinkedIn profile", completed: false },
+      { title: "Plan birthday party", description: "Organize surprise party for spouse's 30th birthday", completed: true },
+      { title: "Buy groceries", description: "Weekly grocery shopping for meal prep", completed: true },
+      { title: "Schedule car maintenance", description: "Book oil change and tire rotation appointment", completed: true },
+      { title: "Write blog post", description: "Draft article about productivity tips for remote work", completed: false },
+      { title: "Organize closet", description: "Sort clothes by season and donate unused items", completed: true },
+      { title: "Learn guitar", description: "Practice basic chords for 30 minutes daily", completed: false },
+      { title: "Set up home office", description: "Arrange desk, monitor, and ergonomic accessories", completed: true },
+      { title: "Read business book", description: "Finish reading 'Atomic Habits' by James Clear", completed: true },
+      { title: "Plan garden layout", description: "Design vegetable garden for spring planting", completed: false },
+      { title: "Update password security", description: "Change passwords for all important accounts", completed: true },
+      { title: "Call old friend", description: "Catch up with college roommate who moved abroad", completed: true },
+      { title: "Exercise routine", description: "Start morning workout routine with yoga", completed: false },
+      { title: "Backup computer files", description: "Create backup of important documents and photos", completed: true },
+      { title: "Plan weekend getaway", description: "Research nearby hiking trails and book accommodation", completed: true },
+      { title: "Study for certification", description: "Prepare for AWS cloud practitioner exam", completed: false },
+      { title: "Volunteer at shelter", description: "Sign up for weekend shifts at local animal shelter", completed: true }
+    ];
+
+    const now = new Date();
+    const tasks: Task[] = [];
+
+    sampleTaskData.forEach((data, index) => {
+      // Generate random dates over the past 90 days
+      const daysAgo = Math.floor(Math.random() * 90);
+      const randomDate = new Date(now);
+      randomDate.setDate(randomDate.getDate() - daysAgo);
+
+      // Add some random hours/minutes for variety
+      randomDate.setHours(Math.floor(Math.random() * 24));
+      randomDate.setMinutes(Math.floor(Math.random() * 60));
+
+      const task: Task = {
+        id: `sample_task_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`,
+        title: data.title,
+        description: data.description,
+        isCompleted: data.completed,
+        scheduledDate: randomDate.toISOString(),
+        createdAt: randomDate.toISOString(),
+      };
+
+      tasks.push(task);
+    });
+
+    return tasks;
+  };
+
   const loadTasksAndSettings = async () => {
     try {
       console.log('[UNDO] Loading tasks and settings...');
