@@ -269,11 +269,11 @@ export default function TasksScreen() {
   const handleSwipeComplete = (task: Task) => {
     if (task.isCompleted) return;
 
-    // Complete the task
-    toggleTaskComplete(task, true);
-
-    // Show undo option
+    // Show undo option immediately
     setUndoTaskId(task.id);
+
+    // Complete the task with celebration
+    toggleTaskComplete(task, true);
 
     // Clear any existing timeout
     if (undoTimeout) {
@@ -437,14 +437,8 @@ export default function TasksScreen() {
           // Trigger completion
           handleSwipeComplete(item);
 
-          // Animate out
-          Animated.timing(translateX, {
-            toValue: translationX > 0 ? 300 : -300,
-            duration: 300,
-            useNativeDriver: false,
-          }).start(() => {
-            translateX.setValue(0);
-          });
+          // Reset position immediately to show undo
+          translateX.setValue(0);
         } else {
           // Snap back
           Animated.spring(translateX, {
@@ -490,7 +484,7 @@ export default function TasksScreen() {
                 style={styles.checkboxContainer}
                 onPress={(e) => {
                   e.stopPropagation();
-                  toggleTaskComplete(item);
+                  toggleTaskComplete(item, true);
                 }}
               >
                 <View style={[
@@ -1021,6 +1015,7 @@ const styles = StyleSheet.create({
   celebrationTask: {
     borderColor: '#10B981',
     backgroundColor: '#F0FDF4',
+    transform: [{ scale: 1.02 }],
   },
   taskHeader: {
     flexDirection: 'row',
@@ -1112,11 +1107,21 @@ const styles = StyleSheet.create({
   undoContainer: {
     backgroundColor: '#10B981',
     borderRadius: 12,
-    padding: 16,
+    padding: 20,
     marginBottom: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: '#059669',
   },
   undoText: {
     color: '#FFFFFF',
@@ -1142,16 +1147,22 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(16, 185, 129, 0.9)',
+    backgroundColor: 'rgba(16, 185, 129, 0.95)',
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
+    elevation: 10,
   },
   celebrationText: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     fontFamily: 'Inter',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   statsContainer: {
     backgroundColor: '#F9FAFB',
