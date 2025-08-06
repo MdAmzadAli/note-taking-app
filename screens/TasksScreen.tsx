@@ -125,7 +125,7 @@ export default function TasksScreen() {
 
     try {
       const task: Task = {
-        id: Date.now().toString(),
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         title: newTitle.trim(),
         description: newDescription.trim(),
         isCompleted: false,
