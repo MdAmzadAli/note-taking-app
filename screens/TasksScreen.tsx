@@ -47,6 +47,13 @@ export default function TasksScreen() {
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [historySearchQuery, setHistorySearchQuery] = useState('');
 
+  // New state for date range filtering
+  const [showDateRangeModal, setShowDateRangeModal] = useState(false);
+  const [fromDate, setFromDate] = useState<Date | null>(null);
+  const [toDate, setToDate] = useState<Date | null>(null);
+  const [showFromDatePicker, setShowFromDatePicker] = useState(false);
+  const [showToDatePicker, setShowToDatePicker] = useState(false);
+
   // New state for tabs and undo functionality
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
   const [undoTasks, setUndoTasks] = useState<Set<string>>(new Set());
@@ -885,7 +892,21 @@ export default function TasksScreen() {
   };
 
   const getTaskStats = () => {
-    const completedTasks = tasks.filter(task => task.isCompleted);
+    let completedTasks = tasks.filter(task => task.isCompleted);
+    
+    // Apply date range filter if both dates are set
+    if (fromDate && toDate) {
+      const fromTime = new Date(fromDate);
+      fromTime.setHours(0, 0, 0, 0);
+      const toTime = new Date(toDate);
+      toTime.setHours(23, 59, 59, 999);
+      
+      completedTasks = completedTasks.filter(task => {
+        const taskDate = new Date(task.createdAt);
+        return taskDate >= fromTime && taskDate <= toTime;
+      });
+    }
+    
     const totalTasks = tasks.length;
     const completionRate = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;
 
@@ -917,6 +938,30 @@ export default function TasksScreen() {
     if (selectedTime) {
       setReminderTime(selectedTime);
     }
+  };
+
+  const onFromDateChange = (event: any, selectedDate?: Date) => {
+    setShowFromDatePicker(false);
+    if (selectedDate) {
+      setFromDate(selectedDate);
+    }
+  };
+
+  const onToDateChange = (event: any, selectedDate?: Date) => {
+    setShowToDatePicker(false);
+    if (selectedDate) {
+      setToDate(selectedDate);
+    }
+  };
+
+  const applyDateRangeFilter = () => {
+    setShowDateRangeModal(false);
+  };
+
+  const clearDateRangeFilter = () => {
+    setFromDate(null);
+    setToDate(null);
+    setShowDateRangeModal(false);
   };
 
   const getTaskStatus = (task: Task) => {
@@ -1160,7 +1205,25 @@ export default function TasksScreen() {
 
         {/* Statistics Section */}
         <View style={styles.statsContainer}>
-          <Text style={styles.statsTitle}>Task Statistics</Text>
+          <View style={styles.statsHeader}>
+            <Text style={styles.statsTitle}>Task Statistics</Text>
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={() => setShowDateRangeModal(true)}
+            >
+              <IconSymbol size={20} name="line.3.horizontal.decrease.circle" color="#6B7280" />
+            </TouchableOpacity>
+          </View>
+          {(fromDate && toDate) && (
+            <View style={styles.dateRangeDisplay}>
+              <Text style={styles.dateRangeText}>
+                {fromDate.toLocaleDateString()} - {toDate.toLocaleDateString()}
+              </Text>
+              <TouchableOpacity onPress={clearDateRangeFilter}>
+                <Text style={styles.clearFilterText}>Clear</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           <View style={styles.statsGrid}>
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>{stats.totalCompleted}</Text>
@@ -1453,6 +1516,86 @@ export default function TasksScreen() {
             </View>
           )}
         </ScrollView>
+      )}
+
+      {/* Date Range Filter Modal */}
+      {showDateRangeModal && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.dateRangeModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Filter by Date Range</Text>
+              <TouchableOpacity
+                onPress={() => setShowDateRangeModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.dateInputContainer}>
+              <View style={styles.dateInputGroup}>
+                <Text style={styles.dateLabel}>From Date</Text>
+                <TouchableOpacity
+                  style={styles.dateInput}
+                  onPress={() => setShowFromDatePicker(true)}
+                >
+                  <Text style={styles.dateInputText}>
+                    {fromDate ? fromDate.toLocaleDateString() : 'Select date'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.dateInputGroup}>
+                <Text style={styles.dateLabel}>To Date</Text>
+                <TouchableOpacity
+                  style={styles.dateInput}
+                  onPress={() => setShowToDatePicker(true)}
+                >
+                  <Text style={styles.dateInputText}>
+                    {toDate ? toDate.toLocaleDateString() : 'Select date'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButtonSecondary}
+                onPress={clearDateRangeFilter}
+              >
+                <Text style={styles.modalButtonSecondaryText}>Clear Filter</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButtonPrimary, (!fromDate || !toDate) && styles.modalButtonDisabled]}
+                onPress={applyDateRangeFilter}
+                disabled={!fromDate || !toDate}
+              >
+                <Text style={styles.modalButtonPrimaryText}>Apply Filter</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {showFromDatePicker && (
+        <DateTimePicker
+          value={fromDate || new Date()}
+          mode="date"
+          display="default"
+          onChange={onFromDateChange}
+          maximumDate={toDate || new Date()}
+        />
+      )}
+
+      {showToDatePicker && (
+        <DateTimePicker
+          value={toDate || new Date()}
+          mode="date"
+          display="default"
+          onChange={onToDateChange}
+          minimumDate={fromDate || undefined}
+          maximumDate={new Date()}
+        />
       )}
 
       <SearchResultsModal
@@ -1860,13 +2003,48 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
+  statsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   statsTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#000000',
     fontFamily: 'Inter',
-    marginBottom: 16,
-    textAlign: 'center',
+  },
+  filterButton: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  dateRangeDisplay: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  dateRangeText: {
+    fontSize: 14,
+    color: '#374151',
+    fontFamily: 'Inter',
+    fontWeight: '500',
+  },
+  clearFilterText: {
+    fontSize: 12,
+    color: '#EF4444',
+    fontFamily: 'Inter',
+    fontWeight: '500',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -2026,5 +2204,120 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     fontFamily: 'Inter',
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  dateRangeModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 24,
+    margin: 20,
+    minWidth: 300,
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
+    fontFamily: 'Inter',
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalCloseText: {
+    fontSize: 18,
+    color: '#6B7280',
+    fontWeight: 'bold',
+  },
+  dateInputContainer: {
+    marginBottom: 24,
+  },
+  dateInputGroup: {
+    marginBottom: 16,
+  },
+  dateLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    fontFamily: 'Inter',
+    marginBottom: 8,
+  },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#FFFFFF',
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  dateInputText: {
+    fontSize: 16,
+    color: '#000000',
+    fontFamily: 'Inter',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButtonSecondary: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  modalButtonSecondaryText: {
+    color: '#6B7280',
+    fontSize: 14,
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  modalButtonPrimary: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  modalButtonPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  modalButtonDisabled: {
+    backgroundColor: '#9CA3AF',
   },
 });
