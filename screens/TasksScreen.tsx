@@ -168,7 +168,7 @@ export default function TasksScreen() {
       
       setAllCompletionsFinishedTimeout(timeout);
     }
-  }, [undoTasks, temporarySuccessMessages, allCompletionsFinishedTimeout]);
+  }, [undoTasks, temporarySuccessMessages]);
 
   function getTomorrowDate(): Date {
     const tomorrow = new Date();
