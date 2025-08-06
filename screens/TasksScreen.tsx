@@ -123,10 +123,30 @@ export default function TasksScreen() {
   useEffect(() => {
     let filtered = getFilteredTasks();
     if (searchQuery.trim()) {
-      filtered = filtered.filter(task =>
-        task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (task.description && task.description.toLowerCase().includes(searchQuery.toLowerCase()))
-      );
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(task => {
+        // Search in title and description
+        const titleMatch = task.title.toLowerCase().includes(query);
+        const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
+        
+        // Search in dates - check if query matches month or day names
+        const taskDate = new Date(task.scheduledDate || task.createdAt);
+        const monthName = taskDate.toLocaleDateString('en-US', { month: 'long' }).toLowerCase();
+        const shortMonthName = taskDate.toLocaleDateString('en-US', { month: 'short' }).toLowerCase();
+        const dayName = taskDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+        const shortDayName = taskDate.toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
+        const fullDate = taskDate.toLocaleDateString().toLowerCase();
+        const yearString = taskDate.getFullYear().toString();
+        
+        const dateMatch = monthName.includes(query) || 
+                         shortMonthName.includes(query) ||
+                         dayName.includes(query) ||
+                         shortDayName.includes(query) ||
+                         fullDate.includes(query) ||
+                         yearString.includes(query);
+        
+        return titleMatch || descriptionMatch || dateMatch;
+      });
     }
     setFilteredTasks(filtered);
   }, [searchQuery, tasks, filter, activeTab]);
@@ -218,6 +238,7 @@ export default function TasksScreen() {
 
   const generateSampleTasks = (): Task[] => {
     const sampleTaskData = [
+      // Regular tasks
       { title: "Complete project proposal", description: "Finish the quarterly project proposal for the marketing team", completed: true },
       { title: "Schedule dentist appointment", description: "Call dental office to book cleaning appointment", completed: true },
       { title: "Review team performance", description: "Conduct quarterly performance reviews for direct reports", completed: false },
@@ -228,6 +249,21 @@ export default function TasksScreen() {
       { title: "Fix kitchen sink leak", description: "Call plumber to repair the dripping faucet", completed: true },
       { title: "Submit expense reports", description: "File Q1 business expense reports with accounting", completed: true },
       { title: "Learn new programming language", description: "Start Python course on online learning platform", completed: false },
+      
+      // August-specific tasks for testing search
+      { title: "August vacation planning", description: "Plan summer vacation for August holidays", completed: true },
+      { title: "Back to school shopping", description: "Buy school supplies for August school start", completed: false },
+      { title: "August birthday party", description: "Organize birthday celebration in August", completed: true },
+      { title: "Summer heat maintenance", description: "Service air conditioning for August heat wave", completed: true },
+      { title: "August report submission", description: "Submit monthly reports due in August", completed: false },
+      
+      // Tasks with old dates (for 60-day deletion testing)
+      { title: "Old task from 70 days ago", description: "This task should be auto-deleted", completed: true, isOldTask: true, daysAgo: 70 },
+      { title: "Old task from 80 days ago", description: "This task should also be auto-deleted", completed: true, isOldTask: true, daysAgo: 80 },
+      { title: "Old task from 90 days ago", description: "Very old completed task", completed: true, isOldTask: true, daysAgo: 90 },
+      { title: "Old task from 100 days ago", description: "Extremely old completed task", completed: true, isOldTask: true, daysAgo: 100 },
+      
+      // Regular remaining tasks
       { title: "Organize photo albums", description: "Sort through vacation photos and create digital albums", completed: true },
       { title: "Research vacation destinations", description: "Look into summer vacation options for the family", completed: true },
       { title: "Clean garage", description: "Sort through boxes and donate unused items", completed: true },
@@ -254,10 +290,20 @@ export default function TasksScreen() {
     const tasks: Task[] = [];
 
     sampleTaskData.forEach((data, index) => {
-      // Generate random dates over the past 90 days
-      const daysAgo = Math.floor(Math.random() * 90);
-      const randomDate = new Date(now);
-      randomDate.setDate(randomDate.getDate() - daysAgo);
+      let randomDate = new Date(now);
+      
+      // Handle special cases for testing
+      if ((data as any).isOldTask) {
+        // Create old tasks for deletion testing
+        randomDate.setDate(randomDate.getDate() - (data as any).daysAgo);
+      } else if (data.title.toLowerCase().includes('august')) {
+        // Create August tasks for search testing
+        randomDate = new Date(2024, 7, Math.floor(Math.random() * 31) + 1); // August is month 7 (0-indexed)
+      } else {
+        // Generate random dates over the past 90 days
+        const daysAgo = Math.floor(Math.random() * 90);
+        randomDate.setDate(randomDate.getDate() - daysAgo);
+      }
 
       // Add some random hours/minutes for variety
       randomDate.setHours(Math.floor(Math.random() * 24));
@@ -302,12 +348,20 @@ export default function TasksScreen() {
       // Delete old completed tasks from storage
       if (tasksToDelete.length > 0) {
         console.log('[CLEANUP] Auto-deleting', tasksToDelete.length, 'tasks older than 60 days');
+        console.log('[CLEANUP] Tasks being deleted:', tasksToDelete.map(t => ({ 
+          title: t.title, 
+          createdAt: t.createdAt, 
+          daysOld: Math.floor((Date.now() - new Date(t.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+        })));
         for (const task of tasksToDelete) {
           if (task.notificationId) {
             await cancelNotification(task.notificationId);
           }
           await deleteTask(task.id);
         }
+        console.log('[CLEANUP] Successfully deleted old tasks');
+      } else {
+        console.log('[CLEANUP] No tasks older than 60 days found for deletion');
       }
 
       // Sort remaining tasks by creation date, newest first and remove any duplicates
@@ -1050,12 +1104,32 @@ export default function TasksScreen() {
 
     // Filter tasks by search query if provided
     if (historySearchQuery.trim()) {
+      const query = historySearchQuery.toLowerCase();
       const filteredTasksByDate: Record<string, Task[]> = {};
       Object.entries(tasksByDate).forEach(([date, tasks]) => {
-        const filteredTasks = tasks.filter(task =>
-          task.title.toLowerCase().includes(historySearchQuery.toLowerCase()) ||
-          (task.description && task.description.toLowerCase().includes(historySearchQuery.toLowerCase()))
-        );
+        const filteredTasks = tasks.filter(task => {
+          // Search in title and description
+          const titleMatch = task.title.toLowerCase().includes(query);
+          const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
+          
+          // Search in dates
+          const taskDate = new Date(task.createdAt);
+          const monthName = taskDate.toLocaleDateString('en-US', { month: 'long' }).toLowerCase();
+          const shortMonthName = taskDate.toLocaleDateString('en-US', { month: 'short' }).toLowerCase();
+          const dayName = taskDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+          const shortDayName = taskDate.toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
+          const fullDate = taskDate.toLocaleDateString().toLowerCase();
+          const yearString = taskDate.getFullYear().toString();
+          
+          const dateMatch = monthName.includes(query) || 
+                           shortMonthName.includes(query) ||
+                           dayName.includes(query) ||
+                           shortDayName.includes(query) ||
+                           fullDate.includes(query) ||
+                           yearString.includes(query);
+          
+          return titleMatch || descriptionMatch || dateMatch;
+        });
         if (filteredTasks.length > 0) {
           filteredTasksByDate[date] = filteredTasks;
         }
