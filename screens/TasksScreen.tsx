@@ -48,6 +48,9 @@ export default function TasksScreen() {
   const [undoTaskId, setUndoTaskId] = useState<string | null>(null);
   const [undoTimeout, setUndoTimeout] = useState<NodeJS.Timeout | null>(null);
   const [celebrationTaskId, setCelebrationTaskId] = useState<string | null>(null);
+  const [showTopCelebration, setShowTopCelebration] = useState(false);
+  const celebrationScale = useRef(new Animated.Value(0)).current;
+  const celebrationOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadTasksAndSettings();
@@ -239,6 +242,44 @@ export default function TasksScreen() {
     }
   };
 
+  const showCelebrationAnimation = () => {
+    setShowTopCelebration(true);
+    
+    // Start animation sequence
+    Animated.parallel([
+      Animated.sequence([
+        Animated.timing(celebrationScale, {
+          toValue: 1.2,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(celebrationScale, {
+          toValue: 1,
+          tension: 100,
+          friction: 5,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.timing(celebrationOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Hide after 2 seconds
+    setTimeout(() => {
+      Animated.timing(celebrationOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        setShowTopCelebration(false);
+        celebrationScale.setValue(0);
+      });
+    }, 2000);
+  };
+
   const toggleTaskComplete = async (task: Task, showCelebration = true) => {
     try {
       const wasCompleted = task.isCompleted;
@@ -255,9 +296,10 @@ export default function TasksScreen() {
       eventBus.emit(EVENTS.TASK_UPDATED, updatedTask);
       await loadTasksAndSettings();
 
-      // Show celebration animation when task is completed
+      // Show celebration animations when task is completed
       if (!wasCompleted && updatedTask.isCompleted && showCelebration) {
         setCelebrationTaskId(task.id);
+        showCelebrationAnimation();
         setTimeout(() => setCelebrationTaskId(null), 2000);
       }
     } catch (error) {
@@ -269,11 +311,11 @@ export default function TasksScreen() {
   const handleSwipeComplete = (task: Task) => {
     if (task.isCompleted) return;
 
-    // Show undo option immediately
-    setUndoTaskId(task.id);
-
-    // Complete the task with celebration
+    // Complete the task first
     toggleTaskComplete(task, true);
+
+    // Show undo option immediately after completion
+    setUndoTaskId(task.id);
 
     // Clear any existing timeout
     if (undoTimeout) {
@@ -449,11 +491,14 @@ export default function TasksScreen() {
       }
     };
 
-    // Show undo interface if this task has undo active
-    if (undoTaskId === item.id) {
+    // Show undo interface if this task has undo active and is completed
+    if (undoTaskId === item.id && item.isCompleted) {
       return (
         <View style={styles.undoContainer}>
-          <Text style={styles.undoText}>Task completed!</Text>
+          <View style={styles.undoContent}>
+            <Text style={styles.undoEmoji}>✅</Text>
+            <Text style={styles.undoText}>Task completed!</Text>
+          </View>
           <TouchableOpacity
             style={styles.undoButton}
             onPress={() => handleUndo(item.id)}
@@ -484,6 +529,22 @@ export default function TasksScreen() {
                 style={styles.checkboxContainer}
                 onPress={(e) => {
                   e.stopPropagation();
+                  if (!item.isCompleted) {
+                    // Show undo option after checkbox completion
+                    setUndoTaskId(item.id);
+                    
+                    // Clear any existing timeout
+                    if (undoTimeout) {
+                      clearTimeout(undoTimeout);
+                    }
+                    
+                    // Set new timeout to hide undo option
+                    const timeout = setTimeout(() => {
+                      setUndoTaskId(null);
+                    }, 4000);
+                    
+                    setUndoTimeout(timeout);
+                  }
                   toggleTaskComplete(item, true);
                 }}
               >
@@ -748,6 +809,19 @@ export default function TasksScreen() {
     <GestureHandlerRootView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Tasks</Text>
+        {showTopCelebration && (
+          <Animated.View 
+            style={[
+              styles.topCelebration,
+              {
+                transform: [{ scale: celebrationScale }],
+                opacity: celebrationOpacity,
+              }
+            ]}
+          >
+            <Text style={styles.topCelebrationEmoji}>🎉</Text>
+          </Animated.View>
+        )}
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.searchButton}
@@ -1122,12 +1196,35 @@ const styles = StyleSheet.create({
     elevation: 8,
     borderWidth: 2,
     borderColor: '#059669',
+    minHeight: 80,
+  },
+  undoContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  undoEmoji: {
+    fontSize: 24,
+    marginRight: 12,
   },
   undoText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '500',
     fontFamily: 'Inter',
+    flex: 1,
+  },
+  topCelebration: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -20,
+    marginTop: -20,
+    zIndex: 1000,
+  },
+  topCelebrationEmoji: {
+    fontSize: 40,
+    textAlign: 'center',
   },
   undoButton: {
     backgroundColor: '#FFFFFF',
