@@ -98,10 +98,16 @@ export default function TasksScreen() {
   useEffect(() => {
     return () => {
       if (undoTimeout) {
+        console.log('[UNDO] Component unmounting, clearing undo timeout');
         clearTimeout(undoTimeout);
       }
     };
   }, [undoTimeout]);
+
+  // Monitor undo state changes
+  useEffect(() => {
+    console.log('[UNDO] Undo state changed - undoTaskId:', undoTaskId);
+  }, [undoTaskId]);
 
   function getTomorrowDate(): Date {
     const tomorrow = new Date();
@@ -112,6 +118,7 @@ export default function TasksScreen() {
 
   const loadTasksAndSettings = async () => {
     try {
+      console.log('[UNDO] Loading tasks and settings...');
       const tasksData = await getTasks();
       // Sort tasks by creation date, newest first and remove any duplicates
       const uniqueTasks = tasksData.reduce((acc, task) => {
@@ -122,9 +129,10 @@ export default function TasksScreen() {
       }, [] as Task[]);
       
       const sortedTasks = uniqueTasks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      console.log('[UNDO] Setting tasks state with', sortedTasks.length, 'tasks');
       setTasks(sortedTasks);
     } catch (error) {
-      console.error('Error loading tasks:', error);
+      console.error('[UNDO] Error loading tasks:', error);
     }
   };
 
@@ -290,6 +298,8 @@ export default function TasksScreen() {
 
   const toggleTaskComplete = async (task: Task, showCelebration = true, showUndo = true) => {
     try {
+      console.log('[UNDO] toggleTaskComplete called for task:', task.id, 'wasCompleted:', task.isCompleted, 'showUndo:', showUndo);
+      
       const wasCompleted = task.isCompleted;
       const updatedTask = {
         ...task,
@@ -298,46 +308,66 @@ export default function TasksScreen() {
 
       if (updatedTask.isCompleted && task.notificationId) {
         await cancelNotification(task.notificationId);
+        console.log('[UNDO] Cancelled notification for completed task:', task.id);
       }
 
-      // Store the current undo task ID before any async operations
-      const currentUndoTaskId = undoTaskId;
-      
-      // Show undo option BEFORE updating storage when task is completed
+      // Show undo option IMMEDIATELY when task is completed
       if (!wasCompleted && updatedTask.isCompleted && showUndo) {
+        console.log('[UNDO] Task completed, setting up undo interface for task:', task.id);
+        
         // Clear any existing timeout first
         if (undoTimeout) {
+          console.log('[UNDO] Clearing previous undo timeout');
           clearTimeout(undoTimeout);
         }
 
+        // Set undo state immediately
         console.log('[UNDO] Setting undo task ID:', task.id);
         setUndoTaskId(task.id);
 
         // Set new timeout to hide undo option
         const timeout = setTimeout(() => {
-          console.log('[UNDO] Clearing undo task ID after 4 seconds');
-          setUndoTaskId(null);
+          console.log('[UNDO] Timeout reached - clearing undo task ID for:', task.id);
+          setUndoTaskId(prev => {
+            console.log('[UNDO] Previous undo task ID was:', prev);
+            return prev === task.id ? null : prev;
+          });
         }, 4000);
 
+        console.log('[UNDO] Undo timeout set for 4 seconds');
         setUndoTimeout(timeout);
       }
 
+      // Update tasks state FIRST to ensure immediate UI update
+      console.log('[UNDO] Updating tasks state for task:', task.id, 'new completion status:', updatedTask.isCompleted);
+      setTasks(prevTasks => {
+        const newTasks = prevTasks.map(t => t.id === task.id ? updatedTask : t);
+        console.log('[UNDO] Tasks state updated, task found and updated');
+        return newTasks;
+      });
+
+      // Then save to storage (async operation)
+      console.log('[UNDO] Saving task to storage:', task.id);
       await saveTask(updatedTask);
-      eventBus.emit(EVENTS.TASK_UPDATED, updatedTask);
       
-      // Update tasks state directly instead of reloading to preserve undo state
-      setTasks(prevTasks => 
-        prevTasks.map(t => t.id === task.id ? updatedTask : t)
-      );
+      // Emit event for other components
+      console.log('[UNDO] Emitting task updated event for:', task.id);
+      eventBus.emit(EVENTS.TASK_UPDATED, updatedTask);
 
       // Show celebration animations when task is completed
       if (!wasCompleted && updatedTask.isCompleted && showCelebration) {
+        console.log('[UNDO] Showing celebration for completed task:', task.id);
         setCelebrationTaskId(task.id);
         showCelebrationAnimation();
-        setTimeout(() => setCelebrationTaskId(null), 2000);
+        setTimeout(() => {
+          console.log('[UNDO] Clearing celebration for task:', task.id);
+          setCelebrationTaskId(null);
+        }, 2000);
       }
+
+      console.log('[UNDO] toggleTaskComplete completed successfully for task:', task.id);
     } catch (error) {
-      console.error('Error updating task:', error);
+      console.error('[UNDO] Error in toggleTaskComplete:', error);
       Alert.alert('Error', 'Failed to update task');
     }
   };
@@ -351,22 +381,30 @@ export default function TasksScreen() {
 
   const handleUndo = async (taskId: string) => {
     try {
-      console.log('[UNDO] Handling undo for task:', taskId);
+      console.log('[UNDO] Starting undo process for task:', taskId);
       
       // Clear undo state first
+      console.log('[UNDO] Clearing undo state');
       setUndoTaskId(null);
       if (undoTimeout) {
+        console.log('[UNDO] Clearing undo timeout');
         clearTimeout(undoTimeout);
         setUndoTimeout(null);
       }
 
       const task = tasks.find(t => t.id === taskId);
+      console.log('[UNDO] Found task for undo:', task ? task.id : 'not found', 'isCompleted:', task?.isCompleted);
+      
       if (task && task.isCompleted) {
+        console.log('[UNDO] Undoing task completion - calling toggleTaskComplete');
         // Don't show celebration or undo when undoing a task
         await toggleTaskComplete(task, false, false);
+        console.log('[UNDO] Undo process completed successfully');
+      } else {
+        console.log('[UNDO] Task not found or not completed, cannot undo');
       }
     } catch (error) {
-      console.error('Error undoing task completion:', error);
+      console.error('[UNDO] Error undoing task completion:', error);
     }
   };
 
@@ -513,9 +551,9 @@ export default function TasksScreen() {
       }
     };
 
-    // Show undo interface if this task has undo active and is completed
+    // Show undo interface if this task has undo active
     if (undoTaskId === item.id) {
-      console.log('[UNDO] Rendering undo interface for task:', item.id);
+      console.log('[UNDO] Rendering undo interface for task:', item.id, 'task completed:', item.isCompleted, 'undoTaskId:', undoTaskId);
       return (
         <View style={styles.undoContainer}>
           <View style={styles.undoContent}>
@@ -524,13 +562,18 @@ export default function TasksScreen() {
           </View>
           <TouchableOpacity
             style={styles.undoButton}
-            onPress={() => handleUndo(item.id)}
+            onPress={() => {
+              console.log('[UNDO] Undo button pressed for task:', item.id);
+              handleUndo(item.id);
+            }}
           >
             <Text style={styles.undoButtonText}>Undo</Text>
           </TouchableOpacity>
         </View>
       );
     }
+
+    console.log('[UNDO] Rendering normal task item for:', item.id, 'undoTaskId:', undoTaskId, 'matches:', undoTaskId === item.id);
 
     return (
       <PanGestureHandler
