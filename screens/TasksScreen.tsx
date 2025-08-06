@@ -293,6 +293,23 @@ export default function TasksScreen() {
         await cancelNotification(task.notificationId);
       }
 
+      // Show undo option BEFORE updating storage when task is completed
+      if (!wasCompleted && updatedTask.isCompleted && showUndo) {
+        // Clear any existing timeout first
+        if (undoTimeout) {
+          clearTimeout(undoTimeout);
+        }
+
+        setUndoTaskId(task.id);
+
+        // Set new timeout to hide undo option
+        const timeout = setTimeout(() => {
+          setUndoTaskId(null);
+        }, 4000);
+
+        setUndoTimeout(timeout);
+      }
+
       await saveTask(updatedTask);
       eventBus.emit(EVENTS.TASK_UPDATED, updatedTask);
       await loadTasksAndSettings();
@@ -302,23 +319,6 @@ export default function TasksScreen() {
         setCelebrationTaskId(task.id);
         showCelebrationAnimation();
         setTimeout(() => setCelebrationTaskId(null), 2000);
-      }
-
-      // Show undo option when task is completed (not when uncompleted)
-      if (!wasCompleted && updatedTask.isCompleted && showUndo) {
-        setUndoTaskId(task.id);
-
-        // Clear any existing timeout
-        if (undoTimeout) {
-          clearTimeout(undoTimeout);
-        }
-
-        // Set new timeout to hide undo option
-        const timeout = setTimeout(() => {
-          setUndoTaskId(null);
-        }, 4000);
-
-        setUndoTimeout(timeout);
       }
     } catch (error) {
       console.error('Error updating task:', error);
@@ -496,7 +496,7 @@ export default function TasksScreen() {
     };
 
     // Show undo interface if this task has undo active and is completed
-    if (undoTaskId === item.id && item.isCompleted) {
+    if (undoTaskId === item.id) {
       return (
         <View style={styles.undoContainer}>
           <View style={styles.undoContent}>
