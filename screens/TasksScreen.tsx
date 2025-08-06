@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -14,7 +13,7 @@ import {
   Animated,
   ScrollView,
 } from 'react-native';
-import { PanGestureHandler, State } from 'react-native-gesture-handler';
+import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Task } from '@/types';
@@ -43,7 +42,7 @@ export default function TasksScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [filter, setFilter] = useState<'all' | 'today' | 'tomorrow' | 'overdue'>('all');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
-  
+
   // New state for tabs and undo functionality
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
   const [undoTaskId, setUndoTaskId] = useState<string | null>(null);
@@ -433,11 +432,11 @@ export default function TasksScreen() {
     const onHandlerStateChange = (event: any) => {
       if (event.nativeEvent.state === State.END) {
         const { translationX } = event.nativeEvent;
-        
+
         if (Math.abs(translationX) > 120 && !item.isCompleted) {
           // Trigger completion
           handleSwipeComplete(item);
-          
+
           // Animate out
           Animated.timing(translateX, {
             toValue: translationX > 0 ? 300 : -300,
@@ -478,7 +477,7 @@ export default function TasksScreen() {
         enabled={!item.isCompleted}
       >
         <Animated.View style={[{ transform: [{ translateX }] }]}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
               styles.taskItem,
               item.isCompleted && styles.completedTask,
@@ -584,11 +583,11 @@ export default function TasksScreen() {
         {dates.map(date => (
           <View key={date} style={styles.dateSection}>
             <Text style={styles.dateHeader}>
-              {new Date(date).toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+              {new Date(date).toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
               })}
             </Text>
             {tasksByDate[date].map(task => (
@@ -752,7 +751,7 @@ export default function TasksScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Tasks</Text>
         <View style={styles.headerActions}>
@@ -809,9 +808,9 @@ export default function TasksScreen() {
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>
-                {searchQuery.trim() 
+                {searchQuery.trim()
                   ? 'No tasks found for your search.'
-                  : filter === 'all' 
+                  : filter === 'all'
                   ? "No active tasks. Tap 'New Task' to create your first task."
                   : `No ${filter} tasks found.`
                 }
@@ -837,7 +836,7 @@ export default function TasksScreen() {
         searchQuery={voiceSearchQuery}
         results={voiceSearchResults}
       />
-    </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 
