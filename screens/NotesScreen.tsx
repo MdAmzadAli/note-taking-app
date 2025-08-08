@@ -82,15 +82,24 @@ export default function NotesScreen() {
   const menuFlatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
-    loadNotes();
-    loadSettings();
-    loadTemplates();
+    // Defer initial loads to avoid useInsertionEffect warnings
+    const timeoutId = setTimeout(() => {
+      loadNotes();
+      loadSettings();
+      loadTemplates();
+    }, 0);
+    
+    return () => clearTimeout(timeoutId);
   }, []);
 
   // Refresh templates when screen gains focus (e.g., returning from Templates tab)
   useFocusEffect(
     React.useCallback(() => {
-      loadTemplates();
+      const timeoutId = setTimeout(() => {
+        loadTemplates();
+      }, 0);
+      
+      return () => clearTimeout(timeoutId);
     }, [])
   );
 
@@ -542,7 +551,10 @@ export default function NotesScreen() {
   };
 
   useEffect(() => {
-    loadNotes();
+    // Defer initial load to avoid useInsertionEffect warnings
+    const loadTimeoutId = setTimeout(() => {
+      loadNotes();
+    }, 0);
 
     // Subscribe to real-time events from other screens
     const unsubscribeNoteCreated = eventBus.subscribe(EVENTS.NOTE_CREATED, (newNote: Note) => {
@@ -562,25 +574,30 @@ export default function NotesScreen() {
     // Subscribe to template events to refresh the templates menu
     const unsubscribeTemplateCreated = eventBus.subscribe(EVENTS.TEMPLATE_CREATED, (template: CustomTemplate) => {
       console.log('[NOTES] Real-time: Template created, reloading templates...');
-      loadTemplates();
-      
-      // Force re-render of filtered templates for search
-      const currentQuery = searchQuery;
-      setSearchQuery('');
-      setTimeout(() => setSearchQuery(currentQuery), 100);
+      setTimeout(() => {
+        loadTemplates();
+        
+        // Force re-render of filtered templates for search
+        const currentQuery = searchQuery;
+        setSearchQuery('');
+        setTimeout(() => setSearchQuery(currentQuery), 100);
+      }, 0);
     });
 
     const unsubscribeTemplateUpdated = eventBus.subscribe(EVENTS.TEMPLATE_UPDATED, (template: CustomTemplate) => {
       console.log('[NOTES] Real-time: Template updated, reloading templates...');
-      loadTemplates();
-      
-      // Force re-render of filtered templates for search
-      const currentQuery = searchQuery;
-      setSearchQuery('');
-      setTimeout(() => setSearchQuery(currentQuery), 100);
+      setTimeout(() => {
+        loadTemplates();
+        
+        // Force re-render of filtered templates for search
+        const currentQuery = searchQuery;
+        setSearchQuery('');
+        setTimeout(() => setSearchQuery(currentQuery), 100);
+      }, 0);
     });
 
     return () => {
+      clearTimeout(loadTimeoutId);
       unsubscribeNoteCreated();
       unsubscribeNoteUpdated();
       unsubscribeTemplateCreated();
