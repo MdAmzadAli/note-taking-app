@@ -26,9 +26,11 @@ export default function HabitsScreen() {
   const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
   const [selectedHabitType, setSelectedHabitType] = useState<'yes_no' | 'measurable' | null>(null);
   const [loading, setLoading] = useState(true);
+  const [scrollableDates, setScrollableDates] = useState<Date[]>([]);
 
   useEffect(() => {
     loadHabits();
+    setScrollableDates(getScrollableDates());
   }, []);
 
   const loadHabits = async () => {
@@ -145,9 +147,10 @@ export default function HabitsScreen() {
     const dates = [];
     const today = new Date();
     
-    for (let i = -2; i <= 4; i++) {
+    // Show dates from 4 months ago (120 days) to today
+    for (let i = 120; i >= 0; i--) {
       const date = new Date(today);
-      date.setDate(today.getDate() + i);
+      date.setDate(today.getDate() - i);
       dates.push(date);
     }
     return dates;
@@ -178,7 +181,7 @@ export default function HabitsScreen() {
     return completion?.completed || false;
   };
 
-  const scrollableDates = getScrollableDates();
+  
 
   if (loading) {
     return (
@@ -212,13 +215,28 @@ export default function HabitsScreen() {
               {/* Empty space for habit names alignment */}
             </View>
             <View style={styles.rightSection}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScroll}>
-                {scrollableDates.map((date, index) => (
-                  <View key={index} style={styles.dateColumn}>
-                    <Text style={styles.dayText}>{formatDay(date)}</Text>
-                    <Text style={styles.dateText}>{formatDate(date)}</Text>
-                  </View>
-                ))}
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                style={styles.dateScroll}
+                ref={(ref) => {
+                  if (ref && scrollableDates.length > 0) {
+                    // Scroll to today (last item in the array)
+                    setTimeout(() => {
+                      ref.scrollToEnd({ animated: false });
+                    }, 100);
+                  }
+                }}
+              >
+                {scrollableDates.map((date, index) => {
+                  const isToday = date.toDateString() === new Date().toDateString();
+                  return (
+                    <View key={index} style={[styles.dateColumn, isToday && styles.todayColumn]}>
+                      <Text style={[styles.dayText, isToday && styles.todayText]}>{formatDay(date)}</Text>
+                      <Text style={[styles.dateText, isToday && styles.todayText]}>{formatDate(date)}</Text>
+                    </View>
+                  );
+                })}
               </ScrollView>
             </View>
           </View>
@@ -260,11 +278,24 @@ export default function HabitsScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.rightSection}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.valuesScroll}>
+                  <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={false} 
+                    style={styles.valuesScroll}
+                    ref={(ref) => {
+                      if (ref && scrollableDates.length > 0) {
+                        // Scroll to today (last item in the array)
+                        setTimeout(() => {
+                          ref.scrollToEnd({ animated: false });
+                        }, 100);
+                      }
+                    }}
+                  >
                     {scrollableDates.map((date, index) => {
                       const value = getHabitValueForDate(habit, date);
                       const isCompleted = getHabitStatusForDate(habit, date);
                       const dateStr = date.toISOString().split('T')[0];
+                      const isToday = date.toDateString() === new Date().toDateString();
                       
                       return (
                         <TouchableOpacity
@@ -298,18 +329,20 @@ export default function HabitsScreen() {
                           <View style={[
                             styles.valueCell,
                             habit.goalType === 'yes_no' && isCompleted && styles.completedCell,
-                            habit.goalType === 'yes_no' && !isCompleted && styles.notCompletedCell
+                            habit.goalType === 'yes_no' && !isCompleted && styles.notCompletedCell,
+                            isToday && styles.todayValueCell
                           ]}>
                             <Text style={[
                               styles.valueText,
                               habit.goalType === 'yes_no' && styles.checkmarkText,
                               habit.goalType === 'yes_no' && isCompleted && styles.completedText,
-                              habit.goalType === 'yes_no' && !isCompleted && styles.notCompletedText
+                              habit.goalType === 'yes_no' && !isCompleted && styles.notCompletedText,
+                              isToday && styles.todayValueText
                             ]}>
                               {value}
                             </Text>
                             {habit.goalType !== 'yes_no' && (
-                              <Text style={styles.unitText}>
+                              <Text style={[styles.unitText, isToday && styles.todayUnitText]}>
                                 {habit.goalType === 'time' ? 'min' : habit.goalType === 'quantity' ? 'qty' : ''}
                               </Text>
                             )}
@@ -516,5 +549,27 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     color: '#64748b',
+  },
+  todayColumn: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 8,
+    marginHorizontal: 2,
+  },
+  todayText: {
+    color: '#0369a1',
+    fontWeight: '700',
+  },
+  todayValueCell: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#0369a1',
+  },
+  todayValueText: {
+    color: '#0369a1',
+    fontWeight: '700',
+  },
+  todayUnitText: {
+    color: '#0369a1',
   },
 });

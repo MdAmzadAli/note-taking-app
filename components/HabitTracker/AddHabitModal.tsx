@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   View,
@@ -39,7 +38,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
   const [customValue2, setCustomValue2] = useState(14);
   const [reminderTime, setReminderTime] = useState<Date | null>(null);
   const [notes, setNotes] = useState('');
-  
+
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showFrequencyModal, setShowFrequencyModal] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -110,7 +109,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
       onRequestClose={handleClose}
     >
       <View style={styles.container}>
-        {/* Black Navbar */}
+        {/* BlackNavbar */}
         <View style={styles.navbar}>
           <TouchableOpacity onPress={handleClose} style={styles.backButton}>
             <Text style={styles.backArrow}>←</Text>
@@ -202,12 +201,12 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
           animationType="fade"
           onRequestClose={() => setShowColorPicker(false)}
         >
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.modalOverlay}
             activeOpacity={1}
             onPress={() => setShowColorPicker(false)}
           >
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.colorPickerModal}
               activeOpacity={1}
               onPress={(e) => e.stopPropagation()}
@@ -243,12 +242,12 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
           animationType="fade"
           onRequestClose={() => setShowFrequencyModal(false)}
         >
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.modalOverlay}
             activeOpacity={1}
             onPress={() => setShowFrequencyModal(false)}
           >
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.frequencyModal}
               activeOpacity={1}
               onPress={(e) => e.stopPropagation()}
@@ -275,7 +274,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                   <Text style={styles.frequencyText}>Every</Text>
                   <TextInput
                     style={styles.numberInput}
-                    value={customValue1.toString()}
+                    value={customValue1 === 0 ? '' : customValue1.toString()}
                     onChangeText={(text) => {
                       if (text === '') {
                         setCustomValue1(0);
@@ -285,6 +284,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                       }
                     }}
                     keyboardType="numeric"
+                    placeholder="0"
                   />
                   <Text style={styles.frequencyText}>days</Text>
                 </TouchableOpacity>
@@ -297,7 +297,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                   <View style={[styles.radio, frequencyType === 'times_per_week' && styles.radioSelected]} />
                   <TextInput
                     style={styles.numberInput}
-                    value={customValue1.toString()}
+                    value={customValue1 === 0 ? '' : customValue1.toString()}
                     onChangeText={(text) => {
                       if (text === '') {
                         setCustomValue1(0);
@@ -307,6 +307,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                       }
                     }}
                     keyboardType="numeric"
+                    placeholder="0"
                   />
                   <Text style={styles.frequencyText}>times per week</Text>
                 </TouchableOpacity>
@@ -319,7 +320,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                   <View style={[styles.radio, frequencyType === 'times_per_month' && styles.radioSelected]} />
                   <TextInput
                     style={styles.numberInput}
-                    value={customValue1.toString()}
+                    value={customValue1 === 0 ? '' : customValue1.toString()}
                     onChangeText={(text) => {
                       if (text === '') {
                         setCustomValue1(0);
@@ -329,6 +330,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                       }
                     }}
                     keyboardType="numeric"
+                    placeholder="0"
                   />
                   <Text style={styles.frequencyText}>times per month</Text>
                 </TouchableOpacity>
@@ -341,7 +343,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                   <View style={[styles.radio, frequencyType === 'times_in_days' && styles.radioSelected]} />
                   <TextInput
                     style={styles.numberInput}
-                    value={customValue1.toString()}
+                    value={customValue1 === 0 ? '' : customValue1.toString()}
                     onChangeText={(text) => {
                       if (text === '') {
                         setCustomValue1(0);
@@ -351,11 +353,12 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                       }
                     }}
                     keyboardType="numeric"
+                    placeholder="0"
                   />
                   <Text style={styles.frequencyText}>times in</Text>
                   <TextInput
                     style={styles.numberInput}
-                    value={customValue2.toString()}
+                    value={customValue2 === 0 ? '' : customValue2.toString()}
                     onChangeText={(text) => {
                       if (text === '') {
                         setCustomValue2(0);
@@ -365,6 +368,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                       }
                     }}
                     keyboardType="numeric"
+                    placeholder="0"
                   />
                   <Text style={styles.frequencyText}>days</Text>
                 </TouchableOpacity>
@@ -374,8 +378,8 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                 style={styles.modalSaveButton}
                 onPress={() => {
                   // Auto-select Every Day if any custom values are empty or 0
-                  if (frequencyType !== 'every_day' && 
-                      (customValue1 === 0 || 
+                  if (frequencyType !== 'every_day' &&
+                      (customValue1 === 0 ||
                        (frequencyType === 'times_in_days' && customValue2 === 0))) {
                     setFrequencyType('every_day');
                     setFrequency('Every day');
@@ -398,12 +402,12 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
           animationType="fade"
           onRequestClose={() => setShowReminderPicker(false)}
         >
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.modalOverlay}
             activeOpacity={1}
             onPress={() => setShowReminderPicker(false)}
           >
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.timePickerModal}
               activeOpacity={1}
               onPress={(e) => e.stopPropagation()}
@@ -420,7 +424,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                 }}
                 style={styles.timePicker}
               />
-              
+
               <View style={styles.timePickerButtons}>
                 <TouchableOpacity
                   style={styles.timePickerButton}
@@ -431,7 +435,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                 >
                   <Text style={styles.timePickerButtonText}>Clear</Text>
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
                   style={styles.timePickerButton}
                   onPress={() => setShowReminderPicker(false)}
