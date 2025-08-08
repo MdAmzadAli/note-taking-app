@@ -31,7 +31,7 @@ const EMOJI_OPTIONS = [
   '🏃', '💪', '📚', '💧', '🧘', '🎯', '⏰', '🌱', '🏋️', '🚶',
   '🥗', '💊', '☕', '🚭', '🛌', '🎵', '🎨', '✍️', '📱', '🧹',
   '🔬', '💻', '📖', '🎸', '🏊', '🚴', '🧠', '💝', '🌟', '🔥',
-  '⚡', '🎲', '🎪', '🎭', '🎬', '📷', '🎯', '🏆', '🥇', '🌈'
+  '⚡', '🎲', '🎪', '🎭', '🎬', '📷', '🚀', '🏆', '🥇', '🌈'
 ];
 
 const { width } = Dimensions.get('window');
@@ -48,6 +48,13 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
   const [frequencyType, setFrequencyType] = useState<'every_day' | 'every_n_days' | 'times_per_week' | 'times_per_month' | 'times_in_days'>('every_day');
   const [customValue1, setCustomValue1] = useState('');
   const [customValue2, setCustomValue2] = useState('');
+  const [frequencyInputs, setFrequencyInputs] = useState({
+    every_n_days: '',
+    times_per_week: '',
+    times_per_month: '',
+    times_in_days_1: '',
+    times_in_days_2: ''
+  });
   const [reminderTime, setReminderTime] = useState<Date | null>(null);
   const [notes, setNotes] = useState('');
 
@@ -70,6 +77,13 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
     setFrequencyType('every_day');
     setCustomValue1('');
     setCustomValue2('');
+    setFrequencyInputs({
+      every_n_days: '',
+      times_per_week: '',
+      times_per_month: '',
+      times_in_days_1: '',
+      times_in_days_2: ''
+    });
     setReminderTime(null);
     setNotes('');
   };
@@ -77,10 +91,10 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
   const getFrequencyText = () => {
     switch (frequencyType) {
       case 'every_day': return 'Every day';
-      case 'every_n_days': return `Every ${customValue1 || '0'} days`;
-      case 'times_per_week': return `${customValue1 || '0'} times per week`;
-      case 'times_per_month': return `${customValue1 || '0'} times per month`;
-      case 'times_in_days': return `${customValue1 || '0'} times in ${customValue2 || '0'} days`;
+      case 'every_n_days': return `Every ${frequencyInputs.every_n_days || '0'} days`;
+      case 'times_per_week': return `${frequencyInputs.times_per_week || '0'} times per week`;
+      case 'times_per_month': return `${frequencyInputs.times_per_month || '0'} times per month`;
+      case 'times_in_days': return `${frequencyInputs.times_in_days_1 || '0'} times in ${frequencyInputs.times_in_days_2 || '0'} days`;
       default: return 'Every day';
     }
   };
@@ -111,6 +125,20 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
       }
     }
 
+    const getCustomValue1 = () => {
+      switch (frequencyType) {
+        case 'every_n_days': return parseInt(frequencyInputs.every_n_days || '1');
+        case 'times_per_week': return parseInt(frequencyInputs.times_per_week || '1');
+        case 'times_per_month': return parseInt(frequencyInputs.times_per_month || '1');
+        case 'times_in_days': return parseInt(frequencyInputs.times_in_days_1 || '1');
+        default: return undefined;
+      }
+    };
+
+    const getCustomValue2 = () => {
+      return frequencyType === 'times_in_days' ? parseInt(frequencyInputs.times_in_days_2 || '7') : undefined;
+    };
+
     const habit = {
       name: name.trim(),
       emoji: selectedEmoji,
@@ -119,11 +147,11 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
       goalType: habitType === 'yes_no' ? 'yes_no' : 'quantity',
       question: question.trim(),
       unit: habitType === 'measurable' ? unit.trim() : undefined,
-      target: habitType === 'measurable' ? Number(target) : undefined,
+      target: habitType === 'measurable' ? Number(target || '1') : undefined,
       targetType: habitType === 'measurable' ? targetType : undefined,
       frequencyType,
-      customValue1: frequencyType !== 'every_day' ? parseInt(customValue1 || '0') : undefined,
-      customValue2: frequencyType === 'times_in_days' ? parseInt(customValue2 || '0') : undefined,
+      customValue1: frequencyType !== 'every_day' ? getCustomValue1() : undefined,
+      customValue2: getCustomValue2(),
       reminderTime: reminderTime ? reminderTime.toISOString() : undefined,
       notes: notes.trim() || undefined,
     };
@@ -513,8 +541,8 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                       <Text style={styles.frequencyText}>Every</Text>
                       <TextInput
                         style={styles.numberInput}
-                        value={customValue1}
-                        onChangeText={(text) => setCustomValue1(text)}
+                        value={frequencyInputs.every_n_days}
+                        onChangeText={(text) => setFrequencyInputs(prev => ({ ...prev, every_n_days: text }))}
                         keyboardType="numeric"
                         placeholder="3"
                         onFocus={() => setFrequencyType('every_n_days')}
@@ -530,8 +558,8 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                       <View style={[styles.radio, frequencyType === 'times_per_week' && styles.radioSelected]} />
                       <TextInput
                         style={styles.numberInput}
-                        value={customValue1}
-                        onChangeText={(text) => setCustomValue1(text)}
+                        value={frequencyInputs.times_per_week}
+                        onChangeText={(text) => setFrequencyInputs(prev => ({ ...prev, times_per_week: text }))}
                         keyboardType="numeric"
                         placeholder="3"
                         onFocus={() => setFrequencyType('times_per_week')}
@@ -547,8 +575,8 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                       <View style={[styles.radio, frequencyType === 'times_per_month' && styles.radioSelected]} />
                       <TextInput
                         style={styles.numberInput}
-                        value={customValue1}
-                        onChangeText={(text) => setCustomValue1(text)}
+                        value={frequencyInputs.times_per_month}
+                        onChangeText={(text) => setFrequencyInputs(prev => ({ ...prev, times_per_month: text }))}
                         keyboardType="numeric"
                         placeholder="3"
                         onFocus={() => setFrequencyType('times_per_month')}
@@ -564,8 +592,8 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                       <View style={[styles.radio, frequencyType === 'times_in_days' && styles.radioSelected]} />
                       <TextInput
                         style={styles.numberInput}
-                        value={customValue1}
-                        onChangeText={(text) => setCustomValue1(text)}
+                        value={frequencyInputs.times_in_days_1}
+                        onChangeText={(text) => setFrequencyInputs(prev => ({ ...prev, times_in_days_1: text }))}
                         keyboardType="numeric"
                         placeholder="3"
                         onFocus={() => setFrequencyType('times_in_days')}
@@ -573,8 +601,8 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                       <Text style={styles.frequencyText}>times in</Text>
                       <TextInput
                         style={styles.numberInput}
-                        value={customValue2}
-                        onChangeText={(text) => setCustomValue2(text)}
+                        value={frequencyInputs.times_in_days_2}
+                        onChangeText={(text) => setFrequencyInputs(prev => ({ ...prev, times_in_days_2: text }))}
                         keyboardType="numeric"
                         placeholder="14"
                         onFocus={() => setFrequencyType('times_in_days')}
@@ -593,9 +621,18 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                     setFrequency(getFrequencyText());
                   } else {
                     // For yes/no habits, validate and save
-                    if (frequencyType !== 'every_day' &&
-                        (!customValue1 ||
-                         (frequencyType === 'times_in_days' && !customValue2))) {
+                    const hasValidInput = () => {
+                      switch (frequencyType) {
+                        case 'every_day': return true;
+                        case 'every_n_days': return frequencyInputs.every_n_days.trim() !== '';
+                        case 'times_per_week': return frequencyInputs.times_per_week.trim() !== '';
+                        case 'times_per_month': return frequencyInputs.times_per_month.trim() !== '';
+                        case 'times_in_days': return frequencyInputs.times_in_days_1.trim() !== '' && frequencyInputs.times_in_days_2.trim() !== '';
+                        default: return false;
+                      }
+                    };
+
+                    if (frequencyType !== 'every_day' && !hasValidInput()) {
                       setFrequencyType('every_day');
                       setFrequency('Every day');
                     } else {
