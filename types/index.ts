@@ -127,11 +127,14 @@ export interface Habit {
   goalType: 'yes_no' | 'quantity' | 'time';
   targetValue?: number; // for quantity or time goals
   customFrequency?: number; // for custom frequency (days)
+  color: string; // hex color for the habit
   createdAt: Date;
   completions: HabitCompletion[];
   currentStreak: number;
   longestStreak: number;
 }
+
+export type HabitType = 'yes_no' | 'measurable';
 
 export interface HabitCompletion {
   id: string;

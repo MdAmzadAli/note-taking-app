@@ -9,14 +9,15 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  Dimensions,
 } from 'react-native';
-import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Habit } from '@/types';
 
 interface AddHabitModalProps {
   visible: boolean;
   onClose: () => void;
   onSave: (habit: Omit<Habit, 'id' | 'createdAt' | 'completions' | 'currentStreak' | 'longestStreak'>) => void;
+  habitType: 'yes_no' | 'measurable' | null;
 }
 
 const EMOJI_OPTIONS = [
@@ -25,21 +26,32 @@ const EMOJI_OPTIONS = [
   '🎨', '🌅', '🌙', '⭐', '🔥', '💎', '🎪', '🎭', '🎸', '🏆'
 ];
 
-export default function AddHabitModal({ visible, onClose, onSave }: AddHabitModalProps) {
+const COLOR_OPTIONS = [
+  '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7',
+  '#dda0dd', '#98d8c8', '#f7dc6f', '#bb8fce', '#85c1e9',
+  '#f8c471', '#82e0aa', '#f1948a', '#85c1e9', '#f7dc6f',
+  '#bb8fce', '#98d8c8', '#ffeaa7', '#96ceb4', '#45b7d1'
+];
+
+const { width } = Dimensions.get('window');
+
+export default function AddHabitModal({ visible, onClose, onSave, habitType }: AddHabitModalProps) {
   const [name, setName] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('🎯');
+  const [selectedColor, setSelectedColor] = useState('#4ecdc4');
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'custom'>('daily');
-  const [goalType, setGoalType] = useState<'yes_no' | 'quantity' | 'time'>('yes_no');
   const [targetValue, setTargetValue] = useState('');
   const [customFrequency, setCustomFrequency] = useState('');
+  const [unit, setUnit] = useState('');
 
   const resetForm = () => {
     setName('');
     setSelectedEmoji('🎯');
+    setSelectedColor('#4ecdc4');
     setFrequency('daily');
-    setGoalType('yes_no');
     setTargetValue('');
     setCustomFrequency('');
+    setUnit('');
   };
 
   const handleSave = () => {
@@ -53,17 +65,20 @@ export default function AddHabitModal({ visible, onClose, onSave }: AddHabitModa
       return;
     }
 
-    if ((goalType === 'quantity' || goalType === 'time') && (!targetValue || parseInt(targetValue) < 1)) {
+    if (habitType === 'measurable' && (!targetValue || parseInt(targetValue) < 1)) {
       Alert.alert('Error', 'Please enter a valid target value');
       return;
     }
 
+    const goalType = habitType === 'yes_no' ? 'yes_no' : 'quantity';
+
     const habit = {
       name: name.trim(),
       emoji: selectedEmoji,
+      color: selectedColor,
       frequency,
       goalType,
-      targetValue: (goalType === 'quantity' || goalType === 'time') ? parseInt(targetValue) : undefined,
+      targetValue: habitType === 'measurable' ? parseInt(targetValue) : undefined,
       customFrequency: frequency === 'custom' ? parseInt(customFrequency) : undefined,
     };
 
@@ -74,6 +89,12 @@ export default function AddHabitModal({ visible, onClose, onSave }: AddHabitModa
   const handleClose = () => {
     resetForm();
     onClose();
+  };
+
+  const getTitle = () => {
+    if (habitType === 'yes_no') return 'Create Yes/No Habit';
+    if (habitType === 'measurable') return 'Create Measurable Habit';
+    return 'Create New Habit';
   };
 
   return (
@@ -88,7 +109,7 @@ export default function AddHabitModal({ visible, onClose, onSave }: AddHabitModa
           <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
             <Text style={styles.closeText}>✕</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Add New Habit</Text>
+          <Text style={styles.title}>{getTitle()}</Text>
           <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
             <Text style={styles.saveButtonText}>Save</Text>
           </TouchableOpacity>
@@ -102,7 +123,7 @@ export default function AddHabitModal({ visible, onClose, onSave }: AddHabitModa
               style={styles.textInput}
               value={name}
               onChangeText={setName}
-              placeholder="e.g., Drink 8 glasses of water"
+              placeholder={habitType === 'yes_no' ? "e.g., Did I exercise today?" : "e.g., Drink water"}
               placeholderTextColor="#9ca3af"
             />
           </View>
@@ -116,7 +137,7 @@ export default function AddHabitModal({ visible, onClose, onSave }: AddHabitModa
                   key={emoji}
                   style={[
                     styles.emojiOption,
-                    selectedEmoji === emoji && styles.selectedEmoji,
+                    selectedEmoji === emoji && { backgroundColor: selectedColor + '20', borderColor: selectedColor },
                   ]}
                   onPress={() => setSelectedEmoji(emoji)}
                 >
@@ -125,6 +146,52 @@ export default function AddHabitModal({ visible, onClose, onSave }: AddHabitModa
               ))}
             </View>
           </View>
+
+          {/* Color Selector */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Choose Color</Text>
+            <View style={styles.colorGrid}>
+              {COLOR_OPTIONS.map((color) => (
+                <TouchableOpacity
+                  key={color}
+                  style={[
+                    styles.colorOption,
+                    { backgroundColor: color },
+                    selectedColor === color && styles.selectedColor,
+                  ]}
+                  onPress={() => setSelectedColor(color)}
+                >
+                  {selectedColor === color && (
+                    <Text style={styles.checkMark}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Target Value for Measurable */}
+          {habitType === 'measurable' && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Target & Unit</Text>
+              <View style={styles.targetRow}>
+                <TextInput
+                  style={[styles.textInput, styles.targetInput]}
+                  value={targetValue}
+                  onChangeText={setTargetValue}
+                  placeholder="Target"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="numeric"
+                />
+                <TextInput
+                  style={[styles.textInput, styles.unitInput]}
+                  value={unit}
+                  onChangeText={setUnit}
+                  placeholder="Unit (e.g., glasses, minutes)"
+                  placeholderTextColor="#9ca3af"
+                />
+              </View>
+            </View>
+          )}
 
           {/* Frequency */}
           <View style={styles.section}>
@@ -135,14 +202,14 @@ export default function AddHabitModal({ visible, onClose, onSave }: AddHabitModa
                   key={freq}
                   style={[
                     styles.optionButton,
-                    frequency === freq && styles.selectedOption,
+                    frequency === freq && { backgroundColor: selectedColor + '20', borderColor: selectedColor },
                   ]}
                   onPress={() => setFrequency(freq)}
                 >
                   <Text
                     style={[
                       styles.optionText,
-                      frequency === freq && styles.selectedOptionText,
+                      frequency === freq && { color: selectedColor },
                     ]}
                   >
                     {freq.charAt(0).toUpperCase() + freq.slice(1)}
@@ -157,57 +224,6 @@ export default function AddHabitModal({ visible, onClose, onSave }: AddHabitModa
                 value={customFrequency}
                 onChangeText={setCustomFrequency}
                 placeholder="Every X days"
-                placeholderTextColor="#9ca3af"
-                keyboardType="numeric"
-              />
-            )}
-          </View>
-
-          {/* Goal Type */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Goal Type</Text>
-            <View style={styles.optionColumn}>
-              {[
-                { key: 'yes_no', label: 'Yes/No', desc: 'Simple completion tracking' },
-                { key: 'quantity', label: 'Quantity', desc: 'Track a specific amount' },
-                { key: 'time', label: 'Time', desc: 'Track minutes spent' },
-              ].map((option) => (
-                <TouchableOpacity
-                  key={option.key}
-                  style={[
-                    styles.goalOption,
-                    goalType === option.key && styles.selectedGoalOption,
-                  ]}
-                  onPress={() => setGoalType(option.key as any)}
-                >
-                  <View style={styles.goalOptionContent}>
-                    <Text
-                      style={[
-                        styles.goalOptionTitle,
-                        goalType === option.key && styles.selectedGoalOptionText,
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.goalOptionDesc,
-                        goalType === option.key && styles.selectedGoalOptionDescText,
-                      ]}
-                    >
-                      {option.desc}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {(goalType === 'quantity' || goalType === 'time') && (
-              <TextInput
-                style={[styles.textInput, styles.smallInput]}
-                value={targetValue}
-                onChangeText={setTargetValue}
-                placeholder={`Target ${goalType === 'time' ? 'minutes' : 'amount'}`}
                 placeholderTextColor="#9ca3af"
                 keyboardType="numeric"
               />
@@ -280,6 +296,16 @@ const styles = StyleSheet.create({
   smallInput: {
     marginTop: 8,
   },
+  targetRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  targetInput: {
+    flex: 1,
+  },
+  unitInput: {
+    flex: 2,
+  },
   emojiGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -295,18 +321,34 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  selectedEmoji: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#3b82f6',
-  },
   emojiText: {
     fontSize: 24,
   },
-  optionRow: {
+  colorGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
-  optionColumn: {
+  colorOption: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'transparent',
+  },
+  selectedColor: {
+    borderColor: '#ffffff',
+    transform: [{ scale: 1.1 }],
+  },
+  checkMark: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  optionRow: {
+    flexDirection: 'row',
     gap: 8,
   },
   optionButton: {
@@ -318,46 +360,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  selectedOption: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#3b82f6',
-  },
   optionText: {
     fontSize: 14,
     fontWeight: '500',
     color: '#6b7280',
-  },
-  selectedOptionText: {
-    color: '#3b82f6',
-  },
-  goalOption: {
-    padding: 16,
-    borderRadius: 8,
-    backgroundColor: '#f9fafb',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  selectedGoalOption: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#3b82f6',
-  },
-  goalOptionContent: {
-    flex: 1,
-  },
-  goalOptionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 4,
-  },
-  selectedGoalOptionText: {
-    color: '#3b82f6',
-  },
-  goalOptionDesc: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  selectedGoalOptionDescText: {
-    color: '#1e40af',
   },
 });

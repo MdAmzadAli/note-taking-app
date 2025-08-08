@@ -8,14 +8,16 @@ interface HabitListProps {
   habits: Habit[];
   onComplete: (habitId: string, completed: boolean, value?: number) => void;
   onDelete: (habitId: string) => void;
+  onHabitPress?: (habit: Habit) => void;
 }
 
-export default function HabitList({ habits, onComplete, onDelete }: HabitListProps) {
+export default function HabitList({ habits, onComplete, onDelete, onHabitPress }: HabitListProps) {
   const renderHabit = ({ item }: { item: Habit }) => (
     <HabitCard
       habit={item}
       onComplete={onComplete}
       onDelete={onDelete}
+      onHabitPress={onHabitPress}
     />
   );
 

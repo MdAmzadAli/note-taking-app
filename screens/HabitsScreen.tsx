@@ -6,19 +6,28 @@ import {
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  FlatList,
+  ScrollView,
   Alert,
+  Dimensions,
 } from 'react-native';
-import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Habit } from '@/types';
 import { getHabits, saveHabit, deleteHabit, updateHabit } from '@/utils/storage';
 import HabitList from '@/components/HabitTracker/HabitList';
 import AddHabitModal from '@/components/HabitTracker/AddHabitModal';
+import HabitDetailModal from '@/components/HabitTracker/HabitDetailModal';
+import HabitTypeModal from '@/components/HabitTracker/HabitTypeModal';
+
+const { width } = Dimensions.get('window');
 
 export default function HabitsScreen() {
   const [habits, setHabits] = useState<Habit[]>([]);
+  const [showTypeModal, setShowTypeModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
+  const [selectedHabitType, setSelectedHabitType] = useState<'yes_no' | 'measurable' | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
   useEffect(() => {
     loadHabits();
@@ -27,7 +36,6 @@ export default function HabitsScreen() {
   const loadHabits = async () => {
     try {
       const loadedHabits = await getHabits();
-      // Sort habits by completion status (incomplete first)
       const sortedHabits = loadedHabits.sort((a, b) => {
         const aCompleted = isHabitCompletedToday(a);
         const bCompleted = isHabitCompletedToday(b);
@@ -92,7 +100,6 @@ export default function HabitsScreen() {
         });
       }
 
-      // Update streaks
       habit.currentStreak = calculateCurrentStreak(habit);
       habit.longestStreak = Math.max(habit.longestStreak, habit.currentStreak);
 
@@ -116,9 +123,11 @@ export default function HabitsScreen() {
     for (let i = 0; i < sortedCompletions.length; i++) {
       const completionDate = new Date(sortedCompletions[i].date);
       const expectedDate = new Date(today);
-      expectedDate.setDate(today.getDate() - i);
-      
-      if (completionDate.toDateString() === expectedDate.toDateString()) {
+      expectedDate.setDate(expectedDate.getDate() - i);
+      expectedDate.setHours(0, 0, 0, 0);
+      completionDate.setHours(0, 0, 0, 0);
+
+      if (completionDate.getTime() === expectedDate.getTime()) {
         streak++;
       } else {
         break;
@@ -129,26 +138,64 @@ export default function HabitsScreen() {
   };
 
   const handleDeleteHabit = async (habitId: string) => {
-    Alert.alert(
-      'Delete Habit',
-      'Are you sure you want to delete this habit? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteHabit(habitId);
-              await loadHabits();
-            } catch (error) {
-              console.error('Error deleting habit:', error);
-              Alert.alert('Error', 'Failed to delete habit');
-            }
-          },
-        },
-      ]
-    );
+    try {
+      await deleteHabit(habitId);
+      await loadHabits();
+    } catch (error) {
+      console.error('Error deleting habit:', error);
+    }
+  };
+
+  const handleHabitPress = (habit: Habit) => {
+    setSelectedHabit(habit);
+    setShowDetailModal(true);
+  };
+
+  const handleTypeSelection = (type: 'yes_no' | 'measurable') => {
+    setSelectedHabitType(type);
+    setShowTypeModal(false);
+    setShowAddModal(true);
+  };
+
+  const getUpcomingDates = () => {
+    const dates = [];
+    const today = new Date();
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      dates.push(date);
+    }
+    return dates;
+  };
+
+  const formatDate = (date: Date) => {
+    const today = new Date();
+    const isToday = date.toDateString() === today.toDateString();
+    const isTomorrow = date.toDateString() === new Date(today.getTime() + 24 * 60 * 60 * 1000).toDateString();
+    
+    if (isToday) return 'Today';
+    if (isTomorrow) return 'Tomorrow';
+    
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
+  const getCompletionPercentage = (date: Date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    let completed = 0;
+    let total = habits.length;
+    
+    habits.forEach(habit => {
+      const completion = habit.completions.find(c => c.date === dateStr);
+      if (completion && completion.completed) {
+        completed++;
+      }
+    });
+    
+    return total > 0 ? (completed / total) * 100 : 0;
   };
 
   if (loading) {
@@ -163,40 +210,111 @@ export default function HabitsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Habit Tracker</Text>
-        <Text style={styles.subtitle}>Build better habits, one day at a time</Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.greeting}>Good Morning! 👋</Text>
+          <Text style={styles.subtitle}>You have {habits.filter(h => !isHabitCompletedToday(h)).length} habits pending today</Text>
+        </View>
+        <TouchableOpacity style={styles.profileButton}>
+          <View style={styles.profileIcon}>
+            <Text style={styles.profileText}>U</Text>
+          </View>
+        </TouchableOpacity>
       </View>
 
-      {habits.length === 0 ? (
-        <View style={styles.centerContent}>
-          <Text style={styles.emptyText}>🎯</Text>
-          <Text style={styles.emptyTitle}>No habits yet</Text>
-          <Text style={styles.emptySubtitle}>
-            Start building better habits by adding your first one!
-          </Text>
-        </View>
-      ) : (
-        <HabitList
-          habits={habits}
-          onComplete={handleHabitComplete}
-          onDelete={handleDeleteHabit}
-        />
-      )}
+      <View style={styles.mainContent}>
+        {/* Left side - Habits */}
+        <View style={styles.leftSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Today's Habits</Text>
+            <TouchableOpacity 
+              style={styles.addButton}
+              onPress={() => setShowTypeModal(true)}
+            >
+              <Text style={styles.addButtonText}>+</Text>
+            </TouchableOpacity>
+          </View>
 
-      {/* Floating Action Button */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => setShowAddModal(true)}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.fabIcon}>➕</Text>
-      </TouchableOpacity>
+          {habits.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>🎯</Text>
+              <Text style={styles.emptyTitle}>No habits yet</Text>
+              <Text style={styles.emptySubtitle}>
+                Start building better habits by adding your first one!
+              </Text>
+            </View>
+          ) : (
+            <HabitList
+              habits={habits}
+              onComplete={handleHabitComplete}
+              onDelete={handleDeleteHabit}
+              onHabitPress={handleHabitPress}
+            />
+          )}
+        </View>
+
+        {/* Right side - Upcoming dates */}
+        <View style={styles.rightSection}>
+          <Text style={styles.upcomingTitle}>Upcoming</Text>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {getUpcomingDates().map((date, index) => {
+              const percentage = getCompletionPercentage(date);
+              const isSelected = date.toDateString() === selectedDate.toDateString();
+              
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={[styles.dateCard, isSelected && styles.selectedDateCard]}
+                  onPress={() => setSelectedDate(date)}
+                >
+                  <Text style={[styles.dateText, isSelected && styles.selectedDateText]}>
+                    {formatDate(date)}
+                  </Text>
+                  <Text style={[styles.dayText, isSelected && styles.selectedDayText]}>
+                    {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                  </Text>
+                  <View style={styles.progressIndicator}>
+                    <View style={[
+                      styles.progressBar,
+                      { width: `${percentage}%` },
+                      isSelected && styles.selectedProgressBar
+                    ]} />
+                  </View>
+                  <Text style={[styles.percentageText, isSelected && styles.selectedPercentageText]}>
+                    {Math.round(percentage)}%
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </View>
+
+      {/* Modals */}
+      <HabitTypeModal
+        visible={showTypeModal}
+        onClose={() => setShowTypeModal(false)}
+        onSelectType={handleTypeSelection}
+      />
 
       <AddHabitModal
         visible={showAddModal}
-        onClose={() => setShowAddModal(false)}
+        onClose={() => {
+          setShowAddModal(false);
+          setSelectedHabitType(null);
+        }}
         onSave={handleAddHabit}
+        habitType={selectedHabitType}
+      />
+
+      <HabitDetailModal
+        visible={showDetailModal}
+        habit={selectedHabit}
+        onClose={() => {
+          setShowDetailModal(false);
+          setSelectedHabit(null);
+        }}
       />
     </SafeAreaView>
   );
@@ -205,66 +323,173 @@ export default function HabitsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f8fafc',
   },
   header: {
-    padding: 20,
-    paddingBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+  headerLeft: {
+    flex: 1,
+  },
+  greeting: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1a202c',
     marginBottom: 4,
   },
   subtitle: {
+    fontSize: 14,
+    color: '#64748b',
+  },
+  profileButton: {
+    marginLeft: 16,
+  },
+  profileIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#6366f1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileText: {
+    color: '#ffffff',
+    fontWeight: '600',
     fontSize: 16,
-    color: '#6b7280',
+  },
+  mainContent: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  leftSection: {
+    flex: 2,
+    padding: 20,
+  },
+  rightSection: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    padding: 16,
+    borderLeftWidth: 1,
+    borderLeftColor: '#e2e8f0',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1a202c',
+  },
+  addButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#6366f1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addButtonText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  upcomingTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a202c',
+    marginBottom: 16,
+  },
+  dateCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  selectedDateCard: {
+    backgroundColor: '#6366f1',
+    borderColor: '#4f46e5',
+  },
+  dateText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a202c',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  selectedDateText: {
+    color: '#ffffff',
+  },
+  dayText: {
+    fontSize: 12,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  selectedDayText: {
+    color: '#e2e8f0',
+  },
+  progressIndicator: {
+    height: 4,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 2,
+    marginBottom: 8,
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#10b981',
+    borderRadius: 2,
+  },
+  selectedProgressBar: {
+    backgroundColor: '#ffffff',
+  },
+  percentageText: {
+    fontSize: 12,
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  selectedPercentageText: {
+    color: '#ffffff',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1a202c',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    paddingHorizontal: 32,
   },
   centerContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   loadingText: {
     fontSize: 16,
-    color: '#6b7280',
-  },
-  emptyText: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  fabIcon: {
-    fontSize: 24,
-    color: '#ffffff',
+    color: '#64748b',
   },
 });

@@ -18,9 +18,10 @@ interface HabitCardProps {
   habit: Habit;
   onComplete: (habitId: string, completed: boolean, value?: number) => void;
   onDelete: (habitId: string) => void;
+  onHabitPress?: (habit: Habit) => void;
 }
 
-export default function HabitCard({ habit, onComplete, onDelete }: HabitCardProps) {
+export default function HabitCard({ habit, onComplete, onDelete, onHabitPress }: HabitCardProps) {
   const [scaleAnim] = useState(new Animated.Value(1));
   const [showInputModal, setShowInputModal] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -127,7 +128,7 @@ export default function HabitCard({ habit, onComplete, onDelete }: HabitCardProp
       <Animated.View style={[styles.container, { transform: [{ scale: scaleAnim }] }]}>
         <TouchableOpacity
           style={[styles.card, isCompleted && styles.completedCard]}
-          onPress={handleComplete}
+          onPress={onHabitPress ? () => onHabitPress(habit) : handleComplete}
           onLongPress={handleLongPress}
           activeOpacity={0.7}
         >
@@ -151,7 +152,7 @@ export default function HabitCard({ habit, onComplete, onDelete }: HabitCardProp
         <View style={styles.progressSection}>
           <ProgressBar
             progress={getProgressPercentage()}
-            color={isCompleted ? '#10b981' : '#3b82f6'}
+            color={habit.color || (isCompleted ? '#10b981' : '#3b82f6')}
           />
           
           {habit.goalType !== 'yes_no' && (
