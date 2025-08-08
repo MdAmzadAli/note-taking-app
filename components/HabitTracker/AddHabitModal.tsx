@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -58,6 +58,20 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
   const [reminderTime, setReminderTime] = useState<Date | null>(null);
   const [notes, setNotes] = useState('');
 
+  // Refs for number inputs to prevent re-renders
+  const targetRef = useRef<TextInput>(null);
+  const targetValue = useRef('');
+  const everyNDaysRef = useRef<TextInput>(null);
+  const everyNDaysValue = useRef('');
+  const timesPerWeekRef = useRef<TextInput>(null);
+  const timesPerWeekValue = useRef('');
+  const timesPerMonthRef = useRef<TextInput>(null);
+  const timesPerMonthValue = useRef('');
+  const timesInDays1Ref = useRef<TextInput>(null);
+  const timesInDays1Value = useRef('');
+  const timesInDays2Ref = useRef<TextInput>(null);
+  const timesInDays2Value = useRef('');
+
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showFrequencyModal, setShowFrequencyModal] = useState(false);
@@ -86,15 +100,31 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
     });
     setReminderTime(null);
     setNotes('');
+
+    // Clear ref values
+    targetValue.current = '';
+    everyNDaysValue.current = '';
+    timesPerWeekValue.current = '';
+    timesPerMonthValue.current = '';
+    timesInDays1Value.current = '';
+    timesInDays2Value.current = '';
+
+    // Clear input fields
+    targetRef.current?.setNativeProps({ text: '' });
+    everyNDaysRef.current?.setNativeProps({ text: '' });
+    timesPerWeekRef.current?.setNativeProps({ text: '' });
+    timesPerMonthRef.current?.setNativeProps({ text: '' });
+    timesInDays1Ref.current?.setNativeProps({ text: '' });
+    timesInDays2Ref.current?.setNativeProps({ text: '' });
   };
 
   const getFrequencyText = () => {
     switch (frequencyType) {
       case 'every_day': return 'Every day';
-      case 'every_n_days': return `Every ${frequencyInputs.every_n_days || '0'} days`;
-      case 'times_per_week': return `${frequencyInputs.times_per_week || '0'} times per week`;
-      case 'times_per_month': return `${frequencyInputs.times_per_month || '0'} times per month`;
-      case 'times_in_days': return `${frequencyInputs.times_in_days_1 || '0'} times in ${frequencyInputs.times_in_days_2 || '0'} days`;
+      case 'every_n_days': return `Every ${everyNDaysValue.current || '0'} days`;
+      case 'times_per_week': return `${timesPerWeekValue.current || '0'} times per week`;
+      case 'times_per_month': return `${timesPerMonthValue.current || '0'} times per month`;
+      case 'times_in_days': return `${timesInDays1Value.current || '0'} times in ${timesInDays2Value.current || '0'} days`;
       default: return 'Every day';
     }
   };
@@ -119,7 +149,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
         Alert.alert('Error', 'Please enter a unit');
         return;
       }
-      if (!target.trim() || isNaN(Number(target))) {
+      if (!targetValue.current.trim() || isNaN(Number(targetValue.current))) {
         Alert.alert('Error', 'Please enter a valid target number');
         return;
       }
@@ -127,16 +157,16 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
 
     const getCustomValue1 = () => {
       switch (frequencyType) {
-        case 'every_n_days': return parseInt(frequencyInputs.every_n_days || '1');
-        case 'times_per_week': return parseInt(frequencyInputs.times_per_week || '1');
-        case 'times_per_month': return parseInt(frequencyInputs.times_per_month || '1');
-        case 'times_in_days': return parseInt(frequencyInputs.times_in_days_1 || '1');
+        case 'every_n_days': return parseInt(everyNDaysValue.current || '1');
+        case 'times_per_week': return parseInt(timesPerWeekValue.current || '1');
+        case 'times_per_month': return parseInt(timesPerMonthValue.current || '1');
+        case 'times_in_days': return parseInt(timesInDays1Value.current || '1');
         default: return undefined;
       }
     };
 
     const getCustomValue2 = () => {
-      return frequencyType === 'times_in_days' ? parseInt(frequencyInputs.times_in_days_2 || '7') : undefined;
+      return frequencyType === 'times_in_days' ? parseInt(timesInDays2Value.current || '7') : undefined;
     };
 
     const habit = {
@@ -147,7 +177,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
       goalType: habitType === 'yes_no' ? 'yes_no' : 'quantity',
       question: question.trim(),
       unit: habitType === 'measurable' ? unit.trim() : undefined,
-      target: habitType === 'measurable' ? Number(target || '1') : undefined,
+      target: habitType === 'measurable' ? Number(targetValue.current || '1') : undefined,
       targetType: habitType === 'measurable' ? targetType : undefined,
       frequencyType,
       customValue1: frequencyType !== 'every_day' ? getCustomValue1() : undefined,
@@ -263,10 +293,12 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
               <View style={styles.targetContainer}>
                 <Text style={styles.label}>Target</Text>
                 <TextInput
-                  key="target_input"
+                  ref={targetRef}
                   style={styles.numberInput}
-                  value={target}
-                  onChangeText={setTarget}
+                  defaultValue={targetValue.current}
+                  onChangeText={(text) => {
+                    targetValue.current = text;
+                  }}
                   placeholder="e.g. 15"
                   placeholderTextColor="#666"
                   keyboardType="numeric"
@@ -545,10 +577,12 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                       <View style={[styles.radio, frequencyType === 'every_n_days' && styles.radioSelected]} />
                       <Text style={styles.frequencyText}>Every</Text>
                       <TextInput
-                        key="every_n_days"
+                        ref={everyNDaysRef}
                         style={styles.numberInput}
-                        value={frequencyInputs.every_n_days}
-                        onChangeText={(text) => setFrequencyInputs(prev => ({ ...prev, every_n_days: text }))}
+                        defaultValue={everyNDaysValue.current}
+                        onChangeText={(text) => {
+                          everyNDaysValue.current = text;
+                        }}
                         keyboardType="numeric"
                         placeholder="3"
                         onFocus={() => setFrequencyType('every_n_days')}
@@ -567,10 +601,12 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                     >
                       <View style={[styles.radio, frequencyType === 'times_per_week' && styles.radioSelected]} />
                       <TextInput
-                        key="times_per_week"
+                        ref={timesPerWeekRef}
                         style={styles.numberInput}
-                        value={frequencyInputs.times_per_week}
-                        onChangeText={(text) => setFrequencyInputs(prev => ({ ...prev, times_per_week: text }))}
+                        defaultValue={timesPerWeekValue.current}
+                        onChangeText={(text) => {
+                          timesPerWeekValue.current = text;
+                        }}
                         keyboardType="numeric"
                         placeholder="3"
                         onFocus={() => setFrequencyType('times_per_week')}
@@ -589,10 +625,12 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                     >
                       <View style={[styles.radio, frequencyType === 'times_per_month' && styles.radioSelected]} />
                       <TextInput
-                        key="times_per_month"
+                        ref={timesPerMonthRef}
                         style={styles.numberInput}
-                        value={frequencyInputs.times_per_month}
-                        onChangeText={(text) => setFrequencyInputs(prev => ({ ...prev, times_per_month: text }))}
+                        defaultValue={timesPerMonthValue.current}
+                        onChangeText={(text) => {
+                          timesPerMonthValue.current = text;
+                        }}
                         keyboardType="numeric"
                         placeholder="3"
                         onFocus={() => setFrequencyType('times_per_month')}
@@ -611,10 +649,12 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                     >
                       <View style={[styles.radio, frequencyType === 'times_in_days' && styles.radioSelected]} />
                       <TextInput
-                        key="times_in_days_1"
+                        ref={timesInDays1Ref}
                         style={styles.numberInput}
-                        value={frequencyInputs.times_in_days_1}
-                        onChangeText={(text) => setFrequencyInputs(prev => ({ ...prev, times_in_days_1: text }))}
+                        defaultValue={timesInDays1Value.current}
+                        onChangeText={(text) => {
+                          timesInDays1Value.current = text;
+                        }}
                         keyboardType="numeric"
                         placeholder="3"
                         onFocus={() => setFrequencyType('times_in_days')}
@@ -625,10 +665,12 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                       />
                       <Text style={styles.frequencyText}>times in</Text>
                       <TextInput
-                        key="times_in_days_2"
+                        ref={timesInDays2Ref}
                         style={styles.numberInput}
-                        value={frequencyInputs.times_in_days_2}
-                        onChangeText={(text) => setFrequencyInputs(prev => ({ ...prev, times_in_days_2: text }))}
+                        defaultValue={timesInDays2Value.current}
+                        onChangeText={(text) => {
+                          timesInDays2Value.current = text;
+                        }}
                         keyboardType="numeric"
                         placeholder="14"
                         onFocus={() => setFrequencyType('times_in_days')}
@@ -654,10 +696,10 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                     const hasValidInput = () => {
                       switch (frequencyType) {
                         case 'every_day': return true;
-                        case 'every_n_days': return frequencyInputs.every_n_days.trim() !== '';
-                        case 'times_per_week': return frequencyInputs.times_per_week.trim() !== '';
-                        case 'times_per_month': return frequencyInputs.times_per_month.trim() !== '';
-                        case 'times_in_days': return frequencyInputs.times_in_days_1.trim() !== '' && frequencyInputs.times_in_days_2.trim() !== '';
+                        case 'every_n_days': return everyNDaysValue.current.trim() !== '';
+                        case 'times_per_week': return timesPerWeekValue.current.trim() !== '';
+                        case 'times_per_month': return timesPerMonthValue.current.trim() !== '';
+                        case 'times_in_days': return timesInDays1Value.current.trim() !== '' && timesInDays2Value.current.trim() !== '';
                         default: return false;
                       }
                     };
