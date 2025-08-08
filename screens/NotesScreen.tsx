@@ -78,6 +78,8 @@ export default function NotesScreen() {
   const [checkedItems, setCheckedItems] = useState<boolean[]>([]);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
   const [currentNoteTitle, setCurrentNoteTitle] = useState('');
+  const [menuScrollOffset, setMenuScrollOffset] = useState(0);
+  const menuFlatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     loadNotes();
@@ -451,7 +453,17 @@ export default function NotesScreen() {
       toValue: 0,
       duration: 300,
       useNativeDriver: true,
-    }).start();
+    }).start(() => {
+      // Restore scroll position after menu animation completes
+      if (menuFlatListRef.current && menuScrollOffset > 0) {
+        setTimeout(() => {
+          menuFlatListRef.current?.scrollToOffset({ 
+            offset: menuScrollOffset, 
+            animated: false 
+          });
+        }, 100);
+      }
+    });
   };
 
   const closeMenu = () => {
@@ -854,6 +866,7 @@ export default function NotesScreen() {
                   </View>
                 ) : (
                   <FlatList
+                    ref={menuFlatListRef}
                     data={filteredTemplates}
                     renderItem={({ item }) => (
                       <TouchableOpacity
@@ -866,6 +879,10 @@ export default function NotesScreen() {
                     )}
                     keyExtractor={(item) => item.id}
                     style={styles.menuList}
+                    onScroll={(event) => {
+                      setMenuScrollOffset(event.nativeEvent.contentOffset.y);
+                    }}
+                    scrollEventThrottle={16}
                   />
                 )}
                 <View style={styles.menuFooter}>
