@@ -14,6 +14,7 @@ interface HabitDetailModalProps {
   visible: boolean;
   habit: Habit | null;
   onClose: () => void;
+  onSaveValue?: (habitId: string, date: string, newValue: number) => void;
 }
 
 export default function HabitDetailModal({ visible, habit, onClose }: HabitDetailModalProps) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   ScrollView,
   Alert,
   Dimensions,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { Habit } from '@/types';
 import { getHabits, saveHabit, deleteHabit, updateHabit } from '@/utils/storage';
@@ -17,12 +19,61 @@ import HabitTypeModal from '@/components/HabitTracker/HabitTypeModal';
 
 const { width } = Dimensions.get('window');
 
+// Mini Edit Input Component
+function MiniEditInput({ habit, currentValue, onSave, onCancel }: {
+  habit?: Habit;
+  currentValue: string;
+  onSave: (value: string) => void;
+  onCancel: () => void;
+}) {
+  const inputRef = useRef<TextInput>(null);
+  const inputValue = useRef(currentValue);
+
+  return (
+    <View>
+      <TextInput
+        ref={inputRef}
+        style={styles.miniModalInput}
+        defaultValue={currentValue}
+        onChangeText={(text) => {
+          inputValue.current = text;
+        }}
+        keyboardType="numeric"
+        placeholder="0"
+        autoFocus
+        autoCorrect={false}
+        textAlign="center"
+        selectTextOnFocus={false}
+        blurOnSubmit={false}
+      />
+      
+      <View style={styles.miniModalButtons}>
+        <TouchableOpacity
+          style={[styles.miniModalButton, styles.cancelButton]}
+          onPress={onCancel}
+        >
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.miniModalButton, styles.saveButton]}
+          onPress={() => onSave(inputValue.current)}
+        >
+          <Text style={styles.saveButtonText}>Save</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 export default function HabitsScreen() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingHabit, setEditingHabit] = useState<{habit: Habit, date: string, currentValue: string} | null>(null);
   const [selectedHabitType, setSelectedHabitType] = useState<'yes_no' | 'measurable' | null>(null);
   const [loading, setLoading] = useState(true);
   const [scrollableDates, setScrollableDates] = useState<Date[]>([]);
@@ -312,9 +363,9 @@ export default function HabitsScreen() {
                             if (habit.goalType === 'yes_no') {
                               handleHabitComplete(habit.id, dateStr, !isCompleted);
                             } else {
-                              // Show modal for editing measurable habits
-                              setSelectedHabit({ ...habit, selectedDate: dateStr }); // Pass date to modal
-                              setShowDetailModal(true);
+                              // Show mini input modal for editing measurable habits
+                              setEditingHabit({ habit, date: dateStr, currentValue: value === '0' ? '' : value });
+                              setShowEditModal(true);
                             }
                           }}
                         >
@@ -378,6 +429,50 @@ export default function HabitsScreen() {
           await handleHabitComplete(habitId, date, newValue > 0, newValue);
         }}
       />
+
+      {/* Mini Edit Modal for Measurable Habits */}
+      <Modal
+        visible={showEditModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.miniModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowEditModal(false)}
+        >
+          <TouchableOpacity
+            style={styles.miniModalContainer}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={styles.miniModalTitle}>Update {editingHabit?.habit.name}</Text>
+            <Text style={styles.miniModalSubtitle}>
+              Enter {editingHabit?.habit.goalType === 'quantity' ? 'quantity' : 'minutes'}:
+            </Text>
+            
+            <MiniEditInput
+              habit={editingHabit?.habit}
+              currentValue={editingHabit?.currentValue || ''}
+              onSave={(newValue) => {
+                if (editingHabit) {
+                  const numValue = parseInt(newValue || '0', 10);
+                  if (numValue >= 0) {
+                    handleHabitComplete(editingHabit.habit.id, editingHabit.date, numValue > 0, numValue);
+                  }
+                }
+                setShowEditModal(false);
+                setEditingHabit(null);
+              }}
+              onCancel={() => {
+                setShowEditModal(false);
+                setEditingHabit(null);
+              }}
+            />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -566,5 +661,69 @@ const styles = StyleSheet.create({
   },
   todayUnitText: {
     color: '#0369a1',
+  },
+  miniModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  miniModalContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 24,
+    width: '80%',
+    maxWidth: 300,
+  },
+  miniModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  miniModalSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  miniModalInput: {
+    backgroundColor: '#f0f0f0',
+    color: '#000',
+    fontSize: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
+    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginBottom: 20,
+  },
+  miniModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  miniModalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f3f4f6',
+  },
+  saveButton: {
+    backgroundColor: '#000000',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#ffffff',
   },
 });
