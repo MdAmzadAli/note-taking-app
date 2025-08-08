@@ -44,7 +44,7 @@ export default function HabitTypeModal({ visible, onClose, onSelectType }: Habit
               </View>
               <Text style={styles.typeTitle}>Yes or No</Text>
               <Text style={styles.typeDescription}>
-                Simple completion tracking for habits like "Did I exercise today?"
+                Did you wake up early today?
               </Text>
             </TouchableOpacity>
 
@@ -57,7 +57,7 @@ export default function HabitTypeModal({ visible, onClose, onSelectType }: Habit
               </View>
               <Text style={styles.typeTitle}>Measurable</Text>
               <Text style={styles.typeDescription}>
-                Track quantities or time like "How many glasses of water?" or "How many minutes?"
+                How many glasses of water did you drink?
               </Text>
             </TouchableOpacity>
           </View>
@@ -70,15 +70,16 @@ export default function HabitTypeModal({ visible, onClose, onSelectType }: Habit
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   container: {
-    backgroundColor: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
     borderRadius: 20,
     width: width * 0.85,
     maxWidth: 400,
+    backdropFilter: 'blur(10px)',
   },
   header: {
     flexDirection: 'row',
@@ -86,7 +87,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: 'rgba(226, 232, 240, 0.3)',
   },
   title: {
     fontSize: 20,
@@ -103,24 +104,40 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    gap: 16,
+    gap: 24,
   },
   typeCard: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
     borderRadius: 16,
     padding: 20,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: 'rgba(255, 255, 255, 0.6)',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
   typeIcon: {
     width: 60,
     height: 60,
-    backgroundColor: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
     borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   typeEmoji: {
     fontSize: 28,
@@ -133,8 +150,9 @@ const styles = StyleSheet.create({
   },
   typeDescription: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#4a5568',
     textAlign: 'center',
     lineHeight: 20,
+    fontStyle: 'italic',
   },
 });
