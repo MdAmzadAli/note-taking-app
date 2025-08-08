@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Note, Task, Reminder, UserSettings, Template, TemplateEntry, CustomTemplate } from '@/types';
+import { Note, Task, Reminder, CustomTemplate, TemplateEntry, UserSettings, Habit } from '@/types';
 import { eventBus, EVENTS } from './eventBus';
 
 const KEYS = {
@@ -198,24 +198,10 @@ export const getCustomTemplates = async (): Promise<CustomTemplate[]> => {
 export const saveCustomTemplate = async (template: CustomTemplate): Promise<void> => {
   try {
     const templates = await getCustomTemplates();
-    const existingIndex = templates.findIndex(t => t.id === template.id);
-
-    if (existingIndex >= 0) {
-      templates[existingIndex] = template;
-    } else {
-      templates.push(template);
-    }
-
-    // Save to storage first
-    await AsyncStorage.setItem('custom_templates', JSON.stringify(templates));
+    const updatedTemplates = [...templates, template];
+    await AsyncStorage.setItem('custom_templates', JSON.stringify(updatedTemplates));
     console.log('[STORAGE] Template saved to AsyncStorage, emitting event...');
-    
-    // Then emit event after successful save
-    if (existingIndex >= 0) {
-      eventBus.emit(EVENTS.TEMPLATE_UPDATED, template);
-    } else {
-      eventBus.emit(EVENTS.TEMPLATE_CREATED, template);
-    }
+    eventBus.emit(EVENTS.TEMPLATE_CREATED, template);
   } catch (error) {
     console.error('Error saving custom template:', error);
     throw error;
@@ -334,6 +320,71 @@ export class StorageService {
     return saveUserSettings(settings);
   }
 }
+
+// Habit Storage Functions
+const HABITS_KEY = '@habits';
+
+export const getHabits = async (): Promise<Habit[]> => {
+  try {
+    const habitsJson = await AsyncStorage.getItem(HABITS_KEY);
+    if (habitsJson) {
+      const habits = JSON.parse(habitsJson);
+      return habits.map((habit: any) => ({
+        ...habit,
+        createdAt: new Date(habit.createdAt),
+        completions: habit.completions.map((completion: any) => ({
+          ...completion,
+          completedAt: new Date(completion.completedAt),
+        })),
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error('Error getting habits:', error);
+    return [];
+  }
+};
+
+export const saveHabit = async (habit: Habit): Promise<void> => {
+  try {
+    const habits = await getHabits();
+    const updatedHabits = [...habits, habit];
+    await AsyncStorage.setItem(HABITS_KEY, JSON.stringify(updatedHabits));
+    console.log('[STORAGE] Habit saved to AsyncStorage');
+  } catch (error) {
+    console.error('Error saving habit:', error);
+    throw error;
+  }
+};
+
+export const updateHabit = async (updatedHabit: Habit): Promise<void> => {
+  try {
+    const habits = await getHabits();
+    const habitIndex = habits.findIndex(h => h.id === updatedHabit.id);
+
+    if (habitIndex !== -1) {
+      habits[habitIndex] = updatedHabit;
+      await AsyncStorage.setItem(HABITS_KEY, JSON.stringify(habits));
+      console.log('[STORAGE] Habit updated in AsyncStorage');
+    }
+  } catch (error) {
+    console.error('Error updating habit:', error);
+    throw error;
+  }
+};
+
+export const deleteHabit = async (habitId: string): Promise<void> => {
+  try {
+    const habits = await getHabits();
+    const filteredHabits = habits.filter(h => h.id !== habitId);
+    await AsyncStorage.setItem(HABITS_KEY, JSON.stringify(filteredHabits));
+    console.log('[STORAGE] Habit deleted from AsyncStorage');
+  } catch (error) {
+    console.error('Error deleting habit:', error);
+    throw error;
+  }
+};
+
 export interface UserSettings {
   viewMode?: 'paragraph' | 'bullet';
   notificationsEnabled?: boolean;

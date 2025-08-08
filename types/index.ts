@@ -102,13 +102,11 @@ export interface TemplateEntry {
 }
 
 export interface UserSettings {
-  voiceLanguage: string;
-  voiceRecognitionMethod: 'assemblyai-regex' | 'assemblyai-gemini';
-  assemblyAIApiKey: string;
-  geminiApiKey: string;
-  writingStyle: string;
-  notifications: boolean;
+  speechProvider: string;
+  ringtone: string;
+  vibrationEnabled: boolean;
   darkMode: boolean;
+  notifications: boolean;
   notificationsEnabled: boolean;
   theme: string;
   autoSync: boolean;
@@ -116,8 +114,32 @@ export interface UserSettings {
   isOnboardingComplete?: boolean;
   alarmEnabled?: boolean;
   alarmSound?: string;
-  vibrationEnabled?: boolean;
-  alarmDuration?: number;
+  
+  // Added for Habit Tracker feature
+  
+}
+
+export interface Habit {
+  id: string;
+  name: string;
+  emoji: string;
+  frequency: 'daily' | 'weekly' | 'custom';
+  goalType: 'yes_no' | 'quantity' | 'time';
+  targetValue?: number; // for quantity or time goals
+  customFrequency?: number; // for custom frequency (days)
+  createdAt: Date;
+  completions: HabitCompletion[];
+  currentStreak: number;
+  longestStreak: number;
+}
+
+export interface HabitCompletion {
+  id: string;
+  habitId: string;
+  date: string; // YYYY-MM-DD format
+  completed: boolean;
+  value?: number; // for quantity or time tracking
+  completedAt: Date;
 }
 
 export interface SearchFilters {
