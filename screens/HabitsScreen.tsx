@@ -193,6 +193,16 @@ export default function HabitsScreen() {
     }
   };
 
+  // Get the currently visible dates based on scroll position
+  const getVisibleDates = () => {
+    const reversedDates = scrollableDates.slice().reverse();
+    const startIndex = Math.max(0, currentDateIndex);
+    const endIndex = Math.min(reversedDates.length, startIndex + 6);
+    return reversedDates.slice(startIndex, endIndex);
+  };
+
+  const visibleDates = getVisibleDates();
+
 
 
   if (loading) {
