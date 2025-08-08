@@ -7,6 +7,8 @@ import {
   StyleSheet,
   Animated,
   Alert,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Habit } from '@/types';
@@ -20,6 +22,8 @@ interface HabitCardProps {
 
 export default function HabitCard({ habit, onComplete, onDelete }: HabitCardProps) {
   const [scaleAnim] = useState(new Animated.Value(1));
+  const [showInputModal, setShowInputModal] = useState(false);
+  const [inputValue, setInputValue] = useState('');
   
   const today = new Date().toISOString().split('T')[0];
   const todayCompletion = habit.completions.find(c => c.date === today);
@@ -47,26 +51,19 @@ export default function HabitCard({ habit, onComplete, onDelete }: HabitCardProp
     if (habit.goalType === 'yes_no') {
       onComplete(habit.id, !isCompleted);
     } else {
-      // For quantity/time goals, show input dialog
-      Alert.prompt(
-        `Update ${habit.name}`,
-        `Enter ${habit.goalType === 'quantity' ? 'quantity' : 'minutes'}:`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Save',
-            onPress: (value) => {
-              const numValue = parseInt(value || '0', 10);
-              if (numValue >= 0) {
-                onComplete(habit.id, numValue > 0, numValue);
-              }
-            },
-          },
-        ],
-        'plain-text',
-        currentValue.toString()
-      );
+      // For quantity/time goals, show input modal
+      setInputValue(currentValue.toString());
+      setShowInputModal(true);
     }
+  };
+
+  const handleInputSave = () => {
+    const numValue = parseInt(inputValue || '0', 10);
+    if (numValue >= 0) {
+      onComplete(habit.id, numValue > 0, numValue);
+    }
+    setShowInputModal(false);
+    setInputValue('');
   };
 
   const getProgressPercentage = (): number => {
@@ -126,13 +123,14 @@ export default function HabitCard({ habit, onComplete, onDelete }: HabitCardProp
   };
 
   return (
-    <Animated.View style={[styles.container, { transform: [{ scale: scaleAnim }] }]}>
-      <TouchableOpacity
-        style={[styles.card, isCompleted && styles.completedCard]}
-        onPress={handleComplete}
-        onLongPress={handleLongPress}
-        activeOpacity={0.7}
-      >
+    <>
+      <Animated.View style={[styles.container, { transform: [{ scale: scaleAnim }] }]}>
+        <TouchableOpacity
+          style={[styles.card, isCompleted && styles.completedCard]}
+          onPress={handleComplete}
+          onLongPress={handleLongPress}
+          activeOpacity={0.7}
+        >
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.titleSection}>
@@ -167,6 +165,49 @@ export default function HabitCard({ habit, onComplete, onDelete }: HabitCardProp
         <Text style={styles.motivationalText}>{getMotivationalText()}</Text>
       </TouchableOpacity>
     </Animated.View>
+
+    {/* Input Modal */}
+    <Modal
+      visible={showInputModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowInputModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <Text style={styles.modalTitle}>Update {habit.name}</Text>
+          <Text style={styles.modalSubtitle}>
+            Enter {habit.goalType === 'quantity' ? 'quantity' : 'minutes'}:
+          </Text>
+          
+          <TextInput
+            style={styles.modalInput}
+            value={inputValue}
+            onChangeText={setInputValue}
+            keyboardType="numeric"
+            placeholder="0"
+            autoFocus
+          />
+          
+          <View style={styles.modalButtons}>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.cancelButton]}
+              onPress={() => setShowInputModal(false)}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.modalButton, styles.saveButton]}
+              onPress={handleInputSave}
+            >
+              <Text style={styles.saveButtonText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  </>
   );
 }
 
@@ -249,5 +290,66 @@ const styles = StyleSheet.create({
     color: '#059669',
     fontWeight: '500',
     textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 24,
+    width: '80%',
+    maxWidth: 300,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f3f4f6',
+  },
+  saveButton: {
+    backgroundColor: '#000000',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#ffffff',
   },
 });
