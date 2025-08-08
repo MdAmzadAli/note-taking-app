@@ -97,23 +97,28 @@ export default function NotesScreen() {
   useEffect(() => {
     console.log('[NOTES] Search filter effect triggered - query:', searchQuery, 'notes count:', notes.length);
 
-    if (searchQuery.trim()) {
-      const filtered = notes.filter(note => 
-        note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (note.title && note.title.toLowerCase().includes(searchQuery.toLowerCase()))
-      );
-      console.log('[NOTES] Filtered notes count:', filtered.length);
-      setFilteredNotes(filtered);
+    // Use setTimeout to prevent synchronous state updates during render
+    const timeoutId = setTimeout(() => {
+      if (searchQuery.trim()) {
+        const filtered = notes.filter(note => 
+          note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (note.title && note.title.toLowerCase().includes(searchQuery.toLowerCase()))
+        );
+        console.log('[NOTES] Filtered notes count:', filtered.length);
+        setFilteredNotes(filtered);
 
-      const filteredTemps = templates.filter(template =>
-        template.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredTemplates(filteredTemps);
-    } else {
-      console.log('[NOTES] No search query, showing all notes:', notes.length);
-      setFilteredNotes([...notes]); // Create a new array to ensure re-render
-      setFilteredTemplates([...templates]);
-    }
+        const filteredTemps = templates.filter(template =>
+          template.name.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        setFilteredTemplates(filteredTemps);
+      } else {
+        console.log('[NOTES] No search query, showing all notes:', notes.length);
+        setFilteredNotes([...notes]); // Create a new array to ensure re-render
+        setFilteredTemplates([...templates]);
+      }
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
   }, [searchQuery, notes, templates]);
 
   const loadNotes = async () => {
@@ -134,19 +139,22 @@ export default function NotesScreen() {
       const sortedNotes = simpleNotes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       console.log('[NOTES] Setting notes state with', sortedNotes.length, 'notes');
 
-      // Update both notes and filtered notes atomically
+      // Update notes state
       setNotes(sortedNotes);
 
-      // Only update filtered notes if there's no active search
-      if (!searchQuery.trim()) {
-        setFilteredNotes(sortedNotes);
-      } else {
-        // Re-apply search filter
-        const filtered = sortedNotes.filter(note => 
-          note.content.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-        setFilteredNotes(filtered);
-      }
+      // Use setTimeout to prevent synchronous state updates
+      setTimeout(() => {
+        // Only update filtered notes if there's no active search
+        if (!searchQuery.trim()) {
+          setFilteredNotes(sortedNotes);
+        } else {
+          // Re-apply search filter
+          const filtered = sortedNotes.filter(note => 
+            note.content.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+          setFilteredNotes(filtered);
+        }
+      }, 0);
 
       console.log('[NOTES] Notes state updated successfully');
     } catch (error) {
@@ -166,15 +174,18 @@ export default function NotesScreen() {
       
       setTemplates([...sortedTemplates]);
       
-      // Apply current search filter if exists
-      if (searchQuery.trim()) {
-        const filtered = sortedTemplates.filter(template =>
-          template.name.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-        setFilteredTemplates(filtered);
-      } else {
-        setFilteredTemplates([...sortedTemplates]);
-      }
+      // Use setTimeout to prevent synchronous state updates
+      setTimeout(() => {
+        // Apply current search filter if exists
+        if (searchQuery.trim()) {
+          const filtered = sortedTemplates.filter(template =>
+            template.name.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+          setFilteredTemplates(filtered);
+        } else {
+          setFilteredTemplates([...sortedTemplates]);
+        }
+      }, 0);
       
       console.log('[NOTES] Templates updated successfully');
     } catch (error) {
@@ -547,37 +558,36 @@ export default function NotesScreen() {
     // Subscribe to real-time events from other screens
     const unsubscribeNoteCreated = eventBus.subscribe(EVENTS.NOTE_CREATED, (newNote: Note) => {
       console.log('[NOTES] Real-time: Note created from external source');
-      // Ensure new notes created via voice are placed at the top
-      setNotes(prevNotes => [newNote, ...prevNotes]);
-      setFilteredNotes(prevNotes => [newNote, ...prevNotes]);
+      // Use setTimeout to prevent synchronous state updates
+      setTimeout(() => {
+        // Ensure new notes created via voice are placed at the top
+        setNotes(prevNotes => [newNote, ...prevNotes]);
+        setFilteredNotes(prevNotes => [newNote, ...prevNotes]);
+      }, 0);
     });
 
     const unsubscribeNoteUpdated = eventBus.subscribe(EVENTS.NOTE_UPDATED, (updatedNote: Note) => {
       console.log('[NOTES] Real-time: Note updated from external source');
-      setNotes(prevNotes => 
-        prevNotes.map(note => note.id === updatedNote.id ? updatedNote : note)
-      );
+      setTimeout(() => {
+        setNotes(prevNotes => 
+          prevNotes.map(note => note.id === updatedNote.id ? updatedNote : note)
+        );
+      }, 0);
     });
 
     // Subscribe to template events to refresh the templates menu
     const unsubscribeTemplateCreated = eventBus.subscribe(EVENTS.TEMPLATE_CREATED, (template: CustomTemplate) => {
       console.log('[NOTES] Real-time: Template created, reloading templates...');
-      loadTemplates();
-      
-      // Force re-render of filtered templates for search
-      const currentQuery = searchQuery;
-      setSearchQuery('');
-      setTimeout(() => setSearchQuery(currentQuery), 100);
+      setTimeout(() => {
+        loadTemplates();
+      }, 0);
     });
 
     const unsubscribeTemplateUpdated = eventBus.subscribe(EVENTS.TEMPLATE_UPDATED, (template: CustomTemplate) => {
       console.log('[NOTES] Real-time: Template updated, reloading templates...');
-      loadTemplates();
-      
-      // Force re-render of filtered templates for search
-      const currentQuery = searchQuery;
-      setSearchQuery('');
-      setTimeout(() => setSearchQuery(currentQuery), 100);
+      setTimeout(() => {
+        loadTemplates();
+      }, 0);
     });
 
     return () => {
