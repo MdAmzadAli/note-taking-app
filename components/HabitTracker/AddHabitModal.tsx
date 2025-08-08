@@ -263,15 +263,17 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
               <View style={styles.targetContainer}>
                 <Text style={styles.label}>Target</Text>
                 <TextInput
+                  key="target_input"
                   style={styles.numberInput}
                   value={target}
                   onChangeText={setTarget}
                   placeholder="e.g. 15"
                   placeholderTextColor="#666"
                   keyboardType="numeric"
-                  selection={undefined}
                   autoCorrect={false}
                   textAlign="center"
+                  selectTextOnFocus={false}
+                  blurOnSubmit={false}
                 />
               </View>
               <View style={styles.frequencyContainer}>
@@ -543,15 +545,17 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                       <View style={[styles.radio, frequencyType === 'every_n_days' && styles.radioSelected]} />
                       <Text style={styles.frequencyText}>Every</Text>
                       <TextInput
+                        key="every_n_days"
                         style={styles.numberInput}
                         value={frequencyInputs.every_n_days}
                         onChangeText={(text) => setFrequencyInputs(prev => ({ ...prev, every_n_days: text }))}
                         keyboardType="numeric"
                         placeholder="3"
                         onFocus={() => setFrequencyType('every_n_days')}
-                        selection={undefined}
                         autoCorrect={false}
                         textAlign="center"
+                        selectTextOnFocus={false}
+                        blurOnSubmit={false}
                       />
                       <Text style={styles.frequencyText}>days</Text>
                     </TouchableOpacity>
@@ -563,15 +567,17 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                     >
                       <View style={[styles.radio, frequencyType === 'times_per_week' && styles.radioSelected]} />
                       <TextInput
+                        key="times_per_week"
                         style={styles.numberInput}
                         value={frequencyInputs.times_per_week}
                         onChangeText={(text) => setFrequencyInputs(prev => ({ ...prev, times_per_week: text }))}
                         keyboardType="numeric"
                         placeholder="3"
                         onFocus={() => setFrequencyType('times_per_week')}
-                        selection={undefined}
                         autoCorrect={false}
                         textAlign="center"
+                        selectTextOnFocus={false}
+                        blurOnSubmit={false}
                       />
                       <Text style={styles.frequencyText}>times per week</Text>
                     </TouchableOpacity>
@@ -583,15 +589,17 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                     >
                       <View style={[styles.radio, frequencyType === 'times_per_month' && styles.radioSelected]} />
                       <TextInput
+                        key="times_per_month"
                         style={styles.numberInput}
                         value={frequencyInputs.times_per_month}
                         onChangeText={(text) => setFrequencyInputs(prev => ({ ...prev, times_per_month: text }))}
                         keyboardType="numeric"
                         placeholder="3"
                         onFocus={() => setFrequencyType('times_per_month')}
-                        selection={undefined}
                         autoCorrect={false}
                         textAlign="center"
+                        selectTextOnFocus={false}
+                        blurOnSubmit={false}
                       />
                       <Text style={styles.frequencyText}>times per month</Text>
                     </TouchableOpacity>
@@ -603,27 +611,31 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                     >
                       <View style={[styles.radio, frequencyType === 'times_in_days' && styles.radioSelected]} />
                       <TextInput
+                        key="times_in_days_1"
                         style={styles.numberInput}
                         value={frequencyInputs.times_in_days_1}
                         onChangeText={(text) => setFrequencyInputs(prev => ({ ...prev, times_in_days_1: text }))}
                         keyboardType="numeric"
                         placeholder="3"
                         onFocus={() => setFrequencyType('times_in_days')}
-                        selection={undefined}
                         autoCorrect={false}
                         textAlign="center"
+                        selectTextOnFocus={false}
+                        blurOnSubmit={false}
                       />
                       <Text style={styles.frequencyText}>times in</Text>
                       <TextInput
+                        key="times_in_days_2"
                         style={styles.numberInput}
                         value={frequencyInputs.times_in_days_2}
                         onChangeText={(text) => setFrequencyInputs(prev => ({ ...prev, times_in_days_2: text }))}
                         keyboardType="numeric"
                         placeholder="14"
                         onFocus={() => setFrequencyType('times_in_days')}
-                        selection={undefined}
                         autoCorrect={false}
                         textAlign="center"
+                        selectTextOnFocus={false}
+                        blurOnSubmit={false}
                       />
                       <Text style={styles.frequencyText}>days</Text>
                     </TouchableOpacity>
