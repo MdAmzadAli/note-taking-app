@@ -256,7 +256,7 @@ export default function HabitsScreen() {
                   }}
                 >
                   <Text style={styles.habitEmoji}>{habit.emoji}</Text>
-                  <Text style={styles.habitName}>{habit.name}</Text>
+                  <Text style={[styles.habitName, { color: habit.color || '#1a202c' }]}>{habit.name}</Text>
                 </TouchableOpacity>
 
                 <View style={styles.rightSection}>

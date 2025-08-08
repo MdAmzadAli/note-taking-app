@@ -276,7 +276,14 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                   <TextInput
                     style={styles.numberInput}
                     value={customValue1.toString()}
-                    onChangeText={(text) => setCustomValue1(parseInt(text) || 3)}
+                    onChangeText={(text) => {
+                      if (text === '') {
+                        setCustomValue1(0);
+                      } else {
+                        const num = parseInt(text) || 0;
+                        setCustomValue1(num);
+                      }
+                    }}
                     keyboardType="numeric"
                   />
                   <Text style={styles.frequencyText}>days</Text>
@@ -291,7 +298,14 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                   <TextInput
                     style={styles.numberInput}
                     value={customValue1.toString()}
-                    onChangeText={(text) => setCustomValue1(parseInt(text) || 3)}
+                    onChangeText={(text) => {
+                      if (text === '') {
+                        setCustomValue1(0);
+                      } else {
+                        const num = parseInt(text) || 0;
+                        setCustomValue1(num);
+                      }
+                    }}
                     keyboardType="numeric"
                   />
                   <Text style={styles.frequencyText}>times per week</Text>
@@ -306,7 +320,14 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                   <TextInput
                     style={styles.numberInput}
                     value={customValue1.toString()}
-                    onChangeText={(text) => setCustomValue1(parseInt(text) || 10)}
+                    onChangeText={(text) => {
+                      if (text === '') {
+                        setCustomValue1(0);
+                      } else {
+                        const num = parseInt(text) || 0;
+                        setCustomValue1(num);
+                      }
+                    }}
                     keyboardType="numeric"
                   />
                   <Text style={styles.frequencyText}>times per month</Text>
@@ -321,14 +342,28 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                   <TextInput
                     style={styles.numberInput}
                     value={customValue1.toString()}
-                    onChangeText={(text) => setCustomValue1(parseInt(text) || 3)}
+                    onChangeText={(text) => {
+                      if (text === '') {
+                        setCustomValue1(0);
+                      } else {
+                        const num = parseInt(text) || 0;
+                        setCustomValue1(num);
+                      }
+                    }}
                     keyboardType="numeric"
                   />
                   <Text style={styles.frequencyText}>times in</Text>
                   <TextInput
                     style={styles.numberInput}
                     value={customValue2.toString()}
-                    onChangeText={(text) => setCustomValue2(parseInt(text) || 14)}
+                    onChangeText={(text) => {
+                      if (text === '') {
+                        setCustomValue2(0);
+                      } else {
+                        const num = parseInt(text) || 0;
+                        setCustomValue2(num);
+                      }
+                    }}
                     keyboardType="numeric"
                   />
                   <Text style={styles.frequencyText}>days</Text>
@@ -338,7 +373,15 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
               <TouchableOpacity
                 style={styles.modalSaveButton}
                 onPress={() => {
-                  setFrequency(getFrequencyText());
+                  // Auto-select Every Day if any custom values are empty or 0
+                  if (frequencyType !== 'every_day' && 
+                      (customValue1 === 0 || 
+                       (frequencyType === 'times_in_days' && customValue2 === 0))) {
+                    setFrequencyType('every_day');
+                    setFrequency('Every day');
+                  } else {
+                    setFrequency(getFrequencyText());
+                  }
                   setShowFrequencyModal(false);
                 }}
               >
@@ -444,7 +487,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#fff',
     padding: 16,
   },
   row: {
@@ -469,11 +512,11 @@ const styles = StyleSheet.create({
   },
   textInput: {
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: '#ddd',
     paddingVertical: 12,
     paddingHorizontal: 0,
     fontSize: 16,
-    color: '#fff',
+    color: '#000',
   },
   notesInput: {
     minHeight: 80,
@@ -494,7 +537,7 @@ const styles = StyleSheet.create({
   },
   dropdownText: {
     fontSize: 16,
-    color: '#fff',
+    color: '#000',
   },
   dropdownArrow: {
     fontSize: 12,
@@ -536,7 +579,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   frequencyModal: {
-    backgroundColor: '#333',
+    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 20,
     width: width * 0.85,
@@ -563,18 +606,20 @@ const styles = StyleSheet.create({
     borderColor: '#4ECDC4',
   },
   frequencyText: {
-    color: '#fff',
+    color: '#000',
     fontSize: 16,
   },
   numberInput: {
-    backgroundColor: '#555',
-    color: '#fff',
+    backgroundColor: '#f0f0f0',
+    color: '#000',
     fontSize: 16,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 4,
     minWidth: 50,
     textAlign: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   modalSaveButton: {
     backgroundColor: '#4ECDC4',

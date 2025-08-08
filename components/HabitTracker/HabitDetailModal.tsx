@@ -55,7 +55,7 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
           </TouchableOpacity>
           <View style={styles.habitInfo}>
             <Text style={styles.habitEmoji}>{habit.emoji}</Text>
-            <Text style={styles.habitName}>{habit.name}</Text>
+            <Text style={[styles.habitName, { color: habit.color || '#1a202c' }]}>{habit.name}</Text>
             <Text style={styles.habitFrequency}>
               {habit.frequency === 'daily' ? 'Daily' : 
                habit.frequency === 'weekly' ? 'Weekly' :
