@@ -583,6 +583,9 @@ export default function NotesScreen() {
         onBack={() => {
           setCurrentView('notes');
           setSelectedTemplateId(null);
+          // Restore the menu state to where the user was before opening the template
+          setIsMenuVisible(true);
+          openMenu();
         }}
       />
     );
