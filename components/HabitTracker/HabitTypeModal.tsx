@@ -65,7 +65,7 @@ export default function HabitTypeModal({ visible, onClose, onSelectType }: Habit
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
