@@ -19,7 +19,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSection } from '@/types';
-import { saveNote, saveTemplate, getNotes, getTemplates, deleteNote, updateNote, getUserSettings, UserSettings } from '@/utils/storage';
+import { saveNote, saveTemplate, getNotes, getTemplates, deleteNote, updateNote, getUserSettings, UserSettings, saveCustomTemplate } from '@/utils/storage';
 import TemplateEntriesScreen from './TemplateEntriesScreen';
 import { eventBus, EVENTS } from '@/utils/eventBus';
 
@@ -49,8 +49,14 @@ export default function NotesScreen() {
   const [templateValues, setTemplateValues] = useState<Record<string, string>>({});
   const [isFillingTemplate, setIsFillingTemplate] = useState(false);
   const [isMenuVisible, setIsMenuVisible] = useState(false);
-  const [currentView, setCurrentView] = useState<'notes' | 'template'>('notes');
+  const [currentView, setCurrentView] = useState<'notes' | 'template' | 'create-template'>('notes');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateDescription, setTemplateDescription] = useState('');
+  const [templateFields, setTemplateFields] = useState<FieldType[]>([]);
+  const [newFieldName, setNewFieldName] = useState('');
+  const [newFieldType, setNewFieldType] = useState<'text' | 'longtext' | 'number'>('text');
   const [settings, setSettings] = useState<UserSettings>({
     voiceLanguage: 'en-US',
     voiceRecognitionMethod: 'assemblyai-regex',
@@ -168,6 +174,65 @@ export default function NotesScreen() {
     if (style !== selectedWritingStyle) {
       setNoteSections([]);
       setCheckedItems([]);
+    }
+  };
+
+  const addTemplateField = () => {
+    if (!newFieldName.trim()) {
+      Alert.alert('Error', 'Please enter a field name');
+      return;
+    }
+
+    const newField: FieldType = {
+      id: Date.now().toString(),
+      label: newFieldName.trim(),
+      type: newFieldType,
+      required: false,
+    };
+
+    setTemplateFields([...templateFields, newField]);
+    setNewFieldName('');
+  };
+
+  const removeTemplateField = (fieldId: string) => {
+    setTemplateFields(templateFields.filter(f => f.id !== fieldId));
+  };
+
+  const saveTemplate = async () => {
+    if (!templateName.trim()) {
+      Alert.alert('Error', 'Please enter a template name');
+      return;
+    }
+
+    if (templateFields.length === 0) {
+      Alert.alert('Error', 'Please add at least one field');
+      return;
+    }
+
+    try {
+      const template: CustomTemplate = {
+        id: Date.now().toString(),
+        name: templateName.trim(),
+        description: templateDescription.trim(),
+        fields: templateFields,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await saveCustomTemplate(template);
+      await loadTemplates();
+
+      // Reset form
+      setTemplateName('');
+      setTemplateDescription('');
+      setTemplateFields([]);
+      setNewFieldName('');
+      setCurrentView('notes');
+      
+      Alert.alert('Success', 'Template created successfully!');
+    } catch (error) {
+      console.error('Error saving template:', error);
+      Alert.alert('Error', 'Failed to save template');
     }
   };
 
@@ -491,6 +556,113 @@ export default function NotesScreen() {
     );
   }
 
+  if (currentView === 'create-template') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>New Template</Text>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity style={styles.iconButton} onPress={saveTemplate}>
+              <Text style={styles.iconButtonText}>Save</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => {
+                setCurrentView('notes');
+                setTemplateName('');
+                setTemplateDescription('');
+                setTemplateFields([]);
+                setNewFieldName('');
+              }}
+            >
+              <Text style={styles.iconButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <ScrollView style={styles.editorContainer} contentContainerStyle={styles.templateFormContainer}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.fieldLabel}>Template Name *</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={templateName}
+              onChangeText={setTemplateName}
+              placeholder="Enter template name"
+              placeholderTextColor="#6B7280"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.fieldLabel}>Description</Text>
+            <TextInput
+              style={[styles.fieldInput, styles.longTextInput]}
+              value={templateDescription}
+              onChangeText={setTemplateDescription}
+              placeholder="Enter template description (optional)"
+              placeholderTextColor="#6B7280"
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+
+          <View style={styles.fieldsSection}>
+            <Text style={styles.sectionTitle}>Fields</Text>
+
+            <View style={styles.addFieldContainer}>
+              <TextInput
+                style={styles.fieldInput}
+                value={newFieldName}
+                onChangeText={setNewFieldName}
+                placeholder="Field name"
+                placeholderTextColor="#6B7280"
+              />
+              <View style={styles.fieldTypeContainer}>
+                {(['text', 'longtext', 'number'] as const).map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    style={[
+                      styles.typeButton,
+                      newFieldType === type && styles.typeButtonActive,
+                    ]}
+                    onPress={() => setNewFieldType(type)}
+                  >
+                    <Text style={[
+                      styles.typeButtonText,
+                      newFieldType === type && styles.typeButtonTextActive,
+                    ]}>
+                      {type}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TouchableOpacity style={styles.addFieldButton} onPress={addTemplateField}>
+                <Text style={styles.addFieldButtonText}>Add Field</Text>
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={templateFields}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.fieldItem}>
+                  <View style={styles.fieldInfo}>
+                    <Text style={styles.fieldName}>{item.label}</Text>
+                    <Text style={styles.fieldType}>{item.type}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => removeTemplateField(item.id)}>
+                    <Text style={styles.removeFieldText}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              style={styles.fieldsList}
+              scrollEnabled={false}
+            />
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   if (isFillingTemplate && selectedTemplate) {
     return (
       <SafeAreaView style={styles.container}>
@@ -661,6 +833,17 @@ export default function NotesScreen() {
                     style={styles.menuList}
                   />
                 )}
+                <View style={styles.menuFooter}>
+                  <TouchableOpacity
+                    style={styles.newTemplateButton}
+                    onPress={() => {
+                      setCurrentView('create-template');
+                      closeMenu();
+                    }}
+                  >
+                    <Text style={styles.newTemplateButtonText}>+ New Template</Text>
+                  </TouchableOpacity>
+                </View>
               </Animated.View>
             </TouchableWithoutFeedback>
           </View>
@@ -994,6 +1177,127 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     color: '#000000',
     marginBottom: 16,
+  },
+  menuFooter: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  newTemplateButton: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  newTemplateButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+    fontSize: 14,
+    fontFamily: 'Inter',
+  },
+  templateFormContainer: {
+    padding: 16,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  fieldsSection: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000000',
+    fontFamily: 'Inter',
+    marginBottom: 16,
+  },
+  addFieldContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  fieldTypeContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  typeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  typeButtonActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  typeButtonText: {
+    fontSize: 13,
+    color: '#000000',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  typeButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  addFieldButton: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  addFieldButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+    fontSize: 13,
+    fontFamily: 'Inter',
+  },
+  fieldsList: {
+    maxHeight: 300,
+  },
+  fieldItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  fieldInfo: {
+    flex: 1,
+  },
+  fieldName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000000',
+    fontFamily: 'Inter',
+  },
+  fieldType: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontFamily: 'Inter',
+    marginTop: 2,
+  },
+  removeFieldText: {
+    fontSize: 13,
+    color: '#000000',
+    fontFamily: 'Inter',
+    fontWeight: '500',
   },
 
 });
