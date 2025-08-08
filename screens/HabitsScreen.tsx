@@ -312,24 +312,9 @@ export default function HabitsScreen() {
                             if (habit.goalType === 'yes_no') {
                               handleHabitComplete(habit.id, dateStr, !isCompleted);
                             } else {
-                              Alert.prompt(
-                                `Update ${habit.name}`,
-                                `Enter ${habit.goalType === 'quantity' ? 'quantity' : 'minutes'}:`,
-                                [
-                                  { text: 'Cancel', style: 'cancel' },
-                                  {
-                                    text: 'Save',
-                                    onPress: (text) => {
-                                      const numValue = parseInt(text || '0', 10);
-                                      if (numValue >= 0) {
-                                        handleHabitComplete(habit.id, dateStr, numValue > 0, numValue);
-                                      }
-                                    },
-                                  },
-                                ],
-                                'plain-text',
-                                value === '✓' || value === '✗' ? '' : value
-                              );
+                              // Show modal for editing measurable habits
+                              setSelectedHabit({ ...habit, selectedDate: dateStr }); // Pass date to modal
+                              setShowDetailModal(true);
                             }
                           }}
                         >
@@ -350,7 +335,7 @@ export default function HabitsScreen() {
                             </Text>
                             {habit.goalType !== 'yes_no' && (
                               <Text style={[styles.unitText, isToday && styles.todayUnitText]}>
-                                {habit.goalType === 'time' ? 'min' : habit.goalType === 'quantity' ? 'qty' : ''}
+                                {habit.goalType === 'time' ? 'min' : habit.unit || ''}
                               </Text>
                             )}
                           </View>
@@ -388,6 +373,9 @@ export default function HabitsScreen() {
         onClose={() => {
           setShowDetailModal(false);
           setSelectedHabit(null);
+        }}
+        onSaveValue={async (habitId, date, newValue) => {
+          await handleHabitComplete(habitId, date, newValue > 0, newValue);
         }}
       />
     </SafeAreaView>
