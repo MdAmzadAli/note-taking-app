@@ -84,11 +84,11 @@ const styles = StyleSheet.create({
     gap: 24,
   },
   typeCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 16,
     padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -98,6 +98,7 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
     backdropFilter: 'blur(20px)',
+    overflow: 'hidden',
   },
   cardContent: {
     flexDirection: 'row',
