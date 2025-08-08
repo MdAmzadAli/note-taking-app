@@ -363,14 +363,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#000000',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: '#333333',
   },
   navTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1a202c',
+    color: '#ffffff',
   },
   addButton: {
     width: 36,
