@@ -205,22 +205,24 @@ export default function HabitsScreen() {
 
       {/* Main Content */}
       <View style={styles.mainContent}>
-        {/* Date Section */}
-        <View style={styles.dateSection}>
-          <View style={styles.leftSection}>
-            {/* Empty space for habit names alignment */}
+        {/* Date Section - Only show when habits exist */}
+        {habits.length > 0 && (
+          <View style={styles.dateSection}>
+            <View style={styles.leftSection}>
+              {/* Empty space for habit names alignment */}
+            </View>
+            <View style={styles.rightSection}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScroll}>
+                {scrollableDates.map((date, index) => (
+                  <View key={index} style={styles.dateColumn}>
+                    <Text style={styles.dayText}>{formatDay(date)}</Text>
+                    <Text style={styles.dateText}>{formatDate(date)}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
           </View>
-          <View style={styles.rightSection}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScroll}>
-              {scrollableDates.map((date, index) => (
-                <View key={index} style={styles.dateColumn}>
-                  <Text style={styles.dayText}>{formatDay(date)}</Text>
-                  <Text style={styles.dateText}>{formatDate(date)}</Text>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
+        )}
 
         {/* Habits Section */}
         <ScrollView style={styles.habitsContainer} showsVerticalScrollIndicator={false}>
