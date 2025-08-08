@@ -2,15 +2,16 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  SafeAreaView,
-  Modal,
+  StyleSheet,
+  Alert,
+  ScrollView,
   Switch,
   Platform,
-  Dimensions,
-  Alert,
+  SafeAreaView,
+  TextInput,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { getUserSettings, saveUserSettings, UserSettings } from '@/utils/storage';
 import { clearAllData } from '@/utils/storage';
@@ -20,7 +21,6 @@ import VoiceCommandsScreen from './VoiceCommandsScreen';
 import AlarmRingtoneScreen from './AlarmRingtoneScreen';
 import * as DocumentPicker from 'expo-document-picker';
 import { Audio } from 'expo-av';
-import CommonHeader from '@/components/CommonHeader';
 
 interface SettingsScreenProps {
   onBack?: () => void;
@@ -312,7 +312,14 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <CommonHeader title="Settings" />
+      <View style={styles.header}>
+        {onBack && (
+          <TouchableOpacity style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backButtonText}>← Back</Text>
+          </TouchableOpacity>
+        )}
+        <Text style={styles.headerTitle}>Settings</Text>
+      </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* API Configuration Status */}
@@ -362,8 +369,8 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
             <View style={styles.settingInfo}>
               <Text style={styles.settingName}>AI-Enhanced Processing</Text>
               <Text style={styles.settingDescription}>
-                {settings.voiceRecognitionMethod === 'assemblyai-gemini' ?
-                  'AssemblyAI + Gemini AI (Smart command understanding)' :
+                {settings.voiceRecognitionMethod === 'assemblyai-gemini' ? 
+                  'AssemblyAI + Gemini AI (Smart command understanding)' : 
                   'AssemblyAI + Regex (Fast pattern matching - Default)'
                 }
               </Text>
@@ -384,8 +391,8 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
                   );
                   return;
                 }
-                updateSettings({
-                  voiceRecognitionMethod: value ? 'assemblyai-gemini' : 'assemblyai-regex' as VoiceRecognitionMethod
+                updateSettings({ 
+                  voiceRecognitionMethod: value ? 'assemblyai-gemini' : 'assemblyai-regex' as VoiceRecognitionMethod 
                 });
               }}
               trackColor={{
@@ -480,7 +487,7 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
         {/* Alarm Manager Setting */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Alarm</Text>
-          <TouchableOpacity
+          <TouchableOpacity 
             style={styles.helpButton}
             onPress={() => setShowAlarmManager(true)}
           >
@@ -492,7 +499,7 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Help & Information</Text>
 
-          <TouchableOpacity
+          <TouchableOpacity 
             style={styles.helpButton}
             onPress={() => setShowVoiceCommands(true)}
           >
@@ -613,7 +620,7 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
               </View>
             </View>
 
-
+            
           </View>
         </SafeAreaView>
       </Modal>
@@ -628,7 +635,33 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  // Removed old header styles
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    backgroundColor: '#000000',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  backButton: {
+    padding: 8,
+  },
+  backButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Inter',
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontFamily: 'Inter',
+    textAlign: 'center',
+    marginRight: 60,
+  },
   content: {
     flex: 1,
     paddingHorizontal: 16,

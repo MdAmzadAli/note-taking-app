@@ -25,7 +25,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 import SearchResultsModal from '@/components/SearchResultsModal';
-import CommonHeader from '@/components/CommonHeader';
 
 export default function TasksScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -137,7 +136,7 @@ export default function TasksScreen() {
         // Search in title and description
         const titleMatch = task.title.toLowerCase().includes(query);
         const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
-
+        
         // Search in dates - check if query matches month or day names
         const taskDate = new Date(task.scheduledDate || task.createdAt);
         const monthName = taskDate.toLocaleDateString('en-US', { month: 'long' }).toLowerCase();
@@ -146,14 +145,14 @@ export default function TasksScreen() {
         const shortDayName = taskDate.toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
         const fullDate = taskDate.toLocaleDateString().toLowerCase();
         const yearString = taskDate.getFullYear().toString();
-
+        
         const dateMatch = monthName.includes(query) || 
                          shortMonthName.includes(query) ||
                          dayName.includes(query) ||
                          shortDayName.includes(query) ||
                          fullDate.includes(query) ||
                          yearString.includes(query);
-
+        
         return titleMatch || descriptionMatch || dateMatch;
       });
     }
@@ -258,20 +257,20 @@ export default function TasksScreen() {
       { title: "Fix kitchen sink leak", description: "Call plumber to repair the dripping faucet", completed: true },
       { title: "Submit expense reports", description: "File Q1 business expense reports with accounting", completed: true },
       { title: "Learn new programming language", description: "Start Python course on online learning platform", completed: false },
-
+      
       // August-specific tasks for testing search
       { title: "August vacation planning", description: "Plan summer vacation for August holidays", completed: true },
       { title: "Back to school shopping", description: "Buy school supplies for August school start", completed: false },
       { title: "August birthday party", description: "Organize birthday celebration in August", completed: true },
       { title: "Summer heat maintenance", description: "Service air conditioning for August heat wave", completed: true },
       { title: "August report submission", description: "Submit monthly reports due in August", completed: false },
-
+      
       // Tasks with old dates (for 60-day deletion testing)
       { title: "Old task from 70 days ago", description: "This task should be auto-deleted", completed: true, isOldTask: true, daysAgo: 70 },
       { title: "Old task from 80 days ago", description: "This task should also be auto-deleted", completed: true, isOldTask: true, daysAgo: 80 },
       { title: "Old task from 90 days ago", description: "Very old completed task", completed: true, isOldTask: true, daysAgo: 90 },
       { title: "Old task from 100 days ago", description: "Extremely old completed task", completed: true, isOldTask: true, daysAgo: 100 },
-
+      
       // Regular remaining tasks
       { title: "Organize photo albums", description: "Sort through vacation photos and create digital albums", completed: true },
       { title: "Research vacation destinations", description: "Look into summer vacation options for the family", completed: true },
@@ -300,7 +299,7 @@ export default function TasksScreen() {
 
     sampleTaskData.forEach((data, index) => {
       let randomDate = new Date(now);
-
+      
       // Handle special cases for testing
       if ((data as any).isOldTask) {
         // Create old tasks for deletion testing
@@ -895,7 +894,7 @@ export default function TasksScreen() {
   const getTaskStats = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
+    
     // Start with all history tasks (completed and overdue)
     let historyTasks = tasks.filter(task => {
       const taskDate = new Date(task.scheduledDate || task.createdAt);
@@ -910,7 +909,7 @@ export default function TasksScreen() {
       fromTime.setHours(0, 0, 0, 0);
       const toTime = new Date(toDate);
       toTime.setHours(23, 59, 59, 999);
-
+      
       historyTasks = historyTasks.filter(task => {
         const taskDate = new Date(task.createdAt);
         return taskDate >= fromTime && taskDate <= toTime;
@@ -925,7 +924,7 @@ export default function TasksScreen() {
       const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
       return taskDay < today && !task.isCompleted;
     });
-
+    
     const completionRate = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;
 
     // Apply history filter for display
@@ -1213,7 +1212,7 @@ export default function TasksScreen() {
           // Search in title and description
           const titleMatch = task.title.toLowerCase().includes(query);
           const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
-
+          
           // Search in dates
           const taskDate = new Date(task.createdAt);
           const monthName = taskDate.toLocaleDateString('en-US', { month: 'long' }).toLowerCase();
@@ -1222,14 +1221,14 @@ export default function TasksScreen() {
           const shortDayName = taskDate.toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
           const fullDate = taskDate.toLocaleDateString().toLowerCase();
           const yearString = taskDate.getFullYear().toString();
-
+          
           const dateMatch = monthName.includes(query) || 
                            shortMonthName.includes(query) ||
                            dayName.includes(query) ||
                            shortDayName.includes(query) ||
                            fullDate.includes(query) ||
                            yearString.includes(query);
-
+          
           return titleMatch || descriptionMatch || dateMatch;
         });
         if (filteredTasks.length > 0) {
@@ -1313,7 +1312,7 @@ export default function TasksScreen() {
               All
             </Text>
           </TouchableOpacity>
-
+          
           <TouchableOpacity
             style={[
               styles.historyFilterButton,
@@ -1328,7 +1327,7 @@ export default function TasksScreen() {
               Completed
             </Text>
           </TouchableOpacity>
-
+          
           <TouchableOpacity
             style={[
               styles.historyFilterButton,
@@ -1416,33 +1415,33 @@ export default function TasksScreen() {
   if (isCreating || isEditing) {
     return (
       <SafeAreaView style={styles.container}>
-        <CommonHeader
-          title={isEditing ? 'Edit Task' : 'New Task'}
-          rightContent={
-            <View style={styles.headerButtons}>
-              <TouchableOpacity
-                style={styles.saveButton}
-                onPress={isEditing ? updateTask : createTask}
-              >
-                <Text style={styles.saveButtonText}>Save</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => {
-                  setIsCreating(false);
-                  setIsEditing(false);
-                  setEditingTask(null);
-                  setNewTitle('');
-                  setNewDescription('');
-                  setSelectedDate(getTomorrowDate());
-                  setHasReminder(false);
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          }
-        />
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>
+            {isEditing ? 'Edit Task' : 'New Task'}
+          </Text>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={isEditing ? updateTask : createTask}
+            >
+              <Text style={styles.saveButtonText}>Save</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => {
+                setIsCreating(false);
+                setIsEditing(false);
+                setEditingTask(null);
+                setNewTitle('');
+                setNewDescription('');
+                setSelectedDate(getTomorrowDate());
+                setHasReminder(false);
+              }}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <View style={styles.formContainer}>
           <View style={styles.inputGroup}>
@@ -1532,26 +1531,37 @@ export default function TasksScreen() {
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      <CommonHeader
-        title="Tasks"
-        rightContent={
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={styles.searchButton}
-              onPress={() => setIsSearchVisible(!isSearchVisible)}
-            >
-              <IconSymbol size={20} name="magnifyingglass" color="#FFFFFF" />
-            </TouchableOpacity>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Tasks</Text>
+        {showTopCelebration && (
+          <Animated.View 
+            style={[
+              styles.topCelebration,
+              {
+                transform: [{ scale: celebrationScale }],
+                opacity: celebrationOpacity,
+              }
+            ]}
+          >
+            <Text style={styles.topCelebrationEmoji}>🎉</Text>
+          </Animated.View>
+        )}
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.searchButton}
+            onPress={() => setIsSearchVisible(!isSearchVisible)}
+          >
+            <IconSymbol size={20} name="magnifyingglass" color="#FFFFFF" />
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => setIsCreating(true)}
-            >
-              <Text style={styles.addButtonText}>New Task</Text>
-            </TouchableOpacity>
-          </View>
-        }
-      />
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setIsCreating(true)}
+          >
+            <Text style={styles.addButtonText}>New Task</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {isSearchVisible && (
         <View style={styles.searchContainer}>
@@ -1566,27 +1576,13 @@ export default function TasksScreen() {
       )}
 
       {/* Tabs */}
-      <View style={[styles.tabsContainer, { paddingVertical: 12 }]}>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'active' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('active')}
-        >
-          <Text style={[styles.tabButtonText, activeTab === 'active' && styles.tabButtonTextActive]}>
-            Active
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'completed' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('completed')}
-        >
-          <Text style={[styles.tabButtonText, activeTab === 'completed' && styles.tabButtonTextActive]}>
-            History
-          </Text>
-        </TouchableOpacity>
+      <View style={styles.tabsContainer}>
+        {renderTabButton('active', 'Active')}
+        {renderTabButton('completed', 'History')}
       </View>
 
       {activeTab === 'active' && (
-        <View style={[styles.filtersContainer, { paddingVertical: 12 }]}>
+        <View style={styles.filtersContainer}>
           {renderFilterButton('all', 'All')}
           {renderFilterButton('today', 'Today')}
           {renderFilterButton('tomorrow', 'Tomorrow')}
@@ -1639,7 +1635,7 @@ export default function TasksScreen() {
                 <Text style={styles.modalCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
-
+            
             <View style={styles.dateInputContainer}>
               <View style={styles.dateInputGroup}>
                 <Text style={styles.dateLabel}>From Date</Text>
@@ -1652,7 +1648,7 @@ export default function TasksScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
-
+              
               <View style={styles.dateInputGroup}>
                 <Text style={styles.dateLabel}>To Date</Text>
                 <TouchableOpacity
@@ -1665,7 +1661,7 @@ export default function TasksScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-
+            
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.modalButtonSecondary}
@@ -1727,11 +1723,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    paddingTop: Platform.OS === 'ios' ? 56 : 36,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     backgroundColor: '#000000',
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
-    height: Platform.OS === 'ios' ? 100 : 80,
   },
   headerTitle: {
     fontSize: 20,
@@ -1822,6 +1817,7 @@ const styles = StyleSheet.create({
   tabsContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
@@ -1854,6 +1850,7 @@ const styles = StyleSheet.create({
   filtersContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
@@ -2430,6 +2427,7 @@ const styles = StyleSheet.create({
   historyFiltersContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#F9FAFB',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',

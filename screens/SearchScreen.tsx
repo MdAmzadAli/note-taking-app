@@ -15,7 +15,6 @@ import { searchContent } from '@/utils/search';
 import { PROFESSIONS, ProfessionType } from '@/constants/professions';
 import VoiceInput from '@/components/VoiceInput';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import CommonHeader from '@/components/CommonHeader';
 
 export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,7 +25,7 @@ export default function SearchScreen() {
     searchIntent: 'general'
   });
   const [isLoading, setIsLoading] = useState(false);
-
+  
   const [isVoiceSearch, setIsVoiceSearch] = useState(false);
   const [showResults, setShowResults] = useState(false);
 
@@ -179,7 +178,7 @@ export default function SearchScreen() {
 
   const renderSearchResult = ({ item }: { item: any }) => {
     console.log('[SEARCH_RENDER] Rendering item:', item);
-
+    
     return (
       <TouchableOpacity style={styles.resultItem}>
         <View style={styles.resultHeader}>
@@ -249,7 +248,16 @@ export default function SearchScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <CommonHeader title="Search" showBackButton={false} />
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Search</Text>
+        <View style={styles.headerActions}>
+          <VoiceInput
+            onCommandExecuted={handleVoiceCommand}
+            onSearchRequested={handleVoiceSearchRequested}
+            style={styles.voiceInputButton}
+          />
+        </View>
+      </View>
 
       <View style={styles.searchContainer}>
         <TextInput
@@ -301,7 +309,7 @@ export default function SearchScreen() {
                 }}
                 renderItem={({ item, index }) => {
                   console.log('[SEARCH_RENDER] Rendering item at index', index, ':', item.type, item.title?.substring(0, 30));
-
+                  
                   if (item.type === 'header') {
                     return (
                       <View style={styles.sectionHeader}>
@@ -350,11 +358,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    paddingTop: Platform.OS === 'ios' ? 56 : 36,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     backgroundColor: '#000000',
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
-    height: Platform.OS === 'ios' ? 100 : 80,
   },
   headerTitle: {
     fontSize: 20,

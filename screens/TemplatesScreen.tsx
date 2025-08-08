@@ -2,22 +2,21 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
-  ScrollView,
+  TextInput,
   TouchableOpacity,
+  FlatList,
+  StyleSheet,
+  Alert,
   SafeAreaView,
   Modal,
-  TextInput,
-  Alert,
+  ScrollView,
   Platform,
-  FlatList,
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import VoiceInput from '@/components/VoiceInput';
 import { CustomTemplate, FieldType } from '@/types';
 import { getCustomTemplates, saveCustomTemplate, deleteCustomTemplate, getUserSettings } from '@/utils/storage';
 import { eventBus, EVENTS } from '@/utils/eventBus';
-import CommonHeader from '@/components/CommonHeader';
 
 
 export default function TemplatesScreen() {
@@ -67,11 +66,11 @@ export default function TemplatesScreen() {
       console.log('[TEMPLATES] Loading templates from storage...');
       const templatesData = await getCustomTemplates();
       console.log('[TEMPLATES] Retrieved templates from storage:', templatesData.length);
-
+      
       // Sort templates by creation date, newest first
       const sortedTemplates = templatesData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       console.log('[TEMPLATES] Setting templates state with', sortedTemplates.length, 'templates');
-
+      
       // Force state update with new array reference
       setTemplates([...sortedTemplates]);
       console.log('[TEMPLATES] Templates state updated successfully');
@@ -240,19 +239,19 @@ export default function TemplatesScreen() {
     setShowSearchModal(true);
   };
 
-  // Mock function for openCreateTemplateModal, replace with actual implementation if needed
-  const openCreateTemplateModal = () => {
-    setIsCreating(true);
-  };
-
   if (isCreating || isEditing) {
     return (
       <SafeAreaView style={styles.container}>
-        <CommonHeader
-          title={isEditing ? 'Edit Template' : 'New Template'}
-          leftContent={
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>
+            {isEditing ? 'Edit Template' : 'New Template'}
+          </Text>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity style={styles.saveButton} onPress={saveTemplate}>
+              <Text style={styles.saveButtonText}>Save</Text>
+            </TouchableOpacity>
             <TouchableOpacity
-              style={styles.backButton}
+              style={styles.cancelButton}
               onPress={() => {
                 setIsCreating(false);
                 setIsEditing(false);
@@ -261,17 +260,11 @@ export default function TemplatesScreen() {
                 setTemplateDescription('');
                 setFields([]);
               }}
-              accessibilityLabel="Go back"
             >
-              <IconSymbol name="chevron.left" size={24} color="#FFFFFF" />
+              <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
-          }
-          rightContent={
-            <TouchableOpacity style={styles.saveButton} onPress={saveTemplate}>
-              <Text style={styles.saveButtonText}>Save</Text>
-            </TouchableOpacity>
-          }
-        />
+          </View>
+        </View>
 
         <ScrollView style={styles.formContainer} contentContainerStyle={styles.formContent}>
           <View style={styles.inputGroup}>
@@ -348,25 +341,23 @@ export default function TemplatesScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <CommonHeader
-        title="Templates"
-        rightContent={
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={styles.searchButton}
-              onPress={() => setIsSearchVisible(!isSearchVisible)}
-            >
-              <IconSymbol size={20} name="magnifyingglass" color="#FFFFFF" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => setIsCreating(true)}
-            >
-              <Text style={styles.addButtonText}>New Template</Text>
-            </TouchableOpacity>
-          </View>
-        }
-      />
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Templates</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.searchButton}
+            onPress={() => setIsSearchVisible(!isSearchVisible)}
+          >
+            <IconSymbol size={20} name="magnifyingglass" color="#FFFFFF" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setIsCreating(true)}
+          >
+            <Text style={styles.addButtonText}>New Template</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {isSearchVisible && (
         <View style={styles.searchContainer}>
@@ -394,7 +385,7 @@ export default function TemplatesScreen() {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>
-              {searchQuery.trim()
+              {searchQuery.trim() 
                 ? 'No templates found for your search.'
                 : 'No templates yet. Tap "New Template" to create your first template.'
               }
@@ -413,19 +404,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  header: { // This style is now redundant due to CommonHeader
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    paddingTop: Platform.OS === 'ios' ? 56 : 36,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     backgroundColor: '#000000',
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
-    height: Platform.OS === 'ios' ? 100 : 80,
   },
-  headerTitle: { // This style is now redundant due to CommonHeader
+  headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#FFFFFF',
@@ -435,7 +425,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  headerButtons: { // This style is now redundant due to CommonHeader's rightContent structure
+  headerButtons: {
     flexDirection: 'row',
     gap: 8,
   },
@@ -469,7 +459,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   saveButton: {
-    backgroundColor: '#FFFFFF', // Changed to white for contrast with black header
+    backgroundColor: '#000000',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
@@ -478,7 +468,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   saveButtonText: {
-    color: '#000000', // Changed to black for contrast
+    color: '#FFFFFF',
     fontWeight: '500',
     fontSize: 13,
     fontFamily: 'Inter',
@@ -501,7 +491,7 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 12,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
@@ -725,24 +715,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'Inter',
     lineHeight: 25.6,
-  },
-  backButton: { // Added style for the back button in CommonHeader
-    padding: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconButton: { // Added style for icon buttons if needed in CommonHeader
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 8,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconButtonText: { // Added style for icon button text
-    fontSize: 24,
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontFamily: 'Inter',
   },
 });

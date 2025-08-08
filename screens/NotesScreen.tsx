@@ -2,18 +2,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
-  ScrollView,
+  TextInput,
   TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  Alert,
+  FlatList,
   SafeAreaView,
   Modal,
-  TextInput,
-  Alert,
-  Dimensions,
-  Platform,
   Animated,
+  Dimensions,
   TouchableWithoutFeedback,
-  FlatList,
+  Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -25,7 +25,6 @@ import { eventBus, EVENTS } from '@/utils/eventBus';
 
 import WritingStyleSelector from '@/components/WritingStyleSelector';
 import WritingStyleEditor from '@/components/WritingStyleEditor';
-import CommonHeader from '@/components/CommonHeader';
 
 interface SimpleNote {
   id: string;
@@ -73,10 +72,6 @@ export default function NotesScreen() {
   const [checkedItems, setCheckedItems] = useState<boolean[]>([]);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
   const [currentNoteTitle, setCurrentNoteTitle] = useState('');
-
-  // Dummy functions for compilation, these should be replaced with actual implementations
-  const [isSearchModalVisible, setIsSearchModalVisible] = useState(false);
-  const openCreateNoteModal = () => setIsCreating(true);
 
   useEffect(() => {
     loadNotes();
@@ -499,26 +494,24 @@ export default function NotesScreen() {
   if (isFillingTemplate && selectedTemplate) {
     return (
       <SafeAreaView style={styles.container}>
-        <CommonHeader
-          title={`Fill ${selectedTemplate.name}`}
-          rightContent={
-            <View style={styles.headerButtons}>
-              <TouchableOpacity style={styles.iconButton} onPress={saveTemplateEntryHandler}>
-                <Text style={styles.iconButtonText}>Save</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.iconButton}
-                onPress={() => {
-                  setIsFillingTemplate(false);
-                  setSelectedTemplate(null);
-                  setTemplateValues({});
-                }}
-              >
-                <Text style={styles.iconButtonText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          }
-        />
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Fill {selectedTemplate.name}</Text>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity style={styles.iconButton} onPress={saveTemplateEntryHandler}>
+              <Text style={styles.iconButtonText}>Save</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => {
+                setIsFillingTemplate(false);
+                setSelectedTemplate(null);
+                setTemplateValues({});
+              }}
+            >
+              <Text style={styles.iconButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <ScrollView style={styles.editorContainer} contentContainerStyle={styles.templateContentContainer}>
           {selectedTemplate.fields.map(field => renderTemplateField(field))}
@@ -530,31 +523,29 @@ export default function NotesScreen() {
   if (isCreating) {
     return (
       <SafeAreaView style={styles.container}>
-        <CommonHeader
-          title={isEditing ? 'Edit Note' : 'New Note'}
-          rightContent={
-            <View style={styles.headerButtons}>
-              <TouchableOpacity style={styles.iconButton} onPress={saveCurrentNote}>
-                <Text style={styles.iconButtonText}>Save</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.iconButton}
-                onPress={() => {
-                  setIsCreating(false);
-                  setIsEditing(false);
-                  setEditingNoteId(null);
-                  setCurrentNoteText('');
-                  setCurrentNoteTitle('');
-                  setSelectedWritingStyle('mind_dump');
-                  setNoteSections([]);
-                  setCheckedItems([]);
-                }}
-              >
-                <Text style={styles.iconButtonText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          }
-        />
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>{isEditing ? 'Edit Note' : 'New Note'}</Text>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity style={styles.iconButton} onPress={saveCurrentNote}>
+              <Text style={styles.iconButtonText}>Save</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => {
+                setIsCreating(false);
+                setIsEditing(false);
+                setEditingNoteId(null);
+                setCurrentNoteText('');
+                setCurrentNoteTitle('');
+                setSelectedWritingStyle('mind_dump');
+                setNoteSections([]);
+                setCheckedItems([]);
+              }}
+            >
+              <Text style={styles.iconButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <View style={styles.editorContainer}>
           <TextInput
@@ -583,19 +574,17 @@ export default function NotesScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <CommonHeader
-        title="My Notes"
-        rightContent={
-          <View style={styles.headerButtons}>
-            <TouchableOpacity style={styles.iconButton} onPress={openMenu}>
-              <IconSymbol size={24} name="line.horizontal.3" color="#FFFFFF" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} onPress={() => setIsCreating(true)}>
-              <Text style={styles.iconButtonText}>New Note</Text>
-            </TouchableOpacity>
-          </View>
-        }
-      />
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>My Notes</Text>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity style={styles.iconButton} onPress={openMenu}>
+            <IconSymbol size={24} name="line.horizontal.3" color="#FFFFFF" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton} onPress={() => setIsCreating(true)}>
+            <Text style={styles.iconButtonText}>New Note</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {isSearchVisible && (
         <View style={styles.searchContainer}>
@@ -694,11 +683,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    paddingTop: Platform.OS === 'ios' ? 56 : 36,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     backgroundColor: '#000000',
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
-    height: Platform.OS === 'ios' ? 100 : 80,
   },
   headerTitle: {
     fontSize: 20,
@@ -728,7 +716,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 12,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -24,7 +25,6 @@ import { eventBus, EVENTS } from '@/utils/eventBus';
 import { mockSpeechToText } from '@/utils/speech';
 import { AlarmManager } from '@/components/AlarmManager';
 import * as Notifications from 'expo-notifications';
-import CommonHeader from '@/components/CommonHeader';
 
 export default function RemindersScreen() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
@@ -161,7 +161,7 @@ export default function RemindersScreen() {
 
         // Check if this is a development environment where notifications fire immediately
         const isDevelopment = __DEV__;
-
+        
         // For development: allow more lenient timing, for production: strict timing
         const timeToleranceMs = isDevelopment ? 300000 : 30000; // 5 minutes in dev, 30 seconds in production
         const shouldTrigger = Math.abs(scheduledTime - now) <= timeToleranceMs;
@@ -227,7 +227,7 @@ export default function RemindersScreen() {
 
         const presentedNotifications = await Notifications.getPresentedNotificationsAsync();
         const presentedIds = new Set(presentedNotifications.map(n => n.request.identifier));
-
+        
         console.log('🔍 DISMISSAL CHECK - Active tracked:', Array.from(activeNotificationIds));
         console.log('🔍 DISMISSAL CHECK - Currently presented:', Array.from(presentedIds));
 
@@ -235,7 +235,7 @@ export default function RemindersScreen() {
         for (const trackedId of activeNotificationIds) {
           if (!presentedIds.has(trackedId)) {
             console.log('🚨 NOTIFICATION DISMISSED DETECTED:', trackedId);
-
+            
             // Find the reminder associated with this notification
             const reminders = await getReminders();
             const dismissedReminder = reminders.find(r => 
@@ -245,13 +245,13 @@ export default function RemindersScreen() {
 
             if (dismissedReminder) {
               console.log('🛑 STOPPING ALARM due to notification dismissal - Reminder:', dismissedReminder.title);
-
+              
               // Stop the alarm completely
               await stopAlarm(dismissedReminder.id, 'notification_dismissed');
-
+              
               // Close alarm screen if it's open
               setActiveAlarmReminder(null);
-
+              
               console.log('✅ Alarm stopped successfully due to notification dismissal');
             }
 
@@ -287,31 +287,31 @@ export default function RemindersScreen() {
               // Handle alarm notification dismissal
               if (data?.isAlarm && data?.reminderId) {
                 console.log('🚨 ALARM notification dismissed via NATIVE listener - STOPPING alarm immediately');
-
+                
                 // Stop the alarm completely
                 await stopAlarm(data.reminderId, 'native_dismissal');
-
+                
                 // Close alarm screen if it's open
                 setActiveAlarmReminder(null);
-
+                
                 console.log('✅ Alarm stopped due to NATIVE notification dismissal');
               } 
               // Handle snooze notification dismissal
               else if (data?.isSnoozeNotification && data?.reminderId) {
                 console.log('😴 SNOOZE notification dismissed via NATIVE listener - STOPPING snooze alarm permanently');
-
+                
                 // Dismiss the snooze and cancel the scheduled resume alarm
                 await dismissSnoozeAlarm(data.reminderId, data.resumeAlarmId, 'native_dismissal');
-
+                
                 // Close alarm screen if it's open
                 setActiveAlarmReminder(null);
-
+                
                 console.log('✅ Snooze alarm dismissed permanently due to NATIVE notification dismissal');
               }
 
               // Remove from tracking if it was being tracked
               activeNotificationIds.delete(notification.request.identifier);
-
+              
               console.log('===========================================================');
             }
           );
@@ -327,7 +327,7 @@ export default function RemindersScreen() {
 
       } catch (error) {
         console.error('❌ Error setting up notification dismissal detection:', error);
-
+        
         // Still try to set up polling as last resort
         console.log('🔧 Setting up POLLING dismissal detection as last resort...');
         dismissalCheckInterval = setInterval(checkDismissedNotifications, 1000);
@@ -338,25 +338,25 @@ export default function RemindersScreen() {
     // Clean up subscription on unmount
     return () => {
       console.log('🧹 Cleaning up notification listeners and intervals...');
-
+      
       eventBus.off(EVENTS.REMINDER_UPDATED, reminderUpdateListener);
       notificationResponseListener.remove();
-
+      
       if (notificationDismissedListener) {
         notificationDismissedListener.remove();
         console.log('✅ Native dismissal listener removed');
       }
-
+      
       if (dismissalCheckInterval) {
         clearInterval(dismissalCheckInterval);
         console.log('✅ Polling dismissal detection stopped');
       }
-
+      
       if (foregroundListener) {
         foregroundListener.remove();
         console.log('✅ Foreground listener removed');
       }
-
+      
       // Clear tracking
       activeNotificationIds.clear();
       console.log('✅ Notification tracking cleared');
@@ -366,7 +366,7 @@ export default function RemindersScreen() {
   useEffect(() => {
     let filtered = reminders;
     const now = new Date();
-
+    
     // Filter based on active tab
     if (activeTab === 'active') {
       // Show only non-overdue reminders (active and future)
@@ -381,12 +381,12 @@ export default function RemindersScreen() {
         if (reminder.isRecurring) return false; // No recurring reminders in history
         const reminderDate = new Date(reminder.dateTime);
         const daysDifference = Math.floor((now.getTime() - reminderDate.getTime()) / (1000 * 60 * 60 * 24));
-
+        
         // Only show overdue reminders that are less than 30 days old
         return reminderDate < now && !reminder.isCompleted && daysDifference <= 30;
       });
     }
-
+    
     // Apply search filter
     if (searchQuery.trim()) {
       filtered = filtered.filter(reminder =>
@@ -394,7 +394,7 @@ export default function RemindersScreen() {
         (reminder.description && reminder.description.toLowerCase().includes(searchQuery.toLowerCase()))
       );
     }
-
+    
     setFilteredReminders(filtered);
   }, [searchQuery, reminders, activeTab]);
 
@@ -402,15 +402,15 @@ export default function RemindersScreen() {
     try {
       const remindersData = await getReminders();
       const now = new Date();
-
+      
       // Clean up overdue reminders older than 30 days
       const cleanedReminders = remindersData.filter(reminder => {
         if (reminder.isRecurring) return true; // Keep all recurring reminders
         if (reminder.isCompleted) return true; // Keep completed reminders
-
+        
         const reminderDate = new Date(reminder.dateTime);
         const daysDifference = Math.floor((now.getTime() - reminderDate.getTime()) / (1000 * 60 * 60 * 24));
-
+        
         // Remove overdue reminders older than 30 days
         if (reminderDate < now && daysDifference > 30) {
           // Cancel any notifications for this reminder
@@ -422,10 +422,10 @@ export default function RemindersScreen() {
           }
           return false;
         }
-
+        
         return true;
       });
-
+      
       // If any reminders were cleaned up, save the updated list
       if (cleanedReminders.length !== remindersData.length) {
         // Save cleaned reminders back to storage
@@ -435,7 +435,7 @@ export default function RemindersScreen() {
           }
         }
       }
-
+      
       // Sort reminders by creation date, newest first
       const sortedReminders = cleanedReminders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setReminders(sortedReminders);
@@ -502,41 +502,41 @@ export default function RemindersScreen() {
   // FIXED: Strict validation function that prevents creation with conflicts
   const validateRecurringSchedule = (days: number[], times: string[]): { valid: boolean; errors: string[] } => {
     const errors: string[] = [];
-
+    
     if (days.length === 0) {
       errors.push('Please select at least one day for recurring reminder');
     }
-
+    
     if (times.length === 0) {
       errors.push('Please add at least one time for recurring reminder');
     }
-
+    
     // Check for duplicate times (exact conflicts)
     const uniqueTimes = new Set(times);
     if (uniqueTimes.size !== times.length) {
       const duplicates = times.filter((time, index) => times.indexOf(time) !== index);
       errors.push(`Duplicate times found: ${[...new Set(duplicates)].join(', ')}`);
     }
-
+    
     // Check for times too close together (within 2 minutes minimum)
     if (times.length > 1) {
       const sortedTimes = [...times].sort();
       for (let i = 0; i < sortedTimes.length - 1; i++) {
         const time1 = sortedTimes[i];
         const time2 = sortedTimes[i + 1];
-
+        
         const [h1, m1] = time1.split(':').map(Number);
         const [h2, m2] = time2.split(':').map(Number);
-
+        
         const minutes1 = h1 * 60 + m1;
         const minutes2 = h2 * 60 + m2;
-
+        
         if (Math.abs(minutes2 - minutes1) < 2) {
           errors.push(`Times ${time1} and ${time2} are too close together (must be at least 2 minutes apart)`);
         }
       }
     }
-
+    
     return {
       valid: errors.length === 0,
       errors
@@ -547,22 +547,22 @@ export default function RemindersScreen() {
   const createOccurrences = (reminderId: string, days: number[], times: string[]): ReminderOccurrence[] => {
     const occurrences: ReminderOccurrence[] = [];
     const now = new Date();
-
+    
     days.forEach(dayOfWeek => {
       times.forEach(time => {
         const [hours, minutes] = time.split(':').map(Number);
-
+        
         // Calculate next occurrence for this day/time
         const nextOccurrence = new Date();
         nextOccurrence.setHours(hours, minutes, 0, 0);
-
+        
         let daysUntilTarget = (dayOfWeek - now.getDay() + 7) % 7;
         if (daysUntilTarget === 0 && nextOccurrence <= now) {
           daysUntilTarget = 7; // Schedule for next week if time has passed today
         }
-
+        
         nextOccurrence.setDate(now.getDate() + daysUntilTarget);
-
+        
         occurrences.push({
           id: `${reminderId}_${dayOfWeek}_${time.replace(':', '')}`,
           parentReminderId: reminderId,
@@ -576,7 +576,7 @@ export default function RemindersScreen() {
         });
       });
     });
-
+    
     return occurrences;
   };
 
@@ -616,7 +616,7 @@ export default function RemindersScreen() {
       if (isRecurring) {
         reminder.occurrences = createOccurrences(reminder.id, selectedDays, selectedTimes);
         reminder.isActive = true; // Set recurring reminders as active by default
-
+        
         // Initialize occurrence statistics
         reminder.occurrenceStats = {
           totalOccurrences: reminder.occurrences.length,
@@ -633,7 +633,7 @@ export default function RemindersScreen() {
             : [];
 
           reminder.notificationIds = notificationIds;
-
+          
           if (notificationIds.length !== selectedDays.length * selectedTimes.length) {
             console.warn(`⚠️ Expected ${selectedDays.length * selectedTimes.length} notifications, but got ${notificationIds.length}`);
           }
@@ -676,7 +676,7 @@ export default function RemindersScreen() {
       setNewTime(new Date());
       setSelectedImageUri(null);
       setIsCreating(false);
-
+      
       // Show success message
       Alert.alert(
         'Success', 
@@ -746,7 +746,7 @@ export default function RemindersScreen() {
       if (isRecurring) {
         // FIXED: Update occurrences properly
         updatedReminder.occurrences = createOccurrences(updatedReminder.id, selectedDays, selectedTimes);
-
+        
         // Preserve existing occurrence stats or create new ones
         if (!updatedReminder.occurrenceStats) {
           updatedReminder.occurrenceStats = {
@@ -816,7 +816,7 @@ export default function RemindersScreen() {
       setSelectedImageUri(null);
       setIsEditing(false);
       setEditingReminder(null);
-
+      
       Alert.alert('Success', 'Reminder updated successfully');
     } catch (error) {
       console.error('Error updating reminder:', error);
@@ -833,24 +833,24 @@ export default function RemindersScreen() {
         const currentDay = now.getDay();
         const currentHour = now.getHours();
         const currentMinute = now.getMinutes();
-
+        
         // Find today's uncompleted occurrences
         const todayOccurrences = reminder.occurrences?.filter(occ => {
           if (occ.dayOfWeek !== currentDay || occ.isCompleted) return false;
-
+          
           // Check if the occurrence time is close to current time (within 2 hours)
           const [occHour, occMinute] = occ.time.split(':').map(Number);
           const occTotalMinutes = occHour * 60 + occMinute;
           const currentTotalMinutes = currentHour * 60 + currentMinute;
           const timeDiff = Math.abs(occTotalMinutes - currentTotalMinutes);
-
+          
           return timeDiff <= 120; // Within 2 hours
         }) || [];
 
         if (todayOccurrences.length > 0) {
           // Show options to mark specific occurrence(s) or complete entire series
           const occurrencesList = todayOccurrences.map(occ => `${occ.time}`).join(', ');
-
+          
           Alert.alert(
             'Complete Recurring Reminder',
             `Found ${todayOccurrences.length} occurrence(s) for today at: ${occurrencesList}`,
@@ -861,7 +861,7 @@ export default function RemindersScreen() {
                 onPress: async () => {
                   const updatedReminder = { ...reminder };
                   const now = new Date().toISOString();
-
+                  
                   // Mark today's occurrences as complete
                   if (updatedReminder.occurrences) {
                     updatedReminder.occurrences = updatedReminder.occurrences.map(occ => {
@@ -884,7 +884,7 @@ export default function RemindersScreen() {
                     updatedReminder.occurrenceStats.completedOccurrences = totalCompleted;
                     updatedReminder.occurrenceStats.completionRate = (totalCompleted / updatedReminder.occurrenceStats.totalOccurrences) * 100;
                     updatedReminder.occurrenceStats.lastCompletedDate = now;
-
+                    
                     // Update streaks
                     const maxConsecutive = Math.max(...(updatedReminder.occurrences?.map(occ => occ.consecutiveCompletions || 0) || [0]));
                     updatedReminder.occurrenceStats.longestStreak = Math.max(updatedReminder.occurrenceStats.longestStreak, maxConsecutive);
@@ -894,7 +894,7 @@ export default function RemindersScreen() {
                   await saveReminder(updatedReminder);
                   eventBus.emit(EVENTS.REMINDER_UPDATED);
                   await loadRemindersAndSettings();
-
+                  
                   Alert.alert('Success', `Marked ${todayOccurrences.length} occurrence(s) as complete!`);
                 },
               },
@@ -917,7 +917,7 @@ export default function RemindersScreen() {
                   await saveReminder(updatedReminder);
                   eventBus.emit(EVENTS.REMINDER_UPDATED);
                   await loadRemindersAndSettings();
-
+                  
                   Alert.alert('Success', 'Entire recurring series marked as complete!');
                 },
               },
@@ -949,7 +949,7 @@ export default function RemindersScreen() {
                   await saveReminder(updatedReminder);
                   eventBus.emit(EVENTS.REMINDER_UPDATED);
                   await loadRemindersAndSettings();
-
+                  
                   Alert.alert('Success', 'Entire recurring series marked as complete!');
                 },
               },
@@ -1063,7 +1063,7 @@ export default function RemindersScreen() {
     for (const existingTime of selectedTimes) {
       const [existingHours, existingMinutes] = existingTime.split(':').map(Number);
       const existingTotalMinutes = existingHours * 60 + existingMinutes;
-
+      
       if (Math.abs(newTotalMinutes - existingTotalMinutes) < 2) {
         Alert.alert(
           'Time Conflict', 
@@ -1279,37 +1279,37 @@ export default function RemindersScreen() {
   if (isCreating || isEditing) {
     return (
       <SafeAreaView style={styles.container}>
-        <CommonHeader
-          title={isEditing ? 'Edit Reminder' : 'New Reminder'}
-          rightContent={
-            <View style={styles.headerButtons}>
-              <TouchableOpacity
-                style={styles.saveButton}
-                onPress={isEditing ? updateReminder : createReminder}
-              >
-                <Text style={styles.saveButtonText}>Save</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => {
-                  setIsCreating(false);
-                  setIsEditing(false);
-                  setEditingReminder(null);
-                  setNewTitle('');
-                  setNewDescription('');
-                  setSelectedDate(new Date());
-                  setIsRecurring(false);
-                  setSelectedDays([]);
-                  setSelectedTimes([]);
-                  setNewTime(new Date());
-                  setSelectedImageUri(null);
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          }
-        />
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>
+            {isEditing ? 'Edit Reminder' : 'New Reminder'}
+          </Text>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={isEditing ? updateReminder : createReminder}
+            >
+              <Text style={styles.saveButtonText}>Save</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => {
+                setIsCreating(false);
+                setIsEditing(false);
+                setEditingReminder(null);
+                setNewTitle('');
+                setNewDescription('');
+                setSelectedDate(new Date());
+                setIsRecurring(false);
+                setSelectedDays([]);
+                setSelectedTimes([]);
+                setNewTime(new Date());
+                setSelectedImageUri(null);
+              }}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <View style={styles.formContainer}>
           <View style={styles.inputGroup}>
@@ -1505,26 +1505,24 @@ export default function RemindersScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <CommonHeader
-        title="Reminders"
-        rightContent={
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={styles.searchButton}
-              onPress={() => setIsSearchVisible(!isSearchVisible)}
-            >
-              <IconSymbol size={20} name="magnifyingglass" color="#FFFFFF" />
-            </TouchableOpacity>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Reminders</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.searchButton}
+            onPress={() => setIsSearchVisible(!isSearchVisible)}
+          >
+            <IconSymbol size={20} name="magnifyingglass" color="#FFFFFF" />
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => setIsCreating(true)}
-            >
-              <Text style={styles.addButtonText}>New Reminder</Text>
-            </TouchableOpacity>
-          </View>
-        }
-      />
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setIsCreating(true)}
+          >
+            <Text style={styles.addButtonText}>New Reminder</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Tabs */}
       <View style={styles.tabsContainer}>
@@ -1542,7 +1540,7 @@ export default function RemindersScreen() {
             Active
           </Text>
         </TouchableOpacity>
-
+        
         <TouchableOpacity
           style={[
             styles.tabButton,
@@ -1611,11 +1609,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    paddingTop: Platform.OS === 'ios' ? 56 : 36,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     backgroundColor: '#000000',
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
-    height: Platform.OS === 'ios' ? 100 : 80,
   },
   headerTitle: {
     fontSize: 20,
@@ -2083,11 +2080,10 @@ input: {
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
-    paddingVertical: 4,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 16,
     paddingHorizontal: 16,
     alignItems: 'center',
     borderBottomWidth: 2,
