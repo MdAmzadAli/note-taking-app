@@ -297,17 +297,8 @@ export default function HabitsScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.rightSection}>
-                  <ScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={false} 
-                    style={styles.valuesScroll}
-                    onScroll={handleDateScroll}
-                    scrollEventThrottle={16}
-                    snapToInterval={50}
-                    decelerationRate="fast"
-                    snapToAlignment="start"
-                  >
-                    {scrollableDates.slice().reverse().map((date, index) => {
+                  <View style={styles.valuesContainer}>
+                    {visibleDates.map((date, index) => {
                       const value = getHabitValueForDate(habit, date);
                       const isCompleted = getHabitStatusForDate(habit, date);
                       const dateStr = date.toISOString().split('T')[0];
@@ -315,7 +306,7 @@ export default function HabitsScreen() {
 
                       return (
                         <TouchableOpacity
-                          key={index}
+                          key={`${habit.id}-${dateStr}-${index}`}
                           style={styles.valueColumn}
                           onPress={() => {
                             if (habit.goalType === 'yes_no') {
@@ -366,7 +357,7 @@ export default function HabitsScreen() {
                         </TouchableOpacity>
                       );
                     })}
-                  </ScrollView>
+                  </View>
                 </View>
               </View>
             ))
@@ -494,7 +485,7 @@ const styles = StyleSheet.create({
     color: '#1a202c',
     flex: 1,
   },
-  valuesScroll: {
+  valuesContainer: {
     flexDirection: 'row',
   },
   valueColumn: {
