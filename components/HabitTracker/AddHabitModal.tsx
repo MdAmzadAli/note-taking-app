@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import {
   View,
@@ -26,12 +27,23 @@ const COLOR_OPTIONS = [
   '#A3E4D7', '#FADBD8', '#D5F4E6', '#FDEAA7', '#E8DAEF', '#D6EAF8', '#FEF9E7', '#EAEDED'
 ];
 
+const EMOJI_OPTIONS = [
+  '🏃', '💪', '📚', '💧', '🧘', '🎯', '⏰', '🌱', '🏋️', '🚶',
+  '🥗', '💊', '☕', '🚭', '🛌', '🎵', '🎨', '✍️', '📱', '🧹',
+  '🔬', '💻', '📖', '🎸', '🏊', '🚴', '🧠', '💝', '🌟', '🔥',
+  '⚡', '🎲', '🎪', '🎭', '🎬', '📷', '🎯', '🏆', '🥇', '🌈'
+];
+
 const { width } = Dimensions.get('window');
 
 export default function AddHabitModal({ visible, onClose, onSave, habitType }: AddHabitModalProps) {
   const [name, setName] = useState('');
   const [selectedColor, setSelectedColor] = useState('#4ECDC4');
+  const [selectedEmoji, setSelectedEmoji] = useState('🎯');
   const [question, setQuestion] = useState('');
+  const [unit, setUnit] = useState('');
+  const [target, setTarget] = useState('');
+  const [targetType, setTargetType] = useState<'at_least' | 'at_max'>('at_least');
   const [frequency, setFrequency] = useState('Every day');
   const [frequencyType, setFrequencyType] = useState<'every_day' | 'every_n_days' | 'times_per_week' | 'times_per_month' | 'times_in_days'>('every_day');
   const [customValue1, setCustomValue1] = useState(3);
@@ -40,14 +52,20 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
   const [notes, setNotes] = useState('');
 
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showFrequencyModal, setShowFrequencyModal] = useState(false);
+  const [showTargetTypeModal, setShowTargetTypeModal] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showReminderPicker, setShowReminderPicker] = useState(false);
 
   const resetForm = () => {
     setName('');
     setSelectedColor('#4ECDC4');
+    setSelectedEmoji('🎯');
     setQuestion('');
+    setUnit('');
+    setTarget('');
+    setTargetType('at_least');
     setFrequency('Every day');
     setFrequencyType('every_day');
     setCustomValue1(3);
@@ -67,24 +85,42 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
     }
   };
 
+  const getTargetTypeText = () => {
+    return targetType === 'at_least' ? 'At least' : 'At max';
+  };
+
   const handleSave = () => {
     if (!name.trim()) {
       Alert.alert('Error', 'Please enter a habit name');
       return;
     }
 
-    if (habitType === 'yes_no' && !question.trim()) {
+    if (!question.trim()) {
       Alert.alert('Error', 'Please enter a question');
       return;
     }
 
+    if (habitType === 'measurable') {
+      if (!unit.trim()) {
+        Alert.alert('Error', 'Please enter a unit');
+        return;
+      }
+      if (!target.trim() || isNaN(Number(target))) {
+        Alert.alert('Error', 'Please enter a valid target number');
+        return;
+      }
+    }
+
     const habit = {
       name: name.trim(),
-      emoji: '🎯',
+      emoji: selectedEmoji,
       color: selectedColor,
       frequency: 'custom',
       goalType: habitType === 'yes_no' ? 'yes_no' : 'quantity',
-      question: habitType === 'yes_no' ? question.trim() : undefined,
+      question: question.trim(),
+      unit: habitType === 'measurable' ? unit.trim() : undefined,
+      target: habitType === 'measurable' ? Number(target) : undefined,
+      targetType: habitType === 'measurable' ? targetType : undefined,
       frequencyType,
       customValue1: frequencyType !== 'every_day' ? customValue1 : undefined,
       customValue2: frequencyType === 'times_in_days' ? customValue2 : undefined,
@@ -99,6 +135,22 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
   const handleClose = () => {
     resetForm();
     onClose();
+  };
+
+  const getPlaceholderText = () => {
+    if (habitType === 'yes_no') {
+      return 'e.g. Did you exercise today?';
+    } else {
+      return 'e.g. How many miles did you run today?';
+    }
+  };
+
+  const getNamePlaceholder = () => {
+    if (habitType === 'yes_no') {
+      return 'e.g. Exercise';
+    } else {
+      return 'e.g. Run';
+    }
   };
 
   return (
@@ -121,17 +173,26 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Name and Color Row */}
-          <View style={styles.row}>
+          {/* Name, Emoji and Color Row */}
+          <View style={styles.topRow}>
             <View style={styles.nameContainer}>
               <Text style={styles.label}>Name</Text>
               <TextInput
                 style={styles.textInput}
                 value={name}
                 onChangeText={setName}
-                placeholder="e.g. Exercise"
+                placeholder={getNamePlaceholder()}
                 placeholderTextColor="#666"
               />
+            </View>
+            <View style={styles.emojiContainer}>
+              <Text style={styles.label}>Emoji</Text>
+              <TouchableOpacity
+                style={styles.emojiPreview}
+                onPress={() => setShowEmojiPicker(true)}
+              >
+                <Text style={styles.emojiText}>{selectedEmoji}</Text>
+              </TouchableOpacity>
             </View>
             <View style={styles.colorContainer}>
               <Text style={styles.label}>Color</Text>
@@ -149,22 +210,77 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
               style={styles.textInput}
               value={question}
               onChangeText={setQuestion}
-              placeholder="e.g. Did you exercise today?"
+              placeholder={getPlaceholderText()}
               placeholderTextColor="#666"
             />
           </View>
 
-          {/* Frequency Field */}
-          <View style={styles.field}>
-            <Text style={styles.label}>Frequency</Text>
-            <TouchableOpacity
-              style={styles.dropdownButton}
-              onPress={() => setShowFrequencyModal(true)}
-            >
-              <Text style={styles.dropdownText}>{getFrequencyText()}</Text>
-              <Text style={styles.dropdownArrow}>▼</Text>
-            </TouchableOpacity>
-          </View>
+          {/* Unit Field - Only for measurable */}
+          {habitType === 'measurable' && (
+            <View style={styles.field}>
+              <Text style={styles.label}>Unit</Text>
+              <TextInput
+                style={styles.textInput}
+                value={unit}
+                onChangeText={setUnit}
+                placeholder="e.g. miles"
+                placeholderTextColor="#666"
+              />
+            </View>
+          )}
+
+          {/* Target and Frequency Row - Only for measurable */}
+          {habitType === 'measurable' ? (
+            <View style={styles.targetFrequencyRow}>
+              <View style={styles.targetContainer}>
+                <Text style={styles.label}>Target</Text>
+                <TextInput
+                  style={styles.numberInput}
+                  value={target}
+                  onChangeText={setTarget}
+                  placeholder="e.g. 15"
+                  placeholderTextColor="#666"
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={styles.frequencyContainer}>
+                <Text style={styles.label}>Frequency</Text>
+                <TouchableOpacity
+                  style={styles.dropdownButton}
+                  onPress={() => setShowFrequencyModal(true)}
+                >
+                  <Text style={styles.dropdownText}>{getFrequencyText()}</Text>
+                  <Text style={styles.dropdownArrow}>▼</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            /* Frequency Field - For yes/no */
+            <View style={styles.field}>
+              <Text style={styles.label}>Frequency</Text>
+              <TouchableOpacity
+                style={styles.dropdownButton}
+                onPress={() => setShowFrequencyModal(true)}
+              >
+                <Text style={styles.dropdownText}>{getFrequencyText()}</Text>
+                <Text style={styles.dropdownArrow}>▼</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Target Type Field - Only for measurable */}
+          {habitType === 'measurable' && (
+            <View style={styles.field}>
+              <Text style={styles.label}>Target Type</Text>
+              <TouchableOpacity
+                style={styles.dropdownButton}
+                onPress={() => setShowTargetTypeModal(true)}
+              >
+                <Text style={styles.dropdownText}>{getTargetTypeText()}</Text>
+                <Text style={styles.dropdownArrow}>▼</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Reminder Field */}
           <View style={styles.field}>
@@ -193,6 +309,44 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
             />
           </View>
         </ScrollView>
+
+        {/* Emoji Picker Modal */}
+        <Modal
+          visible={showEmojiPicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowEmojiPicker(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowEmojiPicker(false)}
+          >
+            <TouchableOpacity
+              style={styles.emojiPickerModal}
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View style={styles.emojiGrid}>
+                {EMOJI_OPTIONS.map((emoji) => (
+                  <TouchableOpacity
+                    key={emoji}
+                    style={[
+                      styles.emojiOption,
+                      selectedEmoji === emoji && styles.selectedEmoji,
+                    ]}
+                    onPress={() => {
+                      setSelectedEmoji(emoji);
+                      setShowEmojiPicker(false);
+                    }}
+                  >
+                    <Text style={styles.emojiOptionText}>{emoji}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
 
         {/* Color Picker Modal */}
         <Modal
@@ -230,6 +384,50 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                     )}
                   </TouchableOpacity>
                 ))}
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Target Type Modal */}
+        <Modal
+          visible={showTargetTypeModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowTargetTypeModal(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowTargetTypeModal(false)}
+          >
+            <TouchableOpacity
+              style={styles.targetTypeModal}
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View style={styles.targetTypeOptions}>
+                <TouchableOpacity
+                  style={styles.targetTypeOption}
+                  onPress={() => {
+                    setTargetType('at_least');
+                    setShowTargetTypeModal(false);
+                  }}
+                >
+                  <View style={[styles.radio, targetType === 'at_least' && styles.radioSelected]} />
+                  <Text style={styles.targetTypeText}>At least</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.targetTypeOption}
+                  onPress={() => {
+                    setTargetType('at_max');
+                    setShowTargetTypeModal(false);
+                  }}
+                >
+                  <View style={[styles.radio, targetType === 'at_max' && styles.radioSelected]} />
+                  <Text style={styles.targetTypeText}>At max</Text>
+                </TouchableOpacity>
               </View>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -494,17 +692,31 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: 16,
   },
-  row: {
+  topRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     marginBottom: 24,
+    gap: 12,
   },
   nameContainer: {
     flex: 1,
-    marginRight: 16,
+  },
+  emojiContainer: {
+    alignItems: 'center',
   },
   colorContainer: {
     alignItems: 'center',
+  },
+  targetFrequencyRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 24,
+  },
+  targetContainer: {
+    flex: 1,
+  },
+  frequencyContainer: {
+    flex: 2,
   },
   field: {
     marginBottom: 24,
@@ -522,9 +734,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#000',
   },
+  numberInput: {
+    backgroundColor: '#f0f0f0',
+    color: '#000',
+    fontSize: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 4,
+    minWidth: 50,
+    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
   notesInput: {
     minHeight: 80,
     textAlignVertical: 'top',
+  },
+  emojiPreview: {
+    width: 40,
+    height: 40,
+    borderRadius: 4,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  emojiText: {
+    fontSize: 20,
   },
   colorPreview: {
     width: 40,
@@ -552,6 +789,36 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  emojiPickerModal: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: width * 0.85,
+    maxHeight: '70%',
+  },
+  emojiGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'center',
+  },
+  emojiOption: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    backgroundColor: '#f8f8f8',
+  },
+  selectedEmoji: {
+    borderColor: '#4ECDC4',
+    backgroundColor: '#e6f7ff',
+  },
+  emojiOptionText: {
+    fontSize: 24,
   },
   colorPickerModal: {
     backgroundColor: '#222',
@@ -581,6 +848,25 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  targetTypeModal: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: width * 0.75,
+  },
+  targetTypeOptions: {
+    marginBottom: 20,
+  },
+  targetTypeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    gap: 12,
+  },
+  targetTypeText: {
+    color: '#000',
+    fontSize: 16,
   },
   frequencyModal: {
     backgroundColor: '#fff',
@@ -612,18 +898,6 @@ const styles = StyleSheet.create({
   frequencyText: {
     color: '#000',
     fontSize: 16,
-  },
-  numberInput: {
-    backgroundColor: '#f0f0f0',
-    color: '#000',
-    fontSize: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 4,
-    minWidth: 50,
-    textAlign: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
   },
   modalSaveButton: {
     backgroundColor: '#4ECDC4',

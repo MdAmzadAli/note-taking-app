@@ -114,20 +114,29 @@ export interface UserSettings {
   isOnboardingComplete?: boolean;
   alarmEnabled?: boolean;
   alarmSound?: string;
-  
+
   // Added for Habit Tracker feature
-  
+
 }
 
 export interface Habit {
   id: string;
   name: string;
   emoji: string;
+  color?: string;
   frequency: 'daily' | 'weekly' | 'custom';
   goalType: 'yes_no' | 'quantity' | 'time';
-  targetValue?: number; // for quantity or time goals
-  customFrequency?: number; // for custom frequency (days)
-  color: string; // hex color for the habit
+  question?: string;
+  targetValue?: number;
+  unit?: string;
+  target?: number;
+  targetType?: 'at_least' | 'at_max';
+  frequencyType?: 'every_day' | 'every_n_days' | 'times_per_week' | 'times_per_month' | 'times_in_days';
+  customValue1?: number;
+  customValue2?: number;
+  customFrequency?: number;
+  reminderTime?: string;
+  notes?: string;
   createdAt: Date;
   completions: HabitCompletion[];
   currentStreak: number;
