@@ -25,8 +25,16 @@ export default function HabitTypeModal({ visible, onClose, onSelectType }: Habit
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
-        <View style={styles.content}>
+      <TouchableOpacity 
+        style={styles.overlay}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <TouchableOpacity 
+          style={styles.content}
+          activeOpacity={1}
+          onPress={(e) => e.stopPropagation()}
+        >
           <TouchableOpacity
             style={styles.typeCard}
             onPress={() => onSelectType('yes_no')}
@@ -56,8 +64,8 @@ export default function HabitTypeModal({ visible, onClose, onSelectType }: Habit
               </View>
             </View>
           </TouchableOpacity>
-        </View>
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 }
