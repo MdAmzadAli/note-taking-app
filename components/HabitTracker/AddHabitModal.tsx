@@ -22,7 +22,7 @@ interface AddHabitModalProps {
 const EMOJI_OPTIONS = [
   '💪', '🏃', '📚', '💧', '🧘', '🍎', '😴', '🎯', '✍️', '🎵',
   '🌱', '🏋️', '🚶', '📱', '💻', '🍔', '🚭', '💊', '🧹', '📖',
-  '🎨', '🌅', '🌙', '⭐', '🔥', '💎', '🎪', '🎭', '🎸', '🎯'
+  '🎨', '🌅', '🌙', '⭐', '🔥', '💎', '🎪', '🎭', '🎸', '🏆'
 ];
 
 export default function AddHabitModal({ visible, onClose, onSave }: AddHabitModalProps) {
@@ -86,7 +86,7 @@ export default function AddHabitModal({ visible, onClose, onSave }: AddHabitModa
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-            <IconSymbol name="xmark" size={20} color="#6b7280" />
+            <Text style={styles.closeText}>✕</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Add New Habit</Text>
           <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
@@ -234,6 +234,11 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     padding: 8,
+  },
+  closeText: {
+    fontSize: 18,
+    color: '#6b7280',
+    fontWeight: '600',
   },
   title: {
     fontSize: 18,
