@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   View,
@@ -27,10 +26,10 @@ const EMOJI_OPTIONS = [
 ];
 
 const COLOR_OPTIONS = [
-  '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7',
-  '#dda0dd', '#98d8c8', '#f7dc6f', '#bb8fce', '#85c1e9',
-  '#f8c471', '#82e0aa', '#f1948a', '#85c1e9', '#f7dc6f',
-  '#bb8fce', '#98d8c8', '#ffeaa7', '#96ceb4', '#45b7d1'
+  '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F',
+  '#BB8FCE', '#85C1E9', '#F8C471', '#82E0AA', '#F1948A', '#AED6F1', '#FCF3CF', '#D7BDE2',
+  '#A3E4D7', '#FADBD8', '#D5F4E6', '#FDEAA7', '#E8DAEF', '#D6EAF8', '#FEF9E7', '#EAEDED',
+  '#EBDEF0', '#D1F2EB', '#FDF2E9'
 ];
 
 const { width } = Dimensions.get('window');
@@ -217,7 +216,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                 </TouchableOpacity>
               ))}
             </View>
-            
+
             {frequency === 'custom' && (
               <TextInput
                 style={[styles.textInput, styles.smallInput]}

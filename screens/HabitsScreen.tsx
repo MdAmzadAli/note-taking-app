@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { Habit } from '@/types';
 import { getHabits, saveHabit, deleteHabit, updateHabit } from '@/utils/storage';
-import HabitList from '@/components/HabitTracker/HabitList';
 import AddHabitModal from '@/components/HabitTracker/AddHabitModal';
 import HabitDetailModal from '@/components/HabitTracker/HabitDetailModal';
 import HabitTypeModal from '@/components/HabitTracker/HabitTypeModal';
@@ -27,7 +26,6 @@ export default function HabitsScreen() {
   const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
   const [selectedHabitType, setSelectedHabitType] = useState<'yes_no' | 'measurable' | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date());
 
   useEffect(() => {
     loadHabits();
@@ -36,25 +34,12 @@ export default function HabitsScreen() {
   const loadHabits = async () => {
     try {
       const loadedHabits = await getHabits();
-      const sortedHabits = loadedHabits.sort((a, b) => {
-        const aCompleted = isHabitCompletedToday(a);
-        const bCompleted = isHabitCompletedToday(b);
-        if (aCompleted === bCompleted) return 0;
-        return aCompleted ? 1 : -1;
-      });
-      setHabits(sortedHabits);
+      setHabits(loadedHabits);
     } catch (error) {
       console.error('Error loading habits:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  const isHabitCompletedToday = (habit: Habit): boolean => {
-    const today = new Date().toISOString().split('T')[0];
-    return habit.completions.some(
-      completion => completion.date === today && completion.completed
-    );
   };
 
   const handleAddHabit = async (newHabit: Omit<Habit, 'id' | 'createdAt' | 'completions' | 'currentStreak' | 'longestStreak'>) => {
@@ -77,13 +62,12 @@ export default function HabitsScreen() {
     }
   };
 
-  const handleHabitComplete = async (habitId: string, completed: boolean, value?: number) => {
+  const handleHabitComplete = async (habitId: string, date: string, completed: boolean, value?: number) => {
     try {
       const habit = habits.find(h => h.id === habitId);
       if (!habit) return;
 
-      const today = new Date().toISOString().split('T')[0];
-      const existingCompletion = habit.completions.find(c => c.date === today);
+      const existingCompletion = habit.completions.find(c => c.date === date);
 
       if (existingCompletion) {
         existingCompletion.completed = completed;
@@ -93,7 +77,7 @@ export default function HabitsScreen() {
         habit.completions.push({
           id: Date.now().toString(),
           habitId,
-          date: today,
+          date,
           completed,
           value,
           completedAt: new Date(),
@@ -157,11 +141,11 @@ export default function HabitsScreen() {
     setShowAddModal(true);
   };
 
-  const getUpcomingDates = () => {
+  const getScrollableDates = () => {
     const dates = [];
     const today = new Date();
     
-    for (let i = 0; i < 7; i++) {
+    for (let i = -2; i <= 4; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
       dates.push(date);
@@ -169,34 +153,32 @@ export default function HabitsScreen() {
     return dates;
   };
 
-  const formatDate = (date: Date) => {
-    const today = new Date();
-    const isToday = date.toDateString() === today.toDateString();
-    const isTomorrow = date.toDateString() === new Date(today.getTime() + 24 * 60 * 60 * 1000).toDateString();
-    
-    if (isToday) return 'Today';
-    if (isTomorrow) return 'Tomorrow';
-    
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric' 
-    });
+  const formatDay = (date: Date) => {
+    return date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
   };
 
-  const getCompletionPercentage = (date: Date) => {
-    const dateStr = date.toISOString().split('T')[0];
-    let completed = 0;
-    let total = habits.length;
-    
-    habits.forEach(habit => {
-      const completion = habit.completions.find(c => c.date === dateStr);
-      if (completion && completion.completed) {
-        completed++;
-      }
-    });
-    
-    return total > 0 ? (completed / total) * 100 : 0;
+  const formatDate = (date: Date) => {
+    return date.getDate().toString();
   };
+
+  const getHabitValueForDate = (habit: Habit, date: Date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    const completion = habit.completions.find(c => c.date === dateStr);
+    
+    if (habit.goalType === 'yes_no') {
+      return completion?.completed ? '✓' : '✗';
+    } else {
+      return completion?.value?.toString() || '0';
+    }
+  };
+
+  const getHabitStatusForDate = (habit: Habit, date: Date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    const completion = habit.completions.find(c => c.date === dateStr);
+    return completion?.completed || false;
+  };
+
+  const scrollableDates = getScrollableDates();
 
   if (loading) {
     return (
@@ -210,32 +192,38 @@ export default function HabitsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.greeting}>Good Morning! 👋</Text>
-          <Text style={styles.subtitle}>You have {habits.filter(h => !isHabitCompletedToday(h)).length} habits pending today</Text>
-        </View>
-        <TouchableOpacity style={styles.profileButton}>
-          <View style={styles.profileIcon}>
-            <Text style={styles.profileText}>U</Text>
-          </View>
+      {/* Navbar */}
+      <View style={styles.navbar}>
+        <Text style={styles.navTitle}>Habits</Text>
+        <TouchableOpacity 
+          style={styles.addButton}
+          onPress={() => setShowTypeModal(true)}
+        >
+          <Text style={styles.addButtonText}>+</Text>
         </TouchableOpacity>
       </View>
 
+      {/* Main Content */}
       <View style={styles.mainContent}>
-        {/* Left side - Habits */}
-        <View style={styles.leftSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Today's Habits</Text>
-            <TouchableOpacity 
-              style={styles.addButton}
-              onPress={() => setShowTypeModal(true)}
-            >
-              <Text style={styles.addButtonText}>+</Text>
-            </TouchableOpacity>
+        {/* Date Section */}
+        <View style={styles.dateSection}>
+          <View style={styles.leftSection}>
+            {/* Empty space for habit names alignment */}
           </View>
+          <View style={styles.rightSection}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScroll}>
+              {scrollableDates.map((date, index) => (
+                <View key={index} style={styles.dateColumn}>
+                  <Text style={styles.dayText}>{formatDay(date)}</Text>
+                  <Text style={styles.dateText}>{formatDate(date)}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
 
+        {/* Habits Section */}
+        <ScrollView style={styles.habitsContainer} showsVerticalScrollIndicator={false}>
           {habits.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>🎯</Text>
@@ -245,50 +233,94 @@ export default function HabitsScreen() {
               </Text>
             </View>
           ) : (
-            <HabitList
-              habits={habits}
-              onComplete={handleHabitComplete}
-              onDelete={handleDeleteHabit}
-              onHabitPress={handleHabitPress}
-            />
-          )}
-        </View>
-
-        {/* Right side - Upcoming dates */}
-        <View style={styles.rightSection}>
-          <Text style={styles.upcomingTitle}>Upcoming</Text>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {getUpcomingDates().map((date, index) => {
-              const percentage = getCompletionPercentage(date);
-              const isSelected = date.toDateString() === selectedDate.toDateString();
-              
-              return (
-                <TouchableOpacity
-                  key={index}
-                  style={[styles.dateCard, isSelected && styles.selectedDateCard]}
-                  onPress={() => setSelectedDate(date)}
+            habits.map((habit) => (
+              <View key={habit.id} style={styles.habitRow}>
+                <TouchableOpacity 
+                  style={styles.leftSection}
+                  onPress={() => handleHabitPress(habit)}
+                  onLongPress={() => {
+                    Alert.alert(
+                      'Habit Options',
+                      `What would you like to do with "${habit.name}"?`,
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Delete',
+                          style: 'destructive',
+                          onPress: () => handleDeleteHabit(habit.id),
+                        },
+                      ]
+                    );
+                  }}
                 >
-                  <Text style={[styles.dateText, isSelected && styles.selectedDateText]}>
-                    {formatDate(date)}
-                  </Text>
-                  <Text style={[styles.dayText, isSelected && styles.selectedDayText]}>
-                    {date.toLocaleDateString('en-US', { weekday: 'short' })}
-                  </Text>
-                  <View style={styles.progressIndicator}>
-                    <View style={[
-                      styles.progressBar,
-                      { width: `${percentage}%` },
-                      isSelected && styles.selectedProgressBar
-                    ]} />
-                  </View>
-                  <Text style={[styles.percentageText, isSelected && styles.selectedPercentageText]}>
-                    {Math.round(percentage)}%
-                  </Text>
+                  <Text style={styles.habitEmoji}>{habit.emoji}</Text>
+                  <Text style={styles.habitName}>{habit.name}</Text>
                 </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
+
+                <View style={styles.rightSection}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.valuesScroll}>
+                    {scrollableDates.map((date, index) => {
+                      const value = getHabitValueForDate(habit, date);
+                      const isCompleted = getHabitStatusForDate(habit, date);
+                      const dateStr = date.toISOString().split('T')[0];
+                      
+                      return (
+                        <TouchableOpacity
+                          key={index}
+                          style={styles.valueColumn}
+                          onPress={() => {
+                            if (habit.goalType === 'yes_no') {
+                              handleHabitComplete(habit.id, dateStr, !isCompleted);
+                            } else {
+                              Alert.prompt(
+                                `Update ${habit.name}`,
+                                `Enter ${habit.goalType === 'quantity' ? 'quantity' : 'minutes'}:`,
+                                [
+                                  { text: 'Cancel', style: 'cancel' },
+                                  {
+                                    text: 'Save',
+                                    onPress: (text) => {
+                                      const numValue = parseInt(text || '0', 10);
+                                      if (numValue >= 0) {
+                                        handleHabitComplete(habit.id, dateStr, numValue > 0, numValue);
+                                      }
+                                    },
+                                  },
+                                ],
+                                'plain-text',
+                                value === '✓' || value === '✗' ? '' : value
+                              );
+                            }
+                          }}
+                        >
+                          <View style={[
+                            styles.valueCell,
+                            habit.goalType === 'yes_no' && isCompleted && styles.completedCell,
+                            habit.goalType === 'yes_no' && !isCompleted && styles.notCompletedCell
+                          ]}>
+                            <Text style={[
+                              styles.valueText,
+                              habit.goalType === 'yes_no' && styles.checkmarkText,
+                              habit.goalType === 'yes_no' && isCompleted && styles.completedText,
+                              habit.goalType === 'yes_no' && !isCompleted && styles.notCompletedText
+                            ]}>
+                              {value}
+                            </Text>
+                            {habit.goalType !== 'yes_no' && (
+                              <Text style={styles.unitText}>
+                                {habit.goalType === 'time' ? 'min' : habit.goalType === 'quantity' ? 'qty' : ''}
+                              </Text>
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              </View>
+            ))
+          )}
+        </ScrollView>
       </View>
 
       {/* Modals */}
@@ -325,7 +357,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  header: {
+  navbar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -335,59 +367,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
-  headerLeft: {
-    flex: 1,
-  },
-  greeting: {
+  navTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1a202c',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#64748b',
-  },
-  profileButton: {
-    marginLeft: 16,
-  },
-  profileIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#6366f1',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileText: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  mainContent: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  leftSection: {
-    flex: 2,
-    padding: 20,
-  },
-  rightSection: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    padding: 16,
-    borderLeftWidth: 1,
-    borderLeftColor: '#e2e8f0',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
     color: '#1a202c',
   },
   addButton: {
@@ -403,69 +385,110 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
-  upcomingTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a202c',
-    marginBottom: 16,
+  mainContent: {
+    flex: 1,
   },
-  dateCard: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: 'transparent',
+  dateSection: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    paddingVertical: 12,
   },
-  selectedDateCard: {
-    backgroundColor: '#6366f1',
-    borderColor: '#4f46e5',
+  leftSection: {
+    width: '40%',
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  dateText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a202c',
-    textAlign: 'center',
-    marginBottom: 4,
+  rightSection: {
+    width: '60%',
   },
-  selectedDateText: {
-    color: '#ffffff',
+  dateScroll: {
+    flexDirection: 'row',
+  },
+  dateColumn: {
+    width: 60,
+    alignItems: 'center',
+    paddingHorizontal: 8,
   },
   dayText: {
     fontSize: 12,
+    fontWeight: '600',
     color: '#64748b',
-    textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
-  selectedDayText: {
-    color: '#e2e8f0',
+  dateText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1a202c',
   },
-  progressIndicator: {
-    height: 4,
-    backgroundColor: '#e2e8f0',
-    borderRadius: 2,
-    marginBottom: 8,
+  habitsContainer: {
+    flex: 1,
   },
-  progressBar: {
-    height: '100%',
-    backgroundColor: '#10b981',
-    borderRadius: 2,
-  },
-  selectedProgressBar: {
+  habitRow: {
+    flexDirection: 'row',
     backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    paddingVertical: 16,
   },
-  percentageText: {
-    fontSize: 12,
-    color: '#64748b',
-    textAlign: 'center',
+  habitEmoji: {
+    fontSize: 20,
+    marginRight: 12,
   },
-  selectedPercentageText: {
-    color: '#ffffff',
+  habitName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1a202c',
+    flex: 1,
+  },
+  valuesScroll: {
+    flexDirection: 'row',
+  },
+  valueColumn: {
+    width: 60,
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  valueCell: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 32,
+    paddingHorizontal: 4,
+  },
+  completedCell: {
+    backgroundColor: '#dcfce7',
+    borderRadius: 6,
+  },
+  notCompletedCell: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 6,
+  },
+  valueText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  checkmarkText: {
+    fontSize: 16,
+  },
+  completedText: {
+    color: '#16a34a',
+  },
+  notCompletedText: {
+    color: '#dc2626',
+  },
+  unitText: {
+    fontSize: 10,
+    color: '#9ca3af',
+    marginTop: 2,
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 60,
   },
   emptyIcon: {
     fontSize: 48,
