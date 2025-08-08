@@ -269,6 +269,9 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                   placeholder="e.g. 15"
                   placeholderTextColor="#666"
                   keyboardType="numeric"
+                  selection={undefined}
+                  autoCorrect={false}
+                  textAlign="center"
                 />
               </View>
               <View style={styles.frequencyContainer}>
@@ -546,6 +549,9 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                         keyboardType="numeric"
                         placeholder="3"
                         onFocus={() => setFrequencyType('every_n_days')}
+                        selection={undefined}
+                        autoCorrect={false}
+                        textAlign="center"
                       />
                       <Text style={styles.frequencyText}>days</Text>
                     </TouchableOpacity>
@@ -563,6 +569,9 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                         keyboardType="numeric"
                         placeholder="3"
                         onFocus={() => setFrequencyType('times_per_week')}
+                        selection={undefined}
+                        autoCorrect={false}
+                        textAlign="center"
                       />
                       <Text style={styles.frequencyText}>times per week</Text>
                     </TouchableOpacity>
@@ -580,6 +589,9 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                         keyboardType="numeric"
                         placeholder="3"
                         onFocus={() => setFrequencyType('times_per_month')}
+                        selection={undefined}
+                        autoCorrect={false}
+                        textAlign="center"
                       />
                       <Text style={styles.frequencyText}>times per month</Text>
                     </TouchableOpacity>
@@ -597,6 +609,9 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                         keyboardType="numeric"
                         placeholder="3"
                         onFocus={() => setFrequencyType('times_in_days')}
+                        selection={undefined}
+                        autoCorrect={false}
+                        textAlign="center"
                       />
                       <Text style={styles.frequencyText}>times in</Text>
                       <TextInput
@@ -606,6 +621,9 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                         keyboardType="numeric"
                         placeholder="14"
                         onFocus={() => setFrequencyType('times_in_days')}
+                        selection={undefined}
+                        autoCorrect={false}
+                        textAlign="center"
                       />
                       <Text style={styles.frequencyText}>days</Text>
                     </TouchableOpacity>
