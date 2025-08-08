@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -54,7 +53,7 @@ export default function HabitsScreen() {
         currentStreak: 0,
         longestStreak: 0,
       };
-      
+
       await saveHabit(habit);
       await loadHabits();
       setShowAddModal(false);
@@ -105,7 +104,7 @@ export default function HabitsScreen() {
 
     let streak = 0;
     const today = new Date();
-    
+
     for (let i = 0; i < sortedCompletions.length; i++) {
       const completionDate = new Date(sortedCompletions[i].date);
       const expectedDate = new Date(today);
@@ -146,7 +145,7 @@ export default function HabitsScreen() {
   const getScrollableDates = () => {
     const dates = [];
     const today = new Date();
-    
+
     // Show dates from 4 months ago (120 days) to today
     for (let i = 120; i >= 0; i--) {
       const date = new Date(today);
@@ -167,7 +166,7 @@ export default function HabitsScreen() {
   const getHabitValueForDate = (habit: Habit, date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
     const completion = habit.completions.find(c => c.date === dateStr);
-    
+
     if (habit.goalType === 'yes_no') {
       return completion?.completed ? '✓' : '✗';
     } else {
@@ -181,7 +180,7 @@ export default function HabitsScreen() {
     return completion?.completed || false;
   };
 
-  
+
 
   if (loading) {
     return (
@@ -219,16 +218,8 @@ export default function HabitsScreen() {
                 horizontal 
                 showsHorizontalScrollIndicator={false} 
                 style={styles.dateScroll}
-                ref={(ref) => {
-                  if (ref && scrollableDates.length > 0) {
-                    // Scroll to today (last item in the array)
-                    setTimeout(() => {
-                      ref.scrollToEnd({ animated: false });
-                    }, 100);
-                  }
-                }}
               >
-                {scrollableDates.map((date, index) => {
+                {scrollableDates.slice().reverse().map((date, index) => {
                   const isToday = date.toDateString() === new Date().toDateString();
                   return (
                     <View key={index} style={[styles.dateColumn, isToday && styles.todayColumn]}>
@@ -282,21 +273,13 @@ export default function HabitsScreen() {
                     horizontal 
                     showsHorizontalScrollIndicator={false} 
                     style={styles.valuesScroll}
-                    ref={(ref) => {
-                      if (ref && scrollableDates.length > 0) {
-                        // Scroll to today (last item in the array)
-                        setTimeout(() => {
-                          ref.scrollToEnd({ animated: false });
-                        }, 100);
-                      }
-                    }}
                   >
-                    {scrollableDates.map((date, index) => {
+                    {scrollableDates.slice().reverse().map((date, index) => {
                       const value = getHabitValueForDate(habit, date);
                       const isCompleted = getHabitStatusForDate(habit, date);
                       const dateStr = date.toISOString().split('T')[0];
                       const isToday = date.toDateString() === new Date().toDateString();
-                      
+
                       return (
                         <TouchableOpacity
                           key={index}
