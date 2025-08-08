@@ -26,10 +26,14 @@ export default function HabitsScreen() {
   const [selectedHabitType, setSelectedHabitType] = useState<'yes_no' | 'measurable' | null>(null);
   const [loading, setLoading] = useState(true);
   const [scrollableDates, setScrollableDates] = useState<Date[]>([]);
+  const [currentDateIndex, setCurrentDateIndex] = useState(0);
 
   useEffect(() => {
     loadHabits();
-    setScrollableDates(getScrollableDates());
+    const dates = getScrollableDates();
+    setScrollableDates(dates);
+    // Start at today (which is the first item in the reversed array)
+    setCurrentDateIndex(0);
   }, []);
 
   const loadHabits = async () => {
@@ -180,6 +184,15 @@ export default function HabitsScreen() {
     return completion?.completed || false;
   };
 
+  const handleDateScroll = (event: any) => {
+    const scrollX = event.nativeEvent.contentOffset.x;
+    const dateWidth = 50; // Smaller width for 6 dates to fit
+    const newIndex = Math.round(scrollX / dateWidth);
+    if (newIndex !== currentDateIndex && newIndex >= 0 && newIndex < scrollableDates.length) {
+      setCurrentDateIndex(newIndex);
+    }
+  };
+
 
 
   if (loading) {
@@ -218,6 +231,11 @@ export default function HabitsScreen() {
                 horizontal 
                 showsHorizontalScrollIndicator={false} 
                 style={styles.dateScroll}
+                onScroll={handleDateScroll}
+                scrollEventThrottle={16}
+                snapToInterval={50}
+                decelerationRate="fast"
+                snapToAlignment="start"
               >
                 {scrollableDates.slice().reverse().map((date, index) => {
                   const isToday = date.toDateString() === new Date().toDateString();
@@ -273,6 +291,11 @@ export default function HabitsScreen() {
                     horizontal 
                     showsHorizontalScrollIndicator={false} 
                     style={styles.valuesScroll}
+                    onScroll={handleDateScroll}
+                    scrollEventThrottle={16}
+                    snapToInterval={50}
+                    decelerationRate="fast"
+                    snapToAlignment="start"
                   >
                     {scrollableDates.slice().reverse().map((date, index) => {
                       const value = getHabitValueForDate(habit, date);
@@ -426,18 +449,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   dateColumn: {
-    width: 60,
+    width: 50,
     alignItems: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
   },
   dayText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
     color: '#64748b',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   dateText: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '600',
     color: '#1a202c',
   },
@@ -449,14 +472,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
-    paddingVertical: 16,
+    paddingVertical: 12,
   },
   habitEmoji: {
-    fontSize: 20,
-    marginRight: 12,
+    fontSize: 16,
+    marginRight: 8,
   },
   habitName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
     color: '#1a202c',
     flex: 1,
@@ -465,15 +488,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   valueColumn: {
-    width: 60,
+    width: 50,
     alignItems: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
   },
   valueCell: {
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 32,
-    paddingHorizontal: 4,
+    minHeight: 28,
+    paddingHorizontal: 2,
   },
   completedCell: {
     backgroundColor: '#dcfce7',
@@ -484,12 +507,12 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   valueText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: '#374151',
   },
   checkmarkText: {
-    fontSize: 16,
+    fontSize: 14,
   },
   completedText: {
     color: '#16a34a',
@@ -498,9 +521,9 @@ const styles = StyleSheet.create({
     color: '#dc2626',
   },
   unitText: {
-    fontSize: 10,
+    fontSize: 8,
     color: '#9ca3af',
-    marginTop: 2,
+    marginTop: 1,
   },
   emptyState: {
     flex: 1,
