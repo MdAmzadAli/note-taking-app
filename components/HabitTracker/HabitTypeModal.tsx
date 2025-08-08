@@ -26,41 +26,36 @@ export default function HabitTypeModal({ visible, onClose, onSelectType }: Habit
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Choose Habit Type</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Text style={styles.closeText}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.content}>
-            <TouchableOpacity
-              style={styles.typeCard}
-              onPress={() => onSelectType('yes_no')}
-            >
-              <View style={styles.typeIcon}>
-                <Text style={styles.typeEmoji}>✅</Text>
+        <View style={styles.content}>
+          <TouchableOpacity
+            style={styles.typeCard}
+            onPress={() => onSelectType('yes_no')}
+          >
+            <View style={styles.cardContent}>
+              <Text style={styles.typeEmoji}>✅</Text>
+              <View style={styles.textContent}>
+                <Text style={styles.typeTitle}>Yes or No</Text>
+                <Text style={styles.exampleText}>• Did you wake up early today?</Text>
+                <Text style={styles.exampleText}>• Did you exercise for 30 minutes?</Text>
+                <Text style={styles.exampleText}>• Did you read a book today?</Text>
               </View>
-              <Text style={styles.typeTitle}>Yes or No</Text>
-              <Text style={styles.typeDescription}>
-                Did you wake up early today?
-              </Text>
-            </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.typeCard}
-              onPress={() => onSelectType('measurable')}
-            >
-              <View style={styles.typeIcon}>
-                <Text style={styles.typeEmoji}>📊</Text>
+          <TouchableOpacity
+            style={styles.typeCard}
+            onPress={() => onSelectType('measurable')}
+          >
+            <View style={styles.cardContent}>
+              <Text style={styles.typeEmoji}>📊</Text>
+              <View style={styles.textContent}>
+                <Text style={styles.typeTitle}>Measurable</Text>
+                <Text style={styles.exampleText}>• How many glasses of water?</Text>
+                <Text style={styles.exampleText}>• How many minutes of meditation?</Text>
+                <Text style={styles.exampleText}>• How many pages did you read?</Text>
               </View>
-              <Text style={styles.typeTitle}>Measurable</Text>
-              <Text style={styles.typeDescription}>
-                How many glasses of water did you drink?
-              </Text>
-            </TouchableOpacity>
-          </View>
+            </View>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -73,44 +68,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  container: {
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
-    borderRadius: 20,
-    width: width * 0.85,
-    maxWidth: 400,
-    backdropFilter: 'blur(10px)',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(226, 232, 240, 0.3)',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1a202c',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  closeText: {
-    fontSize: 18,
-    color: '#64748b',
-    fontWeight: '600',
   },
   content: {
-    padding: 20,
+    width: width * 0.9,
+    maxWidth: 400,
     gap: 24,
   },
   typeCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.4)',
     borderRadius: 16,
     padding: 20,
-    alignItems: 'center',
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.6)',
     shadowColor: '#000',
@@ -122,37 +90,29 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
-  typeIcon: {
-    width: 60,
-    height: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  cardContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 16,
   },
   typeEmoji: {
-    fontSize: 28,
+    fontSize: 32,
+    marginTop: 4,
+  },
+  textContent: {
+    flex: 1,
   },
   typeTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     color: '#1a202c',
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  typeDescription: {
+  exampleText: {
     fontSize: 14,
     color: '#4a5568',
-    textAlign: 'center',
     lineHeight: 20,
+    marginBottom: 4,
     fontStyle: 'italic',
   },
 });
