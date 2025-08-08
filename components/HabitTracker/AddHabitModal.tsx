@@ -46,8 +46,8 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
   const [targetType, setTargetType] = useState<'at_least' | 'at_max'>('at_least');
   const [frequency, setFrequency] = useState('Every day');
   const [frequencyType, setFrequencyType] = useState<'every_day' | 'every_n_days' | 'times_per_week' | 'times_per_month' | 'times_in_days'>('every_day');
-  const [customValue1, setCustomValue1] = useState(3);
-  const [customValue2, setCustomValue2] = useState(14);
+  const [customValue1, setCustomValue1] = useState('');
+  const [customValue2, setCustomValue2] = useState('');
   const [reminderTime, setReminderTime] = useState<Date | null>(null);
   const [notes, setNotes] = useState('');
 
@@ -68,8 +68,8 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
     setTargetType('at_least');
     setFrequency('Every day');
     setFrequencyType('every_day');
-    setCustomValue1(3);
-    setCustomValue2(14);
+    setCustomValue1('');
+    setCustomValue2('');
     setReminderTime(null);
     setNotes('');
   };
@@ -77,10 +77,10 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
   const getFrequencyText = () => {
     switch (frequencyType) {
       case 'every_day': return 'Every day';
-      case 'every_n_days': return `Every ${customValue1} days`;
-      case 'times_per_week': return `${customValue1} times per week`;
-      case 'times_per_month': return `${customValue1} times per month`;
-      case 'times_in_days': return `${customValue1} times in ${customValue2} days`;
+      case 'every_n_days': return `Every ${customValue1 || '0'} days`;
+      case 'times_per_week': return `${customValue1 || '0'} times per week`;
+      case 'times_per_month': return `${customValue1 || '0'} times per month`;
+      case 'times_in_days': return `${customValue1 || '0'} times in ${customValue2 || '0'} days`;
       default: return 'Every day';
     }
   };
@@ -122,8 +122,8 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
       target: habitType === 'measurable' ? Number(target) : undefined,
       targetType: habitType === 'measurable' ? targetType : undefined,
       frequencyType,
-      customValue1: frequencyType !== 'every_day' ? customValue1 : undefined,
-      customValue2: frequencyType === 'times_in_days' ? customValue2 : undefined,
+      customValue1: frequencyType !== 'every_day' ? parseInt(customValue1 || '0') : undefined,
+      customValue2: frequencyType === 'times_in_days' ? parseInt(customValue2 || '0') : undefined,
       reminderTime: reminderTime ? reminderTime.toISOString() : undefined,
       notes: notes.trim() || undefined,
     };
@@ -451,138 +451,156 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
               onPress={(e) => e.stopPropagation()}
             >
               <View style={styles.frequencyOptions}>
-                {/* Every day */}
-                <TouchableOpacity
-                  style={styles.frequencyOption}
-                  onPress={() => {
-                    setFrequencyType('every_day');
-                    setFrequency('Every day');
-                  }}
-                >
-                  <View style={[styles.radio, frequencyType === 'every_day' && styles.radioSelected]} />
-                  <Text style={styles.frequencyText}>Every day</Text>
-                </TouchableOpacity>
+                {habitType === 'measurable' ? (
+                  // Measurable habit options: Only Every Day, Every Week, Every Month
+                  <>
+                    <TouchableOpacity
+                      style={styles.frequencyOption}
+                      onPress={() => {
+                        setFrequencyType('every_day');
+                        setFrequency('Every day');
+                      }}
+                    >
+                      <View style={[styles.radio, frequencyType === 'every_day' && styles.radioSelected]} />
+                      <Text style={styles.frequencyText}>Every day</Text>
+                    </TouchableOpacity>
 
-                {/* Every N days */}
-                <TouchableOpacity
-                  style={styles.frequencyOption}
-                  onPress={() => setFrequencyType('every_n_days')}
-                >
-                  <View style={[styles.radio, frequencyType === 'every_n_days' && styles.radioSelected]} />
-                  <Text style={styles.frequencyText}>Every</Text>
-                  <TextInput
-                    style={styles.numberInput}
-                    value={customValue1 === 0 ? '' : customValue1.toString()}
-                    onChangeText={(text) => {
-                      if (text === '') {
-                        setCustomValue1(0);
-                      } else {
-                        const num = parseInt(text) || 0;
-                        setCustomValue1(num);
-                      }
-                    }}
-                    keyboardType="numeric"
-                    placeholder="0"
-                  />
-                  <Text style={styles.frequencyText}>days</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.frequencyOption}
+                      onPress={() => {
+                        setFrequencyType('times_per_week');
+                        setCustomValue1('1');
+                        setFrequency('Every week');
+                      }}
+                    >
+                      <View style={[styles.radio, frequencyType === 'times_per_week' && customValue1 === '1' && styles.radioSelected]} />
+                      <Text style={styles.frequencyText}>Every week</Text>
+                    </TouchableOpacity>
 
-                {/* Times per week */}
-                <TouchableOpacity
-                  style={styles.frequencyOption}
-                  onPress={() => setFrequencyType('times_per_week')}
-                >
-                  <View style={[styles.radio, frequencyType === 'times_per_week' && styles.radioSelected]} />
-                  <TextInput
-                    style={styles.numberInput}
-                    value={customValue1 === 0 ? '' : customValue1.toString()}
-                    onChangeText={(text) => {
-                      if (text === '') {
-                        setCustomValue1(0);
-                      } else {
-                        const num = parseInt(text) || 0;
-                        setCustomValue1(num);
-                      }
-                    }}
-                    keyboardType="numeric"
-                    placeholder="0"
-                  />
-                  <Text style={styles.frequencyText}>times per week</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.frequencyOption}
+                      onPress={() => {
+                        setFrequencyType('times_per_month');
+                        setCustomValue1('1');
+                        setFrequency('Every month');
+                      }}
+                    >
+                      <View style={[styles.radio, frequencyType === 'times_per_month' && customValue1 === '1' && styles.radioSelected]} />
+                      <Text style={styles.frequencyText}>Every month</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  // Yes/No habit options: All frequency types
+                  <>
+                    {/* Every day */}
+                    <TouchableOpacity
+                      style={styles.frequencyOption}
+                      onPress={() => {
+                        setFrequencyType('every_day');
+                        setFrequency('Every day');
+                      }}
+                    >
+                      <View style={[styles.radio, frequencyType === 'every_day' && styles.radioSelected]} />
+                      <Text style={styles.frequencyText}>Every day</Text>
+                    </TouchableOpacity>
 
-                {/* Times per month */}
-                <TouchableOpacity
-                  style={styles.frequencyOption}
-                  onPress={() => setFrequencyType('times_per_month')}
-                >
-                  <View style={[styles.radio, frequencyType === 'times_per_month' && styles.radioSelected]} />
-                  <TextInput
-                    style={styles.numberInput}
-                    value={customValue1 === 0 ? '' : customValue1.toString()}
-                    onChangeText={(text) => {
-                      if (text === '') {
-                        setCustomValue1(0);
-                      } else {
-                        const num = parseInt(text) || 0;
-                        setCustomValue1(num);
-                      }
-                    }}
-                    keyboardType="numeric"
-                    placeholder="0"
-                  />
-                  <Text style={styles.frequencyText}>times per month</Text>
-                </TouchableOpacity>
+                    {/* Every N days */}
+                    <TouchableOpacity
+                      style={styles.frequencyOption}
+                      onPress={() => setFrequencyType('every_n_days')}
+                    >
+                      <View style={[styles.radio, frequencyType === 'every_n_days' && styles.radioSelected]} />
+                      <Text style={styles.frequencyText}>Every</Text>
+                      <TextInput
+                        style={styles.numberInput}
+                        value={customValue1}
+                        onChangeText={(text) => setCustomValue1(text)}
+                        keyboardType="numeric"
+                        placeholder="3"
+                        onFocus={() => setFrequencyType('every_n_days')}
+                      />
+                      <Text style={styles.frequencyText}>days</Text>
+                    </TouchableOpacity>
 
-                {/* Times in days */}
-                <TouchableOpacity
-                  style={styles.frequencyOption}
-                  onPress={() => setFrequencyType('times_in_days')}
-                >
-                  <View style={[styles.radio, frequencyType === 'times_in_days' && styles.radioSelected]} />
-                  <TextInput
-                    style={styles.numberInput}
-                    value={customValue1 === 0 ? '' : customValue1.toString()}
-                    onChangeText={(text) => {
-                      if (text === '') {
-                        setCustomValue1(0);
-                      } else {
-                        const num = parseInt(text) || 0;
-                        setCustomValue1(num);
-                      }
-                    }}
-                    keyboardType="numeric"
-                    placeholder="0"
-                  />
-                  <Text style={styles.frequencyText}>times in</Text>
-                  <TextInput
-                    style={styles.numberInput}
-                    value={customValue2 === 0 ? '' : customValue2.toString()}
-                    onChangeText={(text) => {
-                      if (text === '') {
-                        setCustomValue2(0);
-                      } else {
-                        const num = parseInt(text) || 0;
-                        setCustomValue2(num);
-                      }
-                    }}
-                    keyboardType="numeric"
-                    placeholder="0"
-                  />
-                  <Text style={styles.frequencyText}>days</Text>
-                </TouchableOpacity>
+                    {/* Times per week */}
+                    <TouchableOpacity
+                      style={styles.frequencyOption}
+                      onPress={() => setFrequencyType('times_per_week')}
+                    >
+                      <View style={[styles.radio, frequencyType === 'times_per_week' && styles.radioSelected]} />
+                      <TextInput
+                        style={styles.numberInput}
+                        value={customValue1}
+                        onChangeText={(text) => setCustomValue1(text)}
+                        keyboardType="numeric"
+                        placeholder="3"
+                        onFocus={() => setFrequencyType('times_per_week')}
+                      />
+                      <Text style={styles.frequencyText}>times per week</Text>
+                    </TouchableOpacity>
+
+                    {/* Times per month */}
+                    <TouchableOpacity
+                      style={styles.frequencyOption}
+                      onPress={() => setFrequencyType('times_per_month')}
+                    >
+                      <View style={[styles.radio, frequencyType === 'times_per_month' && styles.radioSelected]} />
+                      <TextInput
+                        style={styles.numberInput}
+                        value={customValue1}
+                        onChangeText={(text) => setCustomValue1(text)}
+                        keyboardType="numeric"
+                        placeholder="3"
+                        onFocus={() => setFrequencyType('times_per_month')}
+                      />
+                      <Text style={styles.frequencyText}>times per month</Text>
+                    </TouchableOpacity>
+
+                    {/* Times in days */}
+                    <TouchableOpacity
+                      style={styles.frequencyOption}
+                      onPress={() => setFrequencyType('times_in_days')}
+                    >
+                      <View style={[styles.radio, frequencyType === 'times_in_days' && styles.radioSelected]} />
+                      <TextInput
+                        style={styles.numberInput}
+                        value={customValue1}
+                        onChangeText={(text) => setCustomValue1(text)}
+                        keyboardType="numeric"
+                        placeholder="3"
+                        onFocus={() => setFrequencyType('times_in_days')}
+                      />
+                      <Text style={styles.frequencyText}>times in</Text>
+                      <TextInput
+                        style={styles.numberInput}
+                        value={customValue2}
+                        onChangeText={(text) => setCustomValue2(text)}
+                        keyboardType="numeric"
+                        placeholder="14"
+                        onFocus={() => setFrequencyType('times_in_days')}
+                      />
+                      <Text style={styles.frequencyText}>days</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
 
               <TouchableOpacity
                 style={styles.modalSaveButton}
                 onPress={() => {
-                  // Auto-select Every Day if any custom values are empty or 0
-                  if (frequencyType !== 'every_day' &&
-                      (customValue1 === 0 ||
-                       (frequencyType === 'times_in_days' && customValue2 === 0))) {
-                    setFrequencyType('every_day');
-                    setFrequency('Every day');
-                  } else {
+                  if (habitType === 'measurable') {
+                    // For measurable habits, save the selected frequency
                     setFrequency(getFrequencyText());
+                  } else {
+                    // For yes/no habits, validate and save
+                    if (frequencyType !== 'every_day' &&
+                        (!customValue1 ||
+                         (frequencyType === 'times_in_days' && !customValue2))) {
+                      setFrequencyType('every_day');
+                      setFrequency('Every day');
+                    } else {
+                      setFrequency(getFrequencyText());
+                    }
                   }
                   setShowFrequencyModal(false);
                 }}
