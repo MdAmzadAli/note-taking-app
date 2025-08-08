@@ -19,7 +19,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSection } from '@/types';
-import { saveNote, saveTemplate, getNotes, getTemplates, deleteNote, updateNote, getUserSettings, UserSettings, saveCustomTemplate } from '@/utils/storage';
+import { saveNote, saveTemplate, getNotes, getTemplates, getCustomTemplates, deleteNote, updateNote, getUserSettings, UserSettings, saveCustomTemplate } from '@/utils/storage';
 import TemplateEntriesScreen from './TemplateEntriesScreen';
 import { eventBus, EVENTS } from '@/utils/eventBus';
 
@@ -154,9 +154,27 @@ export default function NotesScreen() {
 
   const loadTemplates = async () => {
     try {
-      const templatesData = await getTemplates();
-      setTemplates(templatesData);
-      setFilteredTemplates(templatesData);
+      const templatesData = await getCustomTemplates();
+      console.log('[NOTES] Loading templates:', templatesData.length);
+      
+      // Sort templates by creation date, newest first
+      const sortedTemplates = templatesData.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      
+      setTemplates([...sortedTemplates]);
+      
+      // Apply current search filter if exists
+      if (searchQuery.trim()) {
+        const filtered = sortedTemplates.filter(template =>
+          template.name.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        setFilteredTemplates(filtered);
+      } else {
+        setFilteredTemplates([...sortedTemplates]);
+      }
+      
+      console.log('[NOTES] Templates updated successfully');
     } catch (error) {
       console.error('Error loading templates:', error);
     }
@@ -227,7 +245,11 @@ export default function NotesScreen() {
       setTemplateDescription('');
       setTemplateFields([]);
       setNewFieldName('');
+      
+      // Show the menu with updated templates after creating a new template
       setCurrentView('notes');
+      setIsMenuVisible(true);
+      openMenu();
       
       Alert.alert('Success', 'Template created successfully!');
     } catch (error) {
@@ -526,14 +548,24 @@ export default function NotesScreen() {
     });
 
     // Subscribe to template events to refresh the templates menu
-    const unsubscribeTemplateCreated = eventBus.subscribe(EVENTS.TEMPLATE_CREATED, () => {
+    const unsubscribeTemplateCreated = eventBus.subscribe(EVENTS.TEMPLATE_CREATED, (template: CustomTemplate) => {
       console.log('[NOTES] Real-time: Template created, reloading templates...');
       loadTemplates();
+      
+      // Force re-render of filtered templates for search
+      const currentQuery = searchQuery;
+      setSearchQuery('');
+      setTimeout(() => setSearchQuery(currentQuery), 100);
     });
 
-    const unsubscribeTemplateUpdated = eventBus.subscribe(EVENTS.TEMPLATE_UPDATED, () => {
+    const unsubscribeTemplateUpdated = eventBus.subscribe(EVENTS.TEMPLATE_UPDATED, (template: CustomTemplate) => {
       console.log('[NOTES] Real-time: Template updated, reloading templates...');
       loadTemplates();
+      
+      // Force re-render of filtered templates for search
+      const currentQuery = searchQuery;
+      setSearchQuery('');
+      setTimeout(() => setSearchQuery(currentQuery), 100);
     });
 
     return () => {
