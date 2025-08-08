@@ -219,16 +219,8 @@ export default function HabitsScreen() {
                 horizontal 
                 showsHorizontalScrollIndicator={false} 
                 style={styles.dateScroll}
-                ref={(ref) => {
-                  if (ref && scrollableDates.length > 0) {
-                    // Scroll to today (last item in the array)
-                    setTimeout(() => {
-                      ref.scrollToEnd({ animated: false });
-                    }, 100);
-                  }
-                }}
               >
-                {scrollableDates.map((date, index) => {
+                {scrollableDates.slice().reverse().map((date, index) => {
                   const isToday = date.toDateString() === new Date().toDateString();
                   return (
                     <View key={index} style={[styles.dateColumn, isToday && styles.todayColumn]}>
@@ -282,16 +274,8 @@ export default function HabitsScreen() {
                     horizontal 
                     showsHorizontalScrollIndicator={false} 
                     style={styles.valuesScroll}
-                    ref={(ref) => {
-                      if (ref && scrollableDates.length > 0) {
-                        // Scroll to today (last item in the array)
-                        setTimeout(() => {
-                          ref.scrollToEnd({ animated: false });
-                        }, 100);
-                      }
-                    }}
                   >
-                    {scrollableDates.map((date, index) => {
+                    {scrollableDates.slice().reverse().map((date, index) => {
                       const value = getHabitValueForDate(habit, date);
                       const isCompleted = getHabitStatusForDate(habit, date);
                       const dateStr = date.toISOString().split('T')[0];
