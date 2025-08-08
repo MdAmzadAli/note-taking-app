@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import {
   View,
@@ -10,6 +11,7 @@ import {
   Alert,
   Dimensions,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Habit } from '@/types';
 
 interface AddHabitModalProps {
@@ -19,38 +21,51 @@ interface AddHabitModalProps {
   habitType: 'yes_no' | 'measurable' | null;
 }
 
-const EMOJI_OPTIONS = [
-  '💪', '🏃', '📚', '💧', '🧘', '🍎', '😴', '🎯', '✍️', '🎵',
-  '🌱', '🏋️', '🚶', '📱', '💻', '🍔', '🚭', '💊', '🧹', '📖',
-  '🎨', '🌅', '🌙', '⭐', '🔥', '💎', '🎪', '🎭', '🎸', '🏆'
-];
-
 const COLOR_OPTIONS = [
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F',
   '#BB8FCE', '#85C1E9', '#F8C471', '#82E0AA', '#F1948A', '#AED6F1', '#FCF3CF', '#D7BDE2',
-  '#A3E4D7', '#FADBD8', '#D5F4E6', '#FDEAA7', '#E8DAEF', '#D6EAF8', '#FEF9E7', '#EAEDED',
-  '#EBDEF0', '#D1F2EB', '#FDF2E9'
+  '#A3E4D7', '#FADBD8', '#D5F4E6', '#FDEAA7', '#E8DAEF', '#D6EAF8', '#FEF9E7', '#EAEDED'
 ];
 
 const { width } = Dimensions.get('window');
 
 export default function AddHabitModal({ visible, onClose, onSave, habitType }: AddHabitModalProps) {
   const [name, setName] = useState('');
-  const [selectedEmoji, setSelectedEmoji] = useState('🎯');
-  const [selectedColor, setSelectedColor] = useState('#4ecdc4');
-  const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'custom'>('daily');
-  const [targetValue, setTargetValue] = useState('');
-  const [customFrequency, setCustomFrequency] = useState('');
-  const [unit, setUnit] = useState('');
+  const [selectedColor, setSelectedColor] = useState('#4ECDC4');
+  const [question, setQuestion] = useState('');
+  const [frequency, setFrequency] = useState('Every day');
+  const [frequencyType, setFrequencyType] = useState<'every_day' | 'every_n_days' | 'times_per_week' | 'times_per_month' | 'times_in_days'>('every_day');
+  const [customValue1, setCustomValue1] = useState(3);
+  const [customValue2, setCustomValue2] = useState(14);
+  const [reminderTime, setReminderTime] = useState<Date | null>(null);
+  const [notes, setNotes] = useState('');
+  
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showFrequencyModal, setShowFrequencyModal] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showReminderPicker, setShowReminderPicker] = useState(false);
 
   const resetForm = () => {
     setName('');
-    setSelectedEmoji('🎯');
-    setSelectedColor('#4ecdc4');
-    setFrequency('daily');
-    setTargetValue('');
-    setCustomFrequency('');
-    setUnit('');
+    setSelectedColor('#4ECDC4');
+    setQuestion('');
+    setFrequency('Every day');
+    setFrequencyType('every_day');
+    setCustomValue1(3);
+    setCustomValue2(14);
+    setReminderTime(null);
+    setNotes('');
+  };
+
+  const getFrequencyText = () => {
+    switch (frequencyType) {
+      case 'every_day': return 'Every day';
+      case 'every_n_days': return `Every ${customValue1} days`;
+      case 'times_per_week': return `${customValue1} times per week`;
+      case 'times_per_month': return `${customValue1} times per month`;
+      case 'times_in_days': return `${customValue1} times in ${customValue2} days`;
+      default: return 'Every day';
+    }
   };
 
   const handleSave = () => {
@@ -59,26 +74,23 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
       return;
     }
 
-    if (frequency === 'custom' && (!customFrequency || parseInt(customFrequency) < 1)) {
-      Alert.alert('Error', 'Please enter a valid custom frequency');
+    if (habitType === 'yes_no' && !question.trim()) {
+      Alert.alert('Error', 'Please enter a question');
       return;
     }
-
-    if (habitType === 'measurable' && (!targetValue || parseInt(targetValue) < 1)) {
-      Alert.alert('Error', 'Please enter a valid target value');
-      return;
-    }
-
-    const goalType = habitType === 'yes_no' ? 'yes_no' : 'quantity';
 
     const habit = {
       name: name.trim(),
-      emoji: selectedEmoji,
+      emoji: '🎯',
       color: selectedColor,
-      frequency,
-      goalType,
-      targetValue: habitType === 'measurable' ? parseInt(targetValue) : undefined,
-      customFrequency: frequency === 'custom' ? parseInt(customFrequency) : undefined,
+      frequency: 'custom',
+      goalType: habitType === 'yes_no' ? 'yes_no' : 'quantity',
+      question: habitType === 'yes_no' ? question.trim() : undefined,
+      frequencyType,
+      customValue1: frequencyType !== 'every_day' ? customValue1 : undefined,
+      customValue2: frequencyType === 'times_in_days' ? customValue2 : undefined,
+      reminderTime: reminderTime ? reminderTime.toISOString() : undefined,
+      notes: notes.trim() || undefined,
     };
 
     onSave(habit);
@@ -90,145 +102,303 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
     onClose();
   };
 
-  const getTitle = () => {
-    if (habitType === 'yes_no') return 'Create Yes/No Habit';
-    if (habitType === 'measurable') return 'Create Measurable Habit';
-    return 'Create New Habit';
-  };
-
   return (
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
+      presentationStyle="fullScreen"
       onRequestClose={handleClose}
     >
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-            <Text style={styles.closeText}>✕</Text>
+        {/* Black Navbar */}
+        <View style={styles.navbar}>
+          <TouchableOpacity onPress={handleClose} style={styles.backButton}>
+            <Text style={styles.backArrow}>←</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>{getTitle()}</Text>
+          <Text style={styles.navTitle}>Create habit</Text>
           <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
-            <Text style={styles.saveButtonText}>Save</Text>
+            <Text style={styles.saveButtonText}>SAVE</Text>
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Habit Name */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Habit Name</Text>
+          {/* Name and Color Row */}
+          <View style={styles.row}>
+            <View style={styles.nameContainer}>
+              <Text style={styles.label}>Name</Text>
+              <TextInput
+                style={styles.textInput}
+                value={name}
+                onChangeText={setName}
+                placeholder="e.g. Exercise"
+                placeholderTextColor="#666"
+              />
+            </View>
+            <View style={styles.colorContainer}>
+              <Text style={styles.label}>Color</Text>
+              <TouchableOpacity
+                style={[styles.colorPreview, { backgroundColor: selectedColor }]}
+                onPress={() => setShowColorPicker(true)}
+              />
+            </View>
+          </View>
+
+          {/* Question Field */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Question</Text>
             <TextInput
               style={styles.textInput}
-              value={name}
-              onChangeText={setName}
-              placeholder={habitType === 'yes_no' ? "e.g., Did I exercise today?" : "e.g., Drink water"}
-              placeholderTextColor="#9ca3af"
+              value={question}
+              onChangeText={setQuestion}
+              placeholder="e.g. Did you exercise today?"
+              placeholderTextColor="#666"
             />
           </View>
 
-          {/* Emoji Selector */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Choose Icon</Text>
-            <View style={styles.emojiGrid}>
-              {EMOJI_OPTIONS.map((emoji) => (
-                <TouchableOpacity
-                  key={emoji}
-                  style={[
-                    styles.emojiOption,
-                    selectedEmoji === emoji && { backgroundColor: selectedColor + '20', borderColor: selectedColor },
-                  ]}
-                  onPress={() => setSelectedEmoji(emoji)}
-                >
-                  <Text style={styles.emojiText}>{emoji}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+          {/* Frequency Field */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Frequency</Text>
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => setShowFrequencyModal(true)}
+            >
+              <Text style={styles.dropdownText}>{getFrequencyText()}</Text>
+              <Text style={styles.dropdownArrow}>▼</Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Color Selector */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Choose Color</Text>
-            <View style={styles.colorGrid}>
-              {COLOR_OPTIONS.map((color) => (
-                <TouchableOpacity
-                  key={color}
-                  style={[
-                    styles.colorOption,
-                    { backgroundColor: color },
-                    selectedColor === color && styles.selectedColor,
-                  ]}
-                  onPress={() => setSelectedColor(color)}
-                >
-                  {selectedColor === color && (
-                    <Text style={styles.checkMark}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
+          {/* Reminder Field */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Reminder</Text>
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => setShowReminderPicker(true)}
+            >
+              <Text style={styles.dropdownText}>
+                {reminderTime ? reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Off'}
+              </Text>
+              <Text style={styles.dropdownArrow}>▼</Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Target Value for Measurable */}
-          {habitType === 'measurable' && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Target & Unit</Text>
-              <View style={styles.targetRow}>
-                <TextInput
-                  style={[styles.textInput, styles.targetInput]}
-                  value={targetValue}
-                  onChangeText={setTargetValue}
-                  placeholder="Target"
-                  placeholderTextColor="#9ca3af"
-                  keyboardType="numeric"
-                />
-                <TextInput
-                  style={[styles.textInput, styles.unitInput]}
-                  value={unit}
-                  onChangeText={setUnit}
-                  placeholder="Unit (e.g., glasses, minutes)"
-                  placeholderTextColor="#9ca3af"
-                />
-              </View>
-            </View>
-          )}
-
-          {/* Frequency */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Frequency</Text>
-            <View style={styles.optionRow}>
-              {(['daily', 'weekly', 'custom'] as const).map((freq) => (
-                <TouchableOpacity
-                  key={freq}
-                  style={[
-                    styles.optionButton,
-                    frequency === freq && { backgroundColor: selectedColor + '20', borderColor: selectedColor },
-                  ]}
-                  onPress={() => setFrequency(freq)}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      frequency === freq && { color: selectedColor },
-                    ]}
-                  >
-                    {freq.charAt(0).toUpperCase() + freq.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {frequency === 'custom' && (
-              <TextInput
-                style={[styles.textInput, styles.smallInput]}
-                value={customFrequency}
-                onChangeText={setCustomFrequency}
-                placeholder="Every X days"
-                placeholderTextColor="#9ca3af"
-                keyboardType="numeric"
-              />
-            )}
+          {/* Notes Field */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Notes</Text>
+            <TextInput
+              style={[styles.textInput, styles.notesInput]}
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="(Optional)"
+              placeholderTextColor="#666"
+              multiline
+            />
           </View>
         </ScrollView>
+
+        {/* Color Picker Modal */}
+        <Modal
+          visible={showColorPicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowColorPicker(false)}
+        >
+          <TouchableOpacity 
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowColorPicker(false)}
+          >
+            <TouchableOpacity 
+              style={styles.colorPickerModal}
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View style={styles.colorGrid}>
+                {COLOR_OPTIONS.map((color) => (
+                  <TouchableOpacity
+                    key={color}
+                    style={[
+                      styles.colorOption,
+                      { backgroundColor: color },
+                      selectedColor === color && styles.selectedColor,
+                    ]}
+                    onPress={() => {
+                      setSelectedColor(color);
+                      setShowColorPicker(false);
+                    }}
+                  >
+                    {selectedColor === color && (
+                      <Text style={styles.checkMark}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Frequency Modal */}
+        <Modal
+          visible={showFrequencyModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowFrequencyModal(false)}
+        >
+          <TouchableOpacity 
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowFrequencyModal(false)}
+          >
+            <TouchableOpacity 
+              style={styles.frequencyModal}
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View style={styles.frequencyOptions}>
+                {/* Every day */}
+                <TouchableOpacity
+                  style={styles.frequencyOption}
+                  onPress={() => {
+                    setFrequencyType('every_day');
+                    setFrequency('Every day');
+                  }}
+                >
+                  <View style={[styles.radio, frequencyType === 'every_day' && styles.radioSelected]} />
+                  <Text style={styles.frequencyText}>Every day</Text>
+                </TouchableOpacity>
+
+                {/* Every N days */}
+                <TouchableOpacity
+                  style={styles.frequencyOption}
+                  onPress={() => setFrequencyType('every_n_days')}
+                >
+                  <View style={[styles.radio, frequencyType === 'every_n_days' && styles.radioSelected]} />
+                  <Text style={styles.frequencyText}>Every</Text>
+                  <TextInput
+                    style={styles.numberInput}
+                    value={customValue1.toString()}
+                    onChangeText={(text) => setCustomValue1(parseInt(text) || 3)}
+                    keyboardType="numeric"
+                  />
+                  <Text style={styles.frequencyText}>days</Text>
+                </TouchableOpacity>
+
+                {/* Times per week */}
+                <TouchableOpacity
+                  style={styles.frequencyOption}
+                  onPress={() => setFrequencyType('times_per_week')}
+                >
+                  <View style={[styles.radio, frequencyType === 'times_per_week' && styles.radioSelected]} />
+                  <TextInput
+                    style={styles.numberInput}
+                    value={customValue1.toString()}
+                    onChangeText={(text) => setCustomValue1(parseInt(text) || 3)}
+                    keyboardType="numeric"
+                  />
+                  <Text style={styles.frequencyText}>times per week</Text>
+                </TouchableOpacity>
+
+                {/* Times per month */}
+                <TouchableOpacity
+                  style={styles.frequencyOption}
+                  onPress={() => setFrequencyType('times_per_month')}
+                >
+                  <View style={[styles.radio, frequencyType === 'times_per_month' && styles.radioSelected]} />
+                  <TextInput
+                    style={styles.numberInput}
+                    value={customValue1.toString()}
+                    onChangeText={(text) => setCustomValue1(parseInt(text) || 10)}
+                    keyboardType="numeric"
+                  />
+                  <Text style={styles.frequencyText}>times per month</Text>
+                </TouchableOpacity>
+
+                {/* Times in days */}
+                <TouchableOpacity
+                  style={styles.frequencyOption}
+                  onPress={() => setFrequencyType('times_in_days')}
+                >
+                  <View style={[styles.radio, frequencyType === 'times_in_days' && styles.radioSelected]} />
+                  <TextInput
+                    style={styles.numberInput}
+                    value={customValue1.toString()}
+                    onChangeText={(text) => setCustomValue1(parseInt(text) || 3)}
+                    keyboardType="numeric"
+                  />
+                  <Text style={styles.frequencyText}>times in</Text>
+                  <TextInput
+                    style={styles.numberInput}
+                    value={customValue2.toString()}
+                    onChangeText={(text) => setCustomValue2(parseInt(text) || 14)}
+                    keyboardType="numeric"
+                  />
+                  <Text style={styles.frequencyText}>days</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={styles.modalSaveButton}
+                onPress={() => {
+                  setFrequency(getFrequencyText());
+                  setShowFrequencyModal(false);
+                }}
+              >
+                <Text style={styles.modalSaveText}>SAVE</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Reminder Time Picker Modal */}
+        <Modal
+          visible={showReminderPicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowReminderPicker(false)}
+        >
+          <TouchableOpacity 
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowReminderPicker(false)}
+          >
+            <TouchableOpacity 
+              style={styles.timePickerModal}
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <DateTimePicker
+                value={reminderTime || new Date()}
+                mode="time"
+                is24Hour={false}
+                display="spinner"
+                onChange={(event, selectedTime) => {
+                  if (selectedTime) {
+                    setReminderTime(selectedTime);
+                  }
+                }}
+                style={styles.timePicker}
+              />
+              
+              <View style={styles.timePickerButtons}>
+                <TouchableOpacity
+                  style={styles.timePickerButton}
+                  onPress={() => {
+                    setReminderTime(null);
+                    setShowReminderPicker(false);
+                  }}
+                >
+                  <Text style={styles.timePickerButtonText}>Clear</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={styles.timePickerButton}
+                  onPress={() => setShowReminderPicker(false)}
+                >
+                  <Text style={styles.timePickerButtonText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
       </View>
     </Modal>
   );
@@ -237,96 +407,116 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#000',
   },
-  header: {
+  navbar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingTop: 50,
+    backgroundColor: '#000',
   },
-  closeButton: {
+  backButton: {
     padding: 8,
   },
-  closeText: {
-    fontSize: 18,
-    color: '#6b7280',
-    fontWeight: '600',
+  backArrow: {
+    color: '#fff',
+    fontSize: 20,
   },
-  title: {
+  navTitle: {
+    color: '#fff',
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontWeight: '500',
   },
   saveButton: {
-    backgroundColor: '#000000',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#555',
+    borderRadius: 4,
   },
   saveButtonText: {
-    color: '#ffffff',
-    fontWeight: '600',
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
   },
   content: {
     flex: 1,
+    backgroundColor: '#000',
     padding: 16,
   },
-  section: {
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     marginBottom: 24,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 12,
+  nameContainer: {
+    flex: 1,
+    marginRight: 16,
+  },
+  colorContainer: {
+    alignItems: 'center',
+  },
+  field: {
+    marginBottom: 24,
+  },
+  label: {
+    color: '#666',
+    fontSize: 14,
+    marginBottom: 8,
   },
   textInput: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+    paddingVertical: 12,
+    paddingHorizontal: 0,
     fontSize: 16,
-    color: '#1a1a1a',
-    backgroundColor: '#ffffff',
+    color: '#fff',
   },
-  smallInput: {
-    marginTop: 8,
+  notesInput: {
+    minHeight: 80,
+    textAlignVertical: 'top',
   },
-  targetRow: {
+  colorPreview: {
+    width: 40,
+    height: 40,
+    borderRadius: 4,
+  },
+  dropdownButton: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+    paddingVertical: 12,
   },
-  targetInput: {
+  dropdownText: {
+    fontSize: 16,
+    color: '#fff',
+  },
+  dropdownArrow: {
+    fontSize: 12,
+    color: '#666',
+  },
+  modalOverlay: {
     flex: 1,
-  },
-  unitInput: {
-    flex: 2,
-  },
-  emojiGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  emojiOption: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#f9fafb',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
   },
-  emojiText: {
-    fontSize: 24,
+  colorPickerModal: {
+    backgroundColor: '#222',
+    borderRadius: 12,
+    padding: 20,
+    width: width * 0.8,
   },
   colorGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 12,
+    justifyContent: 'center',
   },
   colorOption: {
     width: 40,
@@ -334,34 +524,90 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: 'transparent',
-  },
-  selectedColor: {
-    borderColor: '#ffffff',
-    transform: [{ scale: 1.1 }],
-  },
-  checkMark: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  optionRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  optionButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#f9fafb',
-    alignItems: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  optionText: {
-    fontSize: 14,
+  selectedColor: {
+    borderColor: '#fff',
+  },
+  checkMark: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  frequencyModal: {
+    backgroundColor: '#333',
+    borderRadius: 12,
+    padding: 20,
+    width: width * 0.85,
+    maxHeight: '70%',
+  },
+  frequencyOptions: {
+    marginBottom: 20,
+  },
+  frequencyOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    gap: 12,
+  },
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#666',
+  },
+  radioSelected: {
+    backgroundColor: '#4ECDC4',
+    borderColor: '#4ECDC4',
+  },
+  frequencyText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  numberInput: {
+    backgroundColor: '#555',
+    color: '#fff',
+    fontSize: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 4,
+    minWidth: 50,
+    textAlign: 'center',
+  },
+  modalSaveButton: {
+    backgroundColor: '#4ECDC4',
+    paddingVertical: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  modalSaveText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  timePickerModal: {
+    backgroundColor: '#222',
+    borderRadius: 12,
+    padding: 20,
+    width: width * 0.8,
+  },
+  timePicker: {
+    backgroundColor: 'transparent',
+  },
+  timePickerButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 20,
+  },
+  timePickerButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  timePickerButtonText: {
+    color: '#4ECDC4',
+    fontSize: 16,
     fontWeight: '500',
-    color: '#6b7280',
   },
 });
