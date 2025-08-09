@@ -245,10 +245,9 @@ export default function HabitHistoryGraphSection({ habit }: HabitHistoryGraphSec
                   ]}
                 />
                 <Text style={styles.periodLabel}>
-                  {selectedFilter === 'day' && index % 7 === 0 ? dataPoint.period :
-                   selectedFilter === 'week' && index % 4 === 0 ? dataPoint.period :
-                   (selectedFilter === 'month' || selectedFilter === 'quarter' || selectedFilter === 'year') ? dataPoint.period :
-                   ' '}
+                  {selectedFilter === 'day' ? (index % 7 === 0 ? dataPoint.period : dataPoint.label) :
+                   selectedFilter === 'week' ? (index % 4 === 0 ? dataPoint.period : dataPoint.label) :
+                   dataPoint.period}
                 </Text>
               </View>
             );
