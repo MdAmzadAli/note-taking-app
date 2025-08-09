@@ -346,14 +346,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     borderRadius: 12,
     padding: 16,
+    width: '100%',
   },
   calendarContainer: {
     marginBottom: 16,
+    width: '100%',
   },
   monthHeadersRow: {
     flexDirection: 'row',
     marginBottom: 8,
-    paddingRight: 50, // Space for fixed day labels
+    paddingRight: 70, // Increased space for fixed day labels
   },
   monthHeader: {
     alignItems: 'center',
@@ -367,9 +369,11 @@ const styles = StyleSheet.create({
   calendarWithLabels: {
     flexDirection: 'row',
     position: 'relative',
+    width: '100%',
   },
   calendarGrid: {
     flex: 1,
+    paddingRight: 70, // Space for fixed day labels
   },
   weekRow: {
     flexDirection: 'row',
@@ -379,14 +383,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
-    width: 50,
+    width: 60,
     height: '100%',
     justifyContent: 'space-between',
+    paddingLeft: 10, // Add padding to separate from calendar
   },
   fixedDayLabel: {
     height: 24, // Same as dayCell height + marginBottom
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'flex-start', // Align to left of the label container
   },
   fixedDayLabelText: {
     fontSize: 12,
