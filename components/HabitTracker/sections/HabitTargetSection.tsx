@@ -25,25 +25,62 @@ export default function HabitTargetSection({ habit }: HabitTargetSectionProps) {
         .reduce((sum, c) => sum + (c.value || 0), 0);
     };
 
-    // Get habit frequency type from the habit data
-    const getFrequencyType = () => {
-      // Check if it's measurable habit with custom frequency
-      if (habit.goalType === 'quantity' && habit.frequencyType === 'every_n_days') {
-        const nDays = habit.customValue1 || 1;
-        if (nDays === 7) return 'weekly';
-        if (nDays === 30) return 'monthly';
-        return 'daily';
+    const getFrequencyInDays = (): number => {
+    // For measurable habits, use the frequency string directly
+    if (habit.goalType === 'quantity' || habit.goalType === 'time') {
+      switch (habit.frequency) {
+        case 'Every day': return 1;
+        case 'Every week': return 7;
+        case 'Every month': return 30;
+        default: return 1;
       }
-      
-      // Check legacy frequency values
-      if (habit.frequency === 'Every week') return 'weekly';
-      if (habit.frequency === 'Every month') return 'monthly';
-      
-      // Default to daily
-      return 'daily';
-    };
+    }
 
-    const frequencyType = getFrequencyType();
+    // For yes_no habits, use the original logic with frequencyType
+    if (!habit.frequencyType) return 1;
+
+    switch (habit.frequencyType) {
+      case 'every_day': return 1;
+      case 'every_n_days': return habit.customValue1 || 1;
+      case 'times_per_week': return 7 / (habit.customValue1 || 1);
+      case 'times_per_month': return 30 / (habit.customValue1 || 1);
+      case 'times_in_days': return (habit.customValue2 || 7) / (habit.customValue1 || 1);
+      default: return 1;
+    }
+  };
+
+    const getFrequencyText = (): string => {
+    // For measurable habits, use the frequency string directly
+    if (habit.goalType === 'quantity' || habit.goalType === 'time') {
+      switch (habit.frequency) {
+        case 'Every day': return 'daily';
+        case 'Every week': return 'weekly';
+        case 'Every month': return 'monthly';
+        default: return 'daily';
+      }
+    }
+
+    // For yes_no habits, use the original logic with frequencyType
+    if (!habit.frequencyType) return 'daily';
+
+    switch (habit.frequencyType) {
+      case 'every_day': return 'daily';
+      case 'every_n_days': 
+        const days = habit.customValue1 || 1;
+        if (days === 7) return 'weekly';
+        if (days === 30) return 'monthly';
+        return `every ${days} days`;
+      case 'times_per_week': return 'weekly';
+      case 'times_per_month': return 'monthly';
+      case 'times_in_days': 
+        const times = habit.customValue1 || 1;
+        const period = habit.customValue2 || 7;
+        return `${times} times in ${period} days`;
+      default: return 'daily';
+    }
+  };
+
+    const frequencyType = getFrequencyText();
 
     // Dynamic rolling periods
     const todayStr = today.toISOString().split('T')[0];

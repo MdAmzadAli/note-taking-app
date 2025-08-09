@@ -191,15 +191,18 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
       name: name.trim(),
       emoji: selectedEmoji,
       color: selectedColor,
-      frequency: 'custom',
+      frequency: habitType === 'measurable' ? getFrequencyText() : 'custom',
       goalType: habitType === 'yes_no' ? 'yes_no' : 'quantity',
       question: question.trim(),
       unit: habitType === 'measurable' ? unit.trim() : undefined,
       target: habitType === 'measurable' ? Number(targetValue.current || '1') : undefined,
       targetType: habitType === 'measurable' ? targetType : undefined,
-      frequencyType,
-      customValue1: frequencyType !== 'every_day' ? getCustomValue1() : undefined,
-      customValue2: getCustomValue2(),
+      // Only include frequency type fields for yes_no habits
+      ...(habitType === 'yes_no' && {
+        frequencyType,
+        customValue1: frequencyType !== 'every_day' ? getCustomValue1() : undefined,
+        customValue2: getCustomValue2(),
+      }),
       reminderTime: reminderTime ? reminderTime.toISOString() : undefined,
       notes: notes.trim() || undefined,
     };
