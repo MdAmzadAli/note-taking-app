@@ -9,11 +9,13 @@ import {
 } from 'react-native';
 import { Habit } from '@/types';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { updateHabit } from '@/utils/storage';
 import HabitTargetSection from './sections/HabitTargetSection';
 import HabitOverviewSection from './sections/HabitOverviewSection';
 import HabitStreakSection from './sections/HabitStreakSection';
 import HabitHistorySection from './sections/HabitHistorySection';
 import HabitHistoryGraphSection from './sections/HabitHistoryGraphSection';
+import HabitCalendarSection from './sections/HabitCalendarSection';
 
 interface HabitDetailModalProps {
   visible: boolean;
@@ -122,6 +124,59 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
       <>
         <HabitTargetSection habit={habit} />
         <HabitHistoryGraphSection habit={habit} />
+        <HabitCalendarSection 
+          habit={habit} 
+          onSaveValue={async (habitId, date, newValue) => {
+            try {
+              const existingCompletion = habit.completions.find(c => c.date === date);
+
+              if (existingCompletion) {
+                existingCompletion.completed = newValue > 0;
+                existingCompletion.value = newValue;
+                existingCompletion.completedAt = new Date();
+              } else {
+                habit.completions.push({
+                  id: Date.now().toString(),
+                  habitId,
+                  date,
+                  completed: newValue > 0,
+                  value: newValue,
+                  completedAt: new Date(),
+                });
+              }
+
+              // Recalculate streaks
+              const sortedCompletions = habit.completions
+                .filter(c => c.completed)
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+              let currentStreak = 0;
+              const today = new Date();
+
+              for (let i = 0; i < sortedCompletions.length; i++) {
+                const completionDate = new Date(sortedCompletions[i].date);
+                const expectedDate = new Date(today);
+                expectedDate.setDate(expectedDate.getDate() - i);
+                expectedDate.setHours(0, 0, 0, 0);
+                completionDate.setHours(0, 0, 0, 0);
+
+                if (completionDate.getTime() === expectedDate.getTime()) {
+                  currentStreak++;
+                } else {
+                  break;
+                }
+              }
+
+              habit.currentStreak = currentStreak;
+              habit.longestStreak = Math.max(habit.longestStreak, currentStreak);
+
+              // Update storage
+              await updateHabit(habit);
+            } catch (error) {
+              console.error('Error updating habit value:', error);
+            }
+          }}
+        />
         <HabitStreakSection
           title="Current Streak"
           streakValue={habit.currentStreak}
