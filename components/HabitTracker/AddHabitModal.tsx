@@ -122,8 +122,12 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
     switch (frequencyType) {
       case 'every_day': return 'Every day';
       case 'every_n_days': return `Every ${everyNDaysValue.current || '0'} days`;
-      case 'times_per_week': return `${timesPerWeekValue.current || '0'} times per week`;
-      case 'times_per_month': return `${timesPerMonthValue.current || '0'} times per month`;
+      case 'times_per_week': 
+        const weekValue = timesPerWeekValue.current || customValue1 || '0';
+        return weekValue === '1' ? 'Every week' : `${weekValue} times per week`;
+      case 'times_per_month': 
+        const monthValue = timesPerMonthValue.current || customValue1 || '0';
+        return monthValue === '1' ? 'Every month' : `${monthValue} times per month`;
       case 'times_in_days': return `${timesInDays1Value.current || '0'} times in ${timesInDays2Value.current || '0'} days`;
       default: return 'Every day';
     }
@@ -535,10 +539,11 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                       onPress={() => {
                         setFrequencyType('times_per_week');
                         setCustomValue1('1');
+                        timesPerWeekValue.current = '1';
                         setFrequency('Every week');
                       }}
                     >
-                      <View style={[styles.radio, frequencyType === 'times_per_week' && customValue1 === '1' && styles.radioSelected]} />
+                      <View style={[styles.radio, frequencyType === 'times_per_week' && styles.radioSelected]} />
                       <Text style={styles.frequencyText}>Every week</Text>
                     </TouchableOpacity>
 
@@ -547,10 +552,11 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                       onPress={() => {
                         setFrequencyType('times_per_month');
                         setCustomValue1('1');
+                        timesPerMonthValue.current = '1';
                         setFrequency('Every month');
                       }}
                     >
-                      <View style={[styles.radio, frequencyType === 'times_per_month' && customValue1 === '1' && styles.radioSelected]} />
+                      <View style={[styles.radio, frequencyType === 'times_per_month' && styles.radioSelected]} />
                       <Text style={styles.frequencyText}>Every month</Text>
                     </TouchableOpacity>
                   </>
@@ -689,8 +695,9 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                 style={styles.modalSaveButton}
                 onPress={() => {
                   if (habitType === 'measurable') {
-                    // For measurable habits, save the selected frequency
-                    setFrequency(getFrequencyText());
+                    // For measurable habits, ensure proper frequency text
+                    const finalFrequency = getFrequencyText();
+                    setFrequency(finalFrequency);
                   } else {
                     // For yes/no habits, validate and save
                     const hasValidInput = () => {
