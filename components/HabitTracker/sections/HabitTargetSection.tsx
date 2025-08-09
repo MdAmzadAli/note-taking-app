@@ -7,6 +7,16 @@ interface HabitTargetSectionProps {
 }
 
 export default function HabitTargetSection({ habit }: HabitTargetSectionProps) {
+  const getFrequencyText = (): string => {
+    // For measurable habits, convert frequency string to lowercase format
+    if (habit.frequency === 'Every day') return 'daily';
+    if (habit.frequency === 'Every week') return 'weekly';
+    if (habit.frequency === 'Every month') return 'monthly';
+
+    // Default fallback
+    return 'daily';
+  };
+
   const calculateTargetProgress = () => {
     const today = new Date();
     const targetValue = habit.target || 0;
@@ -33,16 +43,6 @@ export default function HabitTargetSection({ habit }: HabitTargetSectionProps) {
 
       // Default fallback
       return 1;
-    };
-
-    const getFrequencyText = (): string => {
-      // For measurable habits, convert frequency string to lowercase format
-      if (habit.frequency === 'Every day') return 'daily';
-      if (habit.frequency === 'Every week') return 'weekly';
-      if (habit.frequency === 'Every month') return 'monthly';
-
-      // Default fallback
-      return 'daily';
     };
 
     const frequencyType = getFrequencyText();
