@@ -48,48 +48,59 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
     // Get current completions
     const todayProgress = currentValue;
     
-    // Calculate week progress
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
+    // Calculate week progress - from habit creation date or start of current week, whichever is later
+    const startOfCurrentWeek = new Date(now);
+    startOfCurrentWeek.setDate(now.getDate() - now.getDay());
+    const weekStartDate = createdAt > startOfCurrentWeek ? createdAt : startOfCurrentWeek;
     const weekCompletions = habit.completions.filter(c => {
       const date = new Date(c.date);
-      return date >= startOfWeek && date <= now;
+      return date >= weekStartDate && date <= now;
     });
     const weekProgress = weekCompletions.reduce((sum, c) => sum + (c.value || 0), 0);
     
-    // Calculate month progress
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    // Calculate month progress - from habit creation date or start of current month, whichever is later
+    const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthStartDate = createdAt > startOfCurrentMonth ? createdAt : startOfCurrentMonth;
     const monthCompletions = habit.completions.filter(c => {
       const date = new Date(c.date);
-      return date >= startOfMonth && date <= now;
+      return date >= monthStartDate && date <= now;
     });
     const monthProgress = monthCompletions.reduce((sum, c) => sum + (c.value || 0), 0);
     
-    // Calculate quarter progress
+    // Calculate quarter progress - from habit creation date or start of current quarter, whichever is later
     const quarter = Math.floor(now.getMonth() / 3);
-    const startOfQuarter = new Date(now.getFullYear(), quarter * 3, 1);
+    const startOfCurrentQuarter = new Date(now.getFullYear(), quarter * 3, 1);
+    const quarterStartDate = createdAt > startOfCurrentQuarter ? createdAt : startOfCurrentQuarter;
     const quarterCompletions = habit.completions.filter(c => {
       const date = new Date(c.date);
-      return date >= startOfQuarter && date <= now;
+      return date >= quarterStartDate && date <= now;
     });
     const quarterProgress = quarterCompletions.reduce((sum, c) => sum + (c.value || 0), 0);
     
-    // Calculate year progress
-    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    // Calculate year progress - from habit creation date or start of current year, whichever is later
+    const startOfCurrentYear = new Date(now.getFullYear(), 0, 1);
+    const yearStartDate = createdAt > startOfCurrentYear ? createdAt : startOfCurrentYear;
     const yearCompletions = habit.completions.filter(c => {
       const date = new Date(c.date);
-      return date >= startOfYear && date <= now;
+      return date >= yearStartDate && date <= now;
     });
     const yearProgress = yearCompletions.reduce((sum, c) => sum + (c.value || 0), 0);
     
-    // Calculate targets based on frequency
+    // Calculate targets based on time periods from creation date
     const dailyTarget = targetValue;
-    const weeklyTarget = habit.frequency === 'daily' ? dailyTarget * 7 : 
-                        habit.frequency === 'weekly' ? dailyTarget : dailyTarget * 7;
-    const monthlyTarget = habit.frequency === 'daily' ? dailyTarget * new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() :
-                         habit.frequency === 'weekly' ? dailyTarget * 4 : dailyTarget * 30;
-    const quarterlyTarget = habit.frequency === 'daily' ? dailyTarget * 90 : dailyTarget * 12;
-    const yearlyTarget = habit.frequency === 'daily' ? dailyTarget * 365 : dailyTarget * 52;
+    
+    // Week target: 7 days * target (for daily habits)
+    const weeklyTarget = targetValue * 7;
+    
+    // Month target: current month's days * target
+    const currentMonthDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const monthlyTarget = targetValue * currentMonthDays;
+    
+    // Quarter target: approximately 90 days * target
+    const quarterlyTarget = targetValue * 90;
+    
+    // Year target: 365 days * target
+    const yearlyTarget = targetValue * 365;
     
     return {
       today: { progress: todayProgress, target: dailyTarget },
@@ -113,7 +124,11 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
   const getFrequencyText = () => {
     if (habit.frequency === 'daily') return 'Every day';
     if (habit.frequency === 'weekly') return 'Every week';
-    return `Every ${habit.customFrequency} days`;
+    if (habit.frequency === 'Every day') return 'Every day';
+    if (habit.frequency === 'Every week') return 'Every week';
+    if (habit.frequency === 'Every month') return 'Every month';
+    if (habit.customFrequency) return `Every ${habit.customFrequency} days`;
+    return habit.frequency || 'Every day';
   };
 
   const getUnitText = () => {
@@ -149,7 +164,7 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
           {/* Habit Question and Details */}
           <View style={styles.habitDetailsSection}>
             <Text style={[styles.habitQuestion, { color: habit.color || '#1a202c' }]}>
-              {habit.name}
+              {habit.question || habit.name}
             </Text>
             <View style={styles.habitMetadata}>
               <View style={styles.metadataItem}>
