@@ -103,7 +103,7 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
       <View style={styles.container}>
         {/* Navbar */}
         <View style={styles.navbar}>
-          <Text style={styles.navHabitName}>{habit.question || habit.name}</Text>
+          <Text style={styles.navHabitName}>{ habit.name||habit.question }</Text>
           <View style={styles.navActions}>
             <TouchableOpacity style={styles.navButton}>
               <IconSymbol name="pencil" size={20} color="#ffffff" />
