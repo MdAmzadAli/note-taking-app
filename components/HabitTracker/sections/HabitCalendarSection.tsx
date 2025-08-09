@@ -20,7 +20,8 @@ interface CalendarDay {
   date: Date;
   day: number;
   value: number;
-  isCurrentMonth: boolean;
+  isToday: boolean;
+  monthName: string;
 }
 
 export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalendarSectionProps) {
@@ -29,131 +30,71 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const [inputValue, setInputValue] = useState('');
   const [showValueModal, setShowValueModal] = useState(false);
 
-  const currentDate = new Date();
-  const currentMonth = currentDate.getMonth();
-  const currentYear = currentDate.getFullYear();
-
-  // Generate calendar data for current month
-  const calendarData = useMemo(() => {
-    const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
-    const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
-    const firstDayWeekday = firstDayOfMonth.getDay();
-    const daysInMonth = lastDayOfMonth.getDate();
-
+  // Generate dates for preview (126 days - 18 columns × 7 rows)
+  const previewCalendarData = useMemo(() => {
     const days: CalendarDay[] = [];
-
-    // Add days from previous month to fill the first week
-    for (let i = firstDayWeekday - 1; i >= 0; i--) {
-      const date = new Date(currentYear, currentMonth, -i);
+    const today = new Date();
+    
+    // Generate 126 days (18 weeks worth) ending with today
+    for (let i = 125; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      
       const completion = habit.completions.find(c => c.date === date.toISOString().split('T')[0]);
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      
       days.push({
         date,
         day: date.getDate(),
         value: completion?.value || 0,
-        isCurrentMonth: false,
+        isToday: date.toDateString() === today.toDateString(),
+        monthName: monthNames[date.getMonth()],
       });
     }
-
-    // Add days of current month
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(currentYear, currentMonth, day);
-      const completion = habit.completions.find(c => c.date === date.toISOString().split('T')[0]);
-      days.push({
-        date,
-        day,
-        value: completion?.value || 0,
-        isCurrentMonth: true,
-      });
-    }
-
-    // Add days from next month to complete the calendar
-    const remainingDays = 42 - days.length; // 6 weeks * 7 days
-    for (let day = 1; day <= remainingDays; day++) {
-      const date = new Date(currentYear, currentMonth + 1, day);
-      const completion = habit.completions.find(c => c.date === date.toISOString().split('T')[0]);
-      days.push({
-        date,
-        day,
-        value: completion?.value || 0,
-        isCurrentMonth: false,
-      });
-    }
-
+    
     return days;
-  }, [habit.completions, currentMonth, currentYear]);
+  }, [habit.completions]);
 
-  // Generate extended calendar data for modal (6 months)
-  const extendedCalendarData = useMemo(() => {
-    const months = [];
-    for (let monthOffset = -2; monthOffset <= 3; monthOffset++) {
-      const monthDate = new Date(currentYear, currentMonth + monthOffset, 1);
-      const year = monthDate.getFullYear();
-      const month = monthDate.getMonth();
-      const firstDay = new Date(year, month, 1);
-      const lastDay = new Date(year, month + 1, 0);
-      const firstDayWeekday = firstDay.getDay();
-      const daysInMonth = lastDay.getDate();
-
-      const monthDays: CalendarDay[] = [];
-
-      // Add days from previous month
-      for (let i = firstDayWeekday - 1; i >= 0; i--) {
-        const date = new Date(year, month, -i);
-        const completion = habit.completions.find(c => c.date === date.toISOString().split('T')[0]);
-        monthDays.push({
-          date,
-          day: date.getDate(),
-          value: completion?.value || 0,
-          isCurrentMonth: false,
-        });
-      }
-
-      // Add days of current month
-      for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(year, month, day);
-        const completion = habit.completions.find(c => c.date === date.toISOString().split('T')[0]);
-        monthDays.push({
-          date,
-          day,
-          value: completion?.value || 0,
-          isCurrentMonth: true,
-        });
-      }
-
-      // Add days from next month to complete the grid
-      const remainingDays = 42 - monthDays.length;
-      for (let day = 1; day <= remainingDays; day++) {
-        const date = new Date(year, month + 1, day);
-        const completion = habit.completions.find(c => c.date === date.toISOString().split('T')[0]);
-        monthDays.push({
-          date,
-          day,
-          value: completion?.value || 0,
-          isCurrentMonth: false,
-        });
-      }
-
-      months.push({
-        month: monthDate,
-        days: monthDays,
+  // Generate dates for modal (63 days - 9 columns × 7 rows)
+  const modalCalendarData = useMemo(() => {
+    const days: CalendarDay[] = [];
+    const today = new Date();
+    
+    // Generate 63 days (9 weeks worth) ending with today
+    for (let i = 62; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      
+      const completion = habit.completions.find(c => c.date === date.toISOString().split('T')[0]);
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      
+      days.push({
+        date,
+        day: date.getDate(),
+        value: completion?.value || 0,
+        isToday: date.toDateString() === today.toDateString(),
+        monthName: monthNames[date.getMonth()],
       });
     }
-    return months;
-  }, [habit.completions, currentMonth, currentYear]);
+    
+    return days;
+  }, [habit.completions]);
 
-  const getDateColor = (value: number) => {
+  const getDateColor = (value: number, isToday: boolean) => {
     const target = habit.target || 1;
     const habitColor = habit.color || '#3b82f6';
 
-    if (value === 0) {
-      return '#6b7280'; // Grey for zero
+    if (isToday) {
+      return '#3b82f6'; // Blue for today
+    } else if (value === 0) {
+      return '#374151'; // Dark grey for zero
     } else if (value < target) {
-      return '#ffffff'; // White for below target
+      return '#6b7280'; // Light grey for below target
     } else {
       // Calculate intensity based on how much above target
       const intensity = Math.min(value / target, 3); // Cap at 3x intensity
       const opacity = 0.3 + (intensity * 0.7); // Range from 0.3 to 1.0
-      return habitColor + Math.round(opacity * 255).toString(16).padStart(2, '0');
+      return habitColor;
     }
   };
 
@@ -174,12 +115,48 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     setInputValue('');
   };
 
-  const monthNames = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-  ];
-
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  // Organize data into grid format (7 rows × columns)
+  const organizeDataIntoGrid = (data: CalendarDay[], columns: number) => {
+    const grid: CalendarDay[][] = [[], [], [], [], [], [], []]; // 7 days of week
+    
+    data.forEach((day, index) => {
+      const dayOfWeek = day.date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      grid[dayOfWeek].push(day);
+    });
+    
+    return grid;
+  };
+
+  const previewGrid = organizeDataIntoGrid(previewCalendarData, 18);
+  const modalGrid = organizeDataIntoGrid(modalCalendarData, 9);
+
+  // Get month headers for preview (18 columns)
+  const getMonthHeaders = (data: CalendarDay[]) => {
+    const headers: { month: string; colspan: number }[] = [];
+    let currentMonth = '';
+    let count = 0;
+
+    data.forEach((day) => {
+      const monthYear = `${day.monthName} ${day.date.getFullYear()}`;
+      if (monthYear !== currentMonth) {
+        if (currentMonth && count > 0) {
+          headers.push({ month: currentMonth, colspan: count });
+        }
+        currentMonth = monthYear;
+        count = 1;
+      } else {
+        count++;
+      }
+    });
+
+    if (currentMonth && count > 0) {
+      headers.push({ month: currentMonth, colspan: count });
+    }
+
+    return headers;
+  };
 
   return (
     <View style={styles.section}>
@@ -187,44 +164,50 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         Calendar
       </Text>
       
-      {/* Calendar Preview */}
+      {/* Calendar Preview - 18 columns × 7 rows */}
       <View style={styles.calendarPreview}>
-        <Text style={styles.monthTitle}>
-          {monthNames[currentMonth]} {currentYear}
-        </Text>
-        
-        <View style={styles.calendarGrid}>
-          {/* Week day headers */}
-          <View style={styles.weekRow}>
-            {weekDays.map((day) => (
-              <Text key={day} style={styles.weekDayHeader}>{day}</Text>
-            ))}
-          </View>
-          
-          {/* Calendar days - showing only first 3 weeks for preview */}
-          {Array.from({ length: 3 }).map((_, weekIndex) => (
-            <View key={weekIndex} style={styles.weekRow}>
-              {calendarData.slice(weekIndex * 7, (weekIndex + 1) * 7).map((day, dayIndex) => (
-                <View key={dayIndex} style={styles.dayContainer}>
-                  <View 
-                    style={[
-                      styles.dayCell,
-                      { backgroundColor: day.isCurrentMonth ? getDateColor(day.value) : '#f3f4f6' }
-                    ]}
-                  >
-                    <Text style={[
-                      styles.dayText,
-                      !day.isCurrentMonth && styles.inactiveDayText,
-                      day.value >= (habit.target || 1) && styles.completedDayText
-                    ]}>
-                      {day.day}
-                    </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.calendarContainer}>
+          <View>
+            {/* Month headers */}
+            <View style={styles.monthHeadersRow}>
+              {getMonthHeaders(previewCalendarData).map((header, index) => (
+                <View key={index} style={[styles.monthHeader, { width: header.colspan * 24 }]}>
+                  <Text style={styles.monthHeaderText}>{header.month}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Calendar grid */}
+            <View style={styles.calendarGrid}>
+              {previewGrid.map((weekRow, weekIndex) => (
+                <View key={weekIndex} style={styles.weekRow}>
+                  <View style={styles.dayLabel}>
+                    <Text style={styles.dayLabelText}>{weekDays[weekIndex]}</Text>
+                  </View>
+                  <View style={styles.daysRow}>
+                    {weekRow.map((day, dayIndex) => (
+                      <View
+                        key={dayIndex}
+                        style={[
+                          styles.dayCell,
+                          { backgroundColor: getDateColor(day.value, day.isToday) }
+                        ]}
+                      >
+                        <Text style={[
+                          styles.dayText,
+                          day.isToday && styles.todayText,
+                          day.value >= (habit.target || 1) && !day.isToday && styles.completedText
+                        ]}>
+                          {day.day}
+                        </Text>
+                      </View>
+                    ))}
                   </View>
                 </View>
               ))}
             </View>
-          ))}
-        </View>
+          </View>
+        </ScrollView>
         
         <TouchableOpacity 
           style={styles.editButton}
@@ -234,7 +217,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         </TouchableOpacity>
       </View>
 
-      {/* Full Calendar Modal */}
+      {/* Full Calendar Modal - 9 columns × 7 rows */}
       <Modal
         visible={showModal}
         animationType="slide"
@@ -250,50 +233,47 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
           </View>
           
           <ScrollView style={styles.modalContent}>
-            {extendedCalendarData.map((monthData, monthIndex) => (
-              <View key={monthIndex} style={styles.monthSection}>
-                <Text style={styles.modalMonthTitle}>
-                  {monthNames[monthData.month.getMonth()]} {monthData.month.getFullYear()}
-                </Text>
-                
-                <View style={styles.modalCalendarGrid}>
-                  {/* Week day headers */}
-                  <View style={styles.modalWeekRow}>
-                    {weekDays.map((day) => (
-                      <Text key={day} style={styles.modalWeekDayHeader}>{day}</Text>
-                    ))}
+            <View>
+              {/* Month headers for modal */}
+              <View style={styles.modalMonthHeadersRow}>
+                {getMonthHeaders(modalCalendarData).map((header, index) => (
+                  <View key={index} style={[styles.modalMonthHeader, { width: header.colspan * 36 }]}>
+                    <Text style={styles.modalMonthHeaderText}>{header.month}</Text>
                   </View>
-                  
-                  {/* Calendar days */}
-                  {Array.from({ length: 6 }).map((_, weekIndex) => (
-                    <View key={weekIndex} style={styles.modalWeekRow}>
-                      {monthData.days.slice(weekIndex * 7, (weekIndex + 1) * 7).map((day, dayIndex) => (
+                ))}
+              </View>
+
+              {/* Modal calendar grid */}
+              <View style={styles.modalCalendarGrid}>
+                {modalGrid.map((weekRow, weekIndex) => (
+                  <View key={weekIndex} style={styles.modalWeekRow}>
+                    <View style={styles.modalDayLabel}>
+                      <Text style={styles.modalDayLabelText}>{weekDays[weekIndex]}</Text>
+                    </View>
+                    <View style={styles.modalDaysRow}>
+                      {weekRow.map((day, dayIndex) => (
                         <TouchableOpacity
                           key={dayIndex}
-                          style={styles.modalDayContainer}
+                          style={[
+                            styles.modalDayCell,
+                            { backgroundColor: getDateColor(day.value, day.isToday) }
+                          ]}
                           onPress={() => handleDatePress(day)}
                         >
-                          <View 
-                            style={[
-                              styles.modalDayCell,
-                              { backgroundColor: day.isCurrentMonth ? getDateColor(day.value) : '#4a5568' }
-                            ]}
-                          >
-                            <Text style={[
-                              styles.modalDayText,
-                              !day.isCurrentMonth && styles.modalInactiveDayText,
-                              day.value >= (habit.target || 1) && styles.modalCompletedDayText
-                            ]}>
-                              {day.day}
-                            </Text>
-                          </View>
+                          <Text style={[
+                            styles.modalDayText,
+                            day.isToday && styles.modalTodayText,
+                            day.value >= (habit.target || 1) && !day.isToday && styles.modalCompletedText
+                          ]}>
+                            {day.day}
+                          </Text>
                         </TouchableOpacity>
                       ))}
                     </View>
-                  ))}
-                </View>
+                  </View>
+                ))}
               </View>
-            ))}
+            </View>
           </ScrollView>
         </View>
       </Modal>
@@ -311,7 +291,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
               Update {habit.name}
             </Text>
             <Text style={styles.valueModalSubtitle}>
-              {selectedDate && `${monthNames[selectedDate.getMonth()]} ${selectedDate.getDate()}, ${selectedDate.getFullYear()}`}
+              {selectedDate && `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
             </Text>
             
             <TextInput
@@ -359,53 +339,62 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
   },
-  monthTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a202c',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  calendarGrid: {
+  calendarContainer: {
     marginBottom: 16,
   },
-  weekRow: {
+  monthHeadersRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  weekDayHeader: {
-    flex: 1,
-    textAlign: 'center',
+  monthHeader: {
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  monthHeaderText: {
     fontSize: 12,
     fontWeight: '600',
     color: '#6b7280',
-    marginBottom: 8,
   },
-  dayContainer: {
-    flex: 1,
+  calendarGrid: {
+    
+  },
+  weekRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 2,
+  },
+  dayLabel: {
+    width: 40,
+    alignItems: 'flex-end',
+    paddingRight: 8,
+  },
+  dayLabelText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  daysRow: {
+    flexDirection: 'row',
   },
   dayCell: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    marginHorizontal: 1,
   },
   dayText: {
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: '500',
-    color: '#1a202c',
-  },
-  inactiveDayText: {
-    color: '#9ca3af',
-  },
-  completedDayText: {
     color: '#ffffff',
-    fontWeight: '600',
+  },
+  todayText: {
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  completedText: {
+    color: '#ffffff',
   },
   editButton: {
     backgroundColor: '#374151',
@@ -446,15 +435,18 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
-  monthSection: {
-    marginBottom: 32,
+  modalMonthHeadersRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
   },
-  modalMonthTitle: {
-    fontSize: 18,
+  modalMonthHeader: {
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  modalMonthHeaderText: {
+    fontSize: 14,
     fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 16,
-    textAlign: 'center',
+    color: '#9ca3af',
   },
   modalCalendarGrid: {
     backgroundColor: '#374151',
@@ -463,40 +455,41 @@ const styles = StyleSheet.create({
   },
   modalWeekRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  modalWeekDayHeader: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#9ca3af',
-    marginBottom: 8,
-  },
-  modalDayContainer: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  modalDayCell: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 4,
   },
-  modalDayText: {
+  modalDayLabel: {
+    width: 60,
+    alignItems: 'flex-end',
+    paddingRight: 12,
+  },
+  modalDayLabelText: {
     fontSize: 14,
+    fontWeight: '600',
+    color: '#9ca3af',
+  },
+  modalDaysRow: {
+    flexDirection: 'row',
+  },
+  modalDayCell: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 1,
+  },
+  modalDayText: {
+    fontSize: 12,
     fontWeight: '500',
     color: '#ffffff',
   },
-  modalInactiveDayText: {
-    color: '#6b7280',
-  },
-  modalCompletedDayText: {
+  modalTodayText: {
     color: '#ffffff',
-    fontWeight: '600',
+    fontWeight: '700',
+  },
+  modalCompletedText: {
+    color: '#ffffff',
   },
   valueModalOverlay: {
     flex: 1,
