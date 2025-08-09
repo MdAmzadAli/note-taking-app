@@ -27,21 +27,37 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
   const getFrequencyText = () => {
     // Handle custom frequency types from AddHabitModal
     if (habit.frequency === 'custom' && habit.frequencyType) {
-      switch (habit.frequencyType) {
-        case 'every_day': 
-          return 'Every day';
-        case 'every_n_days': 
-          return `Every ${habit.customValue1 || 1} days`;
-        case 'times_per_week': 
-          if (habit.customValue1 === 1) return 'Every week';
-          return `${habit.customValue1 || 1} times per week`;
-        case 'times_per_month': 
-          if (habit.customValue1 === 1) return 'Every month';
-          return `${habit.customValue1 || 1} times per month`;
-        case 'times_in_days': 
-          return `${habit.customValue1 || 1} times in ${habit.customValue2 || 7} days`;
-        default: 
-          return 'Every day';
+      if (habit.goalType === 'quantity') {
+        // For measurable habits: "Every Week" = every 7 days, "Every Month" = every 30 days
+        switch (habit.frequencyType) {
+          case 'every_day': 
+            return 'Every day';
+          case 'every_n_days': 
+            const nDays = habit.customValue1 || 1;
+            if (nDays === 7) return 'Every week';
+            if (nDays === 30) return 'Every month';
+            return `Every ${nDays} days`;
+          default: 
+            return 'Every day';
+        }
+      } else {
+        // For yes/no habits: Traditional frequency logic
+        switch (habit.frequencyType) {
+          case 'every_day': 
+            return 'Every day';
+          case 'every_n_days': 
+            return `Every ${habit.customValue1 || 1} days`;
+          case 'times_per_week': 
+            if (habit.customValue1 === 1) return 'Every week';
+            return `${habit.customValue1 || 1} times per week`;
+          case 'times_per_month': 
+            if (habit.customValue1 === 1) return 'Every month';
+            return `${habit.customValue1 || 1} times per month`;
+          case 'times_in_days': 
+            return `${habit.customValue1 || 1} times in ${habit.customValue2 || 7} days`;
+          default: 
+            return 'Every day';
+        }
       }
     }
 

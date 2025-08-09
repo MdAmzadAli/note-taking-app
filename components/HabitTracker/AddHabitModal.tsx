@@ -119,17 +119,31 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
   };
 
   const getFrequencyText = () => {
-    switch (frequencyType) {
-      case 'every_day': return 'Every day';
-      case 'every_n_days': return `Every ${everyNDaysValue.current || '0'} days`;
-      case 'times_per_week': 
-        const weekValue = timesPerWeekValue.current || customValue1 || '0';
-        return weekValue === '1' ? 'Every week' : `${weekValue} times per week`;
-      case 'times_per_month': 
-        const monthValue = timesPerMonthValue.current || customValue1 || '0';
-        return monthValue === '1' ? 'Every month' : `${monthValue} times per month`;
-      case 'times_in_days': return `${timesInDays1Value.current || '0'} times in ${timesInDays2Value.current || '0'} days`;
-      default: return 'Every day';
+    if (habitType === 'measurable') {
+      // For measurable habits: "Every Week" = every 7 days, "Every Month" = every 30 days
+      switch (frequencyType) {
+        case 'every_day': return 'Every day';
+        case 'every_n_days': 
+          const nDays = everyNDaysValue.current || customValue1 || '0';
+          if (nDays === '7') return 'Every week';
+          if (nDays === '30') return 'Every month';
+          return `Every ${nDays} days`;
+        default: return 'Every day';
+      }
+    } else {
+      // For yes/no habits: Traditional frequency logic
+      switch (frequencyType) {
+        case 'every_day': return 'Every day';
+        case 'every_n_days': return `Every ${everyNDaysValue.current || customValue1 || '0'} days`;
+        case 'times_per_week': 
+          const weekValue = timesPerWeekValue.current || customValue1 || '0';
+          return weekValue === '1' ? 'Every week' : `${weekValue} times per week`;
+        case 'times_per_month': 
+          const monthValue = timesPerMonthValue.current || customValue1 || '0';
+          return monthValue === '1' ? 'Every month' : `${monthValue} times per month`;
+        case 'times_in_days': return `${timesInDays1Value.current || customValue1 || '0'} times in ${timesInDays2Value.current || customValue2 || '0'} days`;
+        default: return 'Every day';
+      }
     }
   };
 
@@ -521,7 +535,8 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
             >
               <View style={styles.frequencyOptions}>
                 {habitType === 'measurable' ? (
-                  // Measurable habit options: Only Every Day, Every Week, Every Month
+                  // Measurable habit options: Different frequency meanings
+                  // "Every Week" = once every 7 days, "Every Month" = once every 30 days
                   <>
                     <TouchableOpacity
                       style={styles.frequencyOption}
@@ -537,31 +552,32 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                     <TouchableOpacity
                       style={styles.frequencyOption}
                       onPress={() => {
-                        setFrequencyType('times_per_week');
-                        setCustomValue1('1');
-                        timesPerWeekValue.current = '1';
+                        setFrequencyType('every_n_days');
+                        setCustomValue1('7');
+                        everyNDaysValue.current = '7';
                         setFrequency('Every week');
                       }}
                     >
-                      <View style={[styles.radio, frequencyType === 'times_per_week' && styles.radioSelected]} />
+                      <View style={[styles.radio, frequencyType === 'every_n_days' && customValue1 === '7' && styles.radioSelected]} />
                       <Text style={styles.frequencyText}>Every week</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
                       style={styles.frequencyOption}
                       onPress={() => {
-                        setFrequencyType('times_per_month');
-                        setCustomValue1('1');
-                        timesPerMonthValue.current = '1';
+                        setFrequencyType('every_n_days');
+                        setCustomValue1('30');
+                        everyNDaysValue.current = '30';
                         setFrequency('Every month');
                       }}
                     >
-                      <View style={[styles.radio, frequencyType === 'times_per_month' && styles.radioSelected]} />
+                      <View style={[styles.radio, frequencyType === 'every_n_days' && customValue1 === '30' && styles.radioSelected]} />
                       <Text style={styles.frequencyText}>Every month</Text>
                     </TouchableOpacity>
                   </>
                 ) : (
-                  // Yes/No habit options: All frequency types
+                  // Yes/No habit options: Traditional frequency types
+                  // "Times per week" = how many times within a week period
                   <>
                     {/* Every day */}
                     <TouchableOpacity
@@ -588,6 +604,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                         defaultValue={everyNDaysValue.current}
                         onChangeText={(text) => {
                           everyNDaysValue.current = text;
+                          setCustomValue1(text);
                         }}
                         keyboardType="numeric"
                         placeholder="3"
@@ -612,6 +629,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                         defaultValue={timesPerWeekValue.current}
                         onChangeText={(text) => {
                           timesPerWeekValue.current = text;
+                          setCustomValue1(text);
                         }}
                         keyboardType="numeric"
                         placeholder="3"
@@ -636,6 +654,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                         defaultValue={timesPerMonthValue.current}
                         onChangeText={(text) => {
                           timesPerMonthValue.current = text;
+                          setCustomValue1(text);
                         }}
                         keyboardType="numeric"
                         placeholder="3"
@@ -660,6 +679,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                         defaultValue={timesInDays1Value.current}
                         onChangeText={(text) => {
                           timesInDays1Value.current = text;
+                          setCustomValue1(text);
                         }}
                         keyboardType="numeric"
                         placeholder="3"
@@ -676,6 +696,7 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                         defaultValue={timesInDays2Value.current}
                         onChangeText={(text) => {
                           timesInDays2Value.current = text;
+                          setCustomValue2(text);
                         }}
                         keyboardType="numeric"
                         placeholder="14"
@@ -703,10 +724,10 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType }: A
                     const hasValidInput = () => {
                       switch (frequencyType) {
                         case 'every_day': return true;
-                        case 'every_n_days': return everyNDaysValue.current.trim() !== '';
-                        case 'times_per_week': return timesPerWeekValue.current.trim() !== '';
-                        case 'times_per_month': return timesPerMonthValue.current.trim() !== '';
-                        case 'times_in_days': return timesInDays1Value.current.trim() !== '' && timesInDays2Value.current.trim() !== '';
+                        case 'every_n_days': return everyNDaysValue.current.trim() !== '' && customValue1.trim() !== '';
+                        case 'times_per_week': return timesPerWeekValue.current.trim() !== '' && customValue1.trim() !== '';
+                        case 'times_per_month': return timesPerMonthValue.current.trim() !== '' && customValue1.trim() !== '';
+                        case 'times_in_days': return timesInDays1Value.current.trim() !== '' && timesInDays2Value.current.trim() !== '' && customValue1.trim() !== '' && customValue2.trim() !== '';
                         default: return false;
                       }
                     };
