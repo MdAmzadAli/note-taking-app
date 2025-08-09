@@ -25,6 +25,26 @@ export default function HabitTargetSection({ habit }: HabitTargetSectionProps) {
         .reduce((sum, c) => sum + (c.value || 0), 0);
     };
 
+    // Get habit frequency type from the habit data
+    const getFrequencyType = () => {
+      // Check if it's measurable habit with custom frequency
+      if (habit.goalType === 'quantity' && habit.frequencyType === 'every_n_days') {
+        const nDays = habit.customValue1 || 1;
+        if (nDays === 7) return 'weekly';
+        if (nDays === 30) return 'monthly';
+        return 'daily';
+      }
+      
+      // Check legacy frequency values
+      if (habit.frequency === 'Every week') return 'weekly';
+      if (habit.frequency === 'Every month') return 'monthly';
+      
+      // Default to daily
+      return 'daily';
+    };
+
+    const frequencyType = getFrequencyType();
+
     // Dynamic rolling periods
     const todayStr = today.toISOString().split('T')[0];
     const todayProgress = sumProgress([todayStr]);
@@ -33,12 +53,41 @@ export default function HabitTargetSection({ habit }: HabitTargetSectionProps) {
     const quarterProgress = sumProgress(getLastNDaysDates(90));
     const yearProgress = sumProgress(getLastNDaysDates(365));
 
+    // Calculate targets based on frequency
+    let weekTarget, monthTarget, quarterTarget, yearTarget;
+
+    if (frequencyType === 'daily') {
+      // Every Day: user performs habit daily, so targets are multiplied by days
+      weekTarget = targetValue * 7;
+      monthTarget = targetValue * 30;
+      quarterTarget = targetValue * 90;
+      yearTarget = targetValue * 365;
+    } else if (frequencyType === 'weekly') {
+      // Every Week: user performs habit once per week
+      weekTarget = targetValue;
+      monthTarget = targetValue * Math.floor(30 / 7); // ~4 weeks in a month
+      quarterTarget = targetValue * Math.floor(90 / 7); // ~13 weeks in a quarter
+      yearTarget = targetValue * Math.floor(365 / 7); // ~52 weeks in a year
+    } else if (frequencyType === 'monthly') {
+      // Every Month: user performs habit once per month
+      weekTarget = targetValue * (7 / 30); // Portion of monthly target for a week
+      monthTarget = targetValue;
+      quarterTarget = targetValue * 3; // 3 months in a quarter
+      yearTarget = targetValue * 12; // 12 months in a year
+    } else {
+      // Fallback to daily
+      weekTarget = targetValue * 7;
+      monthTarget = targetValue * 30;
+      quarterTarget = targetValue * 90;
+      yearTarget = targetValue * 365;
+    }
+
     return {
       today: { progress: todayProgress, target: targetValue },
-      week: { progress: weekProgress, target: targetValue * 7 },
-      month: { progress: monthProgress, target: targetValue * 30 },
-      quarter: { progress: quarterProgress, target: targetValue * 90 },
-      year: { progress: yearProgress, target: targetValue * 365 },
+      week: { progress: weekProgress, target: Math.round(weekTarget) },
+      month: { progress: monthProgress, target: Math.round(monthTarget) },
+      quarter: { progress: quarterProgress, target: Math.round(quarterTarget) },
+      year: { progress: yearProgress, target: Math.round(yearTarget) },
     };
   };
 
