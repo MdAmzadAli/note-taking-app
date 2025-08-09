@@ -13,61 +13,66 @@ interface HabitTargetSectionProps {
 
 export default function HabitTargetSection({ habit }: HabitTargetSectionProps) {
   const calculateTargetProgress = () => {
-    const now = new Date();
-    const createdAt = habit.createdAt;
+    const today = new Date();
     const targetValue = habit.targetValue || 0;
     
-    // Today's progress
-    const currentValue = habit.completions.find(c => c.date === now.toISOString().split('T')[0])?.value || 0;
+    // Today's progress (just today)
+    const todayStr = today.toISOString().split('T')[0];
+    const todayProgress = habit.completions.find(c => c.date === todayStr)?.value || 0;
 
-    // Week progress
-    const startOfCurrentWeek = new Date(now);
-    startOfCurrentWeek.setDate(now.getDate() - now.getDay());
-    const weekStartDate = createdAt > startOfCurrentWeek ? createdAt : startOfCurrentWeek;
-    const weekCompletions = habit.completions.filter(c => {
-      const date = new Date(c.date);
-      return date >= weekStartDate && date <= now;
-    });
-    const weekProgress = weekCompletions.reduce((sum, c) => sum + (c.value || 0), 0);
+    // Last 7 days (including today)
+    const last7Days = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      last7Days.push(date.toISOString().split('T')[0]);
+    }
+    const weekProgress = habit.completions
+      .filter(c => last7Days.includes(c.date))
+      .reduce((sum, c) => sum + (c.value || 0), 0);
 
-    // Month progress
-    const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthStartDate = createdAt > startOfCurrentMonth ? createdAt : startOfCurrentMonth;
-    const monthCompletions = habit.completions.filter(c => {
-      const date = new Date(c.date);
-      return date >= monthStartDate && date <= now;
-    });
-    const monthProgress = monthCompletions.reduce((sum, c) => sum + (c.value || 0), 0);
+    // Last 30 days (including today) 
+    const last30Days = [];
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      last30Days.push(date.toISOString().split('T')[0]);
+    }
+    const monthProgress = habit.completions
+      .filter(c => last30Days.includes(c.date))
+      .reduce((sum, c) => sum + (c.value || 0), 0);
 
-    // Quarter progress
-    const quarter = Math.floor(now.getMonth() / 3);
-    const startOfCurrentQuarter = new Date(now.getFullYear(), quarter * 3, 1);
-    const quarterStartDate = createdAt > startOfCurrentQuarter ? createdAt : startOfCurrentQuarter;
-    const quarterCompletions = habit.completions.filter(c => {
-      const date = new Date(c.date);
-      return date >= quarterStartDate && date <= now;
-    });
-    const quarterProgress = quarterCompletions.reduce((sum, c) => sum + (c.value || 0), 0);
+    // Last 90 days (including today)
+    const last90Days = [];
+    for (let i = 89; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      last90Days.push(date.toISOString().split('T')[0]);
+    }
+    const quarterProgress = habit.completions
+      .filter(c => last90Days.includes(c.date))
+      .reduce((sum, c) => sum + (c.value || 0), 0);
 
-    // Year progress
-    const startOfCurrentYear = new Date(now.getFullYear(), 0, 1);
-    const yearStartDate = createdAt > startOfCurrentYear ? createdAt : startOfCurrentYear;
-    const yearCompletions = habit.completions.filter(c => {
-      const date = new Date(c.date);
-      return date >= yearStartDate && date <= now;
-    });
-    const yearProgress = yearCompletions.reduce((sum, c) => sum + (c.value || 0), 0);
+    // Last 365 days (including today)
+    const last365Days = [];
+    for (let i = 364; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      last365Days.push(date.toISOString().split('T')[0]);
+    }
+    const yearProgress = habit.completions
+      .filter(c => last365Days.includes(c.date))
+      .reduce((sum, c) => sum + (c.value || 0), 0);
 
-    // Calculate targets
+    // Calculate targets based on periods
     const dailyTarget = targetValue;
     const weeklyTarget = targetValue * 7;
-    const currentMonthDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const monthlyTarget = targetValue * currentMonthDays;
+    const monthlyTarget = targetValue * 30;
     const quarterlyTarget = targetValue * 90;
     const yearlyTarget = targetValue * 365;
 
     return {
-      today: { progress: currentValue, target: dailyTarget },
+      today: { progress: todayProgress, target: dailyTarget },
       week: { progress: weekProgress, target: weeklyTarget },
       month: { progress: monthProgress, target: monthlyTarget },
       quarter: { progress: quarterProgress, target: quarterlyTarget },
@@ -99,23 +104,37 @@ export default function HabitTargetSection({ habit }: HabitTargetSectionProps) {
               </Text>
               <View style={styles.targetBarContainer}>
                 <View style={styles.targetBar}>
-                  <View 
-                    style={[
-                      styles.targetBarFilled, 
-                      { 
-                        backgroundColor: habit.color || '#3b82f6',
-                        width: `${progressPercentage}%`
-                      }
-                    ]}
-                  >
-                    <Text style={styles.targetBarProgressText}>
-                      {formatValue(data.progress)}
-                    </Text>
-                  </View>
+                  {data.progress > 0 && (
+                    <View 
+                      style={[
+                        styles.targetBarFilled, 
+                        { 
+                          backgroundColor: habit.color || '#3b82f6',
+                          width: `${progressPercentage}%`
+                        }
+                      ]}
+                    >
+                      <Text style={styles.targetBarProgressText}>
+                        {formatValue(data.progress)}
+                      </Text>
+                    </View>
+                  )}
                   {remaining > 0 && (
-                    <View style={styles.targetBarRemaining}>
+                    <View 
+                      style={[
+                        styles.targetBarRemaining,
+                        { width: `${100 - progressPercentage}%` }
+                      ]}
+                    >
                       <Text style={styles.targetBarRemainingText}>
                         {formatValue(remaining)}
+                      </Text>
+                    </View>
+                  )}
+                  {data.progress === 0 && (
+                    <View style={styles.targetBarEmpty}>
+                      <Text style={styles.targetBarRemainingText}>
+                        {formatValue(data.target)}
                       </Text>
                     </View>
                   )}
@@ -168,7 +187,7 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: 40,
+    minWidth: 0,
   },
   targetBarProgressText: {
     color: '#ffffff',
@@ -176,7 +195,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   targetBarRemaining: {
-    flex: 1,
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
@@ -186,5 +204,12 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     fontWeight: '500',
     fontSize: 14,
+  },
+  targetBarEmpty: {
+    flex: 1,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#e5e7eb',
   },
 });
