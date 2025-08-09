@@ -13,6 +13,7 @@ import HabitTargetSection from './sections/HabitTargetSection';
 import HabitOverviewSection from './sections/HabitOverviewSection';
 import HabitStreakSection from './sections/HabitStreakSection';
 import HabitHistorySection from './sections/HabitHistorySection';
+import HabitHistoryGraphSection from './sections/HabitHistoryGraphSection';
 
 interface HabitDetailModalProps {
   visible: boolean;
@@ -30,32 +31,32 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
       if (habit.goalType === 'quantity') {
         // For measurable habits: "Every Week" = every 7 days, "Every Month" = every 30 days
         switch (habit.frequencyType) {
-          case 'every_day': 
+          case 'every_day':
             return 'Every day';
-          case 'every_n_days': 
+          case 'every_n_days':
             const nDays = habit.customValue1 || 1;
             if (nDays === 7) return 'Every week';
             if (nDays === 30) return 'Every month';
             return `Every ${nDays} days`;
-          default: 
+          default:
             return 'Every day';
         }
       } else {
         // For yes/no habits: Traditional frequency logic
         switch (habit.frequencyType) {
-          case 'every_day': 
+          case 'every_day':
             return 'Every day';
-          case 'every_n_days': 
+          case 'every_n_days':
             return `Every ${habit.customValue1 || 1} days`;
-          case 'times_per_week': 
+          case 'times_per_week':
             if (habit.customValue1 === 1) return 'Every week';
             return `${habit.customValue1 || 1} times per week`;
-          case 'times_per_month': 
+          case 'times_per_month':
             if (habit.customValue1 === 1) return 'Every month';
             return `${habit.customValue1 || 1} times per month`;
-          case 'times_in_days': 
+          case 'times_in_days':
             return `${habit.customValue1 || 1} times in ${habit.customValue2 || 7} days`;
-          default: 
+          default:
             return 'Every day';
         }
       }
@@ -68,7 +69,7 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
     if (habit.frequency === 'Every week') return 'Every week';
     if (habit.frequency === 'Every month') return 'Every month';
     if (habit.customFrequency) return `Every ${habit.customFrequency} days`;
-    
+
     return habit.frequency || 'Every day';
   };
 
@@ -120,13 +121,12 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
     return (
       <>
         <HabitTargetSection habit={habit} />
-
+        <HabitHistoryGraphSection habit={habit} />
         <HabitStreakSection
           title="Current Streak"
           streakValue={habit.currentStreak}
         />
 
-        <HabitHistorySection habit={habit} />
       </>
     );
   };
