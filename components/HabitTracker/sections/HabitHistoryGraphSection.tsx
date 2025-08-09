@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,7 @@ interface HistoryDataPoint {
 
 export default function HabitHistoryGraphSection({ habit }: HabitHistoryGraphSectionProps) {
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('day');
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const getHistoryData = (): HistoryDataPoint[] => {
     const completions = habit.completions || [];
@@ -157,6 +158,17 @@ export default function HabitHistoryGraphSection({ habit }: HabitHistoryGraphSec
   const historyData = getHistoryData();
   const maxValue = Math.max(...historyData.map(d => d.value), 1);
 
+  // Auto-scroll to show latest data whenever filter changes or component mounts
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (scrollViewRef.current) {
+        scrollViewRef.current.scrollToEnd({ animated: true });
+      }
+    }, 100); // Small delay to ensure content is rendered
+
+    return () => clearTimeout(timer);
+  }, [selectedFilter]);
+
   const renderDropdown = () => {
     const options: { value: FilterType; label: string }[] = [
       { value: 'day', label: 'Day' },
@@ -205,6 +217,7 @@ export default function HabitHistoryGraphSection({ habit }: HabitHistoryGraphSec
       
       <View style={styles.chartContainer}>
         <ScrollView 
+          ref={scrollViewRef}
           horizontal 
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chartContent}
