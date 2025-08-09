@@ -164,7 +164,7 @@ export default function HabitHistoryGraphSection({ habit }: HabitHistoryGraphSec
       if (scrollViewRef.current) {
         scrollViewRef.current.scrollToEnd({ animated: true });
       }
-    }, 100); // Small delay to ensure content is rendered
+    }, 300); // Increased delay for smoother transition
 
     return () => clearTimeout(timer);
   }, [selectedFilter]);
@@ -220,7 +220,10 @@ export default function HabitHistoryGraphSection({ habit }: HabitHistoryGraphSec
           ref={scrollViewRef}
           horizontal 
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chartContent}
+          contentContainerStyle={[
+            styles.chartContent,
+            selectedFilter === 'year' && { justifyContent: 'flex-end' }
+          ]}
         >
           {historyData.map((dataPoint, index) => {
             const barHeight = Math.max((dataPoint.value / maxValue) * 200, 2); // Min height of 2
@@ -314,6 +317,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     paddingHorizontal: 8,
     minHeight: 240,
+    flexGrow: 1,
   },
   barContainer: {
     alignItems: 'center',
