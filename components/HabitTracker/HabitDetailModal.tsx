@@ -161,6 +161,11 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
             <Text style={[styles.habitQuestion, { color: habit.color || '#1a202c' }]}>
               {habit.question || habit.name}
             </Text>
+            {habit.goalType !== 'yes_no' && (
+              <Text style={styles.targetDisplay}>
+                Target: {habit.targetValue} {getUnitText()}
+              </Text>
+            )}
             <View style={styles.habitMetadata}>
               {habit.goalType !== 'yes_no' && (
                 <View style={styles.metadataItem}>
@@ -241,6 +246,12 @@ const styles = StyleSheet.create({
   habitQuestion: {
     fontSize: 24,
     fontWeight: '700',
+    marginBottom: 8,
+  },
+  targetDisplay: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#64748b',
     marginBottom: 16,
   },
   habitMetadata: {
