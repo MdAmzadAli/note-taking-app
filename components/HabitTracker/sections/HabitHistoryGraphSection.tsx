@@ -244,15 +244,12 @@ export default function HabitHistoryGraphSection({ habit }: HabitHistoryGraphSec
                     }
                   ]}
                 />
-                {selectedFilter === 'day' && index % 7 === 0 && (
-                  <Text style={styles.periodLabel}>{dataPoint.period}</Text>
-                )}
-                {selectedFilter === 'week' && index % 4 === 0 && (
-                  <Text style={styles.periodLabel}>{dataPoint.period}</Text>
-                )}
-                {(selectedFilter === 'month' || selectedFilter === 'quarter' || selectedFilter === 'year') && (
-                  <Text style={styles.periodLabel}>{dataPoint.period}</Text>
-                )}
+                <Text style={styles.periodLabel}>
+                  {selectedFilter === 'day' && index % 7 === 0 ? dataPoint.period :
+                   selectedFilter === 'week' && index % 4 === 0 ? dataPoint.period :
+                   (selectedFilter === 'month' || selectedFilter === 'quarter' || selectedFilter === 'year') ? dataPoint.period :
+                   ' '}
+                </Text>
               </View>
             );
           })}
@@ -322,6 +319,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 4,
     minWidth: 24,
+    justifyContent: 'flex-end',
+    minHeight: 50,
   },
   valueLabel: {
     fontSize: 12,
@@ -347,5 +346,7 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginTop: 2,
     textAlign: 'center',
+    minHeight: 12,
+    lineHeight: 12,
   },
 });
