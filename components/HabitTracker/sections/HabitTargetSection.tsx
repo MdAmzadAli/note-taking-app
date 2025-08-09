@@ -101,12 +101,37 @@ export default function HabitTargetSection({ habit }: HabitTargetSectionProps) {
   };
 
   const targetData = calculateTargetProgress();
+  
+  // Determine which bars to show based on frequency type
+  const getVisiblePeriods = () => {
+    const frequencyType = getFrequencyText();
+    const allPeriods = ['today', 'week', 'month', 'quarter', 'year'];
+    
+    if (frequencyType === 'daily') {
+      // Every day: Show all bars
+      return allPeriods;
+    } else if (frequencyType === 'weekly') {
+      // Every week: Hide Today bar, show from Week onwards
+      return allPeriods.filter(period => period !== 'today');
+    } else if (frequencyType === 'monthly') {
+      // Every month: Hide Today and Week bars, show from Month onwards
+      return allPeriods.filter(period => !['today', 'week'].includes(period));
+    } else {
+      // Default fallback: show all bars
+      return allPeriods;
+    }
+  };
+
+  const visiblePeriods = getVisiblePeriods();
+  const filteredTargetData = Object.entries(targetData).filter(([period]) => 
+    visiblePeriods.includes(period)
+  );
 
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Target</Text>
       <View style={styles.targetBarsContainer}>
-        {Object.entries(targetData).map(([period, data]) => {
+        {filteredTargetData.map(([period, data]) => {
           const progressPercentage = Math.min((data.progress / data.target) * 100, 100);
           const remaining = Math.max(data.target - data.progress, 0);
 
