@@ -130,7 +130,8 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
       </>
     );
   };
-
+  console.log('Habit:', habit);
+  // console.log('Target Value:', habit.targetValue);
   return (
     <Modal
       visible={visible}
@@ -166,7 +167,7 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
                 <View style={styles.metadataItem}>
                   <IconSymbol name="target" size={16} color="#64748b" />
                   <Text style={styles.metadataText}>
-                    {habit.targetValue} {getUnitText()}
+                    {habit.target} {getUnitText()}
                   </Text>
                 </View>
               )}
