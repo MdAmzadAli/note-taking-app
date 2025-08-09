@@ -244,7 +244,6 @@ export default function HabitHistoryGraphSection({ habit }: HabitHistoryGraphSec
                     }
                   ]}
                 />
-                <Text style={styles.barLabel}>{dataPoint.label}</Text>
                 {selectedFilter === 'day' && index % 7 === 0 && (
                   <Text style={styles.periodLabel}>{dataPoint.period}</Text>
                 )}
