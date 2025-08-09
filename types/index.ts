@@ -124,17 +124,20 @@ export interface Habit {
   name: string;
   emoji: string;
   color?: string;
-  frequency: 'daily' | 'weekly' | 'custom';
+  // For measurable habits: stores "Every day", "Every week", "Every month"
+  // For yes/no habits: stores "custom" and uses frequencyType for details
+  frequency: string;
   goalType: 'yes_no' | 'quantity' | 'time';
   question?: string;
-  targetValue?: number;
+  // Fields specific to measurable habits (quantity/time)
   unit?: string;
   target?: number;
   targetType?: 'at_least' | 'at_max';
+  // Fields specific to yes/no habits
   frequencyType?: 'every_day' | 'every_n_days' | 'times_per_week' | 'times_per_month' | 'times_in_days';
   customValue1?: number;
   customValue2?: number;
-  customFrequency?: number;
+  // Common fields
   reminderTime?: string;
   notes?: string;
   createdAt: Date;

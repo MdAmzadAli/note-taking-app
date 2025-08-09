@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Habit } from '@/types';
@@ -27,21 +26,23 @@ export default function HabitTargetSection({ habit }: HabitTargetSectionProps) {
     };
 
     const getFrequencyInDays = (): number => {
-      switch (habit.frequency) {
-        case 'Every day': return 1;
-        case 'Every week': return 7;
-        case 'Every month': return 30;
-        default: return 1;
-      }
+      // For measurable habits, frequency is a descriptive string
+      if (habit.frequency === 'Every day') return 1;
+      if (habit.frequency === 'Every week') return 7;
+      if (habit.frequency === 'Every month') return 30;
+
+      // Default fallback
+      return 1;
     };
 
     const getFrequencyText = (): string => {
-      switch (habit.frequency) {
-        case 'Every day': return 'daily';
-        case 'Every week': return 'weekly';
-        case 'Every month': return 'monthly';
-        default: return 'daily';
-      }
+      // For measurable habits, convert frequency string to lowercase format
+      if (habit.frequency === 'Every day') return 'daily';
+      if (habit.frequency === 'Every week') return 'weekly';
+      if (habit.frequency === 'Every month') return 'monthly';
+
+      // Default fallback
+      return 'daily';
     };
 
     const frequencyType = getFrequencyText();
