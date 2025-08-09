@@ -25,12 +25,34 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
   if (!habit) return null;
 
   const getFrequencyText = () => {
+    // Handle custom frequency types from AddHabitModal
+    if (habit.frequency === 'custom' && habit.frequencyType) {
+      switch (habit.frequencyType) {
+        case 'every_day': 
+          return 'Every day';
+        case 'every_n_days': 
+          return `Every ${habit.customValue1 || 1} days`;
+        case 'times_per_week': 
+          if (habit.customValue1 === 1) return 'Every week';
+          return `${habit.customValue1 || 1} times per week`;
+        case 'times_per_month': 
+          if (habit.customValue1 === 1) return 'Every month';
+          return `${habit.customValue1 || 1} times per month`;
+        case 'times_in_days': 
+          return `${habit.customValue1 || 1} times in ${habit.customValue2 || 7} days`;
+        default: 
+          return 'Every day';
+      }
+    }
+
+    // Handle legacy frequency values
     if (habit.frequency === 'daily') return 'Every day';
     if (habit.frequency === 'weekly') return 'Every week';
     if (habit.frequency === 'Every day') return 'Every day';
     if (habit.frequency === 'Every week') return 'Every week';
     if (habit.frequency === 'Every month') return 'Every month';
     if (habit.customFrequency) return `Every ${habit.customFrequency} days`;
+    
     return habit.frequency || 'Every day';
   };
 
