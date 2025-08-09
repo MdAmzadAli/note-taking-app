@@ -30,13 +30,13 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const [inputValue, setInputValue] = useState('');
   const [showValueModal, setShowValueModal] = useState(false);
 
-  // Generate dates for preview (126 days - 18 columns × 7 rows)
+  // Generate dates for preview (105 days - 15 columns × 7 rows)
   const previewCalendarData = useMemo(() => {
     const days: CalendarDay[] = [];
     const today = new Date();
     
-    // Generate 126 days (18 weeks worth) ending with today
-    for (let i = 125; i >= 0; i--) {
+    // Generate 105 days (15 weeks worth) ending with today
+    for (let i = 104; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
       
@@ -129,7 +129,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     return grid;
   };
 
-  const previewGrid = organizeDataIntoGrid(previewCalendarData, 18);
+  const previewGrid = organizeDataIntoGrid(previewCalendarData, 15);
   const modalGrid = organizeDataIntoGrid(modalCalendarData, 9);
 
   // Get month headers for preview (18 columns)
@@ -164,9 +164,9 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         Calendar
       </Text>
       
-      {/* Calendar Preview - 18 columns × 7 rows */}
+      {/* Calendar Preview - 15 columns × 7 rows */}
       <View style={styles.calendarPreview}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.calendarContainer}>
+        <View style={styles.calendarContainer}>
           <View>
             {/* Month headers */}
             <View style={styles.monthHeadersRow}>
@@ -177,37 +177,45 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
               ))}
             </View>
 
-            {/* Calendar grid */}
-            <View style={styles.calendarGrid}>
-              {previewGrid.map((weekRow, weekIndex) => (
-                <View key={weekIndex} style={styles.weekRow}>
-                  <View style={styles.dayLabel}>
-                    <Text style={styles.dayLabelText}>{weekDays[weekIndex]}</Text>
+            {/* Calendar grid with fixed day labels */}
+            <View style={styles.calendarWithLabels}>
+              <View style={styles.calendarGrid}>
+                {previewGrid.map((weekRow, weekIndex) => (
+                  <View key={weekIndex} style={styles.weekRow}>
+                    <View style={styles.daysRow}>
+                      {weekRow.map((day, dayIndex) => (
+                        <View
+                          key={dayIndex}
+                          style={[
+                            styles.dayCell,
+                            { backgroundColor: getDateColor(day.value, day.isToday) }
+                          ]}
+                        >
+                          <Text style={[
+                            styles.dayText,
+                            day.isToday && styles.todayText,
+                            day.value >= (habit.target || 1) && !day.isToday && styles.completedText
+                          ]}>
+                            {day.day}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
                   </View>
-                  <View style={styles.daysRow}>
-                    {weekRow.map((day, dayIndex) => (
-                      <View
-                        key={dayIndex}
-                        style={[
-                          styles.dayCell,
-                          { backgroundColor: getDateColor(day.value, day.isToday) }
-                        ]}
-                      >
-                        <Text style={[
-                          styles.dayText,
-                          day.isToday && styles.todayText,
-                          day.value >= (habit.target || 1) && !day.isToday && styles.completedText
-                        ]}>
-                          {day.day}
-                        </Text>
-                      </View>
-                    ))}
+                ))}
+              </View>
+              
+              {/* Fixed day labels on the right */}
+              <View style={styles.fixedDayLabels}>
+                {weekDays.map((day, index) => (
+                  <View key={index} style={styles.fixedDayLabel}>
+                    <Text style={styles.fixedDayLabelText}>{day}</Text>
                   </View>
-                </View>
-              ))}
+                ))}
+              </View>
             </View>
           </View>
-        </ScrollView>
+        </View>
         
         <TouchableOpacity 
           style={styles.editButton}
@@ -345,6 +353,7 @@ const styles = StyleSheet.create({
   monthHeadersRow: {
     flexDirection: 'row',
     marginBottom: 8,
+    paddingRight: 50, // Space for fixed day labels
   },
   monthHeader: {
     alignItems: 'center',
@@ -355,13 +364,34 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6b7280',
   },
+  calendarWithLabels: {
+    flexDirection: 'row',
+    position: 'relative',
+  },
   calendarGrid: {
-    
+    flex: 1,
   },
   weekRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     marginBottom: 2,
+  },
+  fixedDayLabels: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    width: 50,
+    height: '100%',
+    justifyContent: 'space-between',
+  },
+  fixedDayLabel: {
+    height: 24, // Same as dayCell height + marginBottom
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fixedDayLabelText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
   },
   dayLabel: {
     width: 40,
