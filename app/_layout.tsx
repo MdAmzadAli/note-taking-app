@@ -1,11 +1,3 @@
-import React from 'react';
-import { useLayoutEffect } from 'react';
-
-if (!React.useInsertionEffect) {
-  // @ts-ignore - runtime fix
-  React.useInsertionEffect = useLayoutEffect;
-}
-
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
