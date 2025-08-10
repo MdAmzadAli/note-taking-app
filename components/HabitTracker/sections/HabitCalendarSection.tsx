@@ -31,21 +31,6 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const [showValueModal, setShowValueModal] = useState(false);
   const horizontalScrollRef = useRef<ScrollView>(null);
 
-  // Auto-scroll to position today's date at the rightmost edge when modal opens
-  useEffect(() => {
-    if (showModal && horizontalScrollRef.current) {
-      // Scroll to end to position today's date at the rightmost edge with no gap
-      setTimeout(() => {
-        horizontalScrollRef.current?.scrollToEnd({ animated: false });
-      }, 100);
-      
-      // Fine-tune with animated scroll
-      setTimeout(() => {
-        horizontalScrollRef.current?.scrollToEnd({ animated: true });
-      }, 400);
-    }
-  }, [showModal, modalCalendarData]);
-
   // Generate dates for preview (105 days - 15 columns × 7 rows)
   const previewCalendarData = useMemo(() => {
     const days: CalendarDay[] = [];
@@ -95,6 +80,21 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
 
     return days;
   }, [habit.completions]);
+
+  // Auto-scroll to position today's date at the rightmost edge when modal opens
+  useEffect(() => {
+    if (showModal && horizontalScrollRef.current) {
+      // Scroll to end to position today's date at the rightmost edge with no gap
+      setTimeout(() => {
+        horizontalScrollRef.current?.scrollToEnd({ animated: false });
+      }, 100);
+      
+      // Fine-tune with animated scroll
+      setTimeout(() => {
+        horizontalScrollRef.current?.scrollToEnd({ animated: true });
+      }, 400);
+    }
+  }, [showModal, modalCalendarData]);
 
   const handleDatePress = (day: CalendarDay) => {
     setSelectedDate(day.date);
