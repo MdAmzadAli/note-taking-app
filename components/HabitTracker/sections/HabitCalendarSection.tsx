@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,16 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [inputValue, setInputValue] = useState('');
   const [showValueModal, setShowValueModal] = useState(false);
+  const horizontalScrollRef = useRef<ScrollView>(null);
+
+  // Auto-scroll to the end (latest dates) when modal opens
+  useEffect(() => {
+    if (showModal && horizontalScrollRef.current) {
+      setTimeout(() => {
+        horizontalScrollRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [showModal]);
 
   // Generate dates for preview (105 days - 15 columns × 7 rows)
   const previewCalendarData = useMemo(() => {
@@ -55,13 +65,13 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     return days;
   }, [habit.completions]);
 
-  // Generate dates for modal (63 days - 9 columns × 7 rows)
+  // Generate dates for modal (extended range for scrolling)
   const modalCalendarData = useMemo(() => {
     const days: CalendarDay[] = [];
     const today = new Date();
     
-    // Generate 63 days (9 weeks worth) ending with today
-    for (let i = 62; i >= 0; i--) {
+    // Generate 180 days (approximately 6 months) ending with today for scrolling
+    for (let i = 179; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
       
@@ -130,7 +140,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   };
 
   const previewGrid = organizeDataIntoGrid(previewCalendarData, 15);
-  const modalGrid = organizeDataIntoGrid(modalCalendarData, 9);
+  const modalGrid = organizeDataIntoGrid(modalCalendarData, Math.ceil(modalCalendarData.length / 7));
 
   // Get month headers for preview (18 columns)
   const getMonthHeaders = (data: CalendarDay[]) => {
@@ -241,47 +251,54 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
           </View>
           
           <ScrollView style={styles.modalContent}>
-            <View>
-              {/* Month headers for modal */}
-              <View style={styles.modalMonthHeadersRow}>
-                {getMonthHeaders(modalCalendarData).map((header, index) => (
-                  <View key={index} style={[styles.modalMonthHeader, { width: header.colspan * 36 }]}>
-                    <Text style={styles.modalMonthHeaderText}>{header.month}</Text>
-                  </View>
-                ))}
-              </View>
+            <ScrollView 
+              ref={horizontalScrollRef}
+              horizontal 
+              showsHorizontalScrollIndicator={true} 
+              style={styles.modalHorizontalScroll}
+            >
+              <View style={styles.modalScrollableContent}>
+                {/* Month headers for modal */}
+                <View style={styles.modalMonthHeadersRow}>
+                  {getMonthHeaders(modalCalendarData).map((header, index) => (
+                    <View key={index} style={[styles.modalMonthHeader, { width: header.colspan * 36 }]}>
+                      <Text style={styles.modalMonthHeaderText}>{header.month}</Text>
+                    </View>
+                  ))}
+                </View>
 
-              {/* Modal calendar grid */}
-              <View style={styles.modalCalendarGrid}>
-                {modalGrid.map((weekRow, weekIndex) => (
-                  <View key={weekIndex} style={styles.modalWeekRow}>
-                    <View style={styles.modalDayLabel}>
-                      <Text style={styles.modalDayLabelText}>{weekDays[weekIndex]}</Text>
+                {/* Modal calendar grid */}
+                <View style={styles.modalCalendarGrid}>
+                  {modalGrid.map((weekRow, weekIndex) => (
+                    <View key={weekIndex} style={styles.modalWeekRow}>
+                      <View style={styles.modalDayLabel}>
+                        <Text style={styles.modalDayLabelText}>{weekDays[weekIndex]}</Text>
+                      </View>
+                      <View style={styles.modalDaysRow}>
+                        {weekRow.map((day, dayIndex) => (
+                          <TouchableOpacity
+                            key={dayIndex}
+                            style={[
+                              styles.modalDayCell,
+                              { backgroundColor: getDateColor(day.value, day.isToday) }
+                            ]}
+                            onPress={() => handleDatePress(day)}
+                          >
+                            <Text style={[
+                              styles.modalDayText,
+                              day.isToday && styles.modalTodayText,
+                              day.value >= (habit.target || 1) && !day.isToday && styles.modalCompletedText
+                            ]}>
+                              {day.day}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
                     </View>
-                    <View style={styles.modalDaysRow}>
-                      {weekRow.map((day, dayIndex) => (
-                        <TouchableOpacity
-                          key={dayIndex}
-                          style={[
-                            styles.modalDayCell,
-                            { backgroundColor: getDateColor(day.value, day.isToday) }
-                          ]}
-                          onPress={() => handleDatePress(day)}
-                        >
-                          <Text style={[
-                            styles.modalDayText,
-                            day.isToday && styles.modalTodayText,
-                            day.value >= (habit.target || 1) && !day.isToday && styles.modalCompletedText
-                          ]}>
-                            {day.day}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                ))}
+                  ))}
+                </View>
               </View>
-            </View>
+            </ScrollView>
           </ScrollView>
         </View>
       </Modal>
@@ -466,6 +483,12 @@ const styles = StyleSheet.create({
   modalContent: {
     flex: 1,
     padding: 20,
+  },
+  modalHorizontalScroll: {
+    flex: 1,
+  },
+  modalScrollableContent: {
+    minWidth: '100%',
   },
   modalMonthHeadersRow: {
     flexDirection: 'row',
