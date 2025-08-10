@@ -34,60 +34,14 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   // Auto-scroll to position today's date at the rightmost edge when modal opens
   useEffect(() => {
     if (showModal && horizontalScrollRef.current) {
-      // Calculate the scroll position to show today's date at the rightmost edge
+      // Scroll to end to position today's date at the rightmost edge with no gap
       setTimeout(() => {
-        // Get today's column index in the calendar grid
-        const today = new Date();
-        const todayStr = today.toDateString();
-        
-        // Find today's date in the modal calendar data
-        const todayIndex = modalCalendarData.findIndex(day => 
-          day.date.toDateString() === todayStr
-        );
-        
-        if (todayIndex >= 0) {
-          // Calculate which column today falls in (based on weeks)
-          const weeksFromStart = Math.floor(todayIndex / 7);
-          const cellSize = 32;
-          const cellMargin = 2;
-          const columnWidth = cellSize + cellMargin;
-          
-          // Scroll to position today's column at the rightmost visible area
-          const scrollPosition = weeksFromStart * columnWidth;
-          
-          horizontalScrollRef.current?.scrollTo({ 
-            x: scrollPosition, 
-            animated: false 
-          });
-        } else {
-          // Fallback to scroll to end if today is not found
-          horizontalScrollRef.current?.scrollToEnd({ animated: false });
-        }
+        horizontalScrollRef.current?.scrollToEnd({ animated: false });
       }, 100);
       
       // Fine-tune with animated scroll
       setTimeout(() => {
-        const today = new Date();
-        const todayStr = today.toDateString();
-        
-        const todayIndex = modalCalendarData.findIndex(day => 
-          day.date.toDateString() === todayStr
-        );
-        
-        if (todayIndex >= 0) {
-          const weeksFromStart = Math.floor(todayIndex / 7);
-          const cellSize = 32;
-          const cellMargin = 2;
-          const columnWidth = cellSize + cellMargin;
-          const scrollPosition = weeksFromStart * columnWidth;
-          
-          horizontalScrollRef.current?.scrollTo({ 
-            x: scrollPosition, 
-            animated: true 
-          });
-        } else {
-          horizontalScrollRef.current?.scrollToEnd({ animated: true });
-        }
+        horizontalScrollRef.current?.scrollToEnd({ animated: true });
       }, 400);
     }
   }, [showModal, modalCalendarData]);
@@ -352,7 +306,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 20,
     paddingLeft: 5, // Minimal gap from left edge
-    paddingRight: 20,
+    paddingRight: 0, // Remove right padding
     backgroundColor: '#ffffff',
     minHeight: 300,
   },
@@ -361,20 +315,20 @@ const styles = StyleSheet.create({
   },
   modalScrollContainer: {
     paddingLeft: 5, // Minimal left padding
-    paddingRight: 60, // Space for fixed labels
+    paddingRight: 40, // Minimal space for fixed labels
     alignItems: 'flex-start',
     minWidth: '100%',
   },
   modalContentWithLabels: {
     flex: 1,
     position: 'relative',
-    paddingRight: 50, // Reserve space for labels
+    paddingRight: 40, // Reduced space for labels
   },
   modalFixedDayLabels: {
     position: 'absolute',
-    right: 5, // Position just outside the scrollable area
+    right: 0, // Align with right edge
     top: 46, // Adjust based on month header height
-    width: 40,
+    width: 35,
     justifyContent: 'space-around',
     height: 'calc(100% - 46px)', // Account for month header
     paddingVertical: 2,
