@@ -60,14 +60,24 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const modalCalendarData = useMemo(() => {
     const days: CalendarDay[] = [];
     const today = new Date();
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-    // Generate 180 days total: 179 days in the past + today (no future dates)
-    for (let i = 179; i >= 0; i--) {
+    // Calculate how many days to go back to align properly in grid
+    // We want today to appear in the rightmost column at the bottom of its week
+    const todayDayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    
+    // Calculate total days to generate: 26 weeks = 182 days
+    const totalDays = 26 * 7; // 26 columns × 7 rows
+    
+    // Calculate the start date to ensure proper alignment
+    // We want the rightmost column to end with today
+    const startDaysBack = totalDays - 1 - todayDayOfWeek;
+
+    for (let i = startDaysBack; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
 
       const completion = habit.completions.find(c => c.date === date.toISOString().split('T')[0]);
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
       days.push({
         date,
@@ -76,6 +86,31 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         isToday: date.toDateString() === today.toDateString(),
         monthName: monthNames[date.getMonth()],
       });
+    }
+
+    // Add padding days if needed to fill the grid properly
+    const totalCells = 26 * 7;
+    while (days.length < totalCells) {
+      const lastDate = days[days.length - 1]?.date;
+      if (lastDate) {
+        const nextDate = new Date(lastDate);
+        nextDate.setDate(nextDate.getDate() + 1);
+        
+        // Only add if it's not a future date beyond today
+        if (nextDate <= today) {
+          const completion = habit.completions.find(c => c.date === nextDate.toISOString().split('T')[0]);
+          
+          days.push({
+            date: nextDate,
+            day: nextDate.getDate(),
+            value: completion?.value || 0,
+            isToday: nextDate.toDateString() === today.toDateString(),
+            monthName: monthNames[nextDate.getMonth()],
+          });
+        } else {
+          break;
+        }
+      }
     }
 
     return days;

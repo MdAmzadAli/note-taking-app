@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Habit } from '@/types';
 
@@ -87,22 +87,49 @@ export default function HabitCalendar({
     return headers.sort((a, b) => a.startCol - b.startCol);
   };
 
-  // Organize data into grid format (7 rows × columns)
-  const organizeDataIntoGrid = (data: CalendarDay[]) => {
-    const grid: CalendarDay[][] = [[], [], [], [], [], [], []]; // 7 days of week
+  // Organize data into grid (7 rows × variable columns)
+  const calendarGrid = useMemo(() => {
+    const grid: CalendarDay[][] = [];
 
-    // Sort data by date to ensure proper chronological order
-    const sortedData = [...data].sort((a, b) => a.date.getTime() - b.date.getTime());
+    // Initialize 7 rows (one for each day of the week)
+    for (let row = 0; row < 7; row++) {
+      grid[row] = [];
+    }
 
-    sortedData.forEach((day) => {
-      const dayOfWeek = day.date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-      grid[dayOfWeek].push(day);
-    });
+    // For modal calendar, we need to ensure proper weekly alignment
+    if (isModal) {
+      // Calculate the number of complete weeks
+      const totalDays = calendarData.length;
+      const numWeeks = Math.ceil(totalDays / 7);
+
+      // Fill the grid ensuring each column represents a week
+      for (let week = 0; week < numWeeks; week++) {
+        for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
+          const dataIndex = week * 7 + dayOfWeek;
+          if (dataIndex < calendarData.length) {
+            // Ensure we're placing the day in the correct row based on its actual day of week
+            const day = calendarData[dataIndex];
+            const actualDayOfWeek = day.date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+
+            if (!grid[actualDayOfWeek]) {
+              grid[actualDayOfWeek] = [];
+            }
+
+            grid[actualDayOfWeek][week] = day;
+          }
+        }
+      }
+    } else {
+      // For preview calendar, use the simpler approach
+      calendarData.forEach((day, index) => {
+        const rowIndex = index % 7;
+        grid[rowIndex].push(day);
+      });
+    }
 
     return grid;
-  };
+  }, [calendarData, isModal]);
 
-  const calendarGrid = organizeDataIntoGrid(calendarData);
   const monthHeaders = getMonthHeaders(calendarData, calendarGrid);
 
   const dynamicStyles = StyleSheet.create({
