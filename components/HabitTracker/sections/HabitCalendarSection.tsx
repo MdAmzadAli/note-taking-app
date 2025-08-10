@@ -281,13 +281,13 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     flex: 1,
-    padding: 20,
+    padding: 0,
   },
   modalHorizontalScroll: {
     flex: 1,
   },
   modalScrollContainer: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 0,
     alignItems: 'flex-start',
     minWidth: '100%',
   },

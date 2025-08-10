@@ -94,89 +94,88 @@ export default function HabitCalendar({
     dayCell: {
       width: cellSize,
       height: cellSize,
-      borderRadius: isModal ? 6 : 4,
+      borderRadius: isModal ? 8 : 4,
       justifyContent: 'center',
       alignItems: 'center',
-      marginHorizontal: 1,
+      marginHorizontal: isModal ? 2 : 1,
+      marginVertical: isModal ? 1 : 0,
     },
     dayText: {
-      fontSize: isModal ? 12 : 10,
+      fontSize: isModal ? 14 : 10,
       fontWeight: '500',
       color: '#ffffff',
     },
     fixedDayLabel: {
-      height: cellSize + 2, // Same as dayCell height + marginBottom
+      flex: 1,
       justifyContent: 'center',
       alignItems: 'flex-start',
     },
     monthHeader: {
       alignItems: 'center',
-      paddingVertical: isModal ? 6 : 4,
+      paddingVertical: isModal ? 8 : 4,
     },
     monthHeaderText: {
-      fontSize: isModal ? 14 : 12,
+      fontSize: isModal ? 16 : 12,
       fontWeight: '600',
-      color: isModal ? '#9ca3af' : '#6b7280',
+      color: isModal ? '#6b7280' : '#6b7280',
     },
     fixedDayLabelText: {
-      fontSize: 12,
+      fontSize: isModal ? 14 : 12,
       fontWeight: '600',
-      color: isModal ? '#9ca3af' : '#6b7280',
+      color: isModal ? '#6b7280' : '#6b7280',
     },
   });
 
   return (
-    <View style={styles.calendarContainer}>
-      <View>
-        {/* Month headers */}
-        <View style={styles.monthHeadersRow}>
-          {monthHeaders.map((header, index) => (
-            <View key={index} style={[dynamicStyles.monthHeader, { width: header.width }]}>
-              <Text style={dynamicStyles.monthHeaderText}>{header.month}</Text>
+    <View style={[styles.calendarContainer, isModal && styles.modalCalendarContainer]}>
+      {/* Month headers */}
+      <View style={styles.monthHeadersRow}>
+        {monthHeaders.map((header, index) => (
+          <View key={index} style={[dynamicStyles.monthHeader, { width: header.width }]}>
+            <Text style={dynamicStyles.monthHeaderText}>{header.month}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Calendar grid with fixed day labels */}
+      <View style={[styles.calendarWithLabels, isModal && styles.modalCalendarWithLabels]}>
+        <View style={styles.calendarGrid}>
+          {calendarGrid.map((weekRow, weekIndex) => (
+            <View key={weekIndex} style={styles.weekRow}>
+              <View style={styles.daysRow}>
+                {weekRow.map((day, dayIndex) => {
+                  const CellComponent = onDatePress ? TouchableOpacity : View;
+                  return (
+                    <CellComponent
+                      key={dayIndex}
+                      style={[
+                        dynamicStyles.dayCell,
+                        { backgroundColor: getDateColor(day.value, day.isToday) }
+                      ]}
+                      onPress={onDatePress ? () => onDatePress(day) : undefined}
+                    >
+                      <Text style={[
+                        dynamicStyles.dayText,
+                        day.isToday && styles.todayText,
+                        day.value >= (habit.target || 1) && !day.isToday && styles.completedText
+                      ]}>
+                        {day.day}
+                      </Text>
+                    </CellComponent>
+                  );
+                })}
+              </View>
             </View>
           ))}
         </View>
-
-        {/* Calendar grid with fixed day labels */}
-        <View style={styles.calendarWithLabels}>
-          <View style={styles.calendarGrid}>
-            {calendarGrid.map((weekRow, weekIndex) => (
-              <View key={weekIndex} style={styles.weekRow}>
-                <View style={styles.daysRow}>
-                  {weekRow.map((day, dayIndex) => {
-                    const CellComponent = onDatePress ? TouchableOpacity : View;
-                    return (
-                      <CellComponent
-                        key={dayIndex}
-                        style={[
-                          dynamicStyles.dayCell,
-                          { backgroundColor: getDateColor(day.value, day.isToday) }
-                        ]}
-                        onPress={onDatePress ? () => onDatePress(day) : undefined}
-                      >
-                        <Text style={[
-                          dynamicStyles.dayText,
-                          day.isToday && styles.todayText,
-                          day.value >= (habit.target || 1) && !day.isToday && styles.completedText
-                        ]}>
-                          {day.day}
-                        </Text>
-                      </CellComponent>
-                    );
-                  })}
-                </View>
-              </View>
-            ))}
-          </View>
-          
-          {/* Fixed day labels on the right */}
-          <View style={[styles.fixedDayLabels, { top: isModal ? 6 : 4 }]}>
-            {weekDays.map((day, index) => (
-              <View key={index} style={dynamicStyles.fixedDayLabel}>
-                <Text style={dynamicStyles.fixedDayLabelText}>{day}</Text>
-              </View>
-            ))}
-          </View>
+        
+        {/* Fixed day labels on the right */}
+        <View style={[styles.fixedDayLabels, { top: isModal ? 10 : 4 }]}>
+          {weekDays.map((day, index) => (
+            <View key={index} style={dynamicStyles.fixedDayLabel}>
+              <Text style={dynamicStyles.fixedDayLabelText}>{day}</Text>
+            </View>
+          ))}
         </View>
       </View>
     </View>
@@ -187,6 +186,11 @@ const styles = StyleSheet.create({
   calendarContainer: {
     width: '100%',
   },
+  modalCalendarContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
   monthHeadersRow: {
     flexDirection: 'row',
     marginBottom: 8,
@@ -194,13 +198,19 @@ const styles = StyleSheet.create({
   calendarWithLabels: {
     position: 'relative',
     width: '100%',
+    flex: 1,
+  },
+  modalCalendarWithLabels: {
+    flex: 1,
   },
   calendarGrid: {
     width: '100%',
+    flex: 1,
   },
   weekRow: {
     flexDirection: 'row',
     marginBottom: 2,
+    flex: 1,
   },
   fixedDayLabels: {
     position: 'absolute',
@@ -212,6 +222,7 @@ const styles = StyleSheet.create({
   },
   daysRow: {
     flexDirection: 'row',
+    flex: 1,
   },
   todayText: {
     color: '#ffffff',
