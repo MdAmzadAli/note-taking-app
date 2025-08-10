@@ -116,12 +116,12 @@ export default function HabitCalendar({
     monthHeaderText: {
       fontSize: isModal ? 14 : 12,
       fontWeight: '600',
-      color: isModal ? '#9ca3af' : '#6b7280',
+      color: '#6b7280',
     },
     fixedDayLabelText: {
       fontSize: 12,
       fontWeight: '600',
-      color: isModal ? '#9ca3af' : '#6b7280',
+      color: '#6b7280',
     },
   });
 

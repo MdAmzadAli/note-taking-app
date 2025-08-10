@@ -255,11 +255,19 @@ const styles = StyleSheet.create({
     backdropFilter: 'blur(10px)',
   },
   modalContainer: {
-    backgroundColor: '#1f2937',
+    backgroundColor: '#ffffff',
     borderRadius: 16,
     margin: 20,
     maxHeight: '80%',
     width: '90%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -267,21 +275,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#374151',
+    borderBottomColor: '#e5e7eb',
   },
   modalTitle: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#ffffff',
+    color: '#1f2937',
   },
   closeButton: {
     fontSize: 24,
-    color: '#ffffff',
+    color: '#6b7280',
     fontWeight: '600',
   },
   modalContent: {
     flex: 1,
     padding: 20,
+    backgroundColor: '#ffffff',
   },
   modalHorizontalScroll: {
     flex: 1,
