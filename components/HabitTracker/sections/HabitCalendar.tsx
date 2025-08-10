@@ -195,14 +195,16 @@ export default function HabitCalendar({
             ))}
           </View>
           
-          {/* Fixed day labels on the right */}
-          <View style={[styles.fixedDayLabels, { top: isModal ? 6 : 4 }]}>
-            {weekDays.map((day, index) => (
-              <View key={index} style={dynamicStyles.fixedDayLabel}>
-                <Text style={dynamicStyles.fixedDayLabelText}>{day}</Text>
-              </View>
-            ))}
-          </View>
+          {/* Fixed day labels on the right - only show for non-modal */}
+          {!isModal && (
+            <View style={[styles.fixedDayLabels, { top: 4 }]}>
+              {weekDays.map((day, index) => (
+                <View key={index} style={dynamicStyles.fixedDayLabel}>
+                  <Text style={dynamicStyles.fixedDayLabelText}>{day}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       </View>
     </View>
@@ -226,7 +228,7 @@ const styles = StyleSheet.create({
   },
   calendarGrid: {
     flex: 1,
-    paddingRight: 45, // Reduced padding for day labels
+    paddingRight: isModal ? 0 : 45, // No padding in modal mode since labels are outside
   },
   weekRow: {
     flexDirection: 'row',

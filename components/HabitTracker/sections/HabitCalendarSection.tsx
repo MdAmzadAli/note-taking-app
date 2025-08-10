@@ -150,24 +150,35 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalContent}>
-              <ScrollView
-                ref={horizontalScrollRef}
-                horizontal
-                showsHorizontalScrollIndicator={true}
-                style={styles.modalHorizontalScroll}
-                contentContainerStyle={styles.modalScrollContainer}
-                scrollEventThrottle={16}
-              >
-                <HabitCalendar
-                  habit={habit}
-                  calendarData={modalCalendarData}
-                  onDatePress={handleDatePress}
-                  cellSize={32}
-                  isModal={true}
-                />
+            <View style={styles.modalContentWithLabels}>
+              <ScrollView style={styles.modalContent}>
+                <ScrollView
+                  ref={horizontalScrollRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={true}
+                  style={styles.modalHorizontalScroll}
+                  contentContainerStyle={styles.modalScrollContainer}
+                  scrollEventThrottle={16}
+                >
+                  <HabitCalendar
+                    habit={habit}
+                    calendarData={modalCalendarData}
+                    onDatePress={handleDatePress}
+                    cellSize={32}
+                    isModal={true}
+                  />
+                </ScrollView>
               </ScrollView>
-            </ScrollView>
+              
+              {/* Fixed day labels outside scrollable area */}
+              <View style={styles.modalFixedDayLabels}>
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+                  <View key={index} style={styles.modalDayLabel}>
+                    <Text style={styles.modalDayLabelText}>{day}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
           </View>
         </View>
       </Modal>
@@ -301,7 +312,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     alignItems: 'flex-start',
     minWidth: '100%',
-    paddingRight: 45, // Reduced padding for day labels
+    paddingRight: 10, // Remove extra padding since labels are outside
+  },
+  modalContentWithLabels: {
+    flex: 1,
+    position: 'relative',
+  },
+  modalFixedDayLabels: {
+    position: 'absolute',
+    right: 10,
+    top: 46, // Adjust based on month header height
+    width: 35,
+    justifyContent: 'space-around',
+    height: 'calc(100% - 46px)', // Account for month header
+    paddingVertical: 2,
+  },
+  modalDayLabel: {
+    height: 36, // Same as cell size + margin
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  modalDayLabelText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
   },
   valueModalOverlay: {
     flex: 1,
