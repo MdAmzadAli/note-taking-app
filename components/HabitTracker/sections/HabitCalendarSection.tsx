@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     margin: 20,
     maxHeight: '80%',
-    width: '90%',
+    width: '100%',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -301,10 +301,10 @@ const styles = StyleSheet.create({
   modalFixedDayLabels: {
     position: 'absolute',
     right: 5, // Position within the reserved space
-    top: 20, // Adjust for no header
+    top: 60, // Move lower to align with calendar rows (accounting for month headers)
     width: 35,
     justifyContent: 'space-around',
-    height: 'calc(100% - 20px)', // Account for padding only
+    height: 260, // Fixed height to match calendar area
     paddingVertical: 2,
     backgroundColor: '#ffffff', // Add background to ensure visibility
     zIndex: 100, // Ensure it's above everything
