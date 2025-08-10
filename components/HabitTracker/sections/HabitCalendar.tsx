@@ -18,12 +18,12 @@ interface HabitCalendarProps {
   isModal?: boolean;
 }
 
-export default function HabitCalendar({ 
-  habit, 
-  calendarData, 
-  onDatePress, 
+export default function HabitCalendar({
+  habit,
+  calendarData,
+  onDatePress,
   cellSize = 22,
-  isModal = false 
+  isModal = false
 }: HabitCalendarProps) {
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -146,14 +146,14 @@ export default function HabitCalendar({
         {/* Month headers */}
         <View style={styles.monthHeadersRow}>
           {monthHeaders.map((header, index) => (
-            <View 
-              key={index} 
+            <View
+              key={index}
               style={[
-                dynamicStyles.monthHeader, 
-                { 
+                dynamicStyles.monthHeader,
+                {
                   position: 'absolute',
                   left: header.startCol * (cellSize + 2),
-                  width: header.width 
+                  width: header.width
                 }
               ]}
             >
@@ -164,7 +164,7 @@ export default function HabitCalendar({
 
         {/* Calendar grid with fixed day labels */}
         <View style={styles.calendarWithLabels}>
-          <View style={[styles.calendarGrid, { paddingRight: isModal ? 0 : 45 }]}>
+          <View style={[styles.calendarGrid, { paddingRight: isModal ? 60 : 45, maxWidth: isModal ? 'calc(100% - 50px)' : '100%' }]}>
             {calendarGrid.map((weekRow, weekIndex) => (
               <View key={weekIndex} style={styles.weekRow}>
                 <View style={styles.daysRow}>

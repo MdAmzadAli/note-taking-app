@@ -311,21 +311,25 @@ const styles = StyleSheet.create({
   modalScrollContainer: {
     paddingHorizontal: 10,
     alignItems: 'flex-start',
-    minWidth: 'calc(100% - 60px)', // Reduce width to make space for labels
-    paddingRight: 10,
+    minWidth: '100%',
+    paddingRight: 60, // Increase padding to create clear boundary
+    marginRight: -50, // Pull back to create space for labels
   },
   modalContentWithLabels: {
     flex: 1,
     position: 'relative',
+    paddingRight: 50, // Reserve space for labels
   },
   modalFixedDayLabels: {
     position: 'absolute',
-    right: 15,
+    right: 5, // Position just outside the scrollable area
     top: 46, // Adjust based on month header height
     width: 40,
     justifyContent: 'space-around',
     height: 'calc(100% - 46px)', // Account for month header
     paddingVertical: 2,
+    backgroundColor: '#ffffff', // Add background to ensure visibility
+    zIndex: 100, // Ensure it's above everything
   },
   modalDayLabel: {
     height: 36, // Same as cell size + margin
