@@ -52,7 +52,10 @@ export default function HabitCalendar({
     let currentMonth = '';
     let count = 0;
 
-    data.forEach((day) => {
+    // Sort data by date first to ensure proper month grouping
+    const sortedData = [...data].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    sortedData.forEach((day) => {
       const monthYear = `${day.monthName} ${day.date.getFullYear()}`;
       if (monthYear !== currentMonth) {
         if (currentMonth && count > 0) {
@@ -71,7 +74,7 @@ export default function HabitCalendar({
 
     return headers.map(header => ({
       ...header,
-      width: header.colspan * cellSize
+      width: Math.max(header.colspan * cellSize, 80) // Ensure minimum width for month headers
     }));
   };
 
@@ -79,7 +82,10 @@ export default function HabitCalendar({
   const organizeDataIntoGrid = (data: CalendarDay[]) => {
     const grid: CalendarDay[][] = [[], [], [], [], [], [], []]; // 7 days of week
     
-    data.forEach((day, index) => {
+    // Sort data by date to ensure proper chronological order
+    const sortedData = [...data].sort((a, b) => a.date.getTime() - b.date.getTime());
+    
+    sortedData.forEach((day) => {
       const dayOfWeek = day.date.getDay(); // 0 = Sunday, 1 = Monday, etc.
       grid[dayOfWeek].push(day);
     });

@@ -69,13 +69,13 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     return days;
   }, [habit.completions]);
 
-  // Generate dates for modal (extended range for scrolling)
+  // Generate dates for modal (extended range for scrolling including future dates)
   const modalCalendarData = useMemo(() => {
     const days: CalendarDay[] = [];
     const today = new Date();
 
-    // Generate 90 days (approximately 3 months) ending with today for scrolling
-    for (let i = 89; i >= 0; i--) {
+    // Generate 180 days total: 90 days in the past + today + 89 days in the future
+    for (let i = 89; i >= -89; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
 
@@ -259,6 +259,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     margin: 20,
     maxHeight: '80%',
+    minHeight: '60%',
     width: '90%',
     shadowColor: '#000',
     shadowOffset: {
@@ -291,6 +292,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: '#ffffff',
+    minHeight: 300,
   },
   modalHorizontalScroll: {
     flex: 1,
