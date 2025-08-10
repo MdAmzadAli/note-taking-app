@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     alignItems: 'flex-start',
     minWidth: '100%',
-    paddingRight: 50, // Add padding to create space for day labels
+    paddingRight: 60, // Increased padding to prevent overlap
   },
   modalContentWithLabels: {
     flex: 1,

@@ -165,7 +165,7 @@ export default function HabitCalendar({
 
         {/* Calendar grid with fixed day labels */}
         <View style={styles.calendarWithLabels}>
-          <View style={[styles.calendarGrid, { paddingRight: isModal ? 0 : 45 }]}>
+          <View style={[styles.calendarGrid, { paddingRight: isModal ? 50 : 45, marginRight: isModal ? 50 : 0 }]}>
             {calendarGrid.map((weekRow, weekIndex) => (
               <View key={weekIndex} style={styles.weekRow}>
                 <View style={styles.daysRow}>
