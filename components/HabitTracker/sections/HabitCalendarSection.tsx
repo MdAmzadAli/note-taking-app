@@ -34,9 +34,13 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   // Auto-scroll to the end (latest dates) when modal opens
   useEffect(() => {
     if (showModal && horizontalScrollRef.current) {
+      // Use multiple timeouts to ensure scroll works
+      setTimeout(() => {
+        horizontalScrollRef.current?.scrollToEnd({ animated: false });
+      }, 50);
       setTimeout(() => {
         horizontalScrollRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      }, 300);
     }
   }, [showModal]);
 
@@ -70,8 +74,8 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     const days: CalendarDay[] = [];
     const today = new Date();
 
-    // Generate 180 days (approximately 6 months) ending with today for scrolling
-    for (let i = 179; i >= 0; i--) {
+    // Generate 90 days (approximately 3 months) ending with today for scrolling
+    for (let i = 89; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
 
@@ -153,6 +157,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                 showsHorizontalScrollIndicator={true}
                 style={styles.modalHorizontalScroll}
                 contentContainerStyle={styles.modalScrollContainer}
+                scrollEventThrottle={16}
               >
                 <HabitCalendar
                   habit={habit}
@@ -284,6 +289,7 @@ const styles = StyleSheet.create({
   modalScrollContainer: {
     paddingHorizontal: 10,
     alignItems: 'flex-start',
+    minWidth: '100%',
   },
   valueModalOverlay: {
     flex: 1,
