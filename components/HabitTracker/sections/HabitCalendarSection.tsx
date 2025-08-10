@@ -163,7 +163,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                   />
                 </View>
               </ScrollView>
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
