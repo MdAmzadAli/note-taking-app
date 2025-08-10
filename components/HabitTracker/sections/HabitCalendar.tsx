@@ -53,29 +53,50 @@ export default function HabitCalendar({
     const sortedData = [...data].sort((a, b) => a.date.getTime() - b.date.getTime());
 
     // Track which columns belong to which months
-    const monthColumns: { [key: string]: number[] } = {};
+    const monthColumns: { [key: string]: { columns: number[], year: number, monthName: string } } = {};
 
     // Map each day to its column position
     grid.forEach((weekRow, weekIndex) => {
       weekRow.forEach((day, dayIndex) => {
         const monthYear = `${day.monthName} ${day.date.getFullYear()}`;
         if (!monthColumns[monthYear]) {
-          monthColumns[monthYear] = [];
+          monthColumns[monthYear] = {
+            columns: [],
+            year: day.date.getFullYear(),
+            monthName: day.monthName
+          };
         }
-        monthColumns[monthYear].push(dayIndex);
+        monthColumns[monthYear].columns.push(dayIndex);
       });
     });
 
-    // Create headers based on column spans
-    Object.entries(monthColumns).forEach(([monthYear, columns]) => {
-      if (columns.length > 0) {
-        const uniqueColumns = [...new Set(columns)].sort((a, b) => a - b);
+    // Sort month entries by year and month
+    const sortedMonthEntries = Object.entries(monthColumns).sort((a, b) => {
+      const [, aData] = a;
+      const [, bData] = b;
+      if (aData.year !== bData.year) {
+        return aData.year - bData.year;
+      }
+      const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return monthOrder.indexOf(aData.monthName) - monthOrder.indexOf(bData.monthName);
+    });
+
+    // Create headers based on column spans, showing year only when it changes
+    let lastYear: number | null = null;
+    sortedMonthEntries.forEach(([monthYear, data]) => {
+      if (data.columns.length > 0) {
+        const uniqueColumns = [...new Set(data.columns)].sort((a, b) => a - b);
         const startCol = uniqueColumns[0];
         const endCol = uniqueColumns[uniqueColumns.length - 1];
         const width = (endCol - startCol + 1) * (cellSize + 2); // Include margin
 
+        // Show year only when it changes
+        const showYear = lastYear !== data.year;
+        const displayText = showYear ? `${data.monthName} ${data.year}` : data.monthName;
+        lastYear = data.year;
+
         headers.push({
-          month: monthYear,
+          month: displayText,
           startCol,
           endCol,
           width
@@ -83,8 +104,7 @@ export default function HabitCalendar({
       }
     });
 
-    // Sort headers by start column position
-    return headers.sort((a, b) => a.startCol - b.startCol);
+    return headers;
   };
 
   // Organize data into grid (7 rows × variable columns)

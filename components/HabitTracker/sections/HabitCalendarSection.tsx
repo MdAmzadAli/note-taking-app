@@ -145,13 +145,6 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Calendar</Text>
-              <TouchableOpacity onPress={() => setShowModal(false)}>
-                <Text style={styles.closeButton}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
             <View style={styles.modalContentWithLabels}>
               <ScrollView style={styles.modalContent}>
                 <ScrollView
@@ -283,24 +276,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 10,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  closeButton: {
-    fontSize: 24,
-    color: '#6b7280',
-    fontWeight: '600',
-  },
   modalContent: {
     flex: 1,
     paddingTop: 20,
@@ -329,10 +304,10 @@ const styles = StyleSheet.create({
   modalFixedDayLabels: {
     position: 'absolute',
     right: 5, // Position within the reserved space
-    top: 46, // Adjust based on month header height
+    top: 20, // Adjust for no header
     width: 35,
     justifyContent: 'space-around',
-    height: 'calc(100% - 46px)', // Account for month header
+    height: 'calc(100% - 20px)', // Account for padding only
     paddingVertical: 2,
     backgroundColor: '#ffffff', // Add background to ensure visibility
     zIndex: 100, // Ensure it's above everything
