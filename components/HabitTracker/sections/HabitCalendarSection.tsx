@@ -265,7 +265,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     margin: 20,
     maxHeight: '80%',
-    minHeight: '60%',
     width: '90%',
     shadowColor: '#000',
     shadowOffset: {
@@ -277,17 +276,16 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   modalContent: {
-    flex: 1,
     paddingTop: 20,
     paddingBottom: 20,
     paddingLeft: 5, // Minimal gap from left edge
     paddingRight: 45, // Reserve space for day labels
     backgroundColor: '#ffffff',
-    minHeight: 300,
+    maxHeight: 400,
   },
   modalHorizontalScroll: {
-    flex: 1,
     width: '100%',
+    maxHeight: 400,
   },
   modalScrollContainer: {
     paddingLeft: 5, // Minimal left padding
@@ -297,7 +295,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   modalContentWithLabels: {
-    flex: 1,
     position: 'relative',
     paddingRight: 45, // Reserve space for day labels
   },
