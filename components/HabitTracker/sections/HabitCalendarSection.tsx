@@ -30,8 +30,6 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const [inputValue, setInputValue] = useState('');
   const [showValueModal, setShowValueModal] = useState(false);
   const horizontalScrollRef = useRef<ScrollView>(null);
-  const [currentCalendarIndex, setCurrentCalendarIndex] = useState(0);
-  const [isScrolling, setIsScrolling] = useState(false);
 
   // Generate dates for preview (105 days - 15 columns × 7 rows)
   const previewCalendarData = useMemo(() => {
@@ -58,101 +56,45 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     return days;
   }, [habit.completions]);
 
-  // Generate infinite scrolling calendar data
-  const generateCalendarData = (centerIndex: number) => {
+  // Generate dates for modal (only past dates and today)
+  const modalCalendarData = useMemo(() => {
     const days: CalendarDay[] = [];
     const today = new Date();
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
-    // Generate 3 sets of 182 days each (546 days total) for smooth infinite scroll
-    // Previous set, current set, next set
-    const daysPerSet = 182;
-    const totalSets = 3;
-    
-    for (let set = 0; set < totalSets; set++) {
-      const setOffset = (set - 1) * daysPerSet; // -1, 0, 1 for prev, current, next
-      const baseOffset = centerIndex * daysPerSet + setOffset;
-      
-      for (let i = daysPerSet - 1; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(today.getDate() - (baseOffset + i));
 
-        const completion = habit.completions.find(c => c.date === date.toISOString().split('T')[0]);
+    // Generate 182 days (26 weeks) ending with today
+    for (let i = 181; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
 
-        days.push({
-          date,
-          day: date.getDate(),
-          value: completion?.value || 0,
-          isToday: date.toDateString() === today.toDateString(),
-          monthName: monthNames[date.getMonth()],
-        });
-      }
+      const completion = habit.completions.find(c => c.date === date.toISOString().split('T')[0]);
+
+      days.push({
+        date,
+        day: date.getDate(),
+        value: completion?.value || 0,
+        isToday: date.toDateString() === today.toDateString(),
+        monthName: monthNames[date.getMonth()],
+      });
     }
 
     return days;
-  };
-
-  const modalCalendarData = useMemo(() => {
-    return generateCalendarData(currentCalendarIndex);
-  }, [habit.completions, currentCalendarIndex]);
+  }, [habit.completions]);
 
   // Auto-scroll to position today's date at the rightmost edge when modal opens
   useEffect(() => {
     if (showModal && horizontalScrollRef.current) {
-      // For infinite scroll, position at the middle set (current set)
-      const middlePosition = modalCalendarData.length / 3; // Position at start of middle set
-      const cellWidth = 34; // 32 + 2 margin
-      const columnsPerWeek = 7;
-      const weeksInMiddleSet = 26; // 182 days / 7
-      const scrollPosition = (weeksInMiddleSet * cellWidth * columnsPerWeek);
-      
+      // Scroll to end to position today's date at the rightmost edge with no gap
       setTimeout(() => {
-        horizontalScrollRef.current?.scrollTo({ x: scrollPosition, animated: false });
+        horizontalScrollRef.current?.scrollToEnd({ animated: false });
       }, 100);
       
-      // Fine-tune to show today at rightmost edge
+      // Fine-tune with animated scroll
       setTimeout(() => {
         horizontalScrollRef.current?.scrollToEnd({ animated: true });
       }, 400);
     }
   }, [showModal, modalCalendarData]);
-
-  // Handle infinite scroll
-  const handleCalendarScroll = (event: any) => {
-    if (isScrolling) return;
-    
-    const scrollX = event.nativeEvent.contentOffset.x;
-    const contentWidth = event.nativeEvent.contentSize.width;
-    const containerWidth = event.nativeEvent.layoutMeasurement.width;
-    
-    const scrollThreshold = contentWidth * 0.15; // Trigger at 15% from edges
-    const maxScrollX = contentWidth - containerWidth;
-    
-    // Check if scrolled to beginning (load previous data)
-    if (scrollX < scrollThreshold) {
-      setIsScrolling(true);
-      setCurrentCalendarIndex(prev => prev - 1);
-      
-      // Reposition scroll to middle section after data loads
-      setTimeout(() => {
-        const newPosition = scrollX + (contentWidth / 3);
-        horizontalScrollRef.current?.scrollTo({ x: newPosition, animated: false });
-        setIsScrolling(false);
-      }, 100);
-    }
-    // Check if scrolled to end (load next data)
-    else if (scrollX > maxScrollX - scrollThreshold) {
-      setIsScrolling(true);
-      setCurrentCalendarIndex(prev => prev + 1);
-      
-      // Reposition scroll to middle section after data loads
-      setTimeout(() => {
-        const newPosition = scrollX - (contentWidth / 3);
-        horizontalScrollRef.current?.scrollTo({ x: newPosition, animated: false });
-        setIsScrolling(false);
-      }, 100);
-    }
-  };
 
   const handleDatePress = (day: CalendarDay) => {
     setSelectedDate(day.date);
@@ -219,8 +161,6 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                   style={styles.modalHorizontalScroll}
                   contentContainerStyle={styles.modalScrollContainer}
                   scrollEventThrottle={16}
-                  onScroll={handleCalendarScroll}
-                  decelerationRate="fast"
                 >
                   <HabitCalendar
                     habit={habit}
