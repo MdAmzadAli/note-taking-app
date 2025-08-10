@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   TextInput,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { Habit } from '@/types';
 import HabitCalendar from './HabitCalendar';
@@ -30,6 +31,17 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const [inputValue, setInputValue] = useState('');
   const [showValueModal, setShowValueModal] = useState(false);
   const horizontalScrollRef = useRef<ScrollView>(null);
+  const modalContainerRef = useRef<View>(null);
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+  };
+
+  const handlePressOutsideModal = (event: any) => {
+    if (modalContainerRef.current && event.target === modalContainerRef.current) {
+      handleCloseModal();
+    }
+  };
 
   // Generate dates for preview (105 days - 15 columns × 7 rows)
   const previewCalendarData = useMemo(() => {
@@ -88,7 +100,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       setTimeout(() => {
         horizontalScrollRef.current?.scrollToEnd({ animated: false });
       }, 100);
-      
+
       // Fine-tune with animated scroll
       setTimeout(() => {
         horizontalScrollRef.current?.scrollToEnd({ animated: true });
@@ -112,6 +124,26 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     setSelectedDate(null);
     setInputValue('');
   };
+
+  const getMonthRowCount = (data: CalendarDay[]) => {
+    if (data.length === 0) return 0;
+    const rows = Math.ceil(data.length / 7); // Assuming 7 days a week
+    const monthMap = new Map<string, number>();
+    data.forEach(day => {
+      const monthYear = `${day.date.getFullYear()}-${day.date.getMonth()}`;
+      monthMap.set(monthYear, (monthMap.get(monthYear) || 0) + 1);
+    });
+
+    let totalMonthRows = 0;
+    monthMap.forEach((count) => {
+      totalMonthRows += Math.ceil(count / 7);
+    });
+    return totalMonthRows;
+  };
+
+  const calendarHeight = modalCalendarData.length > 0 ? (Math.ceil(modalCalendarData.length / 7) * 32) + 40 : 300; // 32 is cellSize + some margin, 40 for month names
+  const modalHeight = calendarHeight + 60; // Calendar height + header/footer space
+
 
   return (
     <View style={styles.section}>
@@ -141,41 +173,45 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         visible={showModal}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setShowModal(false)}
+        onRequestClose={handleCloseModal}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContentWithLabels}>
-              <ScrollView style={styles.modalContent}>
-                <ScrollView
-                  ref={horizontalScrollRef}
-                  horizontal
-                  showsHorizontalScrollIndicator={true}
-                  style={styles.modalHorizontalScroll}
-                  contentContainerStyle={styles.modalScrollContainer}
-                  scrollEventThrottle={16}
-                >
-                  <HabitCalendar
-                    habit={habit}
-                    calendarData={modalCalendarData}
-                    onDatePress={handleDatePress}
-                    cellSize={32}
-                    isModal={true}
-                  />
-                </ScrollView>
-              </ScrollView>
-              
-              {/* Fixed day labels outside scrollable area */}
-              <View style={styles.modalFixedDayLabels}>
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
-                  <View key={index} style={styles.modalDayLabel}>
-                    <Text style={styles.modalDayLabelText}>{day}</Text>
+        <TouchableWithoutFeedback onPress={handlePressOutsideModal}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.modalContainer, { height: modalHeight }]}>
+                <View style={styles.modalContentWithLabels}>
+                  <ScrollView style={styles.modalContent}>
+                    <ScrollView
+                      ref={horizontalScrollRef}
+                      horizontal
+                      showsHorizontalScrollIndicator={true}
+                      style={styles.modalHorizontalScroll}
+                      contentContainerStyle={styles.modalScrollContainer}
+                      scrollEventThrottle={16}
+                    >
+                      <HabitCalendar
+                        habit={habit}
+                        calendarData={modalCalendarData}
+                        onDatePress={handleDatePress}
+                        cellSize={32}
+                        isModal={true}
+                      />
+                    </ScrollView>
+                  </ScrollView>
+
+                  {/* Fixed day labels outside scrollable area */}
+                  <View style={styles.modalFixedDayLabels}>
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+                      <View key={index} style={styles.modalDayLabel}>
+                        <Text style={styles.modalDayLabelText}>{day}</Text>
+                      </View>
+                    ))}
                   </View>
-                ))}
+                </View>
               </View>
-            </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Value Input Modal */}
@@ -264,9 +300,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 16,
     margin: 20,
-    maxHeight: '80%',
-    minHeight: '60%',
-    width: '90%',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -280,8 +313,8 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 20,
     paddingBottom: 20,
-    paddingLeft: 5, // Minimal gap from left edge
-    paddingRight: 45, // Reserve space for day labels
+    paddingLeft: 5,
+    paddingRight: 45,
     backgroundColor: '#ffffff',
     minHeight: 300,
   },
@@ -290,8 +323,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   modalScrollContainer: {
-    paddingLeft: 5, // Minimal left padding
-    paddingRight: 0, // Remove all right padding
+    paddingLeft: 5,
+    paddingRight: 0,
     alignItems: 'flex-start',
     minWidth: '100%',
     flexGrow: 1,
@@ -299,21 +332,21 @@ const styles = StyleSheet.create({
   modalContentWithLabels: {
     flex: 1,
     position: 'relative',
-    paddingRight: 45, // Reserve space for day labels
+    paddingRight: 45,
   },
   modalFixedDayLabels: {
     position: 'absolute',
-    right: 5, // Position within the reserved space
-    top: 20, // Adjust for no header
+    right: 5,
+    top: 20,
     width: 35,
     justifyContent: 'space-around',
-    height: 'calc(100% - 20px)', // Account for padding only
+    height: 'calc(100% - 20px)',
     paddingVertical: 2,
-    backgroundColor: '#ffffff', // Add background to ensure visibility
-    zIndex: 100, // Ensure it's above everything
+    backgroundColor: '#ffffff',
+    zIndex: 100,
   },
   modalDayLabel: {
-    height: 36, // Same as cell size + margin
+    height: 36,
     justifyContent: 'center',
     alignItems: 'flex-start',
   },
