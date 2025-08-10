@@ -69,13 +69,13 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     return days;
   }, [habit.completions]);
 
-  // Generate dates for modal (extended range for scrolling including future dates)
+  // Generate dates for modal (only past dates and today)
   const modalCalendarData = useMemo(() => {
     const days: CalendarDay[] = [];
     const today = new Date();
 
-    // Generate 180 days total: 90 days in the past + today + 89 days in the future
-    for (let i = 89; i >= -89; i--) {
+    // Generate 180 days total: 179 days in the past + today (no future dates)
+    for (let i = 179; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
 
@@ -301,7 +301,10 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     flex: 1,
-    padding: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
+    paddingLeft: 5, // Minimal gap from left edge
+    paddingRight: 20,
     backgroundColor: '#ffffff',
     minHeight: 300,
   },
@@ -309,11 +312,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalScrollContainer: {
-    paddingHorizontal: 10,
+    paddingLeft: 5, // Minimal left padding
+    paddingRight: 60, // Space for fixed labels
     alignItems: 'flex-start',
     minWidth: '100%',
-    paddingRight: 60, // Increase padding to create clear boundary
-    marginRight: -50, // Pull back to create space for labels
   },
   modalContentWithLabels: {
     flex: 1,
