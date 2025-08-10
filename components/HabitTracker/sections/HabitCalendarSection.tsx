@@ -315,18 +315,18 @@ const styles = StyleSheet.create({
   },
   modalScrollContainer: {
     paddingLeft: 5, // Minimal left padding
-    paddingRight: 40, // Minimal space for fixed labels
+    paddingRight: 0, // Remove all right padding
     alignItems: 'flex-start',
     minWidth: '100%',
   },
   modalContentWithLabels: {
     flex: 1,
     position: 'relative',
-    paddingRight: 40, // Reduced space for labels
+    paddingRight: 0, // Remove all right padding
   },
   modalFixedDayLabels: {
     position: 'absolute',
-    right: 0, // Align with right edge
+    right: -35, // Move outside the container to the right
     top: 46, // Adjust based on month header height
     width: 35,
     justifyContent: 'space-around',
