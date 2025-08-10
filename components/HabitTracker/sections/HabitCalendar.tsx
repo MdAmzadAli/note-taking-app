@@ -97,30 +97,44 @@ export default function HabitCalendar({
     }
 
     if (isModal) {
-      // For modal: organize dates into columns so each column shows consecutive dates
-      // We want rightmost column to end with today, with consecutive dates going up
-      
+      // For modal: organize dates to align with their actual weekdays
       const totalDays = calendarData.length;
       const numColumns = Math.ceil(totalDays / 7);
       
-      // Initialize all grid positions
+      // Initialize all grid positions with null
       for (let row = 0; row < 7; row++) {
         grid[row] = new Array(numColumns).fill(null);
       }
       
-      // Fill the grid starting from the rightmost column, bottom to top
-      let dataIndex = totalDays - 1; // Start with today (last date in array)
+      // Fill grid by placing each date in its correct weekday row
+      // Start from the rightmost column and work backwards
+      const today = calendarData[calendarData.length - 1]; // Last date is today
+      const todayWeekday = today.date.getDay(); // 0 = Sunday, 1 = Monday, etc.
       
-      for (let col = numColumns - 1; col >= 0 && dataIndex >= 0; col--) {
-        for (let row = 6; row >= 0 && dataIndex >= 0; row--) { // Fill from bottom to top
-          if (dataIndex < calendarData.length) {
-            grid[row][col] = calendarData[dataIndex];
-            dataIndex--;
-          }
+      // Place today in the rightmost column at its correct weekday row
+      let currentCol = numColumns - 1;
+      let currentRow = todayWeekday;
+      
+      // Fill the grid backwards from today
+      for (let i = calendarData.length - 1; i >= 0; i--) {
+        const day = calendarData[i];
+        const dayWeekday = day.date.getDay();
+        
+        // Place the day in the current column at its weekday row
+        grid[dayWeekday][currentCol] = day;
+        
+        // Move to the previous day position
+        if (dayWeekday === 0) {
+          // If we just placed Sunday, move to previous column, Saturday
+          currentCol--;
+          currentRow = 6;
+        } else {
+          // Move up one row (previous weekday)
+          currentRow = dayWeekday - 1;
         }
       }
       
-      // Clean up any null entries and ensure consistent column lengths
+      // Clean up null entries
       for (let row = 0; row < 7; row++) {
         grid[row] = grid[row].filter(day => day !== null);
       }
