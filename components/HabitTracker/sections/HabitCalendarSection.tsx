@@ -152,16 +152,15 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                 horizontal
                 showsHorizontalScrollIndicator={true}
                 style={styles.modalHorizontalScroll}
+                contentContainerStyle={styles.modalScrollContainer}
               >
-                <View style={styles.modalScrollableContent}>
-                  <HabitCalendar
-                    habit={habit}
-                    calendarData={modalCalendarData}
-                    onDatePress={handleDatePress}
-                    cellSize={28}
-                    isModal={true}
-                  />
-                </View>
+                <HabitCalendar
+                  habit={habit}
+                  calendarData={modalCalendarData}
+                  onDatePress={handleDatePress}
+                  cellSize={32}
+                  isModal={true}
+                />
               </ScrollView>
             </ScrollView>
           </View>
@@ -245,9 +244,10 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
+    backdropFilter: 'blur(10px)',
   },
   modalContainer: {
     backgroundColor: '#1f2937',
@@ -281,8 +281,9 @@ const styles = StyleSheet.create({
   modalHorizontalScroll: {
     flex: 1,
   },
-  modalScrollableContent: {
-    minWidth: '100%',
+  modalScrollContainer: {
+    paddingHorizontal: 10,
+    alignItems: 'flex-start',
   },
   valueModalOverlay: {
     flex: 1,
