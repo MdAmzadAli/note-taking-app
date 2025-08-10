@@ -301,16 +301,16 @@ const styles = StyleSheet.create({
   modalFixedDayLabels: {
     position: 'absolute',
     right: 5, // Position within the reserved space
-    top: 60, // Move lower to align with calendar rows (accounting for month headers)
+    top: 52, // Align with the start of calendar rows after month header (40px header + 12px margin)
     width: 35,
-    justifyContent: 'space-around',
-    height: 260, // Fixed height to match calendar area
-    paddingVertical: 2,
+    justifyContent: 'space-between', // Change from space-around to space-between for better alignment
+    height: 252, // 7 rows × (32px cell + 4px margin) = 252px
+    paddingVertical: 0, // Remove padding to ensure perfect alignment
     backgroundColor: '#ffffff', // Add background to ensure visibility
     zIndex: 100, // Ensure it's above everything
   },
   modalDayLabel: {
-    height: 36, // Same as cell size + margin
+    height: 36, // Same as cell size (32) + margin (4)
     justifyContent: 'center',
     alignItems: 'flex-start',
   },

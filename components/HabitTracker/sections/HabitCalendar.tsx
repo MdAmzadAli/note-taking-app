@@ -154,8 +154,9 @@ export default function HabitCalendar({
         }
       }
       
-      // Clean up null entries
+      // Clean up null entries - keep structure but replace nulls with placeholder
       for (let row = 0; row < 7; row++) {
+        // Keep the full width but filter out nulls for rendering
         grid[row] = grid[row].filter(day => day !== null);
       }
     } else {
@@ -231,10 +232,11 @@ export default function HabitCalendar({
         {/* Calendar grid with fixed day labels */}
         <View style={styles.calendarWithLabels}>
           <View style={[styles.calendarGrid, { paddingRight: isModal ? 0 : 45, maxWidth: isModal ? '100%' : '100%' }]}>
-            {calendarGrid.map((weekRow, weekIndex) => (
-              <View key={weekIndex} style={styles.weekRow}>
+            {/* Ensure we always render exactly 7 rows */}
+            {[0, 1, 2, 3, 4, 5, 6].map((weekIndex) => (
+              <View key={weekIndex} style={[styles.weekRow, isModal && { minHeight: cellSize + 2 }]}>
                 <View style={styles.daysRow}>
-                  {weekRow.map((day, dayIndex) => {
+                  {calendarGrid[weekIndex] && calendarGrid[weekIndex].map((day, dayIndex) => {
                     const CellComponent = onDatePress ? TouchableOpacity : View;
                     return (
                       <CellComponent
