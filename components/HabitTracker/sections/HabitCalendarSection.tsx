@@ -312,12 +312,14 @@ const styles = StyleSheet.create({
   },
   modalHorizontalScroll: {
     flex: 1,
+    width: '100%',
   },
   modalScrollContainer: {
     paddingLeft: 5, // Minimal left padding
     paddingRight: 0, // Remove all right padding
     alignItems: 'flex-start',
     minWidth: '100%',
+    flexGrow: 1,
   },
   modalContentWithLabels: {
     flex: 1,
