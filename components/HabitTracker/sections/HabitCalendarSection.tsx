@@ -150,7 +150,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalContent}>
+            <View style={styles.modalContent}>
               <ScrollView
                 ref={horizontalScrollRef}
                 horizontal
@@ -167,7 +167,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                   isModal={true}
                 />
               </ScrollView>
-            </ScrollView>
+            </View>
           </View>
         </View>
       </Modal>
@@ -281,15 +281,15 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     flex: 1,
-    padding: 0,
+    paddingVertical: 20,
   },
   modalHorizontalScroll: {
     flex: 1,
   },
   modalScrollContainer: {
-    paddingHorizontal: 0,
+    paddingHorizontal: 20,
     alignItems: 'flex-start',
-    minWidth: '100%',
+    justifyContent: 'flex-start',
   },
   valueModalOverlay: {
     flex: 1,

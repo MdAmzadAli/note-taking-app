@@ -77,14 +77,42 @@ export default function HabitCalendar({
 
   // Organize data into grid format (7 rows × columns)
   const organizeDataIntoGrid = (data: CalendarDay[]) => {
-    const grid: CalendarDay[][] = [[], [], [], [], [], [], []]; // 7 days of week
-    
-    data.forEach((day, index) => {
-      const dayOfWeek = day.date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-      grid[dayOfWeek].push(day);
-    });
-    
-    return grid;
+    if (isModal) {
+      // For modal, organize data into columns of 7 days each
+      const columns: CalendarDay[][] = [];
+      const columnCount = Math.ceil(data.length / 7);
+      
+      for (let col = 0; col < columnCount; col++) {
+        const column: CalendarDay[] = [];
+        for (let row = 0; row < 7; row++) {
+          const index = col * 7 + row;
+          if (index < data.length) {
+            column.push(data[index]);
+          }
+        }
+        if (column.length > 0) {
+          columns.push(column);
+        }
+      }
+      
+      // Convert columns to rows for rendering
+      const grid: CalendarDay[][] = [[], [], [], [], [], [], []];
+      columns.forEach(column => {
+        column.forEach((day, rowIndex) => {
+          grid[rowIndex].push(day);
+        });
+      });
+      
+      return grid;
+    } else {
+      // For preview, organize by day of week
+      const grid: CalendarDay[][] = [[], [], [], [], [], [], []];
+      data.forEach((day, index) => {
+        const dayOfWeek = day.date.getDay();
+        grid[dayOfWeek].push(day);
+      });
+      return grid;
+    }
   };
 
   const calendarGrid = organizeDataIntoGrid(calendarData);
@@ -187,9 +215,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   modalCalendarContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    minHeight: 300,
+    minWidth: 300,
   },
   monthHeadersRow: {
     flexDirection: 'row',
@@ -211,6 +238,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 2,
     flex: 1,
+    minHeight: 40,
   },
   fixedDayLabels: {
     position: 'absolute',
