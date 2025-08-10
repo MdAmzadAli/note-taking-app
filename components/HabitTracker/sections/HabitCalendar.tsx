@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   },
   calendarGrid: {
     flex: 1,
-    paddingRight: 60, // Make space for day labels
+    paddingRight: 45, // Reduced padding for day labels
   },
   weekRow: {
     flexDirection: 'row',
@@ -234,13 +234,14 @@ const styles = StyleSheet.create({
   },
   fixedDayLabels: {
     position: 'absolute',
-    right: 0,
+    right: 5,
     top: 0,
-    width: 50,
+    width: 35,
     height: '100%',
     justifyContent: 'space-around',
-    paddingLeft: 8,
+    paddingLeft: 4,
     backgroundColor: 'transparent',
+    zIndex: 10,
   },
   daysRow: {
     flexDirection: 'row',

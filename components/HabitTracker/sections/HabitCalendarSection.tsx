@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     alignItems: 'flex-start',
     minWidth: '100%',
-    paddingRight: 70, // Extra padding to ensure day labels don't overlap
+    paddingRight: 45, // Reduced padding for day labels
   },
   valueModalOverlay: {
     flex: 1,
