@@ -98,6 +98,7 @@ export default function HabitCalendar({
 
     if (isModal) {
       // For modal: organize dates to align with their actual weekdays
+      // Process in chunks for better performance with infinite scroll
       const totalDays = calendarData.length;
       const numColumns = Math.ceil(totalDays / 7);
       
@@ -107,30 +108,26 @@ export default function HabitCalendar({
       }
       
       // Fill grid by placing each date in its correct weekday row
-      // Start from the rightmost column and work backwards
-      const today = calendarData[calendarData.length - 1]; // Last date is today
-      const todayWeekday = today.date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      // For infinite scroll, we work with the data as provided (already sorted)
+      let currentCol = 0;
       
-      // Place today in the rightmost column at its correct weekday row
-      let currentCol = numColumns - 1;
-      let currentRow = todayWeekday;
-      
-      // Fill the grid backwards from today
-      for (let i = calendarData.length - 1; i >= 0; i--) {
+      for (let i = 0; i < calendarData.length; i++) {
         const day = calendarData[i];
         const dayWeekday = day.date.getDay();
         
-        // Place the day in the current column at its weekday row
-        grid[dayWeekday][currentCol] = day;
+        // If this is the start of a new week, move to next column
+        if (i > 0 && dayWeekday === 0) {
+          currentCol++;
+        }
         
-        // Move to the previous day position
-        if (dayWeekday === 0) {
-          // If we just placed Sunday, move to previous column, Saturday
-          currentCol--;
-          currentRow = 6;
-        } else {
-          // Move up one row (previous weekday)
-          currentRow = dayWeekday - 1;
+        // Place the day in the current column at its weekday row
+        if (currentCol < numColumns) {
+          grid[dayWeekday][currentCol] = day;
+        }
+        
+        // Move to next column after Sunday (end of week)
+        if (dayWeekday === 6) {
+          currentCol++;
         }
       }
       
