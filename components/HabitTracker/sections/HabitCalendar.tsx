@@ -96,28 +96,33 @@ export default function HabitCalendar({
       grid[row] = [];
     }
 
-    // For modal calendar, we need to ensure proper weekly alignment
     if (isModal) {
-      // Calculate the number of complete weeks
+      // For modal: organize dates into columns so each column shows consecutive dates
+      // We want rightmost column to end with today, with consecutive dates going up
+      
       const totalDays = calendarData.length;
-      const numWeeks = Math.ceil(totalDays / 7);
-
-      // Fill the grid ensuring each column represents a week
-      for (let week = 0; week < numWeeks; week++) {
-        for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
-          const dataIndex = week * 7 + dayOfWeek;
+      const numColumns = Math.ceil(totalDays / 7);
+      
+      // Initialize all grid positions
+      for (let row = 0; row < 7; row++) {
+        grid[row] = new Array(numColumns).fill(null);
+      }
+      
+      // Fill the grid starting from the rightmost column, bottom to top
+      let dataIndex = totalDays - 1; // Start with today (last date in array)
+      
+      for (let col = numColumns - 1; col >= 0 && dataIndex >= 0; col--) {
+        for (let row = 6; row >= 0 && dataIndex >= 0; row--) { // Fill from bottom to top
           if (dataIndex < calendarData.length) {
-            // Ensure we're placing the day in the correct row based on its actual day of week
-            const day = calendarData[dataIndex];
-            const actualDayOfWeek = day.date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-
-            if (!grid[actualDayOfWeek]) {
-              grid[actualDayOfWeek] = [];
-            }
-
-            grid[actualDayOfWeek][week] = day;
+            grid[row][col] = calendarData[dataIndex];
+            dataIndex--;
           }
         }
+      }
+      
+      // Clean up any null entries and ensure consistent column lengths
+      for (let row = 0; row < 7; row++) {
+        grid[row] = grid[row].filter(day => day !== null);
       }
     } else {
       // For preview calendar, use the simpler approach
