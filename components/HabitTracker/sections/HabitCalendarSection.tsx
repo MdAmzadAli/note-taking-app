@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     backdropFilter: 'blur(10px)',
   },
   modalContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#1f2937',
     borderRadius: 16,
     margin: 20,
     maxHeight: '80%',
@@ -267,27 +267,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#374151',
   },
   modalTitle: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#1f2937',
+    color: '#ffffff',
   },
   closeButton: {
     fontSize: 24,
-    color: '#6b7280',
+    color: '#ffffff',
     fontWeight: '600',
   },
   modalContent: {
     flex: 1,
-    padding: 0,
+    padding: 20,
   },
   modalHorizontalScroll: {
     flex: 1,
   },
   modalScrollContainer: {
-    paddingHorizontal: 0,
+    paddingHorizontal: 10,
     alignItems: 'flex-start',
     minWidth: '100%',
   },
