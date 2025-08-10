@@ -46,36 +46,46 @@ export default function HabitCalendar({
     }
   };
 
-  // Get month headers for calendar data
-  const getMonthHeaders = (data: CalendarDay[]) => {
-    const headers: { month: string; colspan: number }[] = [];
-    let currentMonth = '';
-    let count = 0;
-
+  // Get month headers for calendar data based on calendar grid structure
+  const getMonthHeaders = (data: CalendarDay[], grid: CalendarDay[][]) => {
+    const headers: { month: string; startCol: number; endCol: number; width: number }[] = [];
+    
     // Sort data by date first to ensure proper month grouping
     const sortedData = [...data].sort((a, b) => a.date.getTime() - b.date.getTime());
-
-    sortedData.forEach((day) => {
-      const monthYear = `${day.monthName} ${day.date.getFullYear()}`;
-      if (monthYear !== currentMonth) {
-        if (currentMonth && count > 0) {
-          headers.push({ month: currentMonth, colspan: count });
+    
+    // Track which columns belong to which months
+    const monthColumns: { [key: string]: number[] } = {};
+    
+    // Map each day to its column position
+    grid.forEach((weekRow, weekIndex) => {
+      weekRow.forEach((day, dayIndex) => {
+        const monthYear = `${day.monthName} ${day.date.getFullYear()}`;
+        if (!monthColumns[monthYear]) {
+          monthColumns[monthYear] = [];
         }
-        currentMonth = monthYear;
-        count = 1;
-      } else {
-        count++;
+        monthColumns[monthYear].push(dayIndex);
+      });
+    });
+    
+    // Create headers based on column spans
+    Object.entries(monthColumns).forEach(([monthYear, columns]) => {
+      if (columns.length > 0) {
+        const uniqueColumns = [...new Set(columns)].sort((a, b) => a - b);
+        const startCol = uniqueColumns[0];
+        const endCol = uniqueColumns[uniqueColumns.length - 1];
+        const width = (endCol - startCol + 1) * (cellSize + 2); // Include margin
+        
+        headers.push({
+          month: monthYear,
+          startCol,
+          endCol,
+          width
+        });
       }
     });
-
-    if (currentMonth && count > 0) {
-      headers.push({ month: currentMonth, colspan: count });
-    }
-
-    return headers.map(header => ({
-      ...header,
-      width: Math.max(header.colspan * cellSize, 80) // Ensure minimum width for month headers
-    }));
+    
+    // Sort headers by start column position
+    return headers.sort((a, b) => a.startCol - b.startCol);
   };
 
   // Organize data into grid format (7 rows × columns)
@@ -94,7 +104,7 @@ export default function HabitCalendar({
   };
 
   const calendarGrid = organizeDataIntoGrid(calendarData);
-  const monthHeaders = getMonthHeaders(calendarData);
+  const monthHeaders = getMonthHeaders(calendarData, calendarGrid);
 
   const dynamicStyles = StyleSheet.create({
     dayCell: {
@@ -103,7 +113,7 @@ export default function HabitCalendar({
       borderRadius: isModal ? 6 : 4,
       justifyContent: 'center',
       alignItems: 'center',
-      marginHorizontal: 1,
+      marginRight: 2,
     },
     dayText: {
       fontSize: isModal ? 12 : 10,
@@ -137,7 +147,17 @@ export default function HabitCalendar({
         {/* Month headers */}
         <View style={styles.monthHeadersRow}>
           {monthHeaders.map((header, index) => (
-            <View key={index} style={[dynamicStyles.monthHeader, { width: header.width }]}>
+            <View 
+              key={index} 
+              style={[
+                dynamicStyles.monthHeader, 
+                { 
+                  position: 'absolute',
+                  left: header.startCol * (cellSize + 2),
+                  width: header.width 
+                }
+              ]}
+            >
               <Text style={dynamicStyles.monthHeaderText}>{header.month}</Text>
             </View>
           ))}
@@ -196,13 +216,17 @@ const styles = StyleSheet.create({
   monthHeadersRow: {
     flexDirection: 'row',
     marginBottom: 8,
+    position: 'relative',
+    height: 32, // Fixed height for month headers
   },
   calendarWithLabels: {
     position: 'relative',
+    flexDirection: 'row',
     width: '100%',
   },
   calendarGrid: {
-    width: '100%',
+    flex: 1,
+    paddingRight: 60, // Make space for day labels
   },
   weekRow: {
     flexDirection: 'row',
@@ -210,11 +234,13 @@ const styles = StyleSheet.create({
   },
   fixedDayLabels: {
     position: 'absolute',
-    left: '100%', // Position right after the calendar grid
+    right: 0,
+    top: 0,
     width: 50,
     height: '100%',
-    justifyContent: 'space-between',
-    paddingLeft: 8, // Small gap from calendar
+    justifyContent: 'space-around',
+    paddingLeft: 8,
+    backgroundColor: 'transparent',
   },
   daysRow: {
     flexDirection: 'row',
