@@ -56,14 +56,15 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     return days;
   }, [habit.completions]);
 
-  // Generate dates for modal (only past dates and today)
+  // Generate dates for modal (only past dates and today, up to 3 years)
   const modalCalendarData = useMemo(() => {
     const days: CalendarDay[] = [];
     const today = new Date();
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-    // Generate 182 days (26 weeks) ending with today
-    for (let i = 181; i >= 0; i--) {
+    // Generate approximately 1095 days (3 years) ending with today
+    const numberOfDays = 3 * 365;
+    for (let i = numberOfDays - 1; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
 
@@ -88,7 +89,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       setTimeout(() => {
         horizontalScrollRef.current?.scrollToEnd({ animated: false });
       }, 100);
-      
+
       // Fine-tune with animated scroll
       setTimeout(() => {
         horizontalScrollRef.current?.scrollToEnd({ animated: true });
@@ -143,8 +144,16 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         transparent={true}
         onRequestClose={() => setShowModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          onPress={() => setShowModal(false)}
+          activeOpacity={1} // This prevents the underlying content from receiving touches
+        >
+          <TouchableOpacity
+            style={styles.modalContainer}
+            activeOpacity={1} // This prevents the modal content itself from being dismissed
+            onPress={() => {}} // Prevent touches from propagating to the overlay
+          >
             <View style={styles.modalContentWithLabels}>
               <ScrollView style={styles.modalContent}>
                 <ScrollView
@@ -164,7 +173,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                   />
                 </ScrollView>
               </ScrollView>
-              
+
               {/* Fixed day labels outside scrollable area */}
               <View style={styles.modalFixedDayLabels}>
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
@@ -174,8 +183,8 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                 ))}
               </View>
             </View>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
 
       {/* Value Input Modal */}
