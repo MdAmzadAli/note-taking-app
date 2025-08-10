@@ -31,18 +31,66 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const [showValueModal, setShowValueModal] = useState(false);
   const horizontalScrollRef = useRef<ScrollView>(null);
 
-  // Auto-scroll to the end (latest dates) when modal opens
+  // Auto-scroll to position today's date at the rightmost edge when modal opens
   useEffect(() => {
     if (showModal && horizontalScrollRef.current) {
-      // Use multiple timeouts to ensure scroll works
+      // Calculate the scroll position to show today's date at the rightmost edge
       setTimeout(() => {
-        horizontalScrollRef.current?.scrollToEnd({ animated: false });
-      }, 50);
+        // Get today's column index in the calendar grid
+        const today = new Date();
+        const todayStr = today.toDateString();
+        
+        // Find today's date in the modal calendar data
+        const todayIndex = modalCalendarData.findIndex(day => 
+          day.date.toDateString() === todayStr
+        );
+        
+        if (todayIndex >= 0) {
+          // Calculate which column today falls in (based on weeks)
+          const weeksFromStart = Math.floor(todayIndex / 7);
+          const cellSize = 32;
+          const cellMargin = 2;
+          const columnWidth = cellSize + cellMargin;
+          
+          // Scroll to position today's column at the rightmost visible area
+          const scrollPosition = weeksFromStart * columnWidth;
+          
+          horizontalScrollRef.current?.scrollTo({ 
+            x: scrollPosition, 
+            animated: false 
+          });
+        } else {
+          // Fallback to scroll to end if today is not found
+          horizontalScrollRef.current?.scrollToEnd({ animated: false });
+        }
+      }, 100);
+      
+      // Fine-tune with animated scroll
       setTimeout(() => {
-        horizontalScrollRef.current?.scrollToEnd({ animated: true });
-      }, 300);
+        const today = new Date();
+        const todayStr = today.toDateString();
+        
+        const todayIndex = modalCalendarData.findIndex(day => 
+          day.date.toDateString() === todayStr
+        );
+        
+        if (todayIndex >= 0) {
+          const weeksFromStart = Math.floor(todayIndex / 7);
+          const cellSize = 32;
+          const cellMargin = 2;
+          const columnWidth = cellSize + cellMargin;
+          const scrollPosition = weeksFromStart * columnWidth;
+          
+          horizontalScrollRef.current?.scrollTo({ 
+            x: scrollPosition, 
+            animated: true 
+          });
+        } else {
+          horizontalScrollRef.current?.scrollToEnd({ animated: true });
+        }
+      }, 400);
     }
-  }, [showModal]);
+  }, [showModal, modalCalendarData]);
 
   // Generate dates for preview (105 days - 15 columns × 7 rows)
   const previewCalendarData = useMemo(() => {
