@@ -142,8 +142,8 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const previewGrid = organizeDataIntoGrid(previewCalendarData, 15);
   const modalGrid = organizeDataIntoGrid(modalCalendarData, Math.ceil(modalCalendarData.length / 7));
 
-  // Get month headers for preview (18 columns)
-  const getMonthHeaders = (data: CalendarDay[]) => {
+  // Get month headers for any calendar data
+  const getMonthHeaders = (data: CalendarDay[], cellWidth: number = 24) => {
     const headers: { month: string; colspan: number }[] = [];
     let currentMonth = '';
     let count = 0;
@@ -165,7 +165,10 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       headers.push({ month: currentMonth, colspan: count });
     }
 
-    return headers;
+    return headers.map(header => ({
+      ...header,
+      width: header.colspan * cellWidth
+    }));
   };
 
   return (
@@ -260,42 +263,50 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
               <View style={styles.modalScrollableContent}>
                 {/* Month headers for modal */}
                 <View style={styles.modalMonthHeadersRow}>
-                  {getMonthHeaders(modalCalendarData).map((header, index) => (
-                    <View key={index} style={[styles.modalMonthHeader, { width: header.colspan * 36 }]}>
+                  {getMonthHeaders(modalCalendarData, 26).map((header, index) => (
+                    <View key={index} style={[styles.modalMonthHeader, { width: header.width }]}>
                       <Text style={styles.modalMonthHeaderText}>{header.month}</Text>
                     </View>
                   ))}
                 </View>
 
-                {/* Modal calendar grid */}
-                <View style={styles.modalCalendarGrid}>
-                  {modalGrid.map((weekRow, weekIndex) => (
-                    <View key={weekIndex} style={styles.modalWeekRow}>
-                      <View style={styles.modalDayLabel}>
-                        <Text style={styles.modalDayLabelText}>{weekDays[weekIndex]}</Text>
+                {/* Modal calendar with labels - matching preview structure */}
+                <View style={styles.modalCalendarWithLabels}>
+                  <View style={styles.modalCalendarGrid}>
+                    {modalGrid.map((weekRow, weekIndex) => (
+                      <View key={weekIndex} style={styles.modalWeekRow}>
+                        <View style={styles.modalDaysRow}>
+                          {weekRow.map((day, dayIndex) => (
+                            <TouchableOpacity
+                              key={dayIndex}
+                              style={[
+                                styles.modalDayCell,
+                                { backgroundColor: getDateColor(day.value, day.isToday) }
+                              ]}
+                              onPress={() => handleDatePress(day)}
+                            >
+                              <Text style={[
+                                styles.modalDayText,
+                                day.isToday && styles.modalTodayText,
+                                day.value >= (habit.target || 1) && !day.isToday && styles.modalCompletedText
+                              ]}>
+                                {day.day}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
                       </View>
-                      <View style={styles.modalDaysRow}>
-                        {weekRow.map((day, dayIndex) => (
-                          <TouchableOpacity
-                            key={dayIndex}
-                            style={[
-                              styles.modalDayCell,
-                              { backgroundColor: getDateColor(day.value, day.isToday) }
-                            ]}
-                            onPress={() => handleDatePress(day)}
-                          >
-                            <Text style={[
-                              styles.modalDayText,
-                              day.isToday && styles.modalTodayText,
-                              day.value >= (habit.target || 1) && !day.isToday && styles.modalCompletedText
-                            ]}>
-                              {day.day}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
+                    ))}
+                  </View>
+                  
+                  {/* Fixed day labels on the right - matching preview */}
+                  <View style={styles.modalFixedDayLabels}>
+                    {weekDays.map((day, index) => (
+                      <View key={index} style={styles.modalFixedDayLabel}>
+                        <Text style={styles.modalFixedDayLabelText}>{day}</Text>
                       </View>
-                    </View>
-                  ))}
+                    ))}
+                  </View>
                 </View>
               </View>
             </ScrollView>
@@ -503,39 +514,33 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#9ca3af',
   },
-  modalCalendarGrid: {
+  modalCalendarWithLabels: {
+    position: 'relative',
+    width: '100%',
     backgroundColor: '#374151',
     borderRadius: 12,
     padding: 16,
   },
+  modalCalendarGrid: {
+    width: '100%',
+  },
   modalWeekRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  modalDayLabel: {
-    width: 60,
-    alignItems: 'flex-end',
-    paddingRight: 12,
-  },
-  modalDayLabelText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#9ca3af',
+    marginBottom: 2,
   },
   modalDaysRow: {
     flexDirection: 'row',
   },
   modalDayCell: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
     marginHorizontal: 1,
   },
   modalDayText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '500',
     color: '#ffffff',
   },
@@ -545,6 +550,25 @@ const styles = StyleSheet.create({
   },
   modalCompletedText: {
     color: '#ffffff',
+  },
+  modalFixedDayLabels: {
+    position: 'absolute',
+    left: '100%',
+    top: 16,
+    width: 50,
+    height: 'calc(100% - 32px)',
+    justifyContent: 'space-between',
+    paddingLeft: 8,
+  },
+  modalFixedDayLabel: {
+    height: 26,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  modalFixedDayLabelText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#9ca3af',
   },
   valueModalOverlay: {
     flex: 1,
