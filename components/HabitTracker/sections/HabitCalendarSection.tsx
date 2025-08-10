@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 20,
     paddingLeft: 5, // Minimal gap from left edge
-    paddingRight: 0, // Remove right padding
+    paddingRight: 45, // Reserve space for day labels
     backgroundColor: '#ffffff',
     minHeight: 300,
   },
@@ -324,11 +324,11 @@ const styles = StyleSheet.create({
   modalContentWithLabels: {
     flex: 1,
     position: 'relative',
-    paddingRight: 0, // Remove all right padding
+    paddingRight: 45, // Reserve space for day labels
   },
   modalFixedDayLabels: {
     position: 'absolute',
-    right: -35, // Move outside the container to the right
+    right: 5, // Position within the reserved space
     top: 46, // Adjust based on month header height
     width: 35,
     justifyContent: 'space-around',
