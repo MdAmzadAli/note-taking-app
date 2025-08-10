@@ -141,8 +141,12 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     return totalMonthRows;
   };
 
-  const calendarHeight = modalCalendarData.length > 0 ? (Math.ceil(modalCalendarData.length / 7) * 32) + 40 : 300; // 32 is cellSize + some margin, 40 for month names
-  const modalHeight = calendarHeight + 60; // Calendar height + header/footer space
+  // Calculate dynamic modal height based on calendar content
+  const numRows = Math.ceil(modalCalendarData.length / 7);
+  const cellHeight = 34; // cellSize (32) + margin (2)
+  const monthHeaderHeight = 25; // Height for month name headers
+  const calendarContentHeight = (numRows * cellHeight) + (Math.ceil(modalCalendarData.length / 28) * monthHeaderHeight);
+  const modalHeight = calendarContentHeight + 40; // Calendar content + minimal padding
 
 
   return (
@@ -299,7 +303,8 @@ const styles = StyleSheet.create({
   modalContainer: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
-    margin: 20,
+    marginHorizontal: 20,
+    maxHeight: '80%',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -310,13 +315,11 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   modalContent: {
-    flex: 1,
-    paddingTop: 20,
-    paddingBottom: 20,
+    paddingTop: 15,
+    paddingBottom: 15,
     paddingLeft: 5,
     paddingRight: 45,
     backgroundColor: '#ffffff',
-    minHeight: 300,
   },
   modalHorizontalScroll: {
     flex: 1,
@@ -330,17 +333,17 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   modalContentWithLabels: {
-    flex: 1,
     position: 'relative',
     paddingRight: 45,
+    height: modalHeight - 30, // Fit content exactly
   },
   modalFixedDayLabels: {
     position: 'absolute',
     right: 5,
-    top: 20,
+    top: 15,
     width: 35,
     justifyContent: 'space-around',
-    height: 'calc(100% - 20px)',
+    height: 7 * 34, // 7 rows * cell height
     paddingVertical: 2,
     backgroundColor: '#ffffff',
     zIndex: 100,
