@@ -165,7 +165,7 @@ export default function HabitCalendar({
 
         {/* Calendar grid with fixed day labels */}
         <View style={styles.calendarWithLabels}>
-          <View style={styles.calendarGrid}>
+          <View style={[styles.calendarGrid, { paddingRight: isModal ? 0 : 45 }]}>
             {calendarGrid.map((weekRow, weekIndex) => (
               <View key={weekIndex} style={styles.weekRow}>
                 <View style={styles.daysRow}>
@@ -228,7 +228,6 @@ const styles = StyleSheet.create({
   },
   calendarGrid: {
     flex: 1,
-    paddingRight: isModal ? 0 : 45, // No padding in modal mode since labels are outside
   },
   weekRow: {
     flexDirection: 'row',
