@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 20,
     paddingLeft: 5, // Minimal gap from left edge
-    paddingRight: 45, // Reserve space for day labels
+    paddingRight: 40, // Reduced from 45 to 40 to increase scrollable area
     backgroundColor: '#ffffff',
     maxHeight: 400,
   },
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
   },
   modalContentWithLabels: {
     position: 'relative',
-    paddingRight: 45, // Reserve space for day labels
+    paddingRight: 40, // Reduced from 45 to 40 to match modalContent
   },
   modalFixedDayLabels: {
     position: 'absolute',
