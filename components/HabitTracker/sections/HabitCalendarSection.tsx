@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     alignItems: 'flex-start',
     minWidth: '100%',
-    paddingRight: 10, // Remove extra padding since labels are outside
+    paddingRight: 50, // Add padding to create space for day labels
   },
   modalContentWithLabels: {
     flex: 1,
@@ -320,9 +320,9 @@ const styles = StyleSheet.create({
   },
   modalFixedDayLabels: {
     position: 'absolute',
-    right: 10,
+    right: 5,
     top: 46, // Adjust based on month header height
-    width: 35,
+    width: 40,
     justifyContent: 'space-around',
     height: 'calc(100% - 46px)', // Account for month header
     paddingVertical: 2,
