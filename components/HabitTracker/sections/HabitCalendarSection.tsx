@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
@@ -10,6 +9,7 @@ import {
   TextInput,
 } from 'react-native';
 import { Habit } from '@/types';
+import HabitCalendar from './HabitCalendar';
 
 interface HabitCalendarSectionProps {
   habit: Habit;
@@ -44,15 +44,15 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const previewCalendarData = useMemo(() => {
     const days: CalendarDay[] = [];
     const today = new Date();
-    
+
     // Generate 105 days (15 weeks worth) ending with today
     for (let i = 104; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
-      
+
       const completion = habit.completions.find(c => c.date === date.toISOString().split('T')[0]);
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      
+
       days.push({
         date,
         day: date.getDate(),
@@ -61,7 +61,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         monthName: monthNames[date.getMonth()],
       });
     }
-    
+
     return days;
   }, [habit.completions]);
 
@@ -69,15 +69,15 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const modalCalendarData = useMemo(() => {
     const days: CalendarDay[] = [];
     const today = new Date();
-    
+
     // Generate 180 days (approximately 6 months) ending with today for scrolling
     for (let i = 179; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
-      
+
       const completion = habit.completions.find(c => c.date === date.toISOString().split('T')[0]);
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      
+
       days.push({
         date,
         day: date.getDate(),
@@ -86,27 +86,9 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         monthName: monthNames[date.getMonth()],
       });
     }
-    
+
     return days;
   }, [habit.completions]);
-
-  const getDateColor = (value: number, isToday: boolean) => {
-    const target = habit.target || 1;
-    const habitColor = habit.color || '#3b82f6';
-
-    if (isToday) {
-      return '#3b82f6'; // Blue for today
-    } else if (value === 0) {
-      return '#374151'; // Dark grey for zero
-    } else if (value < target) {
-      return '#6b7280'; // Light grey for below target
-    } else {
-      // Calculate intensity based on how much above target
-      const intensity = Math.min(value / target, 3); // Cap at 3x intensity
-      const opacity = 0.3 + (intensity * 0.7); // Range from 0.3 to 1.0
-      return habitColor;
-    }
-  };
 
   const handleDatePress = (day: CalendarDay) => {
     setSelectedDate(day.date);
@@ -125,112 +107,22 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     setInputValue('');
   };
 
-  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-  // Organize data into grid format (7 rows × columns)
-  const organizeDataIntoGrid = (data: CalendarDay[], columns: number) => {
-    const grid: CalendarDay[][] = [[], [], [], [], [], [], []]; // 7 days of week
-    
-    data.forEach((day, index) => {
-      const dayOfWeek = day.date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-      grid[dayOfWeek].push(day);
-    });
-    
-    return grid;
-  };
-
-  const previewGrid = organizeDataIntoGrid(previewCalendarData, 15);
-  const modalGrid = organizeDataIntoGrid(modalCalendarData, Math.ceil(modalCalendarData.length / 7));
-
-  // Get month headers for any calendar data
-  const getMonthHeaders = (data: CalendarDay[], cellWidth: number = 24) => {
-    const headers: { month: string; colspan: number }[] = [];
-    let currentMonth = '';
-    let count = 0;
-
-    data.forEach((day) => {
-      const monthYear = `${day.monthName} ${day.date.getFullYear()}`;
-      if (monthYear !== currentMonth) {
-        if (currentMonth && count > 0) {
-          headers.push({ month: currentMonth, colspan: count });
-        }
-        currentMonth = monthYear;
-        count = 1;
-      } else {
-        count++;
-      }
-    });
-
-    if (currentMonth && count > 0) {
-      headers.push({ month: currentMonth, colspan: count });
-    }
-
-    return headers.map(header => ({
-      ...header,
-      width: header.colspan * cellWidth
-    }));
-  };
-
   return (
     <View style={styles.section}>
       <Text style={[styles.sectionTitle, { color: habit.color || '#1a202c' }]}>
         Calendar
       </Text>
-      
+
       {/* Calendar Preview - 15 columns × 7 rows */}
       <View style={styles.calendarPreview}>
-        <View style={styles.calendarContainer}>
-          <View>
-            {/* Month headers */}
-            <View style={styles.monthHeadersRow}>
-              {getMonthHeaders(previewCalendarData).map((header, index) => (
-                <View key={index} style={[styles.monthHeader, { width: header.colspan * 24 }]}>
-                  <Text style={styles.monthHeaderText}>{header.month}</Text>
-                </View>
-              ))}
-            </View>
+        <HabitCalendar
+          habit={habit}
+          calendarData={previewCalendarData}
+          cellSize={22}
+          isModal={false}
+        />
 
-            {/* Calendar grid with fixed day labels */}
-            <View style={styles.calendarWithLabels}>
-              <View style={styles.calendarGrid}>
-                {previewGrid.map((weekRow, weekIndex) => (
-                  <View key={weekIndex} style={styles.weekRow}>
-                    <View style={styles.daysRow}>
-                      {weekRow.map((day, dayIndex) => (
-                        <View
-                          key={dayIndex}
-                          style={[
-                            styles.dayCell,
-                            { backgroundColor: getDateColor(day.value, day.isToday) }
-                          ]}
-                        >
-                          <Text style={[
-                            styles.dayText,
-                            day.isToday && styles.todayText,
-                            day.value >= (habit.target || 1) && !day.isToday && styles.completedText
-                          ]}>
-                            {day.day}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                ))}
-              </View>
-              
-              {/* Fixed day labels on the right */}
-              <View style={styles.fixedDayLabels}>
-                {weekDays.map((day, index) => (
-                  <View key={index} style={styles.fixedDayLabel}>
-                    <Text style={styles.fixedDayLabelText}>{day}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          </View>
-        </View>
-        
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.editButton}
           onPress={() => setShowModal(true)}
         >
@@ -238,79 +130,41 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         </TouchableOpacity>
       </View>
 
-      {/* Full Calendar Modal - 9 columns × 7 rows */}
+      {/* Full Calendar Modal with transparent background */}
       <Modal
         visible={showModal}
         animationType="slide"
-        presentationStyle="pageSheet"
+        transparent={true}
         onRequestClose={() => setShowModal(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Calendar</Text>
-            <TouchableOpacity onPress={() => setShowModal(false)}>
-              <Text style={styles.closeButton}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView style={styles.modalContent}>
-            <ScrollView 
-              ref={horizontalScrollRef}
-              horizontal 
-              showsHorizontalScrollIndicator={true} 
-              style={styles.modalHorizontalScroll}
-            >
-              <View style={styles.modalScrollableContent}>
-                {/* Month headers for modal */}
-                <View style={styles.modalMonthHeadersRow}>
-                  {getMonthHeaders(modalCalendarData, 26).map((header, index) => (
-                    <View key={index} style={[styles.modalMonthHeader, { width: header.width }]}>
-                      <Text style={styles.modalMonthHeaderText}>{header.month}</Text>
-                    </View>
-                  ))}
-                </View>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Calendar</Text>
+              <TouchableOpacity onPress={() => setShowModal(false)}>
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
 
-                {/* Modal calendar with labels - matching preview structure */}
-                <View style={styles.modalCalendarWithLabels}>
-                  <View style={styles.modalCalendarGrid}>
-                    {modalGrid.map((weekRow, weekIndex) => (
-                      <View key={weekIndex} style={styles.modalWeekRow}>
-                        <View style={styles.modalDaysRow}>
-                          {weekRow.map((day, dayIndex) => (
-                            <TouchableOpacity
-                              key={dayIndex}
-                              style={[
-                                styles.modalDayCell,
-                                { backgroundColor: getDateColor(day.value, day.isToday) }
-                              ]}
-                              onPress={() => handleDatePress(day)}
-                            >
-                              <Text style={[
-                                styles.modalDayText,
-                                day.isToday && styles.modalTodayText,
-                                day.value >= (habit.target || 1) && !day.isToday && styles.modalCompletedText
-                              ]}>
-                                {day.day}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                  
-                  {/* Fixed day labels on the right - matching preview */}
-                  <View style={styles.modalFixedDayLabels}>
-                    {weekDays.map((day, index) => (
-                      <View key={index} style={styles.modalFixedDayLabel}>
-                        <Text style={styles.modalFixedDayLabelText}>{day}</Text>
-                      </View>
-                    ))}
-                  </View>
+            <ScrollView style={styles.modalContent}>
+              <ScrollView
+                ref={horizontalScrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={true}
+                style={styles.modalHorizontalScroll}
+              >
+                <View style={styles.modalScrollableContent}>
+                  <HabitCalendar
+                    habit={habit}
+                    calendarData={modalCalendarData}
+                    onDatePress={handleDatePress}
+                    cellSize={28}
+                    isModal={true}
+                  />
                 </View>
-              </View>
-            </ScrollView>
-          </ScrollView>
+              </ScrollView>
+            </View>
+          </View>
         </View>
       </Modal>
 
@@ -329,7 +183,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
             <Text style={styles.valueModalSubtitle}>
               {selectedDate && `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
             </Text>
-            
+
             <TextInput
               style={styles.valueModalInput}
               value={inputValue}
@@ -338,7 +192,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
               placeholder="0"
               autoFocus
             />
-            
+
             <View style={styles.valueModalButtons}>
               <TouchableOpacity
                 style={[styles.valueModalButton, styles.cancelButton]}
@@ -346,7 +200,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[styles.valueModalButton, styles.saveButton]}
                 onPress={handleSaveValue}
@@ -376,91 +230,12 @@ const styles = StyleSheet.create({
     padding: 16,
     width: '100%',
   },
-  calendarContainer: {
-    marginBottom: 16,
-    width: '100%',
-  },
-  monthHeadersRow: {
-    flexDirection: 'row',
-    marginBottom: 8,
-  },
-  monthHeader: {
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  monthHeaderText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6b7280',
-  },
-  calendarWithLabels: {
-    position: 'relative',
-    width: '100%',
-  },
-  calendarGrid: {
-    width: '100%',
-  },
-  weekRow: {
-    flexDirection: 'row',
-    marginBottom: 2,
-  },
-  fixedDayLabels: {
-    position: 'absolute',
-    left: '100%', // Position right after the calendar grid
-    top: 0,
-    width: 50,
-    height: '100%',
-    justifyContent: 'space-between',
-    paddingLeft: 8, // Small gap from calendar
-  },
-  fixedDayLabel: {
-    height: 24, // Same as dayCell height + marginBottom
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  fixedDayLabelText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6b7280',
-  },
-  dayLabel: {
-    width: 40,
-    alignItems: 'flex-end',
-    paddingRight: 8,
-  },
-  dayLabelText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6b7280',
-  },
-  daysRow: {
-    flexDirection: 'row',
-  },
-  dayCell: {
-    width: 22,
-    height: 22,
-    borderRadius: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 1,
-  },
-  dayText: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#ffffff',
-  },
-  todayText: {
-    color: '#ffffff',
-    fontWeight: '700',
-  },
-  completedText: {
-    color: '#ffffff',
-  },
   editButton: {
     backgroundColor: '#374151',
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
+    marginTop: 16,
   },
   editButtonText: {
     color: '#ffffff',
@@ -468,16 +243,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 1,
   },
-  modalContainer: {
+  modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
     backgroundColor: '#1f2937',
+    borderRadius: 16,
+    margin: 20,
+    maxHeight: '80%',
+    width: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
-    paddingTop: 50,
     borderBottomWidth: 1,
     borderBottomColor: '#374151',
   },
@@ -500,75 +283,6 @@ const styles = StyleSheet.create({
   },
   modalScrollableContent: {
     minWidth: '100%',
-  },
-  modalMonthHeadersRow: {
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  modalMonthHeader: {
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  modalMonthHeaderText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#9ca3af',
-  },
-  modalCalendarWithLabels: {
-    position: 'relative',
-    width: '100%',
-    backgroundColor: '#374151',
-    borderRadius: 12,
-    padding: 16,
-  },
-  modalCalendarGrid: {
-    width: '100%',
-  },
-  modalWeekRow: {
-    flexDirection: 'row',
-    marginBottom: 2,
-  },
-  modalDaysRow: {
-    flexDirection: 'row',
-  },
-  modalDayCell: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 1,
-  },
-  modalDayText: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#ffffff',
-  },
-  modalTodayText: {
-    color: '#ffffff',
-    fontWeight: '700',
-  },
-  modalCompletedText: {
-    color: '#ffffff',
-  },
-  modalFixedDayLabels: {
-    position: 'absolute',
-    left: '100%',
-    top: 16,
-    width: 50,
-    height: 'calc(100% - 32px)',
-    justifyContent: 'space-between',
-    paddingLeft: 8,
-  },
-  modalFixedDayLabel: {
-    height: 26,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  modalFixedDayLabelText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#9ca3af',
   },
   valueModalOverlay: {
     flex: 1,
