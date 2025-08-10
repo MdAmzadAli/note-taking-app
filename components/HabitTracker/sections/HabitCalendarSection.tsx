@@ -311,8 +311,8 @@ const styles = StyleSheet.create({
   modalScrollContainer: {
     paddingHorizontal: 10,
     alignItems: 'flex-start',
-    minWidth: '100%',
-    paddingRight: 60, // Increased padding to prevent overlap
+    minWidth: 'calc(100% - 60px)', // Reduce width to make space for labels
+    paddingRight: 10,
   },
   modalContentWithLabels: {
     flex: 1,
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
   },
   modalFixedDayLabels: {
     position: 'absolute',
-    right: 5,
+    right: 15,
     top: 46, // Adjust based on month header height
     width: 40,
     justifyContent: 'space-around',

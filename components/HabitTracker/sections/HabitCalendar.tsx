@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Habit } from '@/types';
@@ -49,13 +48,13 @@ export default function HabitCalendar({
   // Get month headers for calendar data based on calendar grid structure
   const getMonthHeaders = (data: CalendarDay[], grid: CalendarDay[][]) => {
     const headers: { month: string; startCol: number; endCol: number; width: number }[] = [];
-    
+
     // Sort data by date first to ensure proper month grouping
     const sortedData = [...data].sort((a, b) => a.date.getTime() - b.date.getTime());
-    
+
     // Track which columns belong to which months
     const monthColumns: { [key: string]: number[] } = {};
-    
+
     // Map each day to its column position
     grid.forEach((weekRow, weekIndex) => {
       weekRow.forEach((day, dayIndex) => {
@@ -66,7 +65,7 @@ export default function HabitCalendar({
         monthColumns[monthYear].push(dayIndex);
       });
     });
-    
+
     // Create headers based on column spans
     Object.entries(monthColumns).forEach(([monthYear, columns]) => {
       if (columns.length > 0) {
@@ -74,7 +73,7 @@ export default function HabitCalendar({
         const startCol = uniqueColumns[0];
         const endCol = uniqueColumns[uniqueColumns.length - 1];
         const width = (endCol - startCol + 1) * (cellSize + 2); // Include margin
-        
+
         headers.push({
           month: monthYear,
           startCol,
@@ -83,7 +82,7 @@ export default function HabitCalendar({
         });
       }
     });
-    
+
     // Sort headers by start column position
     return headers.sort((a, b) => a.startCol - b.startCol);
   };
@@ -91,15 +90,15 @@ export default function HabitCalendar({
   // Organize data into grid format (7 rows × columns)
   const organizeDataIntoGrid = (data: CalendarDay[]) => {
     const grid: CalendarDay[][] = [[], [], [], [], [], [], []]; // 7 days of week
-    
+
     // Sort data by date to ensure proper chronological order
     const sortedData = [...data].sort((a, b) => a.date.getTime() - b.date.getTime());
-    
+
     sortedData.forEach((day) => {
       const dayOfWeek = day.date.getDay(); // 0 = Sunday, 1 = Monday, etc.
       grid[dayOfWeek].push(day);
     });
-    
+
     return grid;
   };
 
@@ -165,7 +164,7 @@ export default function HabitCalendar({
 
         {/* Calendar grid with fixed day labels */}
         <View style={styles.calendarWithLabels}>
-          <View style={[styles.calendarGrid, { paddingRight: isModal ? 50 : 45, marginRight: isModal ? 50 : 0 }]}>
+          <View style={[styles.calendarGrid, { paddingRight: isModal ? 0 : 45 }]}>
             {calendarGrid.map((weekRow, weekIndex) => (
               <View key={weekIndex} style={styles.weekRow}>
                 <View style={styles.daysRow}>
@@ -194,7 +193,7 @@ export default function HabitCalendar({
               </View>
             ))}
           </View>
-          
+
           {/* Fixed day labels on the right - only show for non-modal */}
           {!isModal && (
             <View style={[styles.fixedDayLabels, { top: 4 }]}>
