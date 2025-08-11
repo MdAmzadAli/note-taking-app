@@ -7,6 +7,8 @@ import {
   ScrollView,
   StyleSheet,
   TextInput,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from 'react-native';
 import { Habit } from '@/types';
 import HabitCalendar from './HabitCalendar';
@@ -30,7 +32,13 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const [inputValue, setInputValue] = useState('');
   const [showValueModal, setShowValueModal] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<{ [date: string]: number }>({});
+  const [loadedColumns, setLoadedColumns] = useState(12); // Start with 12 columns
   const horizontalScrollRef = useRef<ScrollView>(null);
+  
+  // Configuration for lazy loading
+  const INITIAL_COLUMNS = 12;
+  const COLUMNS_PER_LOAD = 8;
+  const LOAD_THRESHOLD = 0.8; // Load more when 80% scrolled
 
   // Generate dates for preview (105 days - 15 columns × 7 rows)
   const previewCalendarData = useMemo(() => {
@@ -66,15 +74,19 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     return map;
   }, [habit.completions]);
 
-  // Generate dates for modal (only past dates and today, up to 1 year for better performance)
-  const modalCalendarData = useMemo(() => {
-    const days: CalendarDay[] = [];
+  // Generate dates for modal with lazy loading
+  const { modalCalendarData, totalDays } = useMemo(() => {
     const today = new Date();
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-    // Reduced to 1 year (365 days) for better performance
-    const numberOfDays = 365;
-    for (let i = numberOfDays - 1; i >= 0; i--) {
+    // Total days available (1 year)
+    const totalAvailableDays = 365;
+    
+    // Calculate how many days to show based on loaded columns
+    const daysToShow = Math.min(loadedColumns * 7, totalAvailableDays);
+    
+    const days: CalendarDay[] = [];
+    for (let i = daysToShow - 1; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
       const dateStr = date.toISOString().split('T')[0];
@@ -96,8 +108,8 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       });
     }
 
-    return days;
-  }, [completionMap, pendingChanges]);
+    return { modalCalendarData: days, totalDays: totalAvailableDays };
+  }, [completionMap, pendingChanges, loadedColumns]);
 
   // Auto-scroll to position today's date at the rightmost edge when modal opens
   useEffect(() => {
@@ -116,6 +128,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
 
   const handleOpenModal = () => {
     setPendingChanges({});
+    setLoadedColumns(INITIAL_COLUMNS); // Reset to initial columns
     setShowModal(true);
   };
 
@@ -160,6 +173,22 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     }
     
     handleCloseModal();
+  };
+
+  // Handle scroll for lazy loading
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const scrollPercentage = (contentOffset.x + layoutMeasurement.width) / contentSize.width;
+    
+    // Load more columns when user scrolls past threshold
+    if (scrollPercentage > LOAD_THRESHOLD) {
+      const maxPossibleColumns = Math.ceil(totalDays / 7);
+      const newColumnCount = Math.min(loadedColumns + COLUMNS_PER_LOAD, maxPossibleColumns);
+      
+      if (newColumnCount > loadedColumns) {
+        setLoadedColumns(newColumnCount);
+      }
+    }
   };
 
   return (
@@ -211,6 +240,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                   style={styles.modalHorizontalScroll}
                   contentContainerStyle={styles.modalScrollContainer}
                   scrollEventThrottle={16}
+                  onScroll={handleScroll}
                 >
                   <HabitCalendar
                     habit={habit}
