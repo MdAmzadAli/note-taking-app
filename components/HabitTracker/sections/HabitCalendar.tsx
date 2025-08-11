@@ -40,8 +40,7 @@ export default function HabitCalendar({
     } else {
       // Calculate intensity based on how much above target
       const intensity = Math.min(value / target, 3); // Cap at 3x intensity
-      const opacity = 0.3 + (intensity * 0.7); // Range from 0.3 to 1.0
-      return habitColor;
+      return habitColor; // Use full habit color for completed days
     }
   };
 

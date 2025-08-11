@@ -128,7 +128,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       // Use map lookup instead of array.find for better performance
       let value = completionMap.get(dateStr) || 0;
 
-      // Override with pending changes if they exist
+      // Override with pending changes if they exist - this ensures instant color updates
       if (pendingChanges[dateStr] !== undefined) {
         value = pendingChanges[dateStr];
       }
@@ -155,7 +155,8 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       lastDate: days[days.length - 1]?.date.toISOString().split('T')[0],
       todayIndex: days.findIndex(d => d.isToday),
       monthsGenerated: monthsToShow,
-      previousDataLength: previousDataLengthRef.current
+      previousDataLength: previousDataLengthRef.current,
+      pendingChangesApplied: Object.keys(pendingChanges).length
     });
 
     return { modalCalendarData: days, totalMonths: totalAvailableMonths };
@@ -438,6 +439,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                     </View>
                   )}
                   <HabitCalendar
+                    key={`calendar-${Object.keys(pendingChanges).length}-${loadedMonths}`}
                     habit={habit}
                     calendarData={modalCalendarData}
                     onDatePress={handleDatePress}
