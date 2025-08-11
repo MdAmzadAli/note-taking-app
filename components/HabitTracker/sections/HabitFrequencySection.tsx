@@ -23,7 +23,7 @@ interface DataPoint {
 export default function HabitFrequencySection({ habit }: HabitFrequencySectionProps) {
   const frequencyData = useMemo(() => {
     const today = new Date();
-    const startDate = new Date(today.getFullYear(), today.getMonth() - 11, 1); // Start from 12 months ago
+    const startDate = new Date(today.getFullYear(), today.getMonth() - 9, 1); // Start from 10 months ago
     const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0); // End of current month
     
     const data: DataPoint[] = [];
@@ -92,7 +92,7 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
   };
 
   const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const cellWidth = 24;
+  const cellWidth = 4;
   const cellHeight = 24;
 
   return (
@@ -168,8 +168,8 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
             <View style={styles.monthLabelsContainer}>
               {frequencyData.monthLabels.map((label, index) => {
                 if (!label) return null;
-                const weeksInMonth = 4.5; // Average weeks per month
-                const labelWidth = weeksInMonth * cellWidth;
+                const daysInMonth = new Date(new Date().getFullYear(), index + 1, 0).getDate();
+                const labelWidth = daysInMonth * cellWidth;
                 
                 return (
                   <View key={index} style={[styles.monthLabelCell, { width: labelWidth }]}>
@@ -234,19 +234,20 @@ const styles = StyleSheet.create({
     borderRadius: 50,
   },
   monthLabelsContainer: {
-    position: 'absolute',
-    bottom: -24,
-    left: 48, // Offset for weekday labels
+    marginTop: 12,
+    marginLeft: 48, // Offset for weekday labels
     flexDirection: 'row',
+    height: 30,
   },
   monthLabelCell: {
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 2,
   },
   monthLabel: {
-    fontSize: 10,
-    color: '#64748b',
-    fontWeight: '500',
-    transform: [{ rotate: '-45deg' }],
+    fontSize: 12,
+    color: '#374151',
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
