@@ -38,6 +38,8 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const [currentScrollX, setCurrentScrollX] = useState(0);
   const [contentWidth, setContentWidth] = useState(0);
   const [layoutWidth, setLayoutWidth] = useState(0);
+  const [scrollLocked, setScrollLocked] = useState(false);
+  const [loadingPosition, setLoadingPosition] = useState(0);
 
   // Add logging when loadedMonths changes
   useEffect(() => {
@@ -45,6 +47,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   }, [loadedMonths]);
   const horizontalScrollRef = useRef<ScrollView>(null);
   const previousDataLengthRef = useRef(0);
+  const preLoadScrollPositionRef = useRef(0);
   
   // Configuration for lazy loading
   const INITIAL_MONTHS = 5;
@@ -178,41 +181,46 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     }
   }, [showModal, modalCalendarData.length, isInitialLoad]); // Include dependencies for proper triggering
 
-  // Effect to maintain scroll position when new data is loaded
+  // Effect to handle data loading completion and maintain exact scroll position
   useEffect(() => {
-    if (!isInitialLoad && !isLoadingMore && modalCalendarData.length > previousDataLengthRef.current && horizontalScrollRef.current) {
+    if (!isInitialLoad && modalCalendarData.length > previousDataLengthRef.current) {
       const dataLengthDifference = modalCalendarData.length - previousDataLengthRef.current;
-      console.log('[HabitCalendarSection] Data length increased, maintaining scroll position:', {
+      console.log('[HabitCalendarSection] Data length increased:', {
         previousLength: previousDataLengthRef.current,
         currentLength: modalCalendarData.length,
         difference: dataLengthDifference,
-        currentScrollX
+        preLoadScrollPosition: preLoadScrollPositionRef.current,
+        isLoadingMore
       });
 
-      // Calculate how much content was added (approximate cell width + margin)
-      const cellWidth = 32; // Cell size
-      const cellMargin = 4; // Margin between cells
-      const totalCellWidth = cellWidth + cellMargin;
-      const addedWidth = Math.ceil(dataLengthDifference / 7) * totalCellWidth; // Divide by 7 since we have 7 rows
+      if (isLoadingMore && horizontalScrollRef.current) {
+        // Calculate how much content was added (approximate cell width + margin)
+        const cellWidth = 32; // Cell size
+        const cellMargin = 4; // Margin between cells
+        const totalCellWidth = cellWidth + cellMargin;
+        const addedWidth = Math.ceil(dataLengthDifference / 7) * totalCellWidth; // Divide by 7 since we have 7 rows
 
-      // Maintain scroll position by adjusting for the added content
-      const newScrollX = currentScrollX + addedWidth;
-      
-      console.log('[HabitCalendarSection] Adjusting scroll position for new data:', {
-        addedWidth,
-        oldScrollX: currentScrollX,
-        newScrollX
-      });
+        // Restore the exact scroll position relative to the original content
+        const restoredScrollX = preLoadScrollPositionRef.current + addedWidth;
+        
+        console.log('[HabitCalendarSection] Restoring scroll position after data load:', {
+          addedWidth,
+          originalScrollX: preLoadScrollPositionRef.current,
+          restoredScrollX
+        });
 
-      // Use immediate scroll without setTimeout to prevent visual jumping
-      if (horizontalScrollRef.current) {
-        horizontalScrollRef.current.scrollTo({ x: newScrollX, animated: false });
-        setCurrentScrollX(newScrollX);
+        // Restore position immediately without animation
+        horizontalScrollRef.current.scrollTo({ x: restoredScrollX, animated: false });
+        setCurrentScrollX(restoredScrollX);
+        
+        // End loading state and unlock scroll
+        setIsLoadingMore(false);
+        setScrollLocked(false);
       }
 
       previousDataLengthRef.current = modalCalendarData.length;
     }
-  }, [modalCalendarData.length, isInitialLoad, isLoadingMore, currentScrollX]);
+  }, [modalCalendarData.length, isInitialLoad, isLoadingMore]);
 
   const handleOpenModal = () => {
     console.log('[HabitCalendarSection] Opening modal - resetting state');
@@ -222,7 +230,11 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     setCurrentScrollX(0); // Reset scroll position tracking
     setContentWidth(0);
     setLayoutWidth(0);
+    setScrollLocked(false); // Reset scroll lock
+    setIsLoadingMore(false); // Reset loading state
+    setLoadingPosition(0); // Reset loading position
     previousDataLengthRef.current = 0; // Reset data length tracking
+    preLoadScrollPositionRef.current = 0; // Reset pre-load position
     console.log('[HabitCalendarSection] Initial months set to:', INITIAL_MONTHS);
     setShowModal(true);
   };
@@ -275,15 +287,21 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     
+    // If scroll is locked during loading, prevent any scroll updates
+    if (scrollLocked || isLoadingMore) {
+      console.log('[HabitCalendarSection] Scroll locked during loading, preventing scroll updates');
+      return;
+    }
+    
     // Update current scroll position for maintaining position during data loads
     const newScrollX = contentOffset.x;
     setCurrentScrollX(newScrollX);
     setContentWidth(contentSize.width);
     setLayoutWidth(layoutMeasurement.width);
 
-    // Skip loading logic during initial load or while already loading
-    if (isInitialLoad || isLoadingMore) {
-      console.log('[HabitCalendarSection] Skipping load logic - initialLoad:', isInitialLoad, 'isLoadingMore:', isLoadingMore);
+    // Skip loading logic during initial load
+    if (isInitialLoad) {
+      console.log('[HabitCalendarSection] Skipping load logic during initial load');
       return;
     }
 
@@ -306,35 +324,34 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       totalColumns,
       loadedMonths,
       totalMonths,
-      triggerThreshold: 1 // Reduced threshold for more precise loading
+      triggerThreshold: 1
     });
     
     // Load more data when the user is within 1 column of the leftmost edge
-    if (leftmostVisibleColumn <= 1 && loadedMonths < totalMonths && !isLoadingMore) {
+    if (leftmostVisibleColumn <= 1 && loadedMonths < totalMonths && !isLoadingMore && !scrollLocked) {
       console.log('[HabitCalendarSection] Intersection observer triggered - loading more data');
       
       const newMonthCount = Math.min(loadedMonths + MONTHS_PER_LOAD, totalMonths);
       
       if (newMonthCount > loadedMonths) {
-        console.log('[HabitCalendarSection] Starting data load:', {
+        console.log('[HabitCalendarSection] Starting data load and locking scroll:', {
           currentMonths: loadedMonths,
           newMonthCount,
           currentScrollPosition: contentOffset.x,
           leftmostVisibleColumn
         });
         
+        // Lock scroll and store exact position
+        setScrollLocked(true);
         setIsLoadingMore(true);
+        setLoadingPosition(contentOffset.x);
+        preLoadScrollPositionRef.current = contentOffset.x;
         
-        // Store exact scroll position before data change
+        // Store data length before change
         previousDataLengthRef.current = modalCalendarData.length;
         
+        // Load new data
         setLoadedMonths(newMonthCount);
-        
-        // Reduced timeout for faster response
-        setTimeout(() => {
-          setIsLoadingMore(false);
-          console.log('[HabitCalendarSection] Data load completed');
-        }, 200);
       }
     }
   };
@@ -389,10 +406,11 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                   contentContainerStyle={styles.modalScrollContainer}
                   scrollEventThrottle={16}
                   onScroll={handleScroll}
+                  scrollEnabled={!scrollLocked} // Disable scrolling when locked
                 >
-                  {/* Loading indicator positioned at current scroll location */}
+                  {/* Loading indicator positioned at exact loading position */}
                   {isLoadingMore && (
-                    <View style={[styles.loadingIndicator, { left: Math.max(currentScrollX + 20, 20) }]}>
+                    <View style={[styles.loadingIndicator, { left: Math.max(loadingPosition + 20, 20) }]}>
                       <Text style={styles.loadingText}>Loading...</Text>
                     </View>
                   )}
