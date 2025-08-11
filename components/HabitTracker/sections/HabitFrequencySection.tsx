@@ -118,7 +118,7 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
             </View>
 
             {/* Data grid */}
-            <View style={styles.dataGrid}>
+            <View style={[styles.dataGrid, { minWidth: frequencyData.data.length * 4 || 1000 }]}>
               {/* Horizontal grid lines */}
               {weekdayLabels.map((_, rowIndex) => (
                 <View 
@@ -223,7 +223,6 @@ const styles = StyleSheet.create({
   dataGrid: {
     position: 'relative',
     height: 7 * 24, // 7 weekdays * 24px height
-    minWidth: frequencyData?.data?.length * 4 || 1000, // Width based on data length
   },
   gridLine: {
     position: 'absolute',
