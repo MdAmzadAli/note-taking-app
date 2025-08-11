@@ -204,12 +204,11 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         newScrollX
       });
 
-      setTimeout(() => {
-        if (horizontalScrollRef.current) {
-          horizontalScrollRef.current.scrollTo({ x: newScrollX, animated: false });
-          setCurrentScrollX(newScrollX);
-        }
-      }, 50);
+      // Use immediate scroll without setTimeout to prevent visual jumping
+      if (horizontalScrollRef.current) {
+        horizontalScrollRef.current.scrollTo({ x: newScrollX, animated: false });
+        setCurrentScrollX(newScrollX);
+      }
 
       previousDataLengthRef.current = modalCalendarData.length;
     }
@@ -277,7 +276,8 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     
     // Update current scroll position for maintaining position during data loads
-    setCurrentScrollX(contentOffset.x);
+    const newScrollX = contentOffset.x;
+    setCurrentScrollX(newScrollX);
     setContentWidth(contentSize.width);
     setLayoutWidth(layoutMeasurement.width);
 
@@ -306,11 +306,11 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       totalColumns,
       loadedMonths,
       totalMonths,
-      triggerThreshold: 2 // Load when within 2 columns of the left edge
+      triggerThreshold: 1 // Reduced threshold for more precise loading
     });
     
-    // Load more data when the user is within 2 columns of the leftmost edge
-    if (leftmostVisibleColumn <= 2 && loadedMonths < totalMonths && !isLoadingMore) {
+    // Load more data when the user is within 1 column of the leftmost edge
+    if (leftmostVisibleColumn <= 1 && loadedMonths < totalMonths && !isLoadingMore) {
       console.log('[HabitCalendarSection] Intersection observer triggered - loading more data');
       
       const newMonthCount = Math.min(loadedMonths + MONTHS_PER_LOAD, totalMonths);
@@ -319,17 +319,22 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         console.log('[HabitCalendarSection] Starting data load:', {
           currentMonths: loadedMonths,
           newMonthCount,
-          currentScrollPosition: contentOffset.x
+          currentScrollPosition: contentOffset.x,
+          leftmostVisibleColumn
         });
         
         setIsLoadingMore(true);
+        
+        // Store exact scroll position before data change
+        previousDataLengthRef.current = modalCalendarData.length;
+        
         setLoadedMonths(newMonthCount);
         
-        // The scroll position will be maintained by the useEffect above
+        // Reduced timeout for faster response
         setTimeout(() => {
           setIsLoadingMore(false);
           console.log('[HabitCalendarSection] Data load completed');
-        }, 300);
+        }, 200);
       }
     }
   };
@@ -385,9 +390,9 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                   scrollEventThrottle={16}
                   onScroll={handleScroll}
                 >
-                  {/* Loading indicator for left side */}
+                  {/* Loading indicator positioned at current scroll location */}
                   {isLoadingMore && (
-                    <View style={styles.loadingIndicator}>
+                    <View style={[styles.loadingIndicator, { left: Math.max(currentScrollX + 20, 20) }]}>
                       <Text style={styles.loadingText}>Loading...</Text>
                     </View>
                   )}
@@ -658,22 +663,23 @@ const styles = StyleSheet.create({
   },
   loadingIndicator: {
     position: 'absolute',
-    left: 10,
     top: '50%',
     transform: [{ translateY: -10 }],
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
     zIndex: 1000,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 3,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
   },
   loadingText: {
     fontSize: 12,
