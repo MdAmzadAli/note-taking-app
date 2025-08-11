@@ -9,6 +9,9 @@ import {
   TextInput,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Habit } from '@/types';
 import HabitCalendar from './HabitCalendar';
@@ -49,7 +52,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const horizontalScrollRef = useRef<ScrollView>(null);
   const previousDataLengthRef = useRef(0);
   const preLoadScrollPositionRef = useRef(0);
-  
+
   // Configuration for lazy loading
   const INITIAL_MONTHS = 5;
   const MONTHS_PER_LOAD = 5;
@@ -106,23 +109,23 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
 
     // Total months available (12 months)
     const totalAvailableMonths = 12;
-    
+
     // Calculate how many months to show based on loaded months
     const monthsToShow = Math.min(loadedMonths, totalAvailableMonths);
-    
+
     console.log('[HabitCalendarSection] Calendar data calculation:', {
       totalAvailableMonths,
       loadedMonths,
       monthsToShow
     });
-    
+
     // Generate dates starting from the specified number of months ago to today
     const startDate = new Date(today.getFullYear(), today.getMonth() - (monthsToShow - 1), 1);
     const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0); // Last day of current month
-    
+
     const days: CalendarDay[] = [];
     const currentDate = new Date(startDate);
-    
+
     while (currentDate <= endDate) {
       const dateStr = currentDate.toISOString().split('T')[0];
 
@@ -146,7 +149,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         isToday: currentDate.toDateString() === today.toDateString(),
         monthName: formattedMonthName,
       });
-      
+
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
@@ -175,7 +178,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
 
     if (showModal && horizontalScrollRef.current && modalCalendarData.length > 0 && isInitialLoad) {
       console.log('[HabitCalendarSection] Initiating auto-scroll sequence for initial load');
-      
+
       // Single scroll to end after a brief delay for layout completion
       const timeoutId = setTimeout(() => {
         if (horizontalScrollRef.current) {
@@ -210,7 +213,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         const cellWidth = 32; // Cell size
         const cellMargin = 4; // Margin between cells  
         const totalCellWidth = cellWidth + cellMargin;
-        
+
         // Calculate columns added (7 days per column)
         const columnsAdded = Math.ceil(dataLengthDifference / 7);
         const addedWidth = columnsAdded * totalCellWidth;
@@ -218,7 +221,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         // Calculate the exact position to maintain visual consistency
         // The key is to ensure the same visual content remains at the same screen position
         const restoredScrollX = Math.max(0, preLoadScrollPositionRef.current + addedWidth);
-        
+
         console.log('[HabitCalendarSection] Restoring scroll position after data load:', {
           dataLengthDifference,
           columnsAdded,
@@ -233,7 +236,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
           if (horizontalScrollRef.current) {
             horizontalScrollRef.current.scrollTo({ x: restoredScrollX, animated: false });
             setCurrentScrollX(restoredScrollX);
-            
+
             // Small delay before unlocking to ensure scroll position is stable
             setTimeout(() => {
               setIsLoadingMore(false);
@@ -280,7 +283,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     if (selectedDate) {
       const dateStr = selectedDate.toISOString().split('T')[0];
       const newValue = parseInt(inputValue.current) || 0;
-      
+
       // Store the change as pending instead of saving immediately
       setPendingChanges(prev => ({
         ...prev,
@@ -304,20 +307,20 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         await onSaveValue(habit.id, dateStr, newValue);
       }
     }
-    
+
     handleCloseModal();
   };
 
   // Handle scroll for intersection observer-based lazy loading
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-    
+
     // If scroll is locked during loading, prevent any scroll updates
     if (scrollLocked || isLoadingMore) {
       console.log('[HabitCalendarSection] Scroll locked during loading, preventing scroll updates');
       return;
     }
-    
+
     // Update current scroll position for maintaining position during data loads
     const newScrollX = contentOffset.x;
     setCurrentScrollX(newScrollX);
@@ -333,16 +336,16 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     // Calculate visible area and leftmost visible position
     const leftVisibleX = contentOffset.x;
     const rightVisibleX = contentOffset.x + layoutMeasurement.width;
-    
+
     // Cell dimensions
     const cellWidth = 32;
     const cellMargin = 4;
     const totalCellWidth = cellWidth + cellMargin;
-    
+
     // Calculate which column is at the leftmost visible edge
     const leftmostVisibleColumn = Math.floor(leftVisibleX / totalCellWidth);
     const totalColumns = Math.ceil(modalCalendarData.length / 7); // 7 rows per column
-    
+
     console.log('[HabitCalendarSection] Scroll intersection check:', {
       contentOffsetX: contentOffset.x,
       leftmostVisibleColumn,
@@ -351,13 +354,13 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       totalMonths,
       triggerThreshold: 1
     });
-    
+
     // Load more data when the user is within 1 column of the leftmost edge
     if (leftmostVisibleColumn <= 1 && loadedMonths < totalMonths && !isLoadingMore && !scrollLocked) {
       console.log('[HabitCalendarSection] Intersection observer triggered - loading more data');
-      
+
       const newMonthCount = Math.min(loadedMonths + MONTHS_PER_LOAD, totalMonths);
-      
+
       if (newMonthCount > loadedMonths) {
         console.log('[HabitCalendarSection] Starting data load and locking scroll:', {
           currentMonths: loadedMonths,
@@ -365,16 +368,16 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
           currentScrollPosition: contentOffset.x,
           leftmostVisibleColumn
         });
-        
+
         // Lock scroll and store exact position
         setScrollLocked(true);
         setIsLoadingMore(true);
         setLoadingPosition(contentOffset.x);
         preLoadScrollPositionRef.current = contentOffset.x;
-        
+
         // Store data length before change
         previousDataLengthRef.current = modalCalendarData.length;
-        
+
         // Load new data
         setLoadedMonths(newMonthCount);
       }
@@ -411,10 +414,11 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         transparent={true}
         onRequestClose={handleCloseModal}
       >
-        <TouchableOpacity
+        {/* Changed modalOverlay to use KeyboardAvoidingView */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.modalOverlay}
-          onPress={handleCloseModal}
-          activeOpacity={1} // This prevents the underlying content from receiving touches
+          contentContainerStyle={styles.modalOverlayContentContainer} // Apply container style here
         >
           <TouchableOpacity
             style={styles.modalContainer}
@@ -466,7 +470,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                   onPress={handleSaveAllChanges}
                 >
                   <Text style={styles.modalSaveButtonText}>
-                    {Object.keys(pendingChanges).length > 0 
+                    {Object.keys(pendingChanges).length > 0
                       ? `Save ${Object.keys(pendingChanges).length} Changes`
                       : 'Close'
                     }
@@ -475,7 +479,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
               </View>
             </View>
           </TouchableOpacity>
-        </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Value Input Modal */}
@@ -563,9 +567,15 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
+    justifyContent: 'center', // Centers content vertically by default
     alignItems: 'center',
     backdropFilter: 'blur(10px)',
+    paddingTop: '10%', // Added to move content slightly up
+  },
+  modalOverlayContentContainer: {
+    flex: 1, // Ensure it takes up the available space
+    justifyContent: 'center', // Center content within the KeyboardAvoidingView
+    alignItems: 'center',
   },
   modalContainer: {
     backgroundColor: '#ffffff',
