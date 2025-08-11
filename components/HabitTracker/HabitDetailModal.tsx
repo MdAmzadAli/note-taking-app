@@ -16,6 +16,7 @@ import HabitStreakSection from './sections/HabitStreakSection';
 import HabitHistorySection from './sections/HabitHistorySection';
 import HabitHistoryGraphSection from './sections/HabitHistoryGraphSection';
 import HabitCalendarSection from './sections/HabitCalendarSection';
+import HabitFrequencySection from './sections/HabitFrequencySection';
 
 interface HabitDetailModalProps {
   visible: boolean;
@@ -177,6 +178,7 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
             }
           }}
         />
+        <HabitFrequencySection habit={habit} />
         <HabitStreakSection
           title="Current Streak"
           streakValue={habit.currentStreak}
