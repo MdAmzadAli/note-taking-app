@@ -28,7 +28,6 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
     
     const data: DataPoint[] = [];
     const monthLabels: string[] = [];
-    const currentDate = new Date(startDate);
     
     // Create completion lookup map for performance
     const completionMap = new Map<string, number>();
@@ -36,62 +35,43 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
       completionMap.set(completion.date, completion.value || 0);
     });
     
-    // Calculate monthly targets and achievements
-    const monthlyData = new Map<number, { total: number, days: number, target: number }>();
+    // Generate all days in the range
+    const currentDate = new Date(startDate);
+    const allDays: DataPoint[] = [];
     
-    // First pass: collect data by month and calculate monthly totals
-    const tempDate = new Date(startDate);
-    while (tempDate <= endDate) {
-      const monthIndex = (tempDate.getFullYear() - startDate.getFullYear()) * 12 + 
-                        (tempDate.getMonth() - startDate.getMonth());
+    while (currentDate <= endDate) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      const value = completionMap.get(dateStr) || 0;
       
-      if (!monthlyData.has(monthIndex)) {
-        const monthLabel = tempDate.toLocaleDateString('en-US', { month: 'short' });
-        const yearSuffix = tempDate.getFullYear() === today.getFullYear() ? '' : ` ${tempDate.getFullYear()}`;
+      const monthIndex = (currentDate.getFullYear() - startDate.getFullYear()) * 12 + 
+                        (currentDate.getMonth() - startDate.getMonth());
+      
+      // Generate month labels
+      if (!monthLabels[monthIndex]) {
+        const monthLabel = currentDate.toLocaleDateString('en-US', { month: 'short' });
+        const yearSuffix = currentDate.getFullYear() === today.getFullYear() ? '' : ` ${currentDate.getFullYear()}`;
         monthLabels[monthIndex] = `${monthLabel}${yearSuffix}`;
-        
-        monthlyData.set(monthIndex, { total: 0, days: 0, target: habit.target || 10 });
       }
       
-      const dateStr = tempDate.toISOString().split('T')[0];
-      const value = completionMap.get(dateStr) || 0;
-      
-      const monthData = monthlyData.get(monthIndex)!;
-      monthData.total += value;
-      monthData.days += 1;
-      
-      tempDate.setDate(tempDate.getDate() + 1);
-    }
-    
-    // Second pass: create data points with proper scaling
-    const currentDate2 = new Date(startDate);
-    while (currentDate2 <= endDate) {
-      const dateStr = currentDate2.toISOString().split('T')[0];
-      const value = completionMap.get(dateStr) || 0;
-      
-      const monthIndex = (currentDate2.getFullYear() - startDate.getFullYear()) * 12 + 
-                        (currentDate2.getMonth() - startDate.getMonth());
-      
-      data.push({
-        date: new Date(currentDate2),
+      allDays.push({
+        date: new Date(currentDate),
         value,
         monthIndex,
-        weekdayIndex: currentDate2.getDay(), // 0 = Sunday, 6 = Saturday
+        weekdayIndex: currentDate.getDay(), // 0 = Sunday, 6 = Saturday
         monthLabel: monthLabels[monthIndex] || '',
       });
       
-      currentDate2.setDate(currentDate2.getDate() + 1);
+      currentDate.setDate(currentDate.getDate() + 1);
     }
     
     // Calculate max value for proper scaling
-    const allValues = data.map(d => d.value).filter(v => v > 0);
+    const allValues = allDays.map(d => d.value).filter(v => v > 0);
     const maxValue = allValues.length > 0 ? Math.max(...allValues) : habit.target || 10;
     
     return {
-      data,
-      monthLabels,
+      data: allDays,
+      monthLabels: monthLabels.filter(label => label), // Remove empty labels
       maxValue,
-      monthlyData,
     };
   }, [habit.completions, habit.target]);
 
@@ -147,7 +127,7 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
                     styles.gridLine,
                     { 
                       top: rowIndex * cellHeight + cellHeight / 2,
-                      width: frequencyData.monthLabels.length * cellWidth,
+                      width: frequencyData.data.length * 4, // Match data point spacing
                     }
                   ]} 
                 />
@@ -160,9 +140,10 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
                 const circleSize = getCircleSize(point.value, frequencyData.maxValue);
                 const opacity = getCircleOpacity(point.value, frequencyData.maxValue);
                 
-                // Calculate position based on days from start
-                const daysSinceStart = frequencyData.data.findIndex(d => d.date.getTime() === point.date.getTime());
-                const weekIndex = Math.floor(daysSinceStart / 7);
+                // Simple day-based positioning - each day gets its own column
+                const dayIndex = index; // Use direct index for positioning
+                const leftPosition = dayIndex * 4; // 4px spacing between days
+                const topPosition = point.weekdayIndex * cellHeight + (cellHeight - circleSize) / 2;
                 
                 return (
                   <View
@@ -170,8 +151,8 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
                     style={[
                       styles.dataPoint,
                       {
-                        left: weekIndex * cellWidth + (cellWidth - circleSize) / 2,
-                        top: point.weekdayIndex * cellHeight + (cellHeight - circleSize) / 2,
+                        left: leftPosition,
+                        top: topPosition,
                         width: circleSize,
                         height: circleSize,
                         backgroundColor: habit.color || '#3b82f6',
@@ -242,7 +223,7 @@ const styles = StyleSheet.create({
   dataGrid: {
     position: 'relative',
     height: 7 * 24, // 7 weekdays * 24px height
-    minWidth: 365, // Approximate width for a year of data
+    minWidth: frequencyData?.data?.length * 4 || 1000, // Width based on data length
   },
   gridLine: {
     position: 'absolute',
