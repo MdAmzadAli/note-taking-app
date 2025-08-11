@@ -30,7 +30,6 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const [inputValue, setInputValue] = useState('');
   const [showValueModal, setShowValueModal] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<{ [date: string]: number }>({});
-  const [tempHabitData, setTempHabitData] = useState<Habit | null>(null);
   const horizontalScrollRef = useRef<ScrollView>(null);
 
   // Generate dates for preview (105 days - 15 columns × 7 rows)
@@ -58,22 +57,30 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     return days;
   }, [habit.completions]);
 
-  // Generate dates for modal (only past dates and today, up to 3 years)
+  // Create a completion lookup map for faster access
+  const completionMap = useMemo(() => {
+    const map = new Map<string, number>();
+    habit.completions.forEach(completion => {
+      map.set(completion.date, completion.value);
+    });
+    return map;
+  }, [habit.completions]);
+
+  // Generate dates for modal (only past dates and today, up to 1 year for better performance)
   const modalCalendarData = useMemo(() => {
     const days: CalendarDay[] = [];
     const today = new Date();
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const workingHabit = tempHabitData || habit;
 
-    // Generate approximately 1095 days (3 years) ending with today
-    const numberOfDays = 3 * 365;
+    // Reduced to 1 year (365 days) for better performance
+    const numberOfDays = 365;
     for (let i = numberOfDays - 1; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
       const dateStr = date.toISOString().split('T')[0];
 
-      const completion = workingHabit.completions.find(c => c.date === dateStr);
-      let value = completion?.value || 0;
+      // Use map lookup instead of array.find for better performance
+      let value = completionMap.get(dateStr) || 0;
 
       // Override with pending changes if they exist
       if (pendingChanges[dateStr] !== undefined) {
@@ -90,7 +97,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     }
 
     return days;
-  }, [habit.completions, tempHabitData, pendingChanges]);
+  }, [completionMap, pendingChanges]);
 
   // Auto-scroll to position today's date at the rightmost edge when modal opens
   useEffect(() => {
@@ -108,14 +115,12 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   }, [showModal, modalCalendarData]);
 
   const handleOpenModal = () => {
-    setTempHabitData({ ...habit });
     setPendingChanges({});
     setShowModal(true);
   };
 
   const handleCloseModal = () => {
     setShowModal(false);
-    setTempHabitData(null);
     setPendingChanges({});
   };
 
