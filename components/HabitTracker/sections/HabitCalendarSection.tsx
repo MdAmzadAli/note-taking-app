@@ -34,6 +34,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const [pendingChanges, setPendingChanges] = useState<{ [date: string]: number }>({});
   const [loadedMonths, setLoadedMonths] = useState(5); // Start with 5 months
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Add logging when loadedMonths changes
   useEffect(() => {
@@ -227,8 +228,8 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   // Handle scroll for month-based lazy loading
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     // Skip scroll handling during initial load to prevent unwanted loading
-    if (isInitialLoad) {
-      console.log('[HabitCalendarSection] Skipping scroll handling during initial load');
+    if (isInitialLoad || isLoadingMore) {
+      console.log('[HabitCalendarSection] Skipping scroll handling - initialLoad:', isInitialLoad, 'isLoadingMore:', isLoadingMore);
       return;
     }
 
@@ -241,45 +242,54 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       layoutMeasurementWidth: layoutMeasurement.width,
       scrollPercentage: scrollPercentage.toFixed(3),
       loadedMonths,
-      threshold: LOAD_THRESHOLD
+      threshold: LOAD_THRESHOLD,
+      isNearLeftEdge: contentOffset.x < 100 // Check if near the leftmost edge
     });
     
-    // Load more months when user scrolls near the beginning (left side)
-    if (scrollPercentage < LOAD_THRESHOLD && loadedMonths < totalMonths) {
+    // Load more months when user scrolls very close to the left edge (first 100px)
+    if (contentOffset.x < 100 && loadedMonths < totalMonths && !isLoadingMore) {
       const newMonthCount = Math.min(loadedMonths + MONTHS_PER_LOAD, totalMonths);
       
-      console.log('[HabitCalendarSection] Left threshold exceeded:', {
+      console.log('[HabitCalendarSection] Near left edge, loading more months:', {
         currentMonths: loadedMonths,
         totalMonths,
         newMonthCount,
-        willUpdate: newMonthCount > loadedMonths
+        currentScrollX: contentOffset.x
       });
       
       if (newMonthCount > loadedMonths) {
-        console.log('[HabitCalendarSection] Loading more months:', newMonthCount);
+        setIsLoadingMore(true);
         
-        // Store current scroll position relative to content
-        const currentScrollRatio = contentOffset.x / contentSize.width;
+        // Store current scroll position to maintain it after loading
+        const currentScrollX = contentOffset.x;
+        
+        console.log('[HabitCalendarSection] Starting to load more months, current scroll:', currentScrollX);
         
         setLoadedMonths(newMonthCount);
         
-        // After loading more content, maintain relative position
+        // After a brief delay to allow content to render, adjust scroll position
         setTimeout(() => {
           if (horizontalScrollRef.current) {
-            // Calculate new scroll position to maintain visual position
-            const newContentSize = contentSize.width * (newMonthCount / loadedMonths);
-            const newScrollX = currentScrollRatio * newContentSize + (newContentSize - contentSize.width);
+            // Calculate how much content was added (approximately)
+            const monthWidth = 150; // Approximate width per month (adjust based on your layout)
+            const addedWidth = MONTHS_PER_LOAD * monthWidth;
+            const newScrollX = currentScrollX + addedWidth;
             
-            console.log('[HabitCalendarSection] Adjusting scroll position after loading:', {
-              oldScrollX: contentOffset.x,
-              newScrollX,
-              oldContentSize: contentSize.width,
-              estimatedNewContentSize: newContentSize
+            console.log('[HabitCalendarSection] Adjusting scroll position:', {
+              oldScrollX: currentScrollX,
+              addedWidth,
+              newScrollX
             });
             
             horizontalScrollRef.current.scrollTo({ x: newScrollX, animated: false });
+            
+            // Mark loading as complete
+            setTimeout(() => {
+              setIsLoadingMore(false);
+              console.log('[HabitCalendarSection] Loading more months completed');
+            }, 100);
           }
-        }, 50);
+        }, 200);
       }
     }
   };
@@ -335,6 +345,12 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                   scrollEventThrottle={16}
                   onScroll={handleScroll}
                 >
+                  {/* Loading indicator for left side */}
+                  {isLoadingMore && (
+                    <View style={styles.loadingIndicator}>
+                      <Text style={styles.loadingText}>Loading...</Text>
+                    </View>
+                  )}
                   <HabitCalendar
                     habit={habit}
                     calendarData={modalCalendarData}
@@ -599,5 +615,29 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingIndicator: {
+    position: 'absolute',
+    left: 10,
+    top: '50%',
+    transform: [{ translateY: -10 }],
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  loadingText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
   },
 });
