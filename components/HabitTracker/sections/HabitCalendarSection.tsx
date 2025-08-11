@@ -414,12 +414,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         transparent={true}
         onRequestClose={handleCloseModal}
       >
-        {/* Changed modalOverlay to use KeyboardAvoidingView */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.modalOverlay}
-          contentContainerStyle={styles.modalOverlayContentContainer} // Apply container style here
-        >
+        <View style={styles.modalOverlay}>
           <TouchableOpacity
             style={styles.modalContainer}
             activeOpacity={1} // This prevents the modal content itself from being dismissed
@@ -479,7 +474,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
               </View>
             </View>
           </TouchableOpacity>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* Value Input Modal */}
@@ -567,22 +562,17 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center', // Centers content vertically by default
+    justifyContent: 'flex-start', // Align to top instead of center
     alignItems: 'center',
     backdropFilter: 'blur(10px)',
-    paddingTop: '10%', // Added to move content slightly up
-  },
-  modalOverlayContentContainer: {
-    flex: 1, // Ensure it takes up the available space
-    justifyContent: 'center', // Center content within the KeyboardAvoidingView
-    alignItems: 'center',
+    paddingTop: 80, // Fixed padding from top (about 80px from top of screen)
   },
   modalContainer: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
     margin: 20,
-    maxHeight: '80%',
-    width: '100%',
+    height: 500, // Fixed height instead of maxHeight percentage
+    width: '90%', // Fixed width
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -639,8 +629,9 @@ const styles = StyleSheet.create({
   valueModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
+    justifyContent: 'flex-start', // Align to top
     alignItems: 'center',
+    paddingTop: 150, // Fixed position from top
   },
   valueModalContainer: {
     backgroundColor: '#ffffff',
