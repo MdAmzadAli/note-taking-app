@@ -243,7 +243,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
             onPress={() => {}} // Prevent touches from propagating to the overlay
           >
             <View style={styles.modalContentWithLabels}>
-              <ScrollView style={styles.modalContent}>
+              <View style={styles.modalContent}>
                 <ScrollView
                   ref={horizontalScrollRef}
                   horizontal
@@ -256,6 +256,8 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                   snapToInterval={columnWidth}
                   snapToAlignment="start"
                   decelerationRate="fast"
+                  bounces={false}
+                  overScrollMode="never"
                 >
                   <HabitCalendar
                     habit={habit}
@@ -265,7 +267,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                     isModal={true}
                   />
                 </ScrollView>
-              </ScrollView>
+              </View>
 
               {/* Fixed day labels outside scrollable area */}
               <View style={styles.modalFixedDayLabels}>
@@ -403,17 +405,17 @@ const styles = StyleSheet.create({
     paddingLeft: 5, // Minimal gap from left edge
     paddingRight: 40, // Reduced from 45 to 40 to increase scrollable area
     backgroundColor: '#ffffff',
-    maxHeight: 400,
+    height: 400, // Fixed height instead of maxHeight
+    flex: 1,
   },
   modalHorizontalScroll: {
+    flex: 1,
     width: '100%',
-    maxHeight: 400,
   },
   modalScrollContainer: {
     paddingLeft: 5, // Minimal left padding
-    paddingRight: 0, // Remove all right padding
+    paddingRight: 10, // Small right padding for better UX
     alignItems: 'flex-start',
-    minWidth: '100%',
     flexGrow: 1,
   },
   modalContentWithLabels: {
