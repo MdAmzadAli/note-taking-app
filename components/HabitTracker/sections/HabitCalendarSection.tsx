@@ -29,8 +29,9 @@ interface CalendarDay {
 export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalendarSectionProps) {
   const [showModal, setShowModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [inputValue, setInputValue] = useState('');
   const [showValueModal, setShowValueModal] = useState(false);
+  const inputRef = useRef<TextInput>(null);
+  const inputValue = useRef('');
   const [pendingChanges, setPendingChanges] = useState<{ [date: string]: number }>({});
   const [loadedMonths, setLoadedMonths] = useState(5); // Start with 5 months
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -271,14 +272,14 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
 
   const handleDatePress = (day: CalendarDay) => {
     setSelectedDate(day.date);
-    setInputValue(day.value.toString());
+    inputValue.current = day.value.toString();
     setShowValueModal(true);
   };
 
   const handleSaveValue = () => {
     if (selectedDate) {
       const dateStr = selectedDate.toISOString().split('T')[0];
-      const newValue = parseInt(inputValue) || 0;
+      const newValue = parseInt(inputValue.current) || 0;
       
       // Store the change as pending instead of saving immediately
       setPendingChanges(prev => ({
@@ -288,7 +289,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     }
     setShowValueModal(false);
     setSelectedDate(null);
-    setInputValue('');
+    inputValue.current = '';
   };
 
   const handleSaveAllChanges = async () => {
@@ -494,12 +495,19 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
             </Text>
 
             <TextInput
+              ref={inputRef}
               style={styles.valueModalInput}
-              value={inputValue}
-              onChangeText={setInputValue}
+              defaultValue={inputValue.current}
+              onChangeText={(text) => {
+                inputValue.current = text;
+              }}
               keyboardType="numeric"
               placeholder="0"
               autoFocus
+              autoCorrect={false}
+              textAlign="center"
+              selectTextOnFocus={false}
+              blurOnSubmit={false}
             />
 
             <View style={styles.valueModalButtons}>
