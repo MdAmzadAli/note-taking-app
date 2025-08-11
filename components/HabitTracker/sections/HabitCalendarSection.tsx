@@ -568,14 +568,14 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     alignItems: 'center',
     backdropFilter: 'blur(10px)',
-    paddingTop: 60,
+    paddingTop: 160,
   },
   modalContainer: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
+    // borderRadius: 16,
     margin: 20,
-    height: 500,
-    width: '90%',
+    height: 350,
+    width: '100%',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -634,7 +634,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingTop: 150,
+    paddingTop: 200,
   },
   valueModalContainer: {
     backgroundColor: '#ffffff',
@@ -712,9 +712,14 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   modalSaveButtonText: {
+    // position:'absolute',
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+    // paddingTop:100,
+    // paddingTop: 10,
+   // marginTop:30,
+    // paddingBottom:-10,
   },
   loadingIndicator: {
     position: 'absolute',
