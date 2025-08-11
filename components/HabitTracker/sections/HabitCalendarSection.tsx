@@ -67,12 +67,17 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       const completion = habit.completions.find(c => c.date === date.toISOString().split('T')[0]);
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+      // Format month name as "Mon YY" (e.g., "Apr 25")
+      const monthName = monthNames[date.getMonth()];
+      const yearSuffix = date.getFullYear().toString().slice(-2);
+      const formattedMonthName = `${monthName} ${yearSuffix}`;
+
       days.push({
         date,
         day: date.getDate(),
         value: completion?.value || 0,
         isToday: date.toDateString() === today.toDateString(),
-        monthName: monthNames[date.getMonth()],
+        monthName: formattedMonthName,
       });
     }
 
@@ -128,12 +133,17 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         value = pendingChanges[dateStr];
       }
 
+      // Format month name as "Mon YY" (e.g., "Apr 25")
+      const monthName = monthNames[currentDate.getMonth()];
+      const yearSuffix = currentDate.getFullYear().toString().slice(-2);
+      const formattedMonthName = `${monthName} ${yearSuffix}`;
+
       days.push({
         date: new Date(currentDate),
         day: currentDate.getDate(),
         value,
         isToday: currentDate.toDateString() === today.toDateString(),
-        monthName: monthNames[currentDate.getMonth()],
+        monthName: formattedMonthName,
       });
       
       currentDate.setDate(currentDate.getDate() + 1);
@@ -194,28 +204,41 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       });
 
       if (isLoadingMore && horizontalScrollRef.current) {
-        // Calculate how much content was added (approximate cell width + margin)
+        // More precise calculation: each day is exactly one cell
         const cellWidth = 32; // Cell size
-        const cellMargin = 4; // Margin between cells
+        const cellMargin = 4; // Margin between cells  
         const totalCellWidth = cellWidth + cellMargin;
-        const addedWidth = Math.ceil(dataLengthDifference / 7) * totalCellWidth; // Divide by 7 since we have 7 rows
+        
+        // Calculate columns added (7 days per column)
+        const columnsAdded = Math.ceil(dataLengthDifference / 7);
+        const addedWidth = columnsAdded * totalCellWidth;
 
-        // Restore the exact scroll position relative to the original content
-        const restoredScrollX = preLoadScrollPositionRef.current + addedWidth;
+        // Calculate the exact position to maintain visual consistency
+        // The key is to ensure the same visual content remains at the same screen position
+        const restoredScrollX = Math.max(0, preLoadScrollPositionRef.current + addedWidth);
         
         console.log('[HabitCalendarSection] Restoring scroll position after data load:', {
+          dataLengthDifference,
+          columnsAdded,
           addedWidth,
           originalScrollX: preLoadScrollPositionRef.current,
-          restoredScrollX
+          restoredScrollX,
+          cellWidth: totalCellWidth
         });
 
-        // Restore position immediately without animation
-        horizontalScrollRef.current.scrollTo({ x: restoredScrollX, animated: false });
-        setCurrentScrollX(restoredScrollX);
-        
-        // End loading state and unlock scroll
-        setIsLoadingMore(false);
-        setScrollLocked(false);
+        // Use requestAnimationFrame to ensure DOM is fully updated before scrolling
+        requestAnimationFrame(() => {
+          if (horizontalScrollRef.current) {
+            horizontalScrollRef.current.scrollTo({ x: restoredScrollX, animated: false });
+            setCurrentScrollX(restoredScrollX);
+            
+            // Small delay before unlocking to ensure scroll position is stable
+            setTimeout(() => {
+              setIsLoadingMore(false);
+              setScrollLocked(false);
+            }, 50);
+          }
+        });
       }
 
       previousDataLengthRef.current = modalCalendarData.length;
