@@ -92,7 +92,8 @@ export default function HabitCalendar({
 
         // Show year only when it changes
         const showYear = lastYear !== data.year;
-        const displayText = showYear ? `${data.monthName} ${data.year}` : data.monthName;
+        const yearSuffix = data.year.toString().slice(-2); // Get last 2 digits
+        const displayText = showYear ? `${data.monthName} ${yearSuffix}` : data.monthName;
         lastYear = data.year;
 
         headers.push({
