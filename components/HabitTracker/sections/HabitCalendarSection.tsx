@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   ScrollView,
   StyleSheet,
   TextInput,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from 'react-native';
 import { Habit } from '@/types';
 import HabitCalendar from './HabitCalendar';
@@ -30,7 +32,10 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const [inputValue, setInputValue] = useState('');
   const [showValueModal, setShowValueModal] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<{ [date: string]: number }>({});
+  const [loadedColumns, setLoadedColumns] = useState(12); // Start with 12 columns
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const horizontalScrollRef = useRef<ScrollView>(null);
+  const columnWidth = 34; // 32px cell + 2px margin
 
   // Generate dates for preview (105 days - 15 columns × 7 rows)
   const previewCalendarData = useMemo(() => {
@@ -66,14 +71,14 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     return map;
   }, [habit.completions]);
 
-  // Generate dates for modal (only past dates and today, up to 1 year for better performance)
+  // Generate dates for modal (lazy loading - only loaded columns)
   const modalCalendarData = useMemo(() => {
     const days: CalendarDay[] = [];
     const today = new Date();
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-    // Reduced to 1 year (365 days) for better performance
-    const numberOfDays = 365;
+    // Load only the required number of columns (7 days each)
+    const numberOfDays = loadedColumns * 7;
     for (let i = numberOfDays - 1; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
@@ -97,7 +102,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     }
 
     return days;
-  }, [completionMap, pendingChanges]);
+  }, [completionMap, pendingChanges, loadedColumns]);
 
   // Auto-scroll to position today's date at the rightmost edge when modal opens
   useEffect(() => {
@@ -116,13 +121,48 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
 
   const handleOpenModal = () => {
     setPendingChanges({});
+    setLoadedColumns(12); // Reset to initial columns
     setShowModal(true);
   };
 
   const handleCloseModal = () => {
     setShowModal(false);
     setPendingChanges({});
+    setLoadedColumns(12); // Reset for next time
   };
+
+  // Handle scroll events for lazy loading and snap behavior
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, layoutMeasurement } = event.nativeEvent;
+    const scrollX = contentOffset.x;
+    
+    // Load more data when scrolling near the beginning (left side)
+    if (scrollX < columnWidth * 2 && !isLoadingMore && loadedColumns < 52) { // Max 1 year (52 weeks)
+      setIsLoadingMore(true);
+      setTimeout(() => {
+        setLoadedColumns(prev => Math.min(prev + 8, 52)); // Load 8 more columns at a time
+        setIsLoadingMore(false);
+      }, 100);
+    }
+  }, [columnWidth, isLoadingMore, loadedColumns]);
+
+  // Handle scroll end for snap behavior
+  const handleScrollEnd = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset } = event.nativeEvent;
+    const scrollX = contentOffset.x;
+    
+    // Calculate which column we're closest to
+    const targetColumn = Math.round(scrollX / columnWidth);
+    const targetX = targetColumn * columnWidth;
+    
+    // Snap to the nearest column
+    if (Math.abs(scrollX - targetX) > 1) {
+      horizontalScrollRef.current?.scrollTo({
+        x: targetX,
+        animated: true,
+      });
+    }
+  }, [columnWidth]);
 
   const handleDatePress = (day: CalendarDay) => {
     setSelectedDate(day.date);
@@ -211,6 +251,11 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                   style={styles.modalHorizontalScroll}
                   contentContainerStyle={styles.modalScrollContainer}
                   scrollEventThrottle={16}
+                  onScroll={handleScroll}
+                  onMomentumScrollEnd={handleScrollEnd}
+                  snapToInterval={columnWidth}
+                  snapToAlignment="start"
+                  decelerationRate="fast"
                 >
                   <HabitCalendar
                     habit={habit}
@@ -231,8 +276,13 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                 ))}
               </View>
 
-              {/* Save button */}
+              {/* Loading indicator and Save button */}
               <View style={styles.modalSaveButtonContainer}>
+                {isLoadingMore && (
+                  <View style={styles.loadingIndicator}>
+                    <Text style={styles.loadingText}>Loading more dates...</Text>
+                  </View>
+                )}
                 <TouchableOpacity
                   style={styles.modalSaveButton}
                   onPress={handleSaveAllChanges}
@@ -476,5 +526,18 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingIndicator: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
   },
 });
