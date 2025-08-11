@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,8 @@ interface DataPoint {
 }
 
 export default function HabitFrequencySection({ habit }: HabitFrequencySectionProps) {
+  const scrollViewRef = useRef<ScrollView>(null);
+
   const frequencyData = useMemo(() => {
     const today = new Date();
     const startDate = new Date(today.getFullYear(), today.getMonth() - 9, 1); // Start from 10 months ago
@@ -91,6 +93,16 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
     return minOpacity + (normalizedValue * (maxOpacity - minOpacity));
   };
 
+  // Auto-scroll to show the latest data (current month) on component mount
+  useEffect(() => {
+    if (scrollViewRef.current && frequencyData.data.length > 0) {
+      // Delay scroll to ensure layout is complete
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: false });
+      }, 100);
+    }
+  }, [frequencyData.data.length]);
+
   const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const cellWidth = 4;
   const cellHeight = 24;
@@ -105,6 +117,7 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
         <View style={styles.chartWithLabels}>
           {/* Data grid container with horizontal scroll */}
           <ScrollView 
+            ref={scrollViewRef}
             horizontal 
             showsHorizontalScrollIndicator={false}
             style={styles.scrollContainer}
