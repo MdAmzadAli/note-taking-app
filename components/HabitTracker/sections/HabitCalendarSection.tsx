@@ -29,6 +29,8 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [inputValue, setInputValue] = useState('');
   const [showValueModal, setShowValueModal] = useState(false);
+  const [pendingChanges, setPendingChanges] = useState<{ [date: string]: number }>({});
+  const [tempHabitData, setTempHabitData] = useState<Habit | null>(null);
   const horizontalScrollRef = useRef<ScrollView>(null);
 
   // Generate dates for preview (105 days - 15 columns × 7 rows)
@@ -61,26 +63,34 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     const days: CalendarDay[] = [];
     const today = new Date();
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const workingHabit = tempHabitData || habit;
 
     // Generate approximately 1095 days (3 years) ending with today
     const numberOfDays = 3 * 365;
     for (let i = numberOfDays - 1; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
 
-      const completion = habit.completions.find(c => c.date === date.toISOString().split('T')[0]);
+      const completion = workingHabit.completions.find(c => c.date === dateStr);
+      let value = completion?.value || 0;
+
+      // Override with pending changes if they exist
+      if (pendingChanges[dateStr] !== undefined) {
+        value = pendingChanges[dateStr];
+      }
 
       days.push({
         date,
         day: date.getDate(),
-        value: completion?.value || 0,
+        value,
         isToday: date.toDateString() === today.toDateString(),
         monthName: monthNames[date.getMonth()],
       });
     }
 
     return days;
-  }, [habit.completions]);
+  }, [habit.completions, tempHabitData, pendingChanges]);
 
   // Auto-scroll to position today's date at the rightmost edge when modal opens
   useEffect(() => {
@@ -97,6 +107,18 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     }
   }, [showModal, modalCalendarData]);
 
+  const handleOpenModal = () => {
+    setTempHabitData({ ...habit });
+    setPendingChanges({});
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setTempHabitData(null);
+    setPendingChanges({});
+  };
+
   const handleDatePress = (day: CalendarDay) => {
     setSelectedDate(day.date);
     setInputValue(day.value.toString());
@@ -104,14 +126,35 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   };
 
   const handleSaveValue = () => {
-    if (selectedDate && onSaveValue) {
+    if (selectedDate) {
       const dateStr = selectedDate.toISOString().split('T')[0];
       const newValue = parseInt(inputValue) || 0;
-      onSaveValue(habit.id, dateStr, newValue);
+      
+      // Store the change as pending instead of saving immediately
+      setPendingChanges(prev => ({
+        ...prev,
+        [dateStr]: newValue
+      }));
     }
     setShowValueModal(false);
     setSelectedDate(null);
     setInputValue('');
+  };
+
+  const handleSaveAllChanges = async () => {
+    if (Object.keys(pendingChanges).length === 0) {
+      handleCloseModal();
+      return;
+    }
+
+    // Apply all pending changes
+    for (const [dateStr, newValue] of Object.entries(pendingChanges)) {
+      if (onSaveValue) {
+        await onSaveValue(habit.id, dateStr, newValue);
+      }
+    }
+    
+    handleCloseModal();
   };
 
   return (
@@ -131,7 +174,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
 
         <TouchableOpacity
           style={styles.editButton}
-          onPress={() => setShowModal(true)}
+          onPress={handleOpenModal}
         >
           <Text style={styles.editButtonText}>EDIT</Text>
         </TouchableOpacity>
@@ -142,11 +185,11 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         visible={showModal}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setShowModal(false)}
+        onRequestClose={handleCloseModal}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
-          onPress={() => setShowModal(false)}
+          onPress={handleCloseModal}
           activeOpacity={1} // This prevents the underlying content from receiving touches
         >
           <TouchableOpacity
@@ -181,6 +224,21 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                     <Text style={styles.modalDayLabelText}>{day}</Text>
                   </View>
                 ))}
+              </View>
+
+              {/* Save button */}
+              <View style={styles.modalSaveButtonContainer}>
+                <TouchableOpacity
+                  style={styles.modalSaveButton}
+                  onPress={handleSaveAllChanges}
+                >
+                  <Text style={styles.modalSaveButtonText}>
+                    {Object.keys(pendingChanges).length > 0 
+                      ? `Save ${Object.keys(pendingChanges).length} Changes`
+                      : 'Close'
+                    }
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
           </TouchableOpacity>
@@ -387,5 +445,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#ffffff',
+  },
+  modalSaveButtonContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 60, // Leave space for day labels
+    zIndex: 200,
+  },
+  modalSaveButton: {
+    backgroundColor: '#000000',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalSaveButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
