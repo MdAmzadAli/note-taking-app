@@ -33,6 +33,11 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const [showValueModal, setShowValueModal] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<{ [date: string]: number }>({});
   const [loadedColumns, setLoadedColumns] = useState(12); // Start with 12 columns
+
+  // Add logging when loadedColumns changes
+  useEffect(() => {
+    console.log('[HabitCalendarSection] LoadedColumns changed to:', loadedColumns);
+  }, [loadedColumns]);
   const horizontalScrollRef = useRef<ScrollView>(null);
   
   // Configuration for lazy loading
@@ -76,6 +81,11 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
 
   // Generate dates for modal with lazy loading
   const { modalCalendarData, totalDays } = useMemo(() => {
+    console.log('[HabitCalendarSection] Generating modal calendar data:', {
+      loadedColumns,
+      pendingChangesCount: Object.keys(pendingChanges).length
+    });
+
     const today = new Date();
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -84,6 +94,13 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     
     // Calculate how many days to show based on loaded columns
     const daysToShow = Math.min(loadedColumns * 7, totalAvailableDays);
+    
+    console.log('[HabitCalendarSection] Calendar data calculation:', {
+      totalAvailableDays,
+      loadedColumns,
+      daysToShow,
+      columnsCalculated: Math.floor(daysToShow / 7)
+    });
     
     const days: CalendarDay[] = [];
     for (let i = daysToShow - 1; i >= 0; i--) {
@@ -108,31 +125,53 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       });
     }
 
+    console.log('[HabitCalendarSection] Generated calendar data:', {
+      totalDays: days.length,
+      firstDate: days[0]?.date.toISOString().split('T')[0],
+      lastDate: days[days.length - 1]?.date.toISOString().split('T')[0],
+      todayIndex: days.findIndex(d => d.isToday)
+    });
+
     return { modalCalendarData: days, totalDays: totalAvailableDays };
   }, [completionMap, pendingChanges, loadedColumns]);
 
   // Auto-scroll to position today's date at the rightmost edge when modal opens
   useEffect(() => {
-    if (showModal && horizontalScrollRef.current) {
-      // Scroll to end to position today's date at the rightmost edge with no gap
-      setTimeout(() => {
-        horizontalScrollRef.current?.scrollToEnd({ animated: false });
-      }, 100);
+    console.log('[HabitCalendarSection] Auto-scroll effect triggered:', {
+      showModal,
+      hasScrollRef: !!horizontalScrollRef.current,
+      dataLength: modalCalendarData.length,
+      loadedColumns
+    });
 
-      // Fine-tune with animated scroll
-      setTimeout(() => {
-        horizontalScrollRef.current?.scrollToEnd({ animated: true });
-      }, 400);
+    if (showModal && horizontalScrollRef.current && modalCalendarData.length > 0) {
+      console.log('[HabitCalendarSection] Initiating auto-scroll sequence');
+      
+      // Single scroll to end after a brief delay for layout completion
+      const timeoutId = setTimeout(() => {
+        if (horizontalScrollRef.current) {
+          console.log('[HabitCalendarSection] Executing scrollToEnd');
+          horizontalScrollRef.current.scrollToEnd({ animated: true });
+        }
+      }, 200);
+
+      return () => {
+        console.log('[HabitCalendarSection] Cleaning up auto-scroll timeout');
+        clearTimeout(timeoutId);
+      };
     }
-  }, [showModal, modalCalendarData]);
+  }, [showModal]); // Only depend on showModal, not modalCalendarData to prevent multiple triggers
 
   const handleOpenModal = () => {
+    console.log('[HabitCalendarSection] Opening modal - resetting state');
     setPendingChanges({});
     setLoadedColumns(INITIAL_COLUMNS); // Reset to initial columns
+    console.log('[HabitCalendarSection] Initial columns set to:', INITIAL_COLUMNS);
     setShowModal(true);
   };
 
   const handleCloseModal = () => {
+    console.log('[HabitCalendarSection] Closing modal');
     setShowModal(false);
     setPendingChanges({});
   };
@@ -180,12 +219,29 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     const scrollPercentage = (contentOffset.x + layoutMeasurement.width) / contentSize.width;
     
+    console.log('[HabitCalendarSection] Scroll event:', {
+      contentOffsetX: contentOffset.x,
+      contentSizeWidth: contentSize.width,
+      layoutMeasurementWidth: layoutMeasurement.width,
+      scrollPercentage: scrollPercentage.toFixed(3),
+      loadedColumns,
+      threshold: LOAD_THRESHOLD
+    });
+    
     // Load more columns when user scrolls past threshold
     if (scrollPercentage > LOAD_THRESHOLD) {
       const maxPossibleColumns = Math.ceil(totalDays / 7);
       const newColumnCount = Math.min(loadedColumns + COLUMNS_PER_LOAD, maxPossibleColumns);
       
+      console.log('[HabitCalendarSection] Threshold exceeded:', {
+        currentColumns: loadedColumns,
+        maxPossibleColumns,
+        newColumnCount,
+        willUpdate: newColumnCount > loadedColumns
+      });
+      
       if (newColumnCount > loadedColumns) {
+        console.log('[HabitCalendarSection] Loading more columns:', newColumnCount);
         setLoadedColumns(newColumnCount);
       }
     }
