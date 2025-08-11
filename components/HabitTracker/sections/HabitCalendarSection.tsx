@@ -243,7 +243,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
             onPress={() => {}} // Prevent touches from propagating to the overlay
           >
             <View style={styles.modalContentWithLabels}>
-              <View style={styles.modalContent}>
+              <ScrollView style={styles.modalContent}>
                 <ScrollView
                   ref={horizontalScrollRef}
                   horizontal
@@ -256,8 +256,6 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                   snapToInterval={columnWidth}
                   snapToAlignment="start"
                   decelerationRate="fast"
-                  bounces={false}
-                  overScrollMode="never"
                 >
                   <HabitCalendar
                     habit={habit}
@@ -267,7 +265,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                     isModal={true}
                   />
                 </ScrollView>
-              </View>
+              </ScrollView>
 
               {/* Fixed day labels outside scrollable area */}
               <View style={styles.modalFixedDayLabels}>
@@ -403,24 +401,24 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 20,
     paddingLeft: 5, // Minimal gap from left edge
-    paddingRight: 0, // Remove right padding to eliminate gap
+    paddingRight: 40, // Reduced from 45 to 40 to increase scrollable area
     backgroundColor: '#ffffff',
-    height: 400, // Fixed height instead of maxHeight
-    flex: 1,
+    maxHeight: 400,
   },
   modalHorizontalScroll: {
-    flex: 1,
     width: '100%',
+    maxHeight: 400,
   },
   modalScrollContainer: {
     paddingLeft: 5, // Minimal left padding
-    paddingRight: 40, // Right padding to reserve space for day labels
+    paddingRight: 0, // Remove all right padding
     alignItems: 'flex-start',
+    minWidth: '100%',
     flexGrow: 1,
   },
   modalContentWithLabels: {
     position: 'relative',
-    paddingRight: 0, // Remove padding to eliminate gap
+    paddingRight: 40, // Reduced from 45 to 40 to match modalContent
   },
   modalFixedDayLabels: {
     position: 'absolute',
