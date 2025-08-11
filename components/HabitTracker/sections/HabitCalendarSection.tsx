@@ -32,18 +32,19 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const [inputValue, setInputValue] = useState('');
   const [showValueModal, setShowValueModal] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<{ [date: string]: number }>({});
-  const [loadedColumns, setLoadedColumns] = useState(12); // Start with 12 columns
+  const [loadedMonths, setLoadedMonths] = useState(5); // Start with 5 months
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // Add logging when loadedColumns changes
+  // Add logging when loadedMonths changes
   useEffect(() => {
-    console.log('[HabitCalendarSection] LoadedColumns changed to:', loadedColumns);
-  }, [loadedColumns]);
+    console.log('[HabitCalendarSection] LoadedMonths changed to:', loadedMonths);
+  }, [loadedMonths]);
   const horizontalScrollRef = useRef<ScrollView>(null);
   
   // Configuration for lazy loading
-  const INITIAL_COLUMNS = 12;
-  const COLUMNS_PER_LOAD = 8;
-  const LOAD_THRESHOLD = 0.8; // Load more when 80% scrolled
+  const INITIAL_MONTHS = 5;
+  const MONTHS_PER_LOAD = 5;
+  const LOAD_THRESHOLD = 0.15; // Load more when scrolled 15% from the left (near beginning)
 
   // Generate dates for preview (105 days - 15 columns × 7 rows)
   const previewCalendarData = useMemo(() => {
@@ -79,34 +80,37 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     return map;
   }, [habit.completions]);
 
-  // Generate dates for modal with lazy loading
-  const { modalCalendarData, totalDays } = useMemo(() => {
+  // Generate dates for modal with month-based lazy loading
+  const { modalCalendarData, totalMonths } = useMemo(() => {
     console.log('[HabitCalendarSection] Generating modal calendar data:', {
-      loadedColumns,
+      loadedMonths,
       pendingChangesCount: Object.keys(pendingChanges).length
     });
 
     const today = new Date();
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-    // Total days available (1 year)
-    const totalAvailableDays = 365;
+    // Total months available (12 months)
+    const totalAvailableMonths = 12;
     
-    // Calculate how many days to show based on loaded columns
-    const daysToShow = Math.min(loadedColumns * 7, totalAvailableDays);
+    // Calculate how many months to show based on loaded months
+    const monthsToShow = Math.min(loadedMonths, totalAvailableMonths);
     
     console.log('[HabitCalendarSection] Calendar data calculation:', {
-      totalAvailableDays,
-      loadedColumns,
-      daysToShow,
-      columnsCalculated: Math.floor(daysToShow / 7)
+      totalAvailableMonths,
+      loadedMonths,
+      monthsToShow
     });
     
+    // Generate dates starting from the specified number of months ago to today
+    const startDate = new Date(today.getFullYear(), today.getMonth() - (monthsToShow - 1), 1);
+    const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0); // Last day of current month
+    
     const days: CalendarDay[] = [];
-    for (let i = daysToShow - 1; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
+    const currentDate = new Date(startDate);
+    
+    while (currentDate <= endDate) {
+      const dateStr = currentDate.toISOString().split('T')[0];
 
       // Use map lookup instead of array.find for better performance
       let value = completionMap.get(dateStr) || 0;
@@ -117,23 +121,26 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       }
 
       days.push({
-        date,
-        day: date.getDate(),
+        date: new Date(currentDate),
+        day: currentDate.getDate(),
         value,
-        isToday: date.toDateString() === today.toDateString(),
-        monthName: monthNames[date.getMonth()],
+        isToday: currentDate.toDateString() === today.toDateString(),
+        monthName: monthNames[currentDate.getMonth()],
       });
+      
+      currentDate.setDate(currentDate.getDate() + 1);
     }
 
     console.log('[HabitCalendarSection] Generated calendar data:', {
       totalDays: days.length,
       firstDate: days[0]?.date.toISOString().split('T')[0],
       lastDate: days[days.length - 1]?.date.toISOString().split('T')[0],
-      todayIndex: days.findIndex(d => d.isToday)
+      todayIndex: days.findIndex(d => d.isToday),
+      monthsGenerated: monthsToShow
     });
 
-    return { modalCalendarData: days, totalDays: totalAvailableDays };
-  }, [completionMap, pendingChanges, loadedColumns]);
+    return { modalCalendarData: days, totalMonths: totalAvailableMonths };
+  }, [completionMap, pendingChanges, loadedMonths]);
 
   // Auto-scroll to position today's date at the rightmost edge when modal opens
   useEffect(() => {
@@ -141,32 +148,35 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       showModal,
       hasScrollRef: !!horizontalScrollRef.current,
       dataLength: modalCalendarData.length,
-      loadedColumns
+      loadedMonths,
+      isInitialLoad
     });
 
-    if (showModal && horizontalScrollRef.current && modalCalendarData.length > 0) {
-      console.log('[HabitCalendarSection] Initiating auto-scroll sequence');
+    if (showModal && horizontalScrollRef.current && modalCalendarData.length > 0 && isInitialLoad) {
+      console.log('[HabitCalendarSection] Initiating auto-scroll sequence for initial load');
       
       // Single scroll to end after a brief delay for layout completion
       const timeoutId = setTimeout(() => {
         if (horizontalScrollRef.current) {
           console.log('[HabitCalendarSection] Executing scrollToEnd');
-          horizontalScrollRef.current.scrollToEnd({ animated: true });
+          horizontalScrollRef.current.scrollToEnd({ animated: false }); // Use non-animated scroll to prevent triggering scroll events
+          setIsInitialLoad(false); // Mark initial load as complete
         }
-      }, 200);
+      }, 300);
 
       return () => {
         console.log('[HabitCalendarSection] Cleaning up auto-scroll timeout');
         clearTimeout(timeoutId);
       };
     }
-  }, [showModal]); // Only depend on showModal, not modalCalendarData to prevent multiple triggers
+  }, [showModal, modalCalendarData.length, isInitialLoad]); // Include dependencies for proper triggering
 
   const handleOpenModal = () => {
     console.log('[HabitCalendarSection] Opening modal - resetting state');
     setPendingChanges({});
-    setLoadedColumns(INITIAL_COLUMNS); // Reset to initial columns
-    console.log('[HabitCalendarSection] Initial columns set to:', INITIAL_COLUMNS);
+    setLoadedMonths(INITIAL_MONTHS); // Reset to initial months
+    setIsInitialLoad(true); // Reset initial load flag
+    console.log('[HabitCalendarSection] Initial months set to:', INITIAL_MONTHS);
     setShowModal(true);
   };
 
@@ -214,35 +224,62 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     handleCloseModal();
   };
 
-  // Handle scroll for lazy loading
+  // Handle scroll for month-based lazy loading
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    // Skip scroll handling during initial load to prevent unwanted loading
+    if (isInitialLoad) {
+      console.log('[HabitCalendarSection] Skipping scroll handling during initial load');
+      return;
+    }
+
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-    const scrollPercentage = (contentOffset.x + layoutMeasurement.width) / contentSize.width;
+    const scrollPercentage = contentOffset.x / (contentSize.width - layoutMeasurement.width);
     
     console.log('[HabitCalendarSection] Scroll event:', {
       contentOffsetX: contentOffset.x,
       contentSizeWidth: contentSize.width,
       layoutMeasurementWidth: layoutMeasurement.width,
       scrollPercentage: scrollPercentage.toFixed(3),
-      loadedColumns,
+      loadedMonths,
       threshold: LOAD_THRESHOLD
     });
     
-    // Load more columns when user scrolls past threshold
-    if (scrollPercentage > LOAD_THRESHOLD) {
-      const maxPossibleColumns = Math.ceil(totalDays / 7);
-      const newColumnCount = Math.min(loadedColumns + COLUMNS_PER_LOAD, maxPossibleColumns);
+    // Load more months when user scrolls near the beginning (left side)
+    if (scrollPercentage < LOAD_THRESHOLD && loadedMonths < totalMonths) {
+      const newMonthCount = Math.min(loadedMonths + MONTHS_PER_LOAD, totalMonths);
       
-      console.log('[HabitCalendarSection] Threshold exceeded:', {
-        currentColumns: loadedColumns,
-        maxPossibleColumns,
-        newColumnCount,
-        willUpdate: newColumnCount > loadedColumns
+      console.log('[HabitCalendarSection] Left threshold exceeded:', {
+        currentMonths: loadedMonths,
+        totalMonths,
+        newMonthCount,
+        willUpdate: newMonthCount > loadedMonths
       });
       
-      if (newColumnCount > loadedColumns) {
-        console.log('[HabitCalendarSection] Loading more columns:', newColumnCount);
-        setLoadedColumns(newColumnCount);
+      if (newMonthCount > loadedMonths) {
+        console.log('[HabitCalendarSection] Loading more months:', newMonthCount);
+        
+        // Store current scroll position relative to content
+        const currentScrollRatio = contentOffset.x / contentSize.width;
+        
+        setLoadedMonths(newMonthCount);
+        
+        // After loading more content, maintain relative position
+        setTimeout(() => {
+          if (horizontalScrollRef.current) {
+            // Calculate new scroll position to maintain visual position
+            const newContentSize = contentSize.width * (newMonthCount / loadedMonths);
+            const newScrollX = currentScrollRatio * newContentSize + (newContentSize - contentSize.width);
+            
+            console.log('[HabitCalendarSection] Adjusting scroll position after loading:', {
+              oldScrollX: contentOffset.x,
+              newScrollX,
+              oldContentSize: contentSize.width,
+              estimatedNewContentSize: newContentSize
+            });
+            
+            horizontalScrollRef.current.scrollTo({ x: newScrollX, animated: false });
+          }
+        }, 50);
       }
     }
   };
