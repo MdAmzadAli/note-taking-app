@@ -35,12 +35,16 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const [loadedMonths, setLoadedMonths] = useState(5); // Start with 5 months
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [currentScrollX, setCurrentScrollX] = useState(0);
+  const [contentWidth, setContentWidth] = useState(0);
+  const [layoutWidth, setLayoutWidth] = useState(0);
 
   // Add logging when loadedMonths changes
   useEffect(() => {
     console.log('[HabitCalendarSection] LoadedMonths changed to:', loadedMonths);
   }, [loadedMonths]);
   const horizontalScrollRef = useRef<ScrollView>(null);
+  const previousDataLengthRef = useRef(0);
   
   // Configuration for lazy loading
   const INITIAL_MONTHS = 5;
@@ -137,7 +141,8 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       firstDate: days[0]?.date.toISOString().split('T')[0],
       lastDate: days[days.length - 1]?.date.toISOString().split('T')[0],
       todayIndex: days.findIndex(d => d.isToday),
-      monthsGenerated: monthsToShow
+      monthsGenerated: monthsToShow,
+      previousDataLength: previousDataLengthRef.current
     });
 
     return { modalCalendarData: days, totalMonths: totalAvailableMonths };
@@ -162,6 +167,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
           console.log('[HabitCalendarSection] Executing scrollToEnd');
           horizontalScrollRef.current.scrollToEnd({ animated: false }); // Use non-animated scroll to prevent triggering scroll events
           setIsInitialLoad(false); // Mark initial load as complete
+          previousDataLengthRef.current = modalCalendarData.length; // Set initial data length
         }
       }, 300);
 
@@ -172,11 +178,52 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     }
   }, [showModal, modalCalendarData.length, isInitialLoad]); // Include dependencies for proper triggering
 
+  // Effect to maintain scroll position when new data is loaded
+  useEffect(() => {
+    if (!isInitialLoad && !isLoadingMore && modalCalendarData.length > previousDataLengthRef.current && horizontalScrollRef.current) {
+      const dataLengthDifference = modalCalendarData.length - previousDataLengthRef.current;
+      console.log('[HabitCalendarSection] Data length increased, maintaining scroll position:', {
+        previousLength: previousDataLengthRef.current,
+        currentLength: modalCalendarData.length,
+        difference: dataLengthDifference,
+        currentScrollX
+      });
+
+      // Calculate how much content was added (approximate cell width + margin)
+      const cellWidth = 32; // Cell size
+      const cellMargin = 4; // Margin between cells
+      const totalCellWidth = cellWidth + cellMargin;
+      const addedWidth = Math.ceil(dataLengthDifference / 7) * totalCellWidth; // Divide by 7 since we have 7 rows
+
+      // Maintain scroll position by adjusting for the added content
+      const newScrollX = currentScrollX + addedWidth;
+      
+      console.log('[HabitCalendarSection] Adjusting scroll position for new data:', {
+        addedWidth,
+        oldScrollX: currentScrollX,
+        newScrollX
+      });
+
+      setTimeout(() => {
+        if (horizontalScrollRef.current) {
+          horizontalScrollRef.current.scrollTo({ x: newScrollX, animated: false });
+          setCurrentScrollX(newScrollX);
+        }
+      }, 50);
+
+      previousDataLengthRef.current = modalCalendarData.length;
+    }
+  }, [modalCalendarData.length, isInitialLoad, isLoadingMore, currentScrollX]);
+
   const handleOpenModal = () => {
     console.log('[HabitCalendarSection] Opening modal - resetting state');
     setPendingChanges({});
     setLoadedMonths(INITIAL_MONTHS); // Reset to initial months
     setIsInitialLoad(true); // Reset initial load flag
+    setCurrentScrollX(0); // Reset scroll position tracking
+    setContentWidth(0);
+    setLayoutWidth(0);
+    previousDataLengthRef.current = 0; // Reset data length tracking
     console.log('[HabitCalendarSection] Initial months set to:', INITIAL_MONTHS);
     setShowModal(true);
   };
@@ -225,71 +272,64 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     handleCloseModal();
   };
 
-  // Handle scroll for month-based lazy loading
+  // Handle scroll for intersection observer-based lazy loading
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    // Skip scroll handling during initial load to prevent unwanted loading
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    
+    // Update current scroll position for maintaining position during data loads
+    setCurrentScrollX(contentOffset.x);
+    setContentWidth(contentSize.width);
+    setLayoutWidth(layoutMeasurement.width);
+
+    // Skip loading logic during initial load or while already loading
     if (isInitialLoad || isLoadingMore) {
-      console.log('[HabitCalendarSection] Skipping scroll handling - initialLoad:', isInitialLoad, 'isLoadingMore:', isLoadingMore);
+      console.log('[HabitCalendarSection] Skipping load logic - initialLoad:', isInitialLoad, 'isLoadingMore:', isLoadingMore);
       return;
     }
 
-    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-    const scrollPercentage = contentOffset.x / (contentSize.width - layoutMeasurement.width);
+    // Calculate visible area and leftmost visible position
+    const leftVisibleX = contentOffset.x;
+    const rightVisibleX = contentOffset.x + layoutMeasurement.width;
     
-    console.log('[HabitCalendarSection] Scroll event:', {
+    // Cell dimensions
+    const cellWidth = 32;
+    const cellMargin = 4;
+    const totalCellWidth = cellWidth + cellMargin;
+    
+    // Calculate which column is at the leftmost visible edge
+    const leftmostVisibleColumn = Math.floor(leftVisibleX / totalCellWidth);
+    const totalColumns = Math.ceil(modalCalendarData.length / 7); // 7 rows per column
+    
+    console.log('[HabitCalendarSection] Scroll intersection check:', {
       contentOffsetX: contentOffset.x,
-      contentSizeWidth: contentSize.width,
-      layoutMeasurementWidth: layoutMeasurement.width,
-      scrollPercentage: scrollPercentage.toFixed(3),
+      leftmostVisibleColumn,
+      totalColumns,
       loadedMonths,
-      threshold: LOAD_THRESHOLD,
-      isNearLeftEdge: contentOffset.x < 100 // Check if near the leftmost edge
+      totalMonths,
+      triggerThreshold: 2 // Load when within 2 columns of the left edge
     });
     
-    // Load more months when user scrolls very close to the left edge (first 100px)
-    if (contentOffset.x < 100 && loadedMonths < totalMonths && !isLoadingMore) {
+    // Load more data when the user is within 2 columns of the leftmost edge
+    if (leftmostVisibleColumn <= 2 && loadedMonths < totalMonths && !isLoadingMore) {
+      console.log('[HabitCalendarSection] Intersection observer triggered - loading more data');
+      
       const newMonthCount = Math.min(loadedMonths + MONTHS_PER_LOAD, totalMonths);
       
-      console.log('[HabitCalendarSection] Near left edge, loading more months:', {
-        currentMonths: loadedMonths,
-        totalMonths,
-        newMonthCount,
-        currentScrollX: contentOffset.x
-      });
-      
       if (newMonthCount > loadedMonths) {
+        console.log('[HabitCalendarSection] Starting data load:', {
+          currentMonths: loadedMonths,
+          newMonthCount,
+          currentScrollPosition: contentOffset.x
+        });
+        
         setIsLoadingMore(true);
-        
-        // Store current scroll position to maintain it after loading
-        const currentScrollX = contentOffset.x;
-        
-        console.log('[HabitCalendarSection] Starting to load more months, current scroll:', currentScrollX);
-        
         setLoadedMonths(newMonthCount);
         
-        // After a brief delay to allow content to render, adjust scroll position
+        // The scroll position will be maintained by the useEffect above
         setTimeout(() => {
-          if (horizontalScrollRef.current) {
-            // Calculate how much content was added (approximately)
-            const monthWidth = 150; // Approximate width per month (adjust based on your layout)
-            const addedWidth = MONTHS_PER_LOAD * monthWidth;
-            const newScrollX = currentScrollX + addedWidth;
-            
-            console.log('[HabitCalendarSection] Adjusting scroll position:', {
-              oldScrollX: currentScrollX,
-              addedWidth,
-              newScrollX
-            });
-            
-            horizontalScrollRef.current.scrollTo({ x: newScrollX, animated: false });
-            
-            // Mark loading as complete
-            setTimeout(() => {
-              setIsLoadingMore(false);
-              console.log('[HabitCalendarSection] Loading more months completed');
-            }, 100);
-          }
-        }, 200);
+          setIsLoadingMore(false);
+          console.log('[HabitCalendarSection] Data load completed');
+        }, 300);
       }
     }
   };
