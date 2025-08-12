@@ -122,7 +122,7 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
   }, [frequencyData.monthsData.length]);
 
   const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const cellWidth = 30; // Compact width to fit 12 months in one view
+  const cellWidth = 27.5; // Compact width to fit 12 months in one view
   const cellHeight = 24;
   const weekdayLabelsWidth = 60; // Increased width for weekday labels
 
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   },
   weekdayLabelsContainer: {
     position: 'absolute',
-    right: -30,
+    right: -24,
     top: 0,
     height: '100%', // Cover full section height to hide both data points and month labels
     justifyContent: 'flex-start', // Start from top instead of space-around
