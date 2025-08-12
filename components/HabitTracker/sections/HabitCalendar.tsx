@@ -32,15 +32,16 @@ export default function HabitCalendar({
     const habitColor = habit.color || '#3b82f6';
 
     if (habit.goalType === 'yes_no') {
-      // For "Yes or No" habits: use habit color for "yes" (value 1), default color for "no" (value 0)
-      if (isToday && value === 1) {
-        return habitColor; // Habit color for today if completed
-      } else if (isToday && value === 0) {
-        return '#3b82f6'; // Blue for today if not completed
-      } else if (value === 1) {
-        return habitColor; // Habit color for completed days
+      // For "Yes or No" habits: use habit color for "yes" (value 1), grey for "no" (value 0)
+      if (value === 1) {
+        return habitColor; // Habit color for completed days (including today)
       } else {
-        return '#374151'; // Dark grey for not completed days
+        // For incomplete days, use different colors for today vs other days
+        if (isToday) {
+          return '#6b7280'; // Grey for today if not completed
+        } else {
+          return '#e5e7eb'; // Light grey for other incomplete days
+        }
       }
     } else {
       // For measurable habits: existing logic
@@ -130,52 +131,55 @@ export default function HabitCalendar({
       grid[row] = [];
     }
 
-    if (calendarData.length === 0) {
-      return grid;
-    }
+    if (isModal) {
+      // For modal: organize dates to align with their actual weekdays
+      const totalDays = calendarData.length;
+      const numColumns = Math.ceil(totalDays / 7);
 
-    // Sort calendar data by date to ensure proper chronological order
-    const sortedData = [...calendarData].sort((a, b) => a.date.getTime() - b.date.getTime());
-
-    // Get the first date to determine the starting weekday
-    const firstDate = sortedData[0].date;
-    const startWeekday = firstDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
-
-    // Calculate how many columns we need
-    const totalDays = sortedData.length;
-    const firstWeekDays = 7 - startWeekday; // Days remaining in first week
-    const remainingDays = Math.max(0, totalDays - firstWeekDays);
-    const additionalWeeks = Math.ceil(remainingDays / 7);
-    const totalColumns = 1 + additionalWeeks;
-
-    // Initialize grid with proper dimensions
-    for (let row = 0; row < 7; row++) {
-      grid[row] = new Array(totalColumns).fill(null);
-    }
-
-    // Place each date in its correct position
-    sortedData.forEach((day, index) => {
-      const dayWeekday = day.date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-      
-      // Calculate which column (week) this date belongs to
-      let columnIndex;
-      if (index < firstWeekDays) {
-        // First partial week
-        columnIndex = 0;
-      } else {
-        // Subsequent full weeks
-        columnIndex = Math.floor((index - firstWeekDays) / 7) + 1;
+      // Initialize all grid positions with null
+      for (let row = 0; row < 7; row++) {
+        grid[row] = new Array(numColumns).fill(null);
       }
 
-      // Place the day in the correct row (weekday) and column (week)
-      if (columnIndex < totalColumns && dayWeekday < 7) {
-        grid[dayWeekday][columnIndex] = day;
-      }
-    });
+      // Fill grid by placing each date in its correct weekday row
+      // Start from the rightmost column and work backwards
+      const today = calendarData[calendarData.length - 1]; // Last date is today
+      const todayWeekday = today.date.getDay(); // 0 = Sunday, 1 = Monday, etc.
 
-    // Clean up the grid by removing null entries while preserving structure
-    for (let row = 0; row < 7; row++) {
-      grid[row] = grid[row].filter(day => day !== null);
+      // Place today in the rightmost column at its correct weekday row
+      let currentCol = numColumns - 1;
+      let currentRow = todayWeekday;
+
+      // Fill the grid backwards from today
+      for (let i = calendarData.length - 1; i >= 0; i--) {
+        const day = calendarData[i];
+        const dayWeekday = day.date.getDay();
+
+        // Place the day in the current column at its weekday row
+        grid[dayWeekday][currentCol] = day;
+
+        // Move to the previous day position
+        if (dayWeekday === 0) {
+          // If we just placed Sunday, move to previous column, Saturday
+          currentCol--;
+          currentRow = 6;
+        } else {
+          // Move up one row (previous weekday)
+          currentRow = dayWeekday - 1;
+        }
+      }
+
+      // Clean up null entries - keep structure but replace nulls with placeholder
+      for (let row = 0; row < 7; row++) {
+        // Keep the full width but filter out nulls for rendering
+        grid[row] = grid[row].filter(day => day !== null);
+      }
+    } else {
+      // For preview calendar, use the simpler approach
+      calendarData.forEach((day, index) => {
+        const rowIndex = index % 7;
+        grid[rowIndex].push(day);
+      });
     }
 
     return grid;
