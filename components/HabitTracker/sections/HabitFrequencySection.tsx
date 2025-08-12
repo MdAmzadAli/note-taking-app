@@ -1,3 +1,4 @@
+
 import React, { useMemo, useRef, useEffect } from 'react';
 import {
   View,
@@ -26,34 +27,34 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
     const today = new Date();
     const startDate = new Date(today.getFullYear(), today.getMonth() - 9, 1); // Start from 10 months ago
     const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0); // End of current month
-
+    
     const data: DataPoint[] = [];
     const monthLabels: string[] = [];
-
+    
     // Create completion lookup map for performance
     const completionMap = new Map<string, number>();
     habit.completions.forEach(completion => {
       completionMap.set(completion.date, completion.value || 0);
     });
-
+    
     // Generate all days in the range
     const currentDate = new Date(startDate);
     const allDays: DataPoint[] = [];
-
+    
     while (currentDate <= endDate) {
       const dateStr = currentDate.toISOString().split('T')[0];
       const value = completionMap.get(dateStr) || 0;
-
+      
       const monthIndex = (currentDate.getFullYear() - startDate.getFullYear()) * 12 + 
                         (currentDate.getMonth() - startDate.getMonth());
-
+      
       // Generate month labels
       if (!monthLabels[monthIndex]) {
         const monthLabel = currentDate.toLocaleDateString('en-US', { month: 'short' });
         const yearSuffix = currentDate.getFullYear() === today.getFullYear() ? '' : ` ${currentDate.getFullYear()}`;
         monthLabels[monthIndex] = `${monthLabel}${yearSuffix}`;
       }
-
+      
       allDays.push({
         date: new Date(currentDate),
         value,
@@ -61,14 +62,14 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
         weekdayIndex: currentDate.getDay(), // 0 = Sunday, 6 = Saturday
         monthLabel: monthLabels[monthIndex] || '',
       });
-
+      
       currentDate.setDate(currentDate.getDate() + 1);
     }
-
+    
     // Calculate max value for proper scaling
     const allValues = allDays.map(d => d.value).filter(v => v > 0);
     const maxValue = allValues.length > 0 ? Math.max(...allValues) : habit.target || 10;
-
+    
     return {
       data: allDays,
       monthLabels: monthLabels.filter(label => label), // Remove empty labels
@@ -105,14 +106,13 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
   const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const cellWidth = 4;
   const cellHeight = 24;
-  const monthColumnWidth = 32; // Width for each month's column
 
   return (
     <View style={styles.section}>
       <Text style={[styles.sectionTitle, { color: habit.color || '#1a202c' }]}>
         Frequency
       </Text>
-
+      
       <View style={styles.chartContainer}>
         <View style={styles.chartWithLabels}>
           {/* Data grid container with horizontal scroll */}
@@ -125,7 +125,7 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
           >
             <View style={styles.chart}>
               {/* Data grid */}
-              <View style={[styles.dataGrid, { minWidth: frequencyData.monthLabels.length * monthColumnWidth || 1000 }]}>
+              <View style={[styles.dataGrid, { minWidth: frequencyData.data.length * 4 || 1000 }]}>
                 {/* Horizontal grid lines */}
                 {weekdayLabels.map((_, rowIndex) => (
                   <View 
@@ -134,7 +134,7 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
                       styles.gridLine,
                       { 
                         top: rowIndex * cellHeight + cellHeight / 2,
-                        width: frequencyData.monthLabels.length * monthColumnWidth, // Match month column spacing
+                        width: frequencyData.data.length * 4, // Match data point spacing
                       }
                     ]} 
                   />
@@ -143,21 +143,15 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
                 {/* Data points */}
                 {frequencyData.data.map((point, index) => {
                   if (point.value === 0) return null; // Don't render circles for empty days
-
+                  
                   const circleSize = getCircleSize(point.value, frequencyData.maxValue);
                   const opacity = getCircleOpacity(point.value, frequencyData.maxValue);
-
-                  // Calculate position based on month and day within the month
-                  let currentMonthOffset = 0;
-                  for (let i = 0; i < point.monthIndex; i++) {
-                    const daysInPrevMonth = new Date(new Date().getFullYear(), i + 1, 0).getDate();
-                    currentMonthOffset += daysInPrevMonth * cellWidth;
-                  }
-
-                  const dayIndexInMonth = parseInt(point.date.toISOString().split('-')[2], 10);
-                  const leftPosition = currentMonthOffset + (dayIndexInMonth - 1) * cellWidth + (monthColumnWidth - cellWidth) / 2; // Center day within month column
+                  
+                  // Simple day-based positioning - each day gets its own column
+                  const dayIndex = index; // Use direct index for positioning
+                  const leftPosition = dayIndex * 4; // 4px spacing between days
                   const topPosition = point.weekdayIndex * cellHeight + (cellHeight - circleSize) / 2;
-
+                  
                   return (
                     <View
                       key={`${point.date.toISOString()}-${index}`}
@@ -180,12 +174,12 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
               {/* Month labels at the bottom - inside scrollable area */}
               <View style={styles.monthLabelsContainer}>
                 {frequencyData.monthLabels.map((label, index) => {
-                  // Calculate width for each month's label based on its number of days
-                  const daysInCurrentMonth = new Date(new Date().getFullYear(), index + 1, 0).getDate();
-                  const labelWidth = daysInCurrentMonth * cellWidth;
-
+                  if (!label) return null;
+                  const daysInMonth = new Date(new Date().getFullYear(), index + 1, 0).getDate();
+                  const labelWidth = daysInMonth * cellWidth;
+                  
                   return (
-                    <View key={index} style={[styles.monthLabelCell, { width: monthColumnWidth }]}>
+                    <View key={index} style={[styles.monthLabelCell, { width: labelWidth }]}>
                       <Text style={styles.monthLabel}>{label}</Text>
                     </View>
                   );
