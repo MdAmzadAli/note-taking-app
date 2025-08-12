@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     flexDirection: 'row',
     height: 30,
-    marginRight: 0, // No gap between month labels and weekday labels
+    marginRight: 40, // No gap between month labels and weekday labels
   },
   monthLabelCell: {
     alignItems: 'center',
