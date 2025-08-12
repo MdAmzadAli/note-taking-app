@@ -194,9 +194,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     alignItems: 'center',
-    minHeight: 80,
+    minHeight: 65,
     justifyContent: 'center',
   },
   overviewValue: {
