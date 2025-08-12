@@ -32,10 +32,28 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
       completionMap.set(completion.date, completion.value || 0);
     });
     
-    // Group data by month and weekday
+    // First, create all months in the range to ensure consistent spacing
     const monthsData: MonthData[] = [];
+    const currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const endMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
     
-    // Process each completion directly to ensure accurate date-to-weekday mapping
+    // Generate all months in range
+    while (currentMonth <= endMonth) {
+      const monthIndex = (currentMonth.getFullYear() - startDate.getFullYear()) * 12 + 
+                        (currentMonth.getMonth() - startDate.getMonth());
+      const monthLabel = currentMonth.toLocaleDateString('en-US', { month: 'short' });
+      const yearSuffix = currentMonth.getFullYear() === today.getFullYear() ? '' : ` ${currentMonth.getFullYear()}`;
+      
+      monthsData.push({
+        monthIndex,
+        monthLabel: `${monthLabel}${yearSuffix}`,
+        weekdayData: {}
+      });
+      
+      currentMonth.setMonth(currentMonth.getMonth() + 1);
+    }
+    
+    // Now process completions and add them to the appropriate months
     habit.completions.forEach(completion => {
       if (!completion.value || completion.value === 0) return;
       
@@ -47,19 +65,9 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
       const monthIndex = (completionDate.getFullYear() - startDate.getFullYear()) * 12 + 
                         (completionDate.getMonth() - startDate.getMonth());
       
-      // Find or create month data
-      let monthData = monthsData.find(m => m.monthIndex === monthIndex);
-      if (!monthData) {
-        const monthLabel = completionDate.toLocaleDateString('en-US', { month: 'short' });
-        const yearSuffix = completionDate.getFullYear() === today.getFullYear() ? '' : ` ${completionDate.getFullYear()}`;
-        
-        monthData = {
-          monthIndex,
-          monthLabel: `${monthLabel}${yearSuffix}`,
-          weekdayData: {}
-        };
-        monthsData.push(monthData);
-      }
+      // Find the month data (should always exist now)
+      const monthData = monthsData.find(m => m.monthIndex === monthIndex);
+      if (!monthData) return; // Should not happen, but safety check
       
       // Get the weekday (0=Sunday, 1=Monday, ..., 6=Saturday)
       const jsWeekday = completionDate.getDay();
