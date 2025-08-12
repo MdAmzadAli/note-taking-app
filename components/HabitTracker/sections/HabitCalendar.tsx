@@ -130,56 +130,12 @@ export default function HabitCalendar({
       grid[row] = [];
     }
 
-    if (isModal) {
-      // For modal: organize dates to align with their actual weekdays
-      const totalDays = calendarData.length;
-      const numColumns = Math.ceil(totalDays / 7);
-
-      // Initialize all grid positions with null
-      for (let row = 0; row < 7; row++) {
-        grid[row] = new Array(numColumns).fill(null);
-      }
-
-      // Fill grid by placing each date in its correct weekday row
-      // Start from the rightmost column and work backwards
-      const today = calendarData[calendarData.length - 1]; // Last date is today
-      const todayWeekday = today.date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-
-      // Place today in the rightmost column at its correct weekday row
-      let currentCol = numColumns - 1;
-      let currentRow = todayWeekday;
-
-      // Fill the grid backwards from today
-      for (let i = calendarData.length - 1; i >= 0; i--) {
-        const day = calendarData[i];
-        const dayWeekday = day.date.getDay();
-
-        // Place the day in the current column at its weekday row
-        grid[dayWeekday][currentCol] = day;
-
-        // Move to the previous day position
-        if (dayWeekday === 0) {
-          // If we just placed Sunday, move to previous column, Saturday
-          currentCol--;
-          currentRow = 6;
-        } else {
-          // Move up one row (previous weekday)
-          currentRow = dayWeekday - 1;
-        }
-      }
-
-      // Clean up null entries - keep structure but replace nulls with placeholder
-      for (let row = 0; row < 7; row++) {
-        // Keep the full width but filter out nulls for rendering
-        grid[row] = grid[row].filter(day => day !== null);
-      }
-    } else {
-      // For preview calendar, use the simpler approach
-      calendarData.forEach((day, index) => {
-        const rowIndex = index % 7;
-        grid[rowIndex].push(day);
-      });
-    }
+    // Use the same sequential approach for both modal and preview to ensure alignment
+    // This prevents date misalignment issues that occur with weekday-based positioning
+    calendarData.forEach((day, index) => {
+      const rowIndex = index % 7;
+      grid[rowIndex].push(day);
+    });
 
     return grid;
   }, [calendarData, isModal]);
