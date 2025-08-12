@@ -23,7 +23,7 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
 
   const frequencyData = useMemo(() => {
     const today = new Date();
-    const startDate = new Date(today.getFullYear(), today.getMonth() - 9, 1); // Start from 10 months ago
+    const startDate = new Date(today.getFullYear(), today.getMonth() - 11, 1); // Start from 12 months ago
     const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0); // End of current month
     
     // Create completion lookup map for performance
@@ -122,7 +122,7 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
   }, [frequencyData.monthsData.length]);
 
   const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const cellWidth = 80; // Wider to accommodate month labels
+  const cellWidth = 50; // Compact width to fit 12 months in one view
   const cellHeight = 24;
 
   return (
