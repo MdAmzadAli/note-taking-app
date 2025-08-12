@@ -34,17 +34,24 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
     
     // Group data by month and weekday
     const monthsData: MonthData[] = [];
-    const currentDate = new Date(startDate);
     
-    while (currentDate <= endDate) {
-      const monthIndex = (currentDate.getFullYear() - startDate.getFullYear()) * 12 + 
-                        (currentDate.getMonth() - startDate.getMonth());
+    // Process each completion directly to ensure accurate date-to-weekday mapping
+    habit.completions.forEach(completion => {
+      if (!completion.value || completion.value === 0) return;
       
-      // Check if we already have data for this month
+      const completionDate = new Date(completion.date + 'T00:00:00');
+      
+      // Check if this completion falls within our date range
+      if (completionDate < startDate || completionDate > endDate) return;
+      
+      const monthIndex = (completionDate.getFullYear() - startDate.getFullYear()) * 12 + 
+                        (completionDate.getMonth() - startDate.getMonth());
+      
+      // Find or create month data
       let monthData = monthsData.find(m => m.monthIndex === monthIndex);
       if (!monthData) {
-        const monthLabel = currentDate.toLocaleDateString('en-US', { month: 'short' });
-        const yearSuffix = currentDate.getFullYear() === today.getFullYear() ? '' : ` ${currentDate.getFullYear()}`;
+        const monthLabel = completionDate.toLocaleDateString('en-US', { month: 'short' });
+        const yearSuffix = completionDate.getFullYear() === today.getFullYear() ? '' : ` ${completionDate.getFullYear()}`;
         
         monthData = {
           monthIndex,
@@ -54,18 +61,16 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
         monthsData.push(monthData);
       }
       
-      // Get value for this date
-      const dateStr = currentDate.toISOString().split('T')[0];
-      const value = completionMap.get(dateStr) || 0;
+      // Get the weekday (0=Sunday, 1=Monday, ..., 6=Saturday)
+      const jsWeekday = completionDate.getDay();
       
-      if (value > 0) {
-        const weekday = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
-        // Aggregate values for the same weekday in the same month
-        monthData.weekdayData[weekday] = (monthData.weekdayData[weekday] || 0) + value;
-      }
+      // Debug log to verify correct mapping
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      console.log(`Date: ${completion.date}, Day: ${dayNames[jsWeekday]}, WeekdayIndex: ${jsWeekday}, Value: ${completion.value}`);
       
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
+      // Aggregate values for the same weekday in the same month
+      monthData.weekdayData[jsWeekday] = (monthData.weekdayData[jsWeekday] || 0) + completion.value;
+    });
     
     // Calculate max value for proper scaling
     const allValues: number[] = [];
@@ -150,17 +155,20 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
                   const leftPosition = monthIndex * cellWidth + cellWidth / 2; // Center in month column
                   
                   return Object.entries(monthData.weekdayData).map(([weekdayStr, value]) => {
-                    const weekday = parseInt(weekdayStr);
+                    const jsWeekday = parseInt(weekdayStr); // This is the JavaScript weekday (0=Sunday, 1=Monday, etc.)
                     const circleSize = getCircleSize(value, frequencyData.maxValue);
                     const opacity = getCircleOpacity(value, frequencyData.maxValue);
                     
                     if (value === 0 || circleSize === 0) return null;
                     
-                    const topPosition = weekday * cellHeight + (cellHeight - circleSize) / 2;
+                    // Position based on the weekday label array index
+                    // weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+                    // JavaScript weekday (0=Sunday) maps directly to this array index
+                    const topPosition = jsWeekday * cellHeight + (cellHeight - circleSize) / 2;
                     
                     return (
                       <View
-                        key={`${monthData.monthIndex}-${weekday}`}
+                        key={`${monthData.monthIndex}-${jsWeekday}`}
                         style={[
                           styles.dataPoint,
                           {
