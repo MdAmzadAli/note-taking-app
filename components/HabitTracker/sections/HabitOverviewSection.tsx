@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   overviewValue: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '700',
     marginBottom: 4,
   },
