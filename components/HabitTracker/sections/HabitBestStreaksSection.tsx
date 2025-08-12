@@ -119,10 +119,10 @@ export default function HabitBestStreaksSection({ habit }: HabitBestStreaksSecti
           return (
             <View key={index} style={styles.streakRow}>
               <View style={styles.streakContent}>
-                <Text style={styles.startDate}>
-                  {formatDate(streak.startDate)}
-                </Text>
                 <View style={styles.streakBarContainer}>
+                  <Text style={styles.startDate}>
+                    {formatDate(streak.startDate)}
+                  </Text>
                   <View 
                     style={[
                       styles.streakBar, 
@@ -135,10 +135,10 @@ export default function HabitBestStreaksSection({ habit }: HabitBestStreaksSecti
                   >
                     <Text style={styles.streakLength}>{streak.length}</Text>
                   </View>
+                  <Text style={styles.endDate}>
+                    {formatDate(streak.endDate)}
+                  </Text>
                 </View>
-                <Text style={styles.endDate}>
-                  {formatDate(streak.endDate)}
-                </Text>
               </View>
             </View>
           );
@@ -180,27 +180,26 @@ const styles = StyleSheet.create({
   streakContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     width: '100%',
   },
   startDate: {
     fontSize: 12,
     color: '#6b7280',
     fontWeight: '500',
-    minWidth: 85,
-    textAlign: 'left',
+    marginRight: 8,
+    textAlign: 'right',
   },
   endDate: {
     fontSize: 12,
     color: '#6b7280',
     fontWeight: '500',
-    minWidth: 85,
-    textAlign: 'right',
+    marginLeft: 8,
+    textAlign: 'left',
   },
   streakBarContainer: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 8,
   },
   streakBar: {
     borderRadius: 20,
