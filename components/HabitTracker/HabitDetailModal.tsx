@@ -179,10 +179,6 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
           }}
         />
         <HabitFrequencySection habit={habit} />
-        <HabitStreakSection
-          title="Current Streak"
-          streakValue={habit.currentStreak}
-        />
 
       </>
     );
