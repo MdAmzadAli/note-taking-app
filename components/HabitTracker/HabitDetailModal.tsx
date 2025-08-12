@@ -102,6 +102,8 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
       <>
         <HabitOverviewSection habit={habit} />
 
+        <HabitHistoryGraphSection habit={habit} />
+
         <HabitStreakSection
           title="Best Streak"
           streakValue={stats.longestStreak}

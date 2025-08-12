@@ -29,6 +29,14 @@ export default function HabitHistoryGraphSection({ habit }: HabitHistoryGraphSec
     const completions = habit.completions || [];
     const today = new Date();
     
+    // Helper function to get completion value based on habit type
+    const getCompletionValue = (completion: any) => {
+      if (habit.goalType === 'yes_no') {
+        return completion?.completed ? 1 : 0;
+      }
+      return completion?.value || 0;
+    };
+    
     if (selectedFilter === 'day') {
       // Get last 30 days of data
       const data: HistoryDataPoint[] = [];
@@ -38,7 +46,7 @@ export default function HabitHistoryGraphSection({ habit }: HabitHistoryGraphSec
         const dateStr = date.toISOString().split('T')[0];
         
         const completion = completions.find(c => c.date === dateStr);
-        const value = completion?.value || 0;
+        const value = getCompletionValue(completion);
         
         data.push({
           label: date.getDate().toString(),
@@ -64,7 +72,7 @@ export default function HabitHistoryGraphSection({ habit }: HabitHistoryGraphSec
           checkDate.setDate(weekStart.getDate() + d);
           const dateStr = checkDate.toISOString().split('T')[0];
           const completion = completions.find(c => c.date === dateStr);
-          weekTotal += completion?.value || 0;
+          weekTotal += getCompletionValue(completion);
         }
         
         data.push({
@@ -88,7 +96,7 @@ export default function HabitHistoryGraphSection({ habit }: HabitHistoryGraphSec
           const checkDate = new Date(monthStart.getFullYear(), monthStart.getMonth(), d);
           const dateStr = checkDate.toISOString().split('T')[0];
           const completion = completions.find(c => c.date === dateStr);
-          monthTotal += completion?.value || 0;
+          monthTotal += getCompletionValue(completion);
         }
         
         data.push({
@@ -112,7 +120,7 @@ export default function HabitHistoryGraphSection({ habit }: HabitHistoryGraphSec
         while (currentDate <= quarterEnd) {
           const dateStr = currentDate.toISOString().split('T')[0];
           const completion = completions.find(c => c.date === dateStr);
-          quarterTotal += completion?.value || 0;
+          quarterTotal += getCompletionValue(completion);
           currentDate.setDate(currentDate.getDate() + 1);
         }
         
@@ -139,7 +147,7 @@ export default function HabitHistoryGraphSection({ habit }: HabitHistoryGraphSec
         while (currentDate <= yearEnd) {
           const dateStr = currentDate.toISOString().split('T')[0];
           const completion = completions.find(c => c.date === dateStr);
-          yearTotal += completion?.value || 0;
+          yearTotal += getCompletionValue(completion);
           currentDate.setDate(currentDate.getDate() + 1);
         }
         
