@@ -5,24 +5,175 @@ import {
   Text,
   StyleSheet,
 } from 'react-native';
+import { Habit } from '@/types';
 
 interface HabitOverviewSectionProps {
-  completedDays: number;
-  completionRate: number;
+  habit: Habit;
 }
 
-export default function HabitOverviewSection({ completedDays, completionRate }: HabitOverviewSectionProps) {
+export default function HabitOverviewSection({ habit }: HabitOverviewSectionProps) {
+  const calculateCompletionStats = () => {
+    const today = new Date();
+    const completions = habit.completions.filter(c => c.completed);
+    
+    // Helper function to get date range
+    const getDateRange = (days: number) => {
+      const endDate = new Date(today);
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() - days);
+      return { startDate, endDate };
+    };
+
+    // Helper function to count completions in date range
+    const countCompletionsInRange = (startDate: Date, endDate: Date) => {
+      return completions.filter(c => {
+        const completionDate = new Date(c.date);
+        return completionDate >= startDate && completionDate <= endDate;
+      }).length;
+    };
+
+    // Calculate expected completions based on frequency
+    const calculateExpectedCompletions = (days: number) => {
+      if (!habit.frequencyType || habit.frequencyType === 'every_day') {
+        return days; // Expected to complete every day
+      }
+      
+      if (habit.frequencyType === 'every_n_days') {
+        const nDays = parseInt(habit.customValue1 || '1');
+        return Math.floor(days / nDays);
+      }
+      
+      if (habit.frequencyType === 'times_per_week') {
+        const timesPerWeek = parseInt(habit.customValue1 || '1');
+        const weeks = days / 7;
+        return Math.floor(weeks * timesPerWeek);
+      }
+      
+      if (habit.frequencyType === 'times_per_month') {
+        const timesPerMonth = parseInt(habit.customValue1 || '1');
+        const months = days / 30;
+        return Math.floor(months * timesPerMonth);
+      }
+      
+      if (habit.frequencyType === 'times_in_days') {
+        const timesInPeriod = parseInt(habit.customValue1 || '1');
+        const periodDays = parseInt(habit.customValue2 || '7');
+        const periods = Math.floor(days / periodDays);
+        return periods * timesInPeriod;
+      }
+      
+      return days; // Fallback to daily
+    };
+
+    // Calculate stats for different periods
+    const yearRange = getDateRange(365);
+    const monthRange = getDateRange(30);
+    
+    const yearCompletions = countCompletionsInRange(yearRange.startDate, yearRange.endDate);
+    const monthCompletions = countCompletionsInRange(monthRange.startDate, monthRange.endDate);
+    const totalCompletions = completions.length;
+    
+    const yearExpected = calculateExpectedCompletions(365);
+    const monthExpected = calculateExpectedCompletions(30);
+    
+    const yearPercentage = yearExpected > 0 ? Math.round((yearCompletions / yearExpected) * 100) : 0;
+    const monthPercentage = monthExpected > 0 ? Math.round((monthCompletions / monthExpected) * 100) : 0;
+
+    return {
+      yearScore: yearPercentage,
+      monthChange: monthPercentage,
+      yearChange: yearPercentage,
+      totalCompletions,
+      yearCompletions,
+      monthCompletions
+    };
+  };
+
+  const stats = calculateCompletionStats();
+
+  // Ring chart component
+  const RingChart = ({ percentage, color }: { percentage: number; color: string }) => {
+    const strokeWidth = 8;
+    const radius = 25;
+    const normalizedRadius = radius - strokeWidth * 2;
+    const circumference = normalizedRadius * 2 * Math.PI;
+    const strokeDasharray = `${circumference} ${circumference}`;
+    const strokeDashoffset = circumference - (percentage / 100) * circumference;
+
+    return (
+      <View style={styles.ringContainer}>
+        <svg
+          height={radius * 2}
+          width={radius * 2}
+          style={styles.ring}
+        >
+          {/* Background circle */}
+          <circle
+            stroke="#374151"
+            fill="transparent"
+            strokeWidth={strokeWidth}
+            r={normalizedRadius}
+            cx={radius}
+            cy={radius}
+          />
+          {/* Progress circle */}
+          <circle
+            stroke={color}
+            fill="transparent"
+            strokeWidth={strokeWidth}
+            strokeDasharray={strokeDasharray}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            r={normalizedRadius}
+            cx={radius}
+            cy={radius}
+            transform={`rotate(-90 ${radius} ${radius})`}
+          />
+        </svg>
+      </View>
+    );
+  };
+
+  const habitColor = habit.color || '#4ECDC4';
+
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Overview</Text>
+      <Text style={[styles.sectionTitle, { color: habitColor }]}>
+        Overview
+      </Text>
+      
       <View style={styles.overviewGrid}>
+        {/* Ring Chart with Score */}
         <View style={styles.overviewCard}>
-          <Text style={styles.overviewValue}>{completedDays}</Text>
-          <Text style={styles.overviewLabel}>completed{'\n'}days</Text>
+          <RingChart percentage={stats.yearScore} color={habitColor} />
+          <Text style={[styles.overviewValue, { color: habitColor }]}>
+            {stats.yearScore}%
+          </Text>
+          <Text style={styles.overviewLabel}>Score</Text>
         </View>
+
+        {/* Month */}
         <View style={styles.overviewCard}>
-          <Text style={styles.overviewValue}>{completionRate}%</Text>
-          <Text style={styles.overviewLabel}>completion{'\n'}rate</Text>
+          <Text style={[styles.overviewValue, { color: habitColor }]}>
+            +{stats.monthChange}%
+          </Text>
+          <Text style={styles.overviewLabel}>Month</Text>
+        </View>
+
+        {/* Year */}
+        <View style={styles.overviewCard}>
+          <Text style={[styles.overviewValue, { color: habitColor }]}>
+            +{stats.yearChange}%
+          </Text>
+          <Text style={styles.overviewLabel}>Year</Text>
+        </View>
+
+        {/* Total */}
+        <View style={styles.overviewCard}>
+          <Text style={[styles.overviewValue, { color: habitColor }]}>
+            {stats.totalCompletions}
+          </Text>
+          <Text style={styles.overviewLabel}>Total</Text>
         </View>
       </View>
     </View>
@@ -36,7 +187,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1a202c',
     marginBottom: 16,
   },
   overviewGrid: {
@@ -49,16 +199,25 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
+    minHeight: 80,
+    justifyContent: 'center',
   },
   overviewValue: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
-    color: '#1a202c',
     marginBottom: 4,
   },
   overviewLabel: {
     fontSize: 12,
     color: '#64748b',
     textAlign: 'center',
+  },
+  ringContainer: {
+    marginBottom: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ring: {
+    transform: [{ rotate: '0deg' }],
   },
 });

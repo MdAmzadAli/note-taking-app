@@ -100,10 +100,7 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
 
     return (
       <>
-        <HabitOverviewSection
-          completedDays={stats.completedDays}
-          completionRate={stats.completionRate}
-        />
+        <HabitOverviewSection habit={habit} />
 
         <HabitStreakSection
           title="Best Streak"
