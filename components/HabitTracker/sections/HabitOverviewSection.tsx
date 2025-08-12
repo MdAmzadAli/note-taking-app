@@ -94,8 +94,8 @@ export default function HabitOverviewSection({ habit }: HabitOverviewSectionProp
 
   // Ring chart component
   const RingChart = ({ percentage, color }: { percentage: number; color: string }) => {
-    const strokeWidth = 8;
-    const radius = 25;
+    const strokeWidth = 5;
+    const radius = 32;
     const normalizedRadius = radius - strokeWidth * 2;
     const circumference = normalizedRadius * 2 * Math.PI;
     const strokeDasharray = `${circumference} ${circumference}`;
