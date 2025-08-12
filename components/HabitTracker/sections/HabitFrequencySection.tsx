@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
-    height: 7 * 24, // Match data grid height
+    height: 7*24, // Match data grid height
     justifyContent: 'space-around',
     paddingLeft: 12,
     backgroundColor: '#f8fafc', // Match container background to cover overlapping points
