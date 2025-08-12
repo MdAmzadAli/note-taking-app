@@ -147,10 +147,6 @@ export default function HabitOverviewSection({ habit }: HabitOverviewSectionProp
         {/* Ring Chart with Score */}
         <View style={styles.overviewCard}>
           <RingChart percentage={stats.yearScore} color={habitColor} />
-          <Text style={[styles.overviewValue, { color: habitColor }]}>
-            {stats.yearScore}%
-          </Text>
-          <Text style={styles.overviewLabel}>Score</Text>
         </View>
 
         {/* Month */}
