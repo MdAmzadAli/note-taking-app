@@ -293,11 +293,23 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       const currentValue = day.value;
       const newValue = currentValue === 1 ? 0 : 1;
 
-      // Store the change as pending instead of saving immediately
-      setPendingChanges(prev => ({
-        ...prev,
-        [dateStr]: newValue
-      }));
+      // Get the original value from completionMap (before any pending changes)
+      const originalValue = completionMap.get(dateStr) || 0;
+
+      // Store the change as pending, but remove if it matches the original value
+      setPendingChanges(prev => {
+        const updated = { ...prev };
+        
+        if (newValue === originalValue) {
+          // If the new value matches the original, remove the pending change
+          delete updated[dateStr];
+        } else {
+          // Otherwise, store the change
+          updated[dateStr] = newValue;
+        }
+        
+        return updated;
+      });
     } else {
       // For measurable habits, show the value input modal
       setSelectedDate(day.date);
@@ -314,11 +326,23 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       const dateStr = selectedDate.toISOString().split('T')[0];
       const newValue = parseInt(inputValue.current) || 0;
 
-      // Store the change as pending instead of saving immediately
-      setPendingChanges(prev => ({
-        ...prev,
-        [dateStr]: newValue
-      }));
+      // Get the original value from completionMap (before any pending changes)
+      const originalValue = completionMap.get(dateStr) || 0;
+
+      // Store the change as pending, but remove if it matches the original value
+      setPendingChanges(prev => {
+        const updated = { ...prev };
+        
+        if (newValue === originalValue) {
+          // If the new value matches the original, remove the pending change
+          delete updated[dateStr];
+        } else {
+          // Otherwise, store the change
+          updated[dateStr] = newValue;
+        }
+        
+        return updated;
+      });
     }
     setShowValueModal(false);
     setSelectedDate(null);
