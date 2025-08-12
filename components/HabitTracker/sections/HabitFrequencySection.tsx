@@ -41,7 +41,8 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
       const monthIndex = (currentMonth.getFullYear() - startDate.getFullYear()) * 12 + 
                         (currentMonth.getMonth() - startDate.getMonth());
       const monthLabel = currentMonth.toLocaleDateString('en-US', { month: 'short' });
-      const yearSuffix = currentMonth.getFullYear() === today.getFullYear() ? '' : ` ${currentMonth.getFullYear()}`;
+      const isJanuary = currentMonth.getMonth() === 0; // January is month 0
+      const yearSuffix = isJanuary ? ` ${currentMonth.getFullYear()}` : '';
 
       monthsData.push({
         monthIndex,
