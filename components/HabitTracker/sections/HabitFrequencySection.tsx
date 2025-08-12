@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   },
   weekdayLabelsContainer: {
     position: 'absolute',
-    right: 0,
+    right: -30,
     top: 0,
     height: '100%', // Cover full section height to hide both data points and month labels
     justifyContent: 'flex-start', // Start from top instead of space-around
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     flexDirection: 'row',
     height: 30,
-    marginRight: 40, // No gap between month labels and weekday labels
+    marginRight: 15, // No gap between month labels and weekday labels
   },
   monthLabelCell: {
     alignItems: 'center',
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   monthLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#374151',
     fontWeight: '600',
     textAlign: 'center',
