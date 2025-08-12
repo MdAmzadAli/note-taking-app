@@ -103,32 +103,43 @@ export default function HabitBestStreaksSection({ habit }: HabitBestStreaksSecti
       </Text>
       <View style={styles.streaksContainer}>
         {streaks.map((streak, index) => {
+          // Calculate bar width proportional to streak length
+          const minBarWidth = 60; // Minimum bar width for readability
+          const maxBarWidth = 240; // Maximum bar width to fit container
+          const barWidth = Math.max(
+            minBarWidth,
+            Math.min(maxBarWidth, (streak.length / maxStreakLength) * maxBarWidth)
+          );
+
           // Calculate height proportional to streak length
           const baseHeight = 24;
-          const maxHeight = 48;
+          const maxHeight = 40;
           const barHeight = baseHeight + ((streak.length / maxStreakLength) * (maxHeight - baseHeight));
 
           return (
             <View key={index} style={styles.streakRow}>
-              <Text style={styles.startDate}>
-                {formatDate(streak.startDate)}
-              </Text>
-              <View style={styles.streakBarContainer}>
-                <View 
-                  style={[
-                    styles.streakBar, 
-                    { 
-                      height: barHeight,
-                      backgroundColor: habit.color || '#ef4444'
-                    }
-                  ]}
-                >
-                  <Text style={styles.streakLength}>{streak.length}</Text>
+              <View style={styles.streakContent}>
+                <Text style={styles.startDate}>
+                  {formatDate(streak.startDate)}
+                </Text>
+                <View style={styles.streakBarContainer}>
+                  <View 
+                    style={[
+                      styles.streakBar, 
+                      { 
+                        width: barWidth,
+                        height: barHeight,
+                        backgroundColor: habit.color || '#ef4444'
+                      }
+                    ]}
+                  >
+                    <Text style={styles.streakLength}>{streak.length}</Text>
+                  </View>
                 </View>
+                <Text style={styles.endDate}>
+                  {formatDate(streak.endDate)}
+                </Text>
               </View>
-              <Text style={styles.endDate}>
-                {formatDate(streak.endDate)}
-              </Text>
             </View>
           );
         })}
@@ -163,35 +174,46 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   streakRow: {
+    marginBottom: 16,
+    minHeight: 50,
+  },
+  streakContent: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    marginBottom: 12,
-    minHeight: 56, // Increased to accommodate taller bars
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
   },
   startDate: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#6b7280',
-    width: 85,
+    fontWeight: '500',
+    minWidth: 85,
     textAlign: 'left',
   },
   endDate: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#6b7280',
-    width: 85,
+    fontWeight: '500',
+    minWidth: 85,
     textAlign: 'right',
   },
   streakBarContainer: {
     flex: 1,
-    marginHorizontal: 12,
-    justifyContent: 'flex-end',
     alignItems: 'center',
+    marginHorizontal: 8,
   },
   streakBar: {
-    width: '100%', // All bars now have equal width
-    borderRadius: 16,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: 50,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
   streakLength: {
     color: '#ffffff',
