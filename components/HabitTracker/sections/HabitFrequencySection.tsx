@@ -122,7 +122,7 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
   }, [frequencyData.monthsData.length]);
 
   const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const cellWidth = 50; // Compact width to fit 12 months in one view
+  const cellWidth = 30; // Compact width to fit 12 months in one view
   const cellHeight = 24;
 
   return (
