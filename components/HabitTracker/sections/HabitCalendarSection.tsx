@@ -66,10 +66,12 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
 
     // Generate 105 days (15 weeks worth) ending with today
     for (let i = 104; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
-
-      const completion = habit.completions.find(c => c.date === date.toISOString().split('T')[0]);
+      // Create date using local time to avoid timezone issues
+      const date = createLocalDate(today.getFullYear(), today.getMonth(), today.getDate() - i);
+      
+      // Use consistent date string formatting
+      const dateStr = formatDateString(date);
+      const completion = habit.completions.find(c => c.date === dateStr);
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
       // Format month name as "Mon YY" (e.g., "Apr 25")
@@ -89,7 +91,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         date,
         day: date.getDate(),
         value,
-        isToday: date.toDateString() === today.toDateString(),
+        isToday: formatDateString(date) === formatDateString(today),
         monthName: formattedMonthName,
       });
     }
@@ -109,6 +111,19 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     });
     return map;
   }, [habit.completions, habit.goalType]);
+
+  // Helper function to create date without timezone issues
+  const createLocalDate = (year: number, month: number, day: number): Date => {
+    return new Date(year, month, day);
+  };
+
+  // Helper function to format date as YYYY-MM-DD consistently
+  const formatDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
   // Generate dates for modal with month-based lazy loading
   const { modalCalendarData, totalMonths } = useMemo(() => {
@@ -133,14 +148,16 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     });
 
     // Generate dates starting from the specified number of months ago to today
-    const startDate = new Date(today.getFullYear(), today.getMonth() - (monthsToShow - 1), 1);
-    const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0); // Last day of current month
+    // Use local date creation to avoid timezone issues
+    const startDate = createLocalDate(today.getFullYear(), today.getMonth() - (monthsToShow - 1), 1);
+    const endDate = createLocalDate(today.getFullYear(), today.getMonth() + 1, 0); // Last day of current month
 
     const days: CalendarDay[] = [];
-    const currentDate = new Date(startDate);
+    const currentDate = createLocalDate(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
 
     while (currentDate <= endDate) {
-      const dateStr = currentDate.toISOString().split('T')[0];
+      // Use consistent date string formatting to avoid timezone conversion issues
+      const dateStr = formatDateString(currentDate);
 
       // Use map lookup instead of array.find for better performance
       let value = completionMap.get(dateStr) || 0;
@@ -155,11 +172,14 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       const yearSuffix = currentDate.getFullYear().toString().slice(-2);
       const formattedMonthName = `${monthName} ${yearSuffix}`;
 
+      // Create a new date object for each day to avoid reference issues
+      const dayDate = createLocalDate(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+
       days.push({
-        date: new Date(currentDate),
+        date: dayDate,
         day: currentDate.getDate(),
         value,
-        isToday: currentDate.toDateString() === today.toDateString(),
+        isToday: formatDateString(currentDate) === formatDateString(today),
         monthName: formattedMonthName,
       });
 
@@ -168,8 +188,8 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
 
     console.log('[HabitCalendarSection] Generated calendar data:', {
       totalDays: days.length,
-      firstDate: days[0]?.date.toISOString().split('T')[0],
-      lastDate: days[days.length - 1]?.date.toISOString().split('T')[0],
+      firstDate: days[0] ? formatDateString(days[0].date) : 'none',
+      lastDate: days[days.length - 1] ? formatDateString(days[days.length - 1].date) : 'none',
       todayIndex: days.findIndex(d => d.isToday),
       monthsGenerated: monthsToShow,
       previousDataLength: previousDataLengthRef.current,
@@ -289,7 +309,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const handleDatePress = (day: CalendarDay) => {
     if (habit.goalType === 'yes_no') {
       // For "Yes or No" habits, toggle between 0 and 1
-      const dateStr = day.date.toISOString().split('T')[0];
+      const dateStr = formatDateString(day.date);
       const currentValue = day.value;
       const newValue = currentValue === 1 ? 0 : 1;
 
@@ -323,7 +343,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     Keyboard.dismiss();
     
     if (selectedDate) {
-      const dateStr = selectedDate.toISOString().split('T')[0];
+      const dateStr = formatDateString(selectedDate);
       const newValue = parseInt(inputValue.current) || 0;
 
       // Get the original value from completionMap (before any pending changes)
