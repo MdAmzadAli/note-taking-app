@@ -124,6 +124,7 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
   const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const cellWidth = 30; // Compact width to fit 12 months in one view
   const cellHeight = 24;
+  const weekdayLabelsWidth = 60; // Increased width for weekday labels
 
   return (
     <View style={styles.section}>
@@ -140,6 +141,10 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
             showsHorizontalScrollIndicator={false}
             style={styles.scrollContainer}
             contentContainerStyle={styles.scrollContent}
+            scrollEventThrottle={16}
+            onScroll={(event) => {
+              // This will be used to track scroll position for hiding overlapping points
+            }}
           >
             <View style={styles.chart}>
               {/* Data grid */}
@@ -186,6 +191,7 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
                             height: circleSize,
                             backgroundColor: habit.color || '#3b82f6',
                             opacity,
+                            overflow: 'hidden', // Ensure points are clipped when they go under labels
                           }
                         ]}
                       />
@@ -206,7 +212,7 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
           </ScrollView>
 
           {/* Fixed weekday labels on the right */}
-          <View style={styles.weekdayLabelsContainer}>
+          <View style={[styles.weekdayLabelsContainer, { width: weekdayLabelsWidth }]}>
             {weekdayLabels.map((label, index) => (
               <View key={index} style={[styles.weekdayLabelCell, { height: cellHeight }]}>
                 <Text style={styles.weekdayLabel}>{label}</Text>
@@ -250,10 +256,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
-    width: 40,
     height: 7 * 24, // Match data grid height
     justifyContent: 'space-around',
-    paddingLeft: 8,
+    paddingLeft: 12,
+    backgroundColor: '#f8fafc', // Match container background to cover overlapping points
+    zIndex: 10, // Ensure labels appear above data points
   },
   weekdayLabelCell: {
     height: 24,
@@ -268,7 +275,8 @@ const styles = StyleSheet.create({
   dataGrid: {
     position: 'relative',
     height: 7 * 24, // 7 weekdays * 24px height
-    marginRight: 48, // Space for weekday labels
+    marginRight: 68, // Increased space for weekday labels
+    overflow: 'hidden', // Hide data points that go beyond the right edge
   },
   gridLine: {
     position: 'absolute',
@@ -283,7 +291,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     flexDirection: 'row',
     height: 30,
-    marginRight: 48, // Space for weekday labels
+    marginRight: 68, // Increased space for weekday labels
   },
   monthLabelCell: {
     alignItems: 'center',
