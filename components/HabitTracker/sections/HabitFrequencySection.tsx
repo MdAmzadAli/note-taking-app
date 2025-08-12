@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
   dataGrid: {
     position: 'relative',
     height: 7 * 24, // 7 weekdays * 24px height
-    // marginRight: 58, // Increased space for weekday labels
+    marginRight: 0, // No gap between data and weekday labels
     overflow: 'hidden', // Hide data points that go beyond the right edge
   },
   gridLine: {
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     flexDirection: 'row',
     height: 30,
-    marginRight: 68, // Increased space for weekday labels
+    marginRight: 0, // No gap between month labels and weekday labels
   },
   monthLabelCell: {
     alignItems: 'center',
