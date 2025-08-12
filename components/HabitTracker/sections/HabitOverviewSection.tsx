@@ -5,6 +5,7 @@ import {
   Text,
   StyleSheet,
 } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 import { Habit } from '@/types';
 
 interface HabitOverviewSectionProps {
@@ -102,13 +103,13 @@ export default function HabitOverviewSection({ habit }: HabitOverviewSectionProp
 
     return (
       <View style={styles.ringContainer}>
-        <svg
+        <Svg
           height={radius * 2}
           width={radius * 2}
           style={styles.ring}
         >
           {/* Background circle */}
-          <circle
+          <Circle
             stroke="#374151"
             fill="transparent"
             strokeWidth={strokeWidth}
@@ -117,7 +118,7 @@ export default function HabitOverviewSection({ habit }: HabitOverviewSectionProp
             cy={radius}
           />
           {/* Progress circle */}
-          <circle
+          <Circle
             stroke={color}
             fill="transparent"
             strokeWidth={strokeWidth}
@@ -129,7 +130,7 @@ export default function HabitOverviewSection({ habit }: HabitOverviewSectionProp
             cy={radius}
             transform={`rotate(-90 ${radius} ${radius})`}
           />
-        </svg>
+        </Svg>
       </View>
     );
   };
