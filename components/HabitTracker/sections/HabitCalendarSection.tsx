@@ -59,6 +59,19 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const MONTHS_PER_LOAD = 5;
   const LOAD_THRESHOLD = 0.15; // Load more when scrolled 15% from the left (near beginning)
 
+  // Helper function to create date without timezone issues
+  const createLocalDate = (year: number, month: number, day: number): Date => {
+    return new Date(year, month, day);
+  };
+
+  // Helper function to format date as YYYY-MM-DD consistently
+  const formatDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Generate dates for preview (105 days - 15 columns × 7 rows)
   const previewCalendarData = useMemo(() => {
     const days: CalendarDay[] = [];
@@ -111,19 +124,6 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     });
     return map;
   }, [habit.completions, habit.goalType]);
-
-  // Helper function to create date without timezone issues
-  const createLocalDate = (year: number, month: number, day: number): Date => {
-    return new Date(year, month, day);
-  };
-
-  // Helper function to format date as YYYY-MM-DD consistently
-  const formatDateString = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
 
   // Generate dates for modal with month-based lazy loading
   const { modalCalendarData, totalMonths } = useMemo(() => {
