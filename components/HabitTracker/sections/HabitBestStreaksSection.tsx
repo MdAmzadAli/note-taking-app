@@ -67,9 +67,14 @@ export default function HabitBestStreaksSection({ habit }: HabitBestStreaksSecti
     });
 
     // Sort by length (descending) and take top 10
-    return streaks
+    const topStreaks = streaks
       .sort((a, b) => b.length - a.length)
       .slice(0, 10);
+
+    return topStreaks.sort(
+      (a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+    );
+
   };
 
   const formatDate = (dateStr: string): string => {
@@ -112,8 +117,8 @@ export default function HabitBestStreaksSection({ habit }: HabitBestStreaksSecti
           );
 
           // Calculate height proportional to streak length
-          const baseHeight = 24;
-          const maxHeight = 40;
+          const baseHeight = 17;
+          const maxHeight = 24;
           const barHeight = baseHeight + ((streak.length / maxStreakLength) * (maxHeight - baseHeight));
 
           return (
@@ -171,11 +176,12 @@ const styles = StyleSheet.create({
   streaksContainer: {
     backgroundColor: '#f8fafc',
     borderRadius: 12,
-    padding: 16,
+    paddingHorizontal: 16, // only horizontal padding
+    paddingVertical: 0,     // remove vertical padding
   },
   streakRow: {
-    marginBottom: 16,
-    minHeight: 50,
+    minHeight: 20,       // smaller
+    marginBottom: 2,     // no spacing between bars
   },
   streakContent: {
     flexDirection: 'row',
@@ -183,17 +189,17 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   startDate: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#6b7280',
     fontWeight: '500',
-    marginRight: 8,
+    marginRight: 4,
     textAlign: 'right',
   },
   endDate: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#6b7280',
     fontWeight: '500',
-    marginLeft: 8,
+    marginLeft: 4,
     textAlign: 'left',
   },
   streakBarContainer: {
@@ -203,14 +209,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   streakBar: {
-    borderRadius: 20,
+    borderRadius: 2, // removed roundness
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
