@@ -130,12 +130,53 @@ export default function HabitCalendar({
       grid[row] = [];
     }
 
-    // Use the same sequential approach for both modal and preview to ensure alignment
-    // This prevents date misalignment issues that occur with weekday-based positioning
-    calendarData.forEach((day, index) => {
-      const rowIndex = index % 7;
-      grid[rowIndex].push(day);
+    if (calendarData.length === 0) {
+      return grid;
+    }
+
+    // Sort calendar data by date to ensure proper chronological order
+    const sortedData = [...calendarData].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    // Get the first date to determine the starting weekday
+    const firstDate = sortedData[0].date;
+    const startWeekday = firstDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+
+    // Calculate how many columns we need
+    const totalDays = sortedData.length;
+    const firstWeekDays = 7 - startWeekday; // Days remaining in first week
+    const remainingDays = Math.max(0, totalDays - firstWeekDays);
+    const additionalWeeks = Math.ceil(remainingDays / 7);
+    const totalColumns = 1 + additionalWeeks;
+
+    // Initialize grid with proper dimensions
+    for (let row = 0; row < 7; row++) {
+      grid[row] = new Array(totalColumns).fill(null);
+    }
+
+    // Place each date in its correct position
+    sortedData.forEach((day, index) => {
+      const dayWeekday = day.date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      
+      // Calculate which column (week) this date belongs to
+      let columnIndex;
+      if (index < firstWeekDays) {
+        // First partial week
+        columnIndex = 0;
+      } else {
+        // Subsequent full weeks
+        columnIndex = Math.floor((index - firstWeekDays) / 7) + 1;
+      }
+
+      // Place the day in the correct row (weekday) and column (week)
+      if (columnIndex < totalColumns && dayWeekday < 7) {
+        grid[dayWeekday][columnIndex] = day;
+      }
     });
+
+    // Clean up the grid by removing null entries while preserving structure
+    for (let row = 0; row < 7; row++) {
+      grid[row] = grid[row].filter(day => day !== null);
+    }
 
     return grid;
   }, [calendarData, isModal]);
