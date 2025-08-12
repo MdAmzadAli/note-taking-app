@@ -1,4 +1,3 @@
-
 import React from 'react';
 import {
   View,
@@ -38,10 +37,10 @@ export default function HabitBestStreaksSection({ habit }: HabitBestStreaksSecti
     for (let i = 1; i < completedDates.length; i++) {
       const currentDate = new Date(completedDates[i]);
       const previousDate = new Date(completedDates[i - 1]);
-      
+
       // Check if dates are consecutive (difference of 1 day)
       const dayDifference = Math.floor((currentDate.getTime() - previousDate.getTime()) / (1000 * 60 * 60 * 24));
-      
+
       if (dayDifference === 1) {
         // Continue current streak
         currentStreakEnd = completedDates[i];
@@ -53,7 +52,7 @@ export default function HabitBestStreaksSection({ habit }: HabitBestStreaksSecti
           endDate: currentStreakEnd,
           length: currentStreakLength,
         });
-        
+
         currentStreakStart = completedDates[i];
         currentStreakEnd = completedDates[i];
         currentStreakLength = 1;
@@ -104,48 +103,32 @@ export default function HabitBestStreaksSection({ habit }: HabitBestStreaksSecti
       </Text>
       <View style={styles.streaksContainer}>
         {streaks.map((streak, index) => {
-          const barWidth = (streak.length / maxStreakLength) * 100;
-          const isLongerStreak = streak.length > 1;
-          
+          // Calculate height proportional to streak length
+          const baseHeight = 24;
+          const maxHeight = 48;
+          const barHeight = baseHeight + ((streak.length / maxStreakLength) * (maxHeight - baseHeight));
+
           return (
             <View key={index} style={styles.streakRow}>
-              {isLongerStreak ? (
-                // Long streak layout with proportional bar
-                <>
-                  <Text style={styles.startDate}>
-                    {formatDate(streak.startDate)}
-                  </Text>
-                  <View style={styles.streakBarContainer}>
-                    <View 
-                      style={[
-                        styles.streakBar, 
-                        { 
-                          width: `${barWidth}%`,
-                          backgroundColor: habit.color || '#ef4444'
-                        }
-                      ]}
-                    >
-                      <Text style={styles.streakLength}>{streak.length}</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.endDate}>
-                    {formatDate(streak.endDate)}
-                  </Text>
-                </>
-              ) : (
-                // Single day streak - compact layout
-                <>
-                  <Text style={styles.singleStreakDate}>
-                    {formatDate(streak.startDate)}
-                  </Text>
-                  <View style={styles.singleStreakBar}>
-                    <Text style={styles.singleStreakLength}>{streak.length}</Text>
-                  </View>
-                  <Text style={styles.singleStreakDate}>
-                    {formatDate(streak.endDate)}
-                  </Text>
-                </>
-              )}
+              <Text style={styles.startDate}>
+                {formatDate(streak.startDate)}
+              </Text>
+              <View style={styles.streakBarContainer}>
+                <View 
+                  style={[
+                    styles.streakBar, 
+                    { 
+                      height: barHeight,
+                      backgroundColor: habit.color || '#ef4444'
+                    }
+                  ]}
+                >
+                  <Text style={styles.streakLength}>{streak.length}</Text>
+                </View>
+              </View>
+              <Text style={styles.endDate}>
+                {formatDate(streak.endDate)}
+              </Text>
             </View>
           );
         })}
@@ -181,9 +164,9 @@ const styles = StyleSheet.create({
   },
   streakRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     marginBottom: 12,
-    minHeight: 36,
+    minHeight: 56, // Increased to accommodate taller bars
   },
   startDate: {
     fontSize: 13,
@@ -200,13 +183,11 @@ const styles = StyleSheet.create({
   streakBarContainer: {
     flex: 1,
     marginHorizontal: 12,
-    height: 32,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 16,
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
   },
   streakBar: {
-    height: '100%',
+    width: '100%', // All bars now have equal width
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
@@ -216,26 +197,5 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
-  },
-  // Single day streak styles (more compact)
-  singleStreakDate: {
-    fontSize: 12,
-    color: '#9ca3af',
-    width: 85,
-    textAlign: 'center',
-  },
-  singleStreakBar: {
-    flex: 1,
-    marginHorizontal: 12,
-    height: 24,
-    backgroundColor: '#d1d5db',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  singleStreakLength: {
-    color: '#6b7280',
-    fontSize: 12,
-    fontWeight: '500',
   },
 });
