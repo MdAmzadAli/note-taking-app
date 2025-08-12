@@ -32,15 +32,16 @@ export default function HabitCalendar({
     const habitColor = habit.color || '#3b82f6';
 
     if (habit.goalType === 'yes_no') {
-      // For "Yes or No" habits: use habit color for "yes" (value 1), default color for "no" (value 0)
-      if (isToday && value === 1) {
-        return habitColor; // Habit color for today if completed
-      } else if (isToday && value === 0) {
-        return '#3b82f6'; // Blue for today if not completed
-      } else if (value === 1) {
-        return habitColor; // Habit color for completed days
+      // For "Yes or No" habits: use habit color for "yes" (value 1), grey for "no" (value 0)
+      if (value === 1) {
+        return habitColor; // Habit color for completed days (including today)
       } else {
-        return '#374151'; // Dark grey for not completed days
+        // For incomplete days, use different colors for today vs other days
+        if (isToday) {
+          return '#6b7280'; // Grey for today if not completed
+        } else {
+          return '#e5e7eb'; // Light grey for other incomplete days
+        }
       }
     } else {
       // For measurable habits: existing logic

@@ -77,12 +77,16 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       const yearSuffix = date.getFullYear().toString().slice(-2);
       const formattedMonthName = `${monthName} ${yearSuffix}`;
 
-      // For "Yes or No" habits, value is 1 for completed, 0 for not completed
+      // Determine value based on habit type and completion data
       let value = 0;
-      if (habit.goalType === 'yes_no') {
-        value = completion?.completed ? 1 : 0;
-      } else {
-        value = completion?.value || 0;
+      if (completion) {
+        if (habit.goalType === 'yes_no') {
+          // For yes/no habits, use the completed boolean
+          value = completion.completed ? 1 : 0;
+        } else {
+          // For measurable habits, use the actual value
+          value = completion.value || 0;
+        }
       }
 
       days.push({
@@ -102,9 +106,11 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     const map = new Map<string, number>();
     habit.completions.forEach(completion => {
       if (habit.goalType === 'yes_no') {
+        // For yes/no habits, use completed boolean to determine value
         map.set(completion.date, completion.completed ? 1 : 0);
       } else {
-        map.set(completion.date, completion.value);
+        // For measurable habits, use the actual value
+        map.set(completion.date, completion.value || 0);
       }
     });
     return map;
