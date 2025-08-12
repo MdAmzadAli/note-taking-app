@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
@@ -76,26 +77,38 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       const yearSuffix = date.getFullYear().toString().slice(-2);
       const formattedMonthName = `${monthName} ${yearSuffix}`;
 
+      // For "Yes or No" habits, value is 1 for completed, 0 for not completed
+      let value = 0;
+      if (habit.goalType === 'yes_no') {
+        value = completion?.completed ? 1 : 0;
+      } else {
+        value = completion?.value || 0;
+      }
+
       days.push({
         date,
         day: date.getDate(),
-        value: completion?.value || 0,
+        value,
         isToday: date.toDateString() === today.toDateString(),
         monthName: formattedMonthName,
       });
     }
 
     return days;
-  }, [habit.completions]);
+  }, [habit.completions, habit.goalType]);
 
   // Create a completion lookup map for faster access
   const completionMap = useMemo(() => {
     const map = new Map<string, number>();
     habit.completions.forEach(completion => {
-      map.set(completion.date, completion.value);
+      if (habit.goalType === 'yes_no') {
+        map.set(completion.date, completion.completed ? 1 : 0);
+      } else {
+        map.set(completion.date, completion.value);
+      }
     });
     return map;
-  }, [habit.completions]);
+  }, [habit.completions, habit.goalType]);
 
   // Generate dates for modal with month-based lazy loading
   const { modalCalendarData, totalMonths } = useMemo(() => {
@@ -164,7 +177,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     });
 
     return { modalCalendarData: days, totalMonths: totalAvailableMonths };
-  }, [completionMap, pendingChanges, loadedMonths]);
+  }, [completionMap, pendingChanges, loadedMonths, habit.goalType]);
 
   // Auto-scroll to position today's date at the rightmost edge when modal opens
   useEffect(() => {
@@ -274,9 +287,23 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   };
 
   const handleDatePress = (day: CalendarDay) => {
-    setSelectedDate(day.date);
-    inputValue.current = day.value.toString();
-    setShowValueModal(true);
+    if (habit.goalType === 'yes_no') {
+      // For "Yes or No" habits, toggle between 0 and 1
+      const dateStr = day.date.toISOString().split('T')[0];
+      const currentValue = day.value;
+      const newValue = currentValue === 1 ? 0 : 1;
+
+      // Store the change as pending instead of saving immediately
+      setPendingChanges(prev => ({
+        ...prev,
+        [dateStr]: newValue
+      }));
+    } else {
+      // For measurable habits, show the value input modal
+      setSelectedDate(day.date);
+      inputValue.current = day.value.toString();
+      setShowValueModal(true);
+    }
   };
 
   const handleSaveValue = () => {
@@ -480,56 +507,58 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         </View>
       </Modal>
 
-      {/* Value Input Modal */}
-      <Modal
-        visible={showValueModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowValueModal(false)}
-      >
-        <View style={styles.valueModalOverlay}>
-          <View style={styles.valueModalContainer}>
-            <Text style={styles.valueModalTitle}>
-              Update {habit.name}
-            </Text>
-            <Text style={styles.valueModalSubtitle}>
-              {selectedDate && `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
-            </Text>
+      {/* Value Input Modal - Only for measurable habits */}
+      {habit.goalType !== 'yes_no' && (
+        <Modal
+          visible={showValueModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowValueModal(false)}
+        >
+          <View style={styles.valueModalOverlay}>
+            <View style={styles.valueModalContainer}>
+              <Text style={styles.valueModalTitle}>
+                Update {habit.name}
+              </Text>
+              <Text style={styles.valueModalSubtitle}>
+                {selectedDate && `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+              </Text>
 
-            <TextInput
-              ref={inputRef}
-              style={styles.valueModalInput}
-              defaultValue={inputValue.current}
-              onChangeText={(text) => {
-                inputValue.current = text;
-              }}
-              keyboardType="numeric"
-              placeholder="0"
-              autoFocus
-              autoCorrect={false}
-              textAlign="center"
-              selectTextOnFocus={false}
-              blurOnSubmit={false}
-            />
+              <TextInput
+                ref={inputRef}
+                style={styles.valueModalInput}
+                defaultValue={inputValue.current}
+                onChangeText={(text) => {
+                  inputValue.current = text;
+                }}
+                keyboardType="numeric"
+                placeholder="0"
+                autoFocus
+                autoCorrect={false}
+                textAlign="center"
+                selectTextOnFocus={false}
+                blurOnSubmit={false}
+              />
 
-            <View style={styles.valueModalButtons}>
-              <TouchableOpacity
-                style={[styles.valueModalButton, styles.cancelButton]}
-                onPress={() => setShowValueModal(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
+              <View style={styles.valueModalButtons}>
+                <TouchableOpacity
+                  style={[styles.valueModalButton, styles.cancelButton]}
+                  onPress={() => setShowValueModal(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.valueModalButton, styles.saveButton]}
-                onPress={handleSaveValue}
-              >
-                <Text style={styles.saveButtonText}>Save</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.valueModalButton, styles.saveButton]}
+                  onPress={handleSaveValue}
+                >
+                  <Text style={styles.saveButtonText}>Save</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -712,14 +741,9 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   modalSaveButtonText: {
-    // position:'absolute',
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
-    // paddingTop:100,
-    // paddingTop: 10,
-   // marginTop:30,
-    // paddingBottom:-10,
   },
   loadingIndicator: {
     position: 'absolute',

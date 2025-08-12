@@ -31,16 +31,30 @@ export default function HabitCalendar({
     const target = habit.target || 1;
     const habitColor = habit.color || '#3b82f6';
 
-    if (isToday) {
-      return '#3b82f6'; // Blue for today
-    } else if (value === 0) {
-      return '#374151'; // Dark grey for zero
-    } else if (value < target) {
-      return '#6b7280'; // Light grey for below target
+    if (habit.goalType === 'yes_no') {
+      // For "Yes or No" habits: use habit color for "yes" (value 1), default color for "no" (value 0)
+      if (isToday && value === 1) {
+        return habitColor; // Habit color for today if completed
+      } else if (isToday && value === 0) {
+        return '#3b82f6'; // Blue for today if not completed
+      } else if (value === 1) {
+        return habitColor; // Habit color for completed days
+      } else {
+        return '#374151'; // Dark grey for not completed days
+      }
     } else {
-      // Calculate intensity based on how much above target
-      const intensity = Math.min(value / target, 3); // Cap at 3x intensity
-      return habitColor; // Use full habit color for completed days
+      // For measurable habits: existing logic
+      if (isToday) {
+        return '#3b82f6'; // Blue for today
+      } else if (value === 0) {
+        return '#374151'; // Dark grey for zero
+      } else if (value < target) {
+        return '#6b7280'; // Light grey for below target
+      } else {
+        // Calculate intensity based on how much above target
+        const intensity = Math.min(value / target, 3); // Cap at 3x intensity
+        return habitColor; // Use full habit color for completed days
+      }
     }
   };
 
