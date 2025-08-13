@@ -268,7 +268,7 @@ const HabitCalendar = React.memo(function HabitCalendar({
                 dynamicStyles.monthHeader,
                 {
                   position: 'absolute',
-                  left: header.startCol * (cellSize + 2),
+                  left: header.startCol * (cellSize + 2) + 8, // Move 8px to the right
                   width: header.width
                 }
               ]}
