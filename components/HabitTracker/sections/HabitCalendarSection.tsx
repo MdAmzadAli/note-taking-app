@@ -582,37 +582,43 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         >
           <View style={styles.valueModalOverlay}>
             <View style={styles.valueModalContainer}>
-              <Text style={styles.valueModalTitle}>
-                Update {habit.name}
-              </Text>
-              <Text style={styles.valueModalSubtitle}>
-                {selectedDate && `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
-              </Text>
-
-              <View style={styles.yesNoButtons}>
-                <TouchableOpacity
-                  style={[styles.yesNoButton, styles.yesButton]}
-                  onPress={() => handleYesNoSave(1)}
-                >
-                  <Text style={styles.yesNoButtonIcon}>✓</Text>
-                  <Text style={styles.yesButtonText}>Yes</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.yesNoButton, styles.noButton]}
-                  onPress={() => handleYesNoSave(0)}
-                >
-                  <Text style={styles.yesNoButtonIcon}>✗</Text>
-                  <Text style={styles.noButtonText}>No</Text>
-                </TouchableOpacity>
+              <View style={styles.modalHeaderSection}>
+                <Text style={styles.valueModalTitle}>
+                  Update {habit.name}
+                </Text>
+                <Text style={styles.valueModalSubtitle}>
+                  {selectedDate && `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                </Text>
               </View>
 
-              <TouchableOpacity
-                style={[styles.valueModalButton, styles.cancelButton, { width: '100%', marginTop: 16 }]}
-                onPress={() => setShowYesNoModal(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
+              <View style={styles.modalButtonSection}>
+                <View style={styles.yesNoButtons}>
+                  <TouchableOpacity
+                    style={styles.yesNoButton}
+                    onPress={() => handleYesNoSave(1)}
+                  >
+                    <Text style={styles.yesNoButtonIcon}>✓</Text>
+                    <Text style={styles.yesNoButtonText}>Yes</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.yesNoButton}
+                    onPress={() => handleYesNoSave(0)}
+                  >
+                    <Text style={styles.yesNoButtonIcon}>✗</Text>
+                    <Text style={styles.yesNoButtonText}>No</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.modalCancelSection}>
+                <TouchableOpacity
+                  style={[styles.valueModalButton, styles.cancelButton, { width: '100%' }]}
+                  onPress={() => setShowYesNoModal(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </Modal>
@@ -830,38 +836,41 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#ffffff',
   },
+  modalHeaderSection: {
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  modalButtonSection: {
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  modalCancelSection: {
+    paddingTop: 16,
+  },
   yesNoButtons: {
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 8,
+    justifyContent: 'center',
+    gap: 24,
   },
   yesNoButton: {
-    flex: 1,
     alignItems: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
-  yesButton: {
-    backgroundColor: '#10b981',
-  },
-  noButton: {
-    backgroundColor: '#ef4444',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    minWidth: 60,
   },
   yesNoButtonIcon: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#374151',
   },
-  yesButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  noButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
+  yesNoButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginTop: 4,
   },
   modalSaveButtonContainer: {
     position: 'absolute',
