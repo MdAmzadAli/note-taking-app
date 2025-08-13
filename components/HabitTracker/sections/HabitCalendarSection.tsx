@@ -527,11 +527,15 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         transparent={true}
         onRequestClose={handleCloseModal}
       >
-        <View style={styles.modalOverlay}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={handleCloseModal}
+        >
           <TouchableOpacity
             style={styles.modalContainer}
-            activeOpacity={1} // This prevents the modal content itself from being dismissed
-            onPress={() => {}} // Prevent touches from propagating to the overlay
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
           >
             <View style={styles.modalContentWithLabels}>
               <ScrollView style={styles.modalContent}>
@@ -575,7 +579,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
               
             </View>
           </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
       </Modal>
 
       {/* Yes/No Confirmation Modal - Only for yes/no habits */}
