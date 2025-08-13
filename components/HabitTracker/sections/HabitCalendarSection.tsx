@@ -34,6 +34,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const [showModal, setShowModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showValueModal, setShowValueModal] = useState(false);
+  const [showYesNoModal, setShowYesNoModal] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const inputValue = useRef('');
   const [pendingChanges, setPendingChanges] = useState<{ [date: string]: number }>({});
@@ -320,10 +321,20 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
 
   const handleDatePress = (day: CalendarDay) => {
     if (habit.goalType === 'yes_no') {
-      // For "Yes or No" habits, toggle between 0 and 1
-      const dateStr = formatDateString(day.date);
-      const currentValue = day.value;
-      const newValue = currentValue === 1 ? 0 : 1;
+      // For "Yes or No" habits, show confirmation modal
+      setSelectedDate(day.date);
+      setShowYesNoModal(true);
+    } else {
+      // For measurable habits, show the value input modal
+      setSelectedDate(day.date);
+      inputValue.current = day.value.toString();
+      setShowValueModal(true);
+    }
+  };
+
+  const handleYesNoSave = (value: number) => {
+    if (selectedDate) {
+      const dateStr = formatDateString(selectedDate);
 
       // Get the original value from completionMap (before any pending changes)
       const originalValue = completionMap.get(dateStr) || 0;
@@ -332,22 +343,19 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       setPendingChanges(prev => {
         const updated = { ...prev };
         
-        if (newValue === originalValue) {
+        if (value === originalValue) {
           // If the new value matches the original, remove the pending change
           delete updated[dateStr];
         } else {
           // Otherwise, store the change
-          updated[dateStr] = newValue;
+          updated[dateStr] = value;
         }
         
         return updated;
       });
-    } else {
-      // For measurable habits, show the value input modal
-      setSelectedDate(day.date);
-      inputValue.current = day.value.toString();
-      setShowValueModal(true);
     }
+    setShowYesNoModal(false);
+    setSelectedDate(null);
   };
 
   const handleSaveValue = () => {
@@ -564,6 +572,52 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         </View>
       </Modal>
 
+      {/* Yes/No Confirmation Modal - Only for yes/no habits */}
+      {habit.goalType === 'yes_no' && (
+        <Modal
+          visible={showYesNoModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowYesNoModal(false)}
+        >
+          <View style={styles.valueModalOverlay}>
+            <View style={styles.valueModalContainer}>
+              <Text style={styles.valueModalTitle}>
+                Update {habit.name}
+              </Text>
+              <Text style={styles.valueModalSubtitle}>
+                {selectedDate && `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+              </Text>
+
+              <View style={styles.yesNoButtons}>
+                <TouchableOpacity
+                  style={[styles.yesNoButton, styles.yesButton]}
+                  onPress={() => handleYesNoSave(1)}
+                >
+                  <Text style={styles.yesNoButtonIcon}>✓</Text>
+                  <Text style={styles.yesButtonText}>Yes</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.yesNoButton, styles.noButton]}
+                  onPress={() => handleYesNoSave(0)}
+                >
+                  <Text style={styles.yesNoButtonIcon}>✗</Text>
+                  <Text style={styles.noButtonText}>No</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.valueModalButton, styles.cancelButton, { width: '100%', marginTop: 16 }]}
+                onPress={() => setShowYesNoModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
       {/* Value Input Modal - Only for measurable habits */}
       {habit.goalType !== 'yes_no' && (
         <Modal
@@ -774,6 +828,39 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontWeight: '500',
+    color: '#ffffff',
+  },
+  yesNoButtons: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 8,
+  },
+  yesNoButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  yesButton: {
+    backgroundColor: '#10b981',
+  },
+  noButton: {
+    backgroundColor: '#ef4444',
+  },
+  yesNoButtonIcon: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  yesButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  noButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#ffffff',
   },
   modalSaveButtonContainer: {
