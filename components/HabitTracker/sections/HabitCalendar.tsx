@@ -312,8 +312,6 @@ const HabitCalendar = React.memo(function HabitCalendar({
       </View>
     </View>
   );
-}
-
 });
 
 export default HabitCalendar;
