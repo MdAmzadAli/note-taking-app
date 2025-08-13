@@ -630,42 +630,40 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         >
           <View style={styles.valueModalOverlay}>
             <View style={styles.valueModalContainer}>
-              <Text style={styles.valueModalTitle}>
-                Update {habit.name}
-              </Text>
-              <Text style={styles.valueModalSubtitle}>
-                {selectedDate && `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
-              </Text>
+              {/* Top Section - Centered header */}
+              <View style={styles.valueModalHeader}>
+                <Text style={styles.valueModalTitle}>
+                  Update {habit.name}
+                </Text>
+                <Text style={styles.valueModalDate}>
+                  {selectedDate && `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                </Text>
+              </View>
 
-              <TextInput
-                ref={inputRef}
-                style={styles.valueModalInput}
-                defaultValue={inputValue.current}
-                onChangeText={(text) => {
-                  inputValue.current = text;
-                }}
-                keyboardType="numeric"
-                placeholder="0"
-                autoFocus
-                autoCorrect={false}
-                textAlign="center"
-                selectTextOnFocus={false}
-                blurOnSubmit={false}
-              />
-
-              <View style={styles.valueModalButtons}>
+              {/* Bottom Section - Input and Save Button */}
+              <View style={styles.valueModalInputSection}>
+                <View style={styles.valueModalInputContainer}>
+                  <TextInput
+                    ref={inputRef}
+                    style={styles.valueModalInput}
+                    defaultValue={inputValue.current}
+                    onChangeText={(text) => {
+                      inputValue.current = text;
+                    }}
+                    keyboardType="numeric"
+                    placeholder="0"
+                    autoFocus
+                    autoCorrect={false}
+                    textAlign="center"
+                    selectTextOnFocus={false}
+                    blurOnSubmit={false}
+                  />
+                </View>
                 <TouchableOpacity
-                  style={[styles.valueModalButton, styles.cancelButton]}
-                  onPress={() => setShowValueModal(false)}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.valueModalButton, styles.saveButton]}
+                  style={styles.valueModalSaveButton}
                   onPress={handleSaveValue}
                 >
-                  <Text style={styles.saveButtonText}>Save</Text>
+                  <Text style={styles.valueModalSaveButtonText}>Save</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -774,62 +772,62 @@ const styles = StyleSheet.create({
   valueModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 200,
   },
   valueModalContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#1a202c',
     borderRadius: 16,
+    padding: 0,
+    minWidth: 320,
+    overflow: 'hidden',
+  },
+  valueModalHeader: {
+    alignItems: 'center',
     padding: 24,
-    width: '80%',
-    maxWidth: 300,
+    paddingBottom: 20,
   },
   valueModalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
-    color: '#1a202c',
-    textAlign: 'center',
+    color: '#ffffff',
     marginBottom: 8,
-  },
-  valueModalSubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
     textAlign: 'center',
-    marginBottom: 16,
+  },
+  valueModalDate: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
+  valueModalInputSection: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#374151',
+    height: 60,
+  },
+  valueModalInputContainer: {
+    flex: 0.7,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#374151',
   },
   valueModalInput: {
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+    fontSize: 24,
+    color: '#ffffff',
     textAlign: 'center',
-    marginBottom: 20,
+    backgroundColor: 'transparent',
+    minWidth: 60,
+    fontWeight: '600',
   },
-  valueModalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  valueModalButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+  valueModalSaveButton: {
+    flex: 0.3,
+    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#10b981',
   },
-  cancelButton: {
-    backgroundColor: '#f3f4f6',
-  },
-  saveButton: {
-    backgroundColor: '#000000',
-  },
-  cancelButtonText: {
+  valueModalSaveButtonText: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#6b7280',
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#ffffff',
   },
   yesNoModalOverlay: {
