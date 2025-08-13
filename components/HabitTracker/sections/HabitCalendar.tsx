@@ -252,6 +252,26 @@ export default function HabitCalendar({
                 <View style={styles.daysRow}>
                   {calendarGrid[weekIndex] && calendarGrid[weekIndex].map((day, dayIndex) => {
                     const CellComponent = onDatePress ? TouchableOpacity : View;
+                    const today = new Date();
+                    const isDateInFuture = day.date > today;
+                    
+                    // Hide future dates by making them invisible
+                    if (isDateInFuture) {
+                      return (
+                        <View
+                          key={dayIndex}
+                          style={[
+                            dynamicStyles.dayCell,
+                            { backgroundColor: 'transparent', opacity: 0 }
+                          ]}
+                        >
+                          <Text style={[dynamicStyles.dayText, { opacity: 0 }]}>
+                            {day.day}
+                          </Text>
+                        </View>
+                      );
+                    }
+                    
                     return (
                       <CellComponent
                         key={dayIndex}
