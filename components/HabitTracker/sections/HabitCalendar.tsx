@@ -262,7 +262,7 @@ export default function HabitCalendar({
                           key={dayIndex}
                           style={[
                             dynamicStyles.dayCell,
-                            { backgroundColor: 'transparent', opacity: 0 }
+                            { display: 'none' }
                           ]}
                         >
                           <Text style={[dynamicStyles.dayText, { opacity: 0 }]}>
