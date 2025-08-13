@@ -152,12 +152,17 @@ export default function HabitDetailModal({ visible, habit, onClose, onHabitUpdat
               habit.currentStreak = currentStreak;
               habit.longestStreak = Math.max(habit.longestStreak, currentStreak);
 
-              // Update storage
-              await updateHabit(habit);
+              // Update storage without waiting
+              updateHabit(habit).catch(error => {
+                console.error('Error updating habit value:', error);
+              });
 
-              // Trigger habit update callback to refresh the modal
+              // Trigger habit update callback to refresh the modal immediately
               if (onHabitUpdate) {
-                onHabitUpdate();
+                // Use setTimeout to avoid blocking the current execution
+                setTimeout(() => {
+                  onHabitUpdate();
+                }, 0);
               }
             } catch (error) {
               console.error('Error updating habit value:', error);
@@ -223,12 +228,17 @@ export default function HabitDetailModal({ visible, habit, onClose, onHabitUpdat
               habit.currentStreak = currentStreak;
               habit.longestStreak = Math.max(habit.longestStreak, currentStreak);
 
-              // Update storage
-              await updateHabit(habit);
+              // Update storage without waiting
+              updateHabit(habit).catch(error => {
+                console.error('Error updating habit value:', error);
+              });
 
-              // Trigger habit update callback to refresh the modal
+              // Trigger habit update callback to refresh the modal immediately
               if (onHabitUpdate) {
-                onHabitUpdate();
+                // Use setTimeout to avoid blocking the current execution
+                setTimeout(() => {
+                  onHabitUpdate();
+                }, 0);
               }
             } catch (error) {
               console.error('Error updating habit value:', error);

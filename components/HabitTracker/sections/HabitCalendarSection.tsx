@@ -38,6 +38,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const inputRef = useRef<TextInput>(null);
   const inputValue = useRef('');
   const [pendingChanges, setPendingChanges] = useState<{ [date: string]: number }>({});
+  const [localUpdates, setLocalUpdates] = useState<{ [date: string]: number }>({});
   const [loadedMonths, setLoadedMonths] = useState(5); // Start with 5 months
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -113,7 +114,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     return days;
   }, [habit.completions, habit.goalType]);
 
-  // Create a completion lookup map for faster access
+  // Create a completion lookup map for faster access with local updates applied
   const completionMap = useMemo(() => {
     const map = new Map<string, number>();
     habit.completions.forEach(completion => {
@@ -123,8 +124,14 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         map.set(completion.date, completion.value);
       }
     });
+    
+    // Apply local updates for immediate visual feedback
+    Object.entries(localUpdates).forEach(([date, value]) => {
+      map.set(date, value);
+    });
+    
     return map;
-  }, [habit.completions, habit.goalType]);
+  }, [habit.completions, habit.goalType, localUpdates]);
 
   // Generate base calendar data without pending changes for better performance
   const { baseModalCalendarData, totalMonths } = useMemo(() => {
@@ -299,6 +306,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const handleOpenModal = () => {
     console.log('[HabitCalendarSection] Opening modal - resetting state');
     setPendingChanges({});
+    setLocalUpdates({});
     setLoadedMonths(INITIAL_MONTHS); // Reset to initial months
     setIsInitialLoad(true); // Reset initial load flag
     setCurrentScrollX(0); // Reset scroll position tracking
@@ -329,36 +337,91 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   };
 
   const handleYesNoSave = async (value: number) => {
-    if (selectedDate && onSaveValue) {
+    if (selectedDate) {
       const dateStr = formatDateString(selectedDate);
       
-      // Save immediately to storage and update the habit
-      await onSaveValue(habit.id, dateStr, value);
+      // Apply local update immediately for instant visual feedback
+      setLocalUpdates(prev => ({
+        ...prev,
+        [dateStr]: value
+      }));
+      
+      // Close modal first
+      setShowYesNoModal(false);
+      setSelectedDate(null);
+      
+      // Then persist to storage asynchronously
+      if (onSaveValue) {
+        try {
+          await onSaveValue(habit.id, dateStr, value);
+          
+          // Clear local update after successful save
+          setLocalUpdates(prev => {
+            const updated = { ...prev };
+            delete updated[dateStr];
+            return updated;
+          });
+        } catch (error) {
+          console.error('Error saving habit value:', error);
+          // Revert local update on error
+          setLocalUpdates(prev => {
+            const updated = { ...prev };
+            delete updated[dateStr];
+            return updated;
+          });
+        }
+      }
     }
-    setShowYesNoModal(false);
-    setSelectedDate(null);
   };
 
   const handleSaveValue = async () => {
     // Dismiss keyboard first to prevent interference
     Keyboard.dismiss();
     
-    if (selectedDate && onSaveValue) {
+    if (selectedDate) {
       const dateStr = formatDateString(selectedDate);
       const newValue = parseInt(inputValue.current) || 0;
       
-      // Save immediately to storage and update the habit
-      await onSaveValue(habit.id, dateStr, newValue);
+      // Apply local update immediately for instant visual feedback
+      setLocalUpdates(prev => ({
+        ...prev,
+        [dateStr]: newValue
+      }));
+      
+      // Close modal first
+      setShowValueModal(false);
+      setSelectedDate(null);
+      inputValue.current = '';
+      
+      // Then persist to storage asynchronously
+      if (onSaveValue) {
+        try {
+          await onSaveValue(habit.id, dateStr, newValue);
+          
+          // Clear local update after successful save
+          setLocalUpdates(prev => {
+            const updated = { ...prev };
+            delete updated[dateStr];
+            return updated;
+          });
+        } catch (error) {
+          console.error('Error saving habit value:', error);
+          // Revert local update on error
+          setLocalUpdates(prev => {
+            const updated = { ...prev };
+            delete updated[dateStr];
+            return updated;
+          });
+        }
+      }
     }
-    setShowValueModal(false);
-    setSelectedDate(null);
-    inputValue.current = '';
   };
 
   const handleCloseModalOnly = () => {
     console.log('[HabitCalendarSection] Closing modal');
     setShowModal(false);
     setPendingChanges({});
+    setLocalUpdates({});
   };
 
   // Handle scroll for intersection observer-based lazy loading
