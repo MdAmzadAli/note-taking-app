@@ -532,10 +532,8 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
           activeOpacity={1}
           onPress={handleCloseModal}
         >
-          <TouchableOpacity
+          <View
             style={styles.modalContainer}
-            activeOpacity={1}
-            onPress={(e) => e.stopPropagation()}
           >
             <View style={styles.modalContentWithLabels}>
               <ScrollView style={styles.modalContent}>
@@ -578,7 +576,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
 
               
             </View>
-          </TouchableOpacity>
+          </View>
         </TouchableOpacity>
       </Modal>
 
