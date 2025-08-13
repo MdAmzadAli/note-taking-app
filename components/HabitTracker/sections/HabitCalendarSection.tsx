@@ -814,7 +814,7 @@ const styles = StyleSheet.create({
   valueModalInputSection: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderRightWidth:1,
+    borderRightWidth: 1,
     borderColor: '#ffffff',
     height: 40,
   },
