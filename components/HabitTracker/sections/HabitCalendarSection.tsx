@@ -837,7 +837,7 @@ const styles = StyleSheet.create({
   yesNoModalContainer: {
     backgroundColor: '#2c2c2e',
     borderRadius: 0,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: '#ffffff',
     width: 220,
     height: 130,
@@ -865,6 +865,8 @@ const styles = StyleSheet.create({
   yesNoModalOptions: {
     flexDirection: 'row',
     height: 40,
+    borderTopWidth: 1,
+    borderColor: '#ffffff',
   },
   yesNoModalOption: {
     flex: 1,
@@ -874,7 +876,7 @@ const styles = StyleSheet.create({
   },
   yesNoModalDivider: {
     width: 1,
-    backgroundColor: '#48484a',
+    backgroundColor: '#ffffff',
   },
   yesNoModalCheckmark: {
     fontSize: 16,
