@@ -125,11 +125,10 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     return map;
   }, [habit.completions, habit.goalType]);
 
-  // Generate dates for modal with month-based lazy loading
-  const { modalCalendarData, totalMonths } = useMemo(() => {
-    console.log('[HabitCalendarSection] Generating modal calendar data:', {
-      loadedMonths,
-      pendingChangesCount: Object.keys(pendingChanges).length
+  // Generate base calendar data without pending changes for better performance
+  const { baseModalCalendarData, totalMonths } = useMemo(() => {
+    console.log('[HabitCalendarSection] Generating base modal calendar data:', {
+      loadedMonths
     });
 
     const today = new Date();
@@ -160,12 +159,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       const dateStr = formatDateString(currentDate);
 
       // Use map lookup instead of array.find for better performance
-      let value = completionMap.get(dateStr) || 0;
-
-      // Override with pending changes if they exist - this ensures instant color updates
-      if (pendingChanges[dateStr] !== undefined) {
-        value = pendingChanges[dateStr];
-      }
+      const value = completionMap.get(dateStr) || 0;
 
       // Format month name as "Mon YY" (e.g., "Apr 25")
       const monthName = monthNames[currentDate.getMonth()];
@@ -186,18 +180,36 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
-    console.log('[HabitCalendarSection] Generated calendar data:', {
+    console.log('[HabitCalendarSection] Generated base calendar data:', {
       totalDays: days.length,
       firstDate: days[0] ? formatDateString(days[0].date) : 'none',
       lastDate: days[days.length - 1] ? formatDateString(days[days.length - 1].date) : 'none',
       todayIndex: days.findIndex(d => d.isToday),
       monthsGenerated: monthsToShow,
-      previousDataLength: previousDataLengthRef.current,
-      pendingChangesApplied: Object.keys(pendingChanges).length
+      previousDataLength: previousDataLengthRef.current
     });
 
     return { modalCalendarData: days, totalMonths: totalAvailableMonths };
-  }, [completionMap, pendingChanges, loadedMonths, habit.goalType]);
+  }, [completionMap, loadedMonths, habit.goalType]);
+
+  // Apply pending changes to calendar data efficiently
+  const modalCalendarData = useMemo(() => {
+    if (Object.keys(pendingChanges).length === 0) {
+      return baseModalCalendarData;
+    }
+
+    // Only update the days that have pending changes
+    return baseModalCalendarData.map(day => {
+      const dateStr = formatDateString(day.date);
+      if (pendingChanges[dateStr] !== undefined) {
+        return {
+          ...day,
+          value: pendingChanges[dateStr]
+        };
+      }
+      return day;
+    });
+  }, [baseModalCalendarData, pendingChanges]);
 
   // Auto-scroll to position today's date at the rightmost edge when modal opens
   useEffect(() => {
@@ -209,7 +221,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       isInitialLoad
     });
 
-    if (showModal && horizontalScrollRef.current && modalCalendarData.length > 0 && isInitialLoad) {
+    if (showModal && horizontalScrollRef.current && baseModalCalendarData.length > 0 && isInitialLoad) {
       console.log('[HabitCalendarSection] Initiating auto-scroll sequence for initial load');
 
       // Single scroll to end after a brief delay for layout completion
@@ -218,7 +230,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
           console.log('[HabitCalendarSection] Executing scrollToEnd');
           horizontalScrollRef.current.scrollToEnd({ animated: false }); // Use non-animated scroll to prevent triggering scroll events
           setIsInitialLoad(false); // Mark initial load as complete
-          previousDataLengthRef.current = modalCalendarData.length; // Set initial data length
+          previousDataLengthRef.current = baseModalCalendarData.length; // Set initial data length
         }
       }, 300);
 
@@ -227,12 +239,12 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         clearTimeout(timeoutId);
       };
     }
-  }, [showModal, modalCalendarData.length, isInitialLoad]); // Include dependencies for proper triggering
+  }, [showModal, baseModalCalendarData.length, isInitialLoad]); // Include dependencies for proper triggering
 
   // Effect to handle data loading completion and maintain exact scroll position
   useEffect(() => {
-    if (!isInitialLoad && modalCalendarData.length > previousDataLengthRef.current) {
-      const dataLengthDifference = modalCalendarData.length - previousDataLengthRef.current;
+    if (!isInitialLoad && baseModalCalendarData.length > previousDataLengthRef.current) {
+      const dataLengthDifference = baseModalCalendarData.length - previousDataLengthRef.current;
       console.log('[HabitCalendarSection] Data length increased:', {
         previousLength: previousDataLengthRef.current,
         currentLength: modalCalendarData.length,
@@ -279,9 +291,9 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         });
       }
 
-      previousDataLengthRef.current = modalCalendarData.length;
+      previousDataLengthRef.current = baseModalCalendarData.length;
     }
-  }, [modalCalendarData.length, isInitialLoad, isLoadingMore]);
+  }, [baseModalCalendarData.length, isInitialLoad, isLoadingMore]);
 
   const handleOpenModal = () => {
     console.log('[HabitCalendarSection] Opening modal - resetting state');
@@ -418,7 +430,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
 
     // Calculate which column is at the leftmost visible edge
     const leftmostVisibleColumn = Math.floor(leftVisibleX / totalCellWidth);
-    const totalColumns = Math.ceil(modalCalendarData.length / 7); // 7 rows per column
+    const totalColumns = Math.ceil(baseModalCalendarData.length / 7); // 7 rows per column
 
     console.log('[HabitCalendarSection] Scroll intersection check:', {
       contentOffsetX: contentOffset.x,
@@ -450,7 +462,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         preLoadScrollPositionRef.current = contentOffset.x;
 
         // Store data length before change
-        previousDataLengthRef.current = modalCalendarData.length;
+        previousDataLengthRef.current = baseModalCalendarData.length;
 
         // Load new data
         setLoadedMonths(newMonthCount);
@@ -513,7 +525,6 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                     </View>
                   )}
                   <HabitCalendar
-                    key={`calendar-${Object.keys(pendingChanges).length}-${loadedMonths}`}
                     habit={habit}
                     calendarData={modalCalendarData}
                     onDatePress={handleDatePress}
