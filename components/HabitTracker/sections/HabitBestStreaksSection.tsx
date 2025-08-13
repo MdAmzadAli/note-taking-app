@@ -118,7 +118,7 @@ export default function HabitBestStreaksSection({ habit }: HabitBestStreaksSecti
 
           // Calculate height proportional to streak length
           const baseHeight = 17;
-          const maxHeight = 24;
+          const maxHeight = 18;
           const barHeight = baseHeight + ((streak.length / maxStreakLength) * (maxHeight - baseHeight));
 
           return (
