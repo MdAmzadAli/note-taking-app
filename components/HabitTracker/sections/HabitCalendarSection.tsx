@@ -321,7 +321,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     setShowModal(true);
   };
 
-  const handleCloseModal = handleCloseModalOnly;
+  // const handleCloseModal = handleCloseModalOnly;
 
   const handleDatePress = (day: CalendarDay) => {
     if (habit.goalType === 'yes_no') {
@@ -417,7 +417,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     }
   };
 
-  const handleCloseModalOnly = () => {
+  const handleCloseModal = () => {
     console.log('[HabitCalendarSection] Closing modal');
     setShowModal(false);
     setPendingChanges({});
