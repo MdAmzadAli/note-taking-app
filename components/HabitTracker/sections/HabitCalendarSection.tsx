@@ -632,7 +632,13 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
           animationType="fade"
           onRequestClose={() => setShowValueModal(false)}
         >
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0} // tweak for your header height
+          >
           <TouchableWithoutFeedback onPress={() => setShowValueModal(false)}>
+           
             <View style={styles.valueModalOverlay}>
               <TouchableWithoutFeedback onPress={() => {}}>
                 <View style={styles.valueModalContainer}>
@@ -667,7 +673,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                     </View>
                     <TouchableOpacity
                       style={styles.valueModalSaveButton}
-                      onPress={handleSaveValue}
+                      onPress={()=>{ Keyboard.dismiss(); handleSaveValue();}}
                     >
                       <Text style={styles.valueModalSaveButtonText}>Save</Text>
                     </TouchableOpacity>
@@ -676,6 +682,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
               </TouchableWithoutFeedback>
             </View>
           </TouchableWithoutFeedback>
+            </KeyboardAvoidingView>
         </Modal>
       )}
     </View>
