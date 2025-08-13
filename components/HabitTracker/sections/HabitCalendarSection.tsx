@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
@@ -80,7 +81,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     for (let i = 104; i >= 0; i--) {
       // Create date using local time to avoid timezone issues
       const date = createLocalDate(today.getFullYear(), today.getMonth(), today.getDate() - i);
-
+      
       // Use consistent date string formatting
       const dateStr = formatDateString(date);
       const completion = habit.completions.find(c => c.date === dateStr);
@@ -149,41 +150,38 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     // Generate dates starting from the specified number of months ago to today
     // Use local date creation to avoid timezone issues
     const startDate = createLocalDate(today.getFullYear(), today.getMonth() - (monthsToShow - 1), 1);
-    const endDate = createLocalDate(today.getFullYear(), today.getMonth(), today.getDate()); // Only up to today
+    const endDate = createLocalDate(today.getFullYear(), today.getMonth() + 1, 0); // Last day of current month
 
     const days: CalendarDay[] = [];
     const currentDate = createLocalDate(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
 
     while (currentDate <= endDate) {
-      // Only include dates that are not in the future
-      if (currentDate <= today) {
-        // Use consistent date string formatting to avoid timezone conversion issues
-        const dateStr = formatDateString(currentDate);
+      // Use consistent date string formatting to avoid timezone conversion issues
+      const dateStr = formatDateString(currentDate);
 
-        // Use map lookup instead of array.find for better performance
-        let value = completionMap.get(dateStr) || 0;
+      // Use map lookup instead of array.find for better performance
+      let value = completionMap.get(dateStr) || 0;
 
-        // Override with pending changes if they exist - this ensures instant color updates
-        if (pendingChanges[dateStr] !== undefined) {
-          value = pendingChanges[dateStr];
-        }
-
-        // Format month name as "Mon YY" (e.g., "Apr 25")
-        const monthName = monthNames[currentDate.getMonth()];
-        const yearSuffix = currentDate.getFullYear().toString().slice(-2);
-        const formattedMonthName = `${monthName} ${yearSuffix}`;
-
-        // Create a new date object for each day to avoid reference issues
-        const dayDate = createLocalDate(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-
-        days.push({
-          date: dayDate,
-          day: currentDate.getDate(),
-          value,
-          isToday: formatDateString(currentDate) === formatDateString(today),
-          monthName: formattedMonthName,
-        });
+      // Override with pending changes if they exist - this ensures instant color updates
+      if (pendingChanges[dateStr] !== undefined) {
+        value = pendingChanges[dateStr];
       }
+
+      // Format month name as "Mon YY" (e.g., "Apr 25")
+      const monthName = monthNames[currentDate.getMonth()];
+      const yearSuffix = currentDate.getFullYear().toString().slice(-2);
+      const formattedMonthName = `${monthName} ${yearSuffix}`;
+
+      // Create a new date object for each day to avoid reference issues
+      const dayDate = createLocalDate(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+
+      days.push({
+        date: dayDate,
+        day: currentDate.getDate(),
+        value,
+        isToday: formatDateString(currentDate) === formatDateString(today),
+        monthName: formattedMonthName,
+      });
 
       currentDate.setDate(currentDate.getDate() + 1);
     }
@@ -246,7 +244,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       if (isLoadingMore && horizontalScrollRef.current) {
         // More precise calculation: each day is exactly one cell
         const cellWidth = 32; // Cell size
-        const cellMargin = 4; // Margin between cells
+        const cellMargin = 4; // Margin between cells  
         const totalCellWidth = cellWidth + cellMargin;
 
         // Calculate columns added (7 days per column)
@@ -321,7 +319,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       // Store the change as pending, but remove if it matches the original value
       setPendingChanges(prev => {
         const updated = { ...prev };
-
+        
         if (newValue === originalValue) {
           // If the new value matches the original, remove the pending change
           delete updated[dateStr];
@@ -329,7 +327,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
           // Otherwise, store the change
           updated[dateStr] = newValue;
         }
-
+        
         return updated;
       });
     } else {
@@ -343,7 +341,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const handleSaveValue = () => {
     // Dismiss keyboard first to prevent interference
     Keyboard.dismiss();
-
+    
     if (selectedDate) {
       const dateStr = formatDateString(selectedDate);
       const newValue = parseInt(inputValue.current) || 0;
@@ -354,7 +352,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       // Store the change as pending, but remove if it matches the original value
       setPendingChanges(prev => {
         const updated = { ...prev };
-
+        
         if (newValue === originalValue) {
           // If the new value matches the original, remove the pending change
           delete updated[dateStr];
@@ -362,7 +360,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
           // Otherwise, store the change
           updated[dateStr] = newValue;
         }
-
+        
         return updated;
       });
     }
