@@ -76,11 +76,18 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const previewCalendarData = useMemo(() => {
     const days: CalendarDay[] = [];
     const today = new Date();
+    // Set today to start of day for proper comparison
+    const todayStart = createLocalDate(today.getFullYear(), today.getMonth(), today.getDate());
 
     // Generate 105 days (15 weeks worth) ending with today
     for (let i = 104; i >= 0; i--) {
       // Create date using local time to avoid timezone issues
       const date = createLocalDate(today.getFullYear(), today.getMonth(), today.getDate() - i);
+      
+      // Skip dates that are in the future
+      if (date > todayStart) {
+        continue;
+      }
       
       // Use consistent date string formatting
       const dateStr = formatDateString(date);
@@ -155,7 +162,19 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     const days: CalendarDay[] = [];
     const currentDate = createLocalDate(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
 
+    // Set today to start of day for proper comparison
+    const todayStart = createLocalDate(today.getFullYear(), today.getMonth(), today.getDate());
+
     while (currentDate <= endDate) {
+      // Create a new date object for each day to avoid reference issues
+      const dayDate = createLocalDate(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+      
+      // Skip dates that are in the future
+      if (dayDate > todayStart) {
+        currentDate.setDate(currentDate.getDate() + 1);
+        continue;
+      }
+
       // Use consistent date string formatting to avoid timezone conversion issues
       const dateStr = formatDateString(currentDate);
 
@@ -171,9 +190,6 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       const monthName = monthNames[currentDate.getMonth()];
       const yearSuffix = currentDate.getFullYear().toString().slice(-2);
       const formattedMonthName = `${monthName} ${yearSuffix}`;
-
-      // Create a new date object for each day to avoid reference issues
-      const dayDate = createLocalDate(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
 
       days.push({
         date: dayDate,
