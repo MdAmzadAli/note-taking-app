@@ -150,7 +150,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     // Generate dates starting from the specified number of months ago to today
     // Use local date creation to avoid timezone issues
     const startDate = createLocalDate(today.getFullYear(), today.getMonth() - (monthsToShow - 1), 1);
-    const endDate = createLocalDate(today.getFullYear(), today.getMonth() + 1, 0); // Last day of current month
+    const endDate = createLocalDate(today.getFullYear(), today.getMonth(), today.getDate()); // Only up to today
 
     const days: CalendarDay[] = [];
     const currentDate = createLocalDate(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
