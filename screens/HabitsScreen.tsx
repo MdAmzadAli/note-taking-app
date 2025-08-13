@@ -46,7 +46,7 @@ function MiniEditInput({ habit, currentValue, onSave, onCancel }: {
         selectTextOnFocus={false}
         blurOnSubmit={false}
       />
-      
+
       <View style={styles.miniModalButtons}>
         <TouchableOpacity
           style={[styles.miniModalButton, styles.cancelButton]}
@@ -54,7 +54,7 @@ function MiniEditInput({ habit, currentValue, onSave, onCancel }: {
         >
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[styles.miniModalButton, styles.saveButton]}
           onPress={() => onSave(inputValue.current)}
@@ -86,6 +86,16 @@ export default function HabitsScreen() {
     // Start at today (which is the first item in the reversed array)
     setCurrentDateIndex(0);
   }, []);
+
+  // Update selected habit when habits change (to reflect real-time updates)
+  useEffect(() => {
+    if (selectedHabit && habits.length > 0) {
+      const updatedHabit = habits.find(h => h.id === selectedHabit.id);
+      if (updatedHabit) {
+        setSelectedHabit(updatedHabit);
+      }
+    }
+  }, [habits, selectedHabit?.id]);
 
   const loadHabits = async () => {
     try {
@@ -271,7 +281,7 @@ export default function HabitsScreen() {
       {/* Navbar */}
       <View style={styles.navbar}>
         <Text style={styles.navTitle}>Habits</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.addButton}
           onPress={() => setShowTypeModal(true)}
         >
@@ -288,9 +298,9 @@ export default function HabitsScreen() {
               {/* Empty space for habit names alignment */}
             </View>
             <View style={styles.rightSection}>
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false} 
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
                 style={styles.dateScroll}
                 onScroll={handleDateScroll}
                 scrollEventThrottle={16}
@@ -325,7 +335,7 @@ export default function HabitsScreen() {
           ) : (
             habits.map((habit) => (
               <View key={habit.id} style={styles.habitRow}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.leftSection}
                   onPress={() => handleHabitPress(habit)}
                   onLongPress={() => {
@@ -425,8 +435,9 @@ export default function HabitsScreen() {
           setShowDetailModal(false);
           setSelectedHabit(null);
         }}
-        onSaveValue={async (habitId, date, newValue) => {
-          await handleHabitComplete(habitId, date, newValue > 0, newValue);
+        onHabitUpdate={async () => {
+          // Reload habits to get updated data and wait for completion
+          await loadHabits();
         }}
       />
 
@@ -451,7 +462,7 @@ export default function HabitsScreen() {
             <Text style={styles.miniModalSubtitle}>
               Enter {editingHabit?.habit.goalType === 'quantity' ? 'quantity' : 'minutes'}:
             </Text>
-            
+
             <MiniEditInput
               habit={editingHabit?.habit}
               currentValue={editingHabit?.currentValue || ''}

@@ -24,9 +24,10 @@ interface HabitDetailModalProps {
   habit: Habit | null;
   onClose: () => void;
   onSaveValue?: (habitId: string, date: string, newValue: number) => void;
+  onHabitUpdate?: () => void; // Add this prop
 }
 
-export default function HabitDetailModal({ visible, habit, onClose }: HabitDetailModalProps) {
+export default function HabitDetailModal({ visible, habit, onClose, onHabitUpdate }: HabitDetailModalProps) {
   if (!habit) return null;
 
   const getFrequencyText = () => {
@@ -105,8 +106,8 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
 
         <HabitHistoryGraphSection habit={habit} />
 
-        <HabitCalendarSection 
-          habit={habit} 
+        <HabitCalendarSection
+          habit={habit}
           onSaveValue={async (habitId, date, newValue) => {
             try {
               const existingCompletion = habit.completions.find(c => c.date === date);
@@ -153,6 +154,11 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
 
               // Update storage
               await updateHabit(habit);
+
+              // Trigger habit update callback to refresh the modal
+              if (onHabitUpdate) {
+                onHabitUpdate();
+              }
             } catch (error) {
               console.error('Error updating habit value:', error);
             }
@@ -171,8 +177,8 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
       <>
         <HabitTargetSection habit={habit} />
         <HabitHistoryGraphSection habit={habit} />
-        <HabitCalendarSection 
-          habit={habit} 
+        <HabitCalendarSection
+          habit={habit}
           onSaveValue={async (habitId, date, newValue) => {
             try {
               const existingCompletion = habit.completions.find(c => c.date === date);
@@ -219,6 +225,11 @@ export default function HabitDetailModal({ visible, habit, onClose }: HabitDetai
 
               // Update storage
               await updateHabit(habit);
+
+              // Trigger habit update callback to refresh the modal
+              if (onHabitUpdate) {
+                onHabitUpdate();
+              }
             } catch (error) {
               console.error('Error updating habit value:', error);
             }
