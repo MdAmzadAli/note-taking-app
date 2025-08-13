@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
@@ -13,6 +12,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  TouchableWithoutFeedback, // Import TouchableWithoutFeedback
 } from 'react-native';
 import { Habit } from '@/types';
 import HabitCalendar from './HabitCalendar';
@@ -83,7 +83,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     for (let i = 104; i >= 0; i--) {
       // Create date using local time to avoid timezone issues
       const date = createLocalDate(today.getFullYear(), today.getMonth(), today.getDate() - i);
-      
+
       // Use consistent date string formatting
       const dateStr = formatDateString(date);
       const completion = habit.completions.find(c => c.date === dateStr);
@@ -124,12 +124,12 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         map.set(completion.date, completion.value);
       }
     });
-    
+
     // Apply local updates for immediate visual feedback
     Object.entries(localUpdates).forEach(([date, value]) => {
       map.set(date, value);
     });
-    
+
     return map;
   }, [habit.completions, habit.goalType, localUpdates]);
 
@@ -339,22 +339,22 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const handleYesNoSave = async (value: number) => {
     if (selectedDate) {
       const dateStr = formatDateString(selectedDate);
-      
+
       // Apply local update immediately for instant visual feedback
       setLocalUpdates(prev => ({
         ...prev,
         [dateStr]: value
       }));
-      
+
       // Close modal first
       setShowYesNoModal(false);
       setSelectedDate(null);
-      
+
       // Then persist to storage asynchronously
       if (onSaveValue) {
         try {
           await onSaveValue(habit.id, dateStr, value);
-          
+
           // Clear local update after successful save
           setLocalUpdates(prev => {
             const updated = { ...prev };
@@ -377,27 +377,27 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   const handleSaveValue = async () => {
     // Dismiss keyboard first to prevent interference
     Keyboard.dismiss();
-    
+
     if (selectedDate) {
       const dateStr = formatDateString(selectedDate);
       const newValue = parseInt(inputValue.current) || 0;
-      
+
       // Apply local update immediately for instant visual feedback
       setLocalUpdates(prev => ({
         ...prev,
         [dateStr]: newValue
       }));
-      
+
       // Close modal first
       setShowValueModal(false);
       setSelectedDate(null);
       inputValue.current = '';
-      
+
       // Then persist to storage asynchronously
       if (onSaveValue) {
         try {
           await onSaveValue(habit.id, dateStr, newValue);
-          
+
           // Clear local update after successful save
           setLocalUpdates(prev => {
             const updated = { ...prev };
@@ -576,7 +576,6 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                 ))}
               </View>
 
-              
             </View>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -610,10 +609,10 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                 >
                   <Text style={[styles.yesNoModalCheckmark, { color: habit.color || '#4ECDC4' }]}>✓</Text>
                 </TouchableOpacity>
-                
+
                 {/* Vertical dividing line */}
                 <View style={styles.yesNoModalDivider} />
-                
+
                 <TouchableOpacity
                   style={styles.yesNoModalOption}
                   onPress={() => handleYesNoSave(0)}
@@ -897,7 +896,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#8e8e93',
   },
-  
+
   loadingIndicator: {
     position: 'absolute',
     top: '50%',
