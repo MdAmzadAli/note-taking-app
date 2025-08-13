@@ -313,11 +313,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     setShowModal(true);
   };
 
-  const handleCloseModal = () => {
-    console.log('[HabitCalendarSection] Closing modal');
-    setShowModal(false);
-    setPendingChanges({});
-  };
+  const handleCloseModal = handleCloseModalOnly;
 
   const handleDatePress = (day: CalendarDay) => {
     if (habit.goalType === 'yes_no') {
@@ -332,77 +328,37 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     }
   };
 
-  const handleYesNoSave = (value: number) => {
-    if (selectedDate) {
+  const handleYesNoSave = async (value: number) => {
+    if (selectedDate && onSaveValue) {
       const dateStr = formatDateString(selectedDate);
-
-      // Get the original value from completionMap (before any pending changes)
-      const originalValue = completionMap.get(dateStr) || 0;
-
-      // Store the change as pending, but remove if it matches the original value
-      setPendingChanges(prev => {
-        const updated = { ...prev };
-        
-        if (value === originalValue) {
-          // If the new value matches the original, remove the pending change
-          delete updated[dateStr];
-        } else {
-          // Otherwise, store the change
-          updated[dateStr] = value;
-        }
-        
-        return updated;
-      });
+      
+      // Save immediately to storage and update the habit
+      await onSaveValue(habit.id, dateStr, value);
     }
     setShowYesNoModal(false);
     setSelectedDate(null);
   };
 
-  const handleSaveValue = () => {
+  const handleSaveValue = async () => {
     // Dismiss keyboard first to prevent interference
     Keyboard.dismiss();
     
-    if (selectedDate) {
+    if (selectedDate && onSaveValue) {
       const dateStr = formatDateString(selectedDate);
       const newValue = parseInt(inputValue.current) || 0;
-
-      // Get the original value from completionMap (before any pending changes)
-      const originalValue = completionMap.get(dateStr) || 0;
-
-      // Store the change as pending, but remove if it matches the original value
-      setPendingChanges(prev => {
-        const updated = { ...prev };
-        
-        if (newValue === originalValue) {
-          // If the new value matches the original, remove the pending change
-          delete updated[dateStr];
-        } else {
-          // Otherwise, store the change
-          updated[dateStr] = newValue;
-        }
-        
-        return updated;
-      });
+      
+      // Save immediately to storage and update the habit
+      await onSaveValue(habit.id, dateStr, newValue);
     }
     setShowValueModal(false);
     setSelectedDate(null);
     inputValue.current = '';
   };
 
-  const handleSaveAllChanges = async () => {
-    if (Object.keys(pendingChanges).length === 0) {
-      handleCloseModal();
-      return;
-    }
-
-    // Apply all pending changes
-    for (const [dateStr, newValue] of Object.entries(pendingChanges)) {
-      if (onSaveValue) {
-        await onSaveValue(habit.id, dateStr, newValue);
-      }
-    }
-
-    handleCloseModal();
+  const handleCloseModalOnly = () => {
+    console.log('[HabitCalendarSection] Closing modal');
+    setShowModal(false);
+    setPendingChanges({});
   };
 
   // Handle scroll for intersection observer-based lazy loading
@@ -553,20 +509,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                 ))}
               </View>
 
-              {/* Save button */}
-              <View style={styles.modalSaveButtonContainer}>
-                <TouchableOpacity
-                  style={styles.modalSaveButton}
-                  onPress={handleSaveAllChanges}
-                >
-                  <Text style={styles.modalSaveButtonText}>
-                    {Object.keys(pendingChanges).length > 0
-                      ? `Save ${Object.keys(pendingChanges).length} Changes`
-                      : 'Close'
-                    }
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              
             </View>
           </TouchableOpacity>
         </View>
@@ -887,32 +830,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#8e8e93',
   },
-  modalSaveButtonContainer: {
-    position: 'absolute',
-    bottom: -40,
-    left: 20,
-    right: 60, // Leave space for day labels
-    zIndex: 200,
-  },
-  modalSaveButton: {
-    backgroundColor: '#000000',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  modalSaveButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  
   loadingIndicator: {
     position: 'absolute',
     top: '50%',
