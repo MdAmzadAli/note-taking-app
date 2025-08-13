@@ -55,7 +55,10 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
 
     // Now process completions and add them to the appropriate months
     habit.completions.forEach(completion => {
-      if (!completion.value || completion.value === 0) return;
+      // For yes/no habits, check if completed is true
+      // For measurable habits, check if value > 0
+      const hasValue = habit.goalType === 'yes_no' ? completion.completed : (completion.value && completion.value > 0);
+      if (!hasValue) return;
 
       const completionDate = new Date(completion.date + 'T00:00:00');
 
@@ -74,10 +77,11 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
 
       // Debug log to verify correct mapping
       const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      console.log(`Date: ${completion.date}, Day: ${dayNames[jsWeekday]}, WeekdayIndex: ${jsWeekday}, Value: ${completion.value}`);
+      const valueToAdd = habit.goalType === 'yes_no' ? 1 : (completion.value || 0);
+      console.log(`Date: ${completion.date}, Day: ${dayNames[jsWeekday]}, WeekdayIndex: ${jsWeekday}, Value: ${valueToAdd}, GoalType: ${habit.goalType}`);
 
       // Aggregate values for the same weekday in the same month
-      monthData.weekdayData[jsWeekday] = (monthData.weekdayData[jsWeekday] || 0) + completion.value;
+      monthData.weekdayData[jsWeekday] = (monthData.weekdayData[jsWeekday] || 0) + valueToAdd;
     });
 
     // Calculate max value for proper scaling
@@ -87,7 +91,15 @@ export default function HabitFrequencySection({ habit }: HabitFrequencySectionPr
         if (value > 0) allValues.push(value);
       });
     });
-    const maxValue = allValues.length > 0 ? Math.max(...allValues) : habit.target || 10;
+    
+    // For yes/no habits, set a reasonable max value based on frequency
+    // For measurable habits, use the target or calculated max
+    let maxValue: number;
+    if (habit.goalType === 'yes_no') {
+      maxValue = allValues.length > 0 ? Math.max(...allValues) : 4; // Max 4 completions per weekday per month
+    } else {
+      maxValue = allValues.length > 0 ? Math.max(...allValues) : habit.target || 10;
+    }
 
     return {
       monthsData: monthsData.sort((a, b) => a.monthIndex - b.monthIndex),
