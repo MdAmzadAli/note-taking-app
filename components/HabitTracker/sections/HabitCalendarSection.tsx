@@ -531,51 +531,50 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback onPress={() => {}}>
               <View style={styles.modalContainer}>
-                <View style={styles.modalContentWithLabels}></View>
+                <View style={styles.modalContentWithLabels}>
+                  <ScrollView style={styles.modalContent}>
+                    <ScrollView
+                      ref={horizontalScrollRef}
+                      horizontal
+                      showsHorizontalScrollIndicator={true}
+                      style={styles.modalHorizontalScroll}
+                      contentContainerStyle={styles.modalScrollContainer}
+                      scrollEventThrottle={16}
+                      onScroll={handleScroll}
+                      scrollEnabled={!scrollLocked} // Disable scrolling when locked
+                    >
+                      {/* Loading indicator positioned at exact loading position */}
+                      {isLoadingMore && (
+                        <View style={[styles.loadingIndicator, { left: Math.max(loadingPosition + 20, 20) }]}>
+                          <Text style={styles.loadingText}>Loading...</Text>
+                        </View>
+                      )}
+                      {modalCalendarData && modalCalendarData.length > 0 && (
+                        <HabitCalendar
+                          habit={habit}
+                          calendarData={modalCalendarData}
+                          onDatePress={handleDatePress}
+                          cellSize={32}
+                          isModal={true}
+                        />
+                      )}
+                    </ScrollView>
+                  </ScrollView>
+
+                  {/* Fixed day labels outside scrollable area */}
+                  <View style={styles.modalFixedDayLabels}>
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+                      <View key={index} style={styles.modalDayLabel}>
+                        <Text style={styles.modalDayLabelText}>{day}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
               </View>
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
       </Modal>
-              <ScrollView style={styles.modalContent}>
-                <ScrollView
-                  ref={horizontalScrollRef}
-                  horizontal
-                  showsHorizontalScrollIndicator={true}
-                  style={styles.modalHorizontalScroll}
-                  contentContainerStyle={styles.modalScrollContainer}
-                  scrollEventThrottle={16}
-                  onScroll={handleScroll}
-                  scrollEnabled={!scrollLocked} // Disable scrolling when locked
-                >
-                  {/* Loading indicator positioned at exact loading position */}
-                  {isLoadingMore && (
-                    <View style={[styles.loadingIndicator, { left: Math.max(loadingPosition + 20, 20) }]}>
-                      <Text style={styles.loadingText}>Loading...</Text>
-                    </View>
-                  )}
-                  {modalCalendarData && modalCalendarData.length > 0 && (
-                    <HabitCalendar
-                      habit={habit}
-                      calendarData={modalCalendarData}
-                      onDatePress={handleDatePress}
-                      cellSize={32}
-                      isModal={true}
-                    />
-                  )}
-                </ScrollView>
-              </ScrollView>
-
-              {/* Fixed day labels outside scrollable area */}
-              <View style={styles.modalFixedDayLabels}>
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
-                  <View key={index} style={styles.modalDayLabel}>
-                    <Text style={styles.modalDayLabelText}>{day}</Text>
-                  </View>
-                ))}
-              </View>
-
-            </View>
 
       {/* Yes/No Confirmation Modal - Only for yes/no habits */}
       {habit.goalType === 'yes_no' && (
