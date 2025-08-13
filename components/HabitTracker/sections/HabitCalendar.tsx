@@ -132,48 +132,39 @@ export default function HabitCalendar({
 
     if (isModal) {
       // For modal: organize dates to align with their actual weekdays
-      // Calculate the number of weeks needed based on the date range
-      const firstDate = calendarData[0];
-      const lastDate = calendarData[calendarData.length - 1];
-      
-      // Get the first Sunday of the period (or the first date if it's Sunday)
-      const startOfWeek = new Date(firstDate.date);
-      const daysToSubtract = startOfWeek.getDay(); // 0 = Sunday, so subtract 0; 1 = Monday, subtract 1, etc.
-      startOfWeek.setDate(startOfWeek.getDate() - daysToSubtract);
-      
-      // Get the last Saturday of the period (or the last date if it's Saturday)
-      const endOfWeek = new Date(lastDate.date);
-      const daysToAdd = 6 - endOfWeek.getDay(); // 6 = Saturday, so add 0; 5 = Friday, add 1, etc.
-      endOfWeek.setDate(endOfWeek.getDate() + daysToAdd);
-      
-      // Calculate number of weeks
-      const timeDiff = endOfWeek.getTime() - startOfWeek.getTime();
-      const numColumns = Math.ceil(timeDiff / (7 * 24 * 60 * 60 * 1000));
+      const totalDays = calendarData.length;
+      const numColumns = Math.ceil(totalDays / 7);
 
       // Initialize all grid positions with null
       for (let row = 0; row < 7; row++) {
         grid[row] = new Array(numColumns).fill(null);
       }
 
-      // Create a map of dates for quick lookup
-      const dateMap = new Map();
-      calendarData.forEach(day => {
-        const dateStr = day.date.toDateString();
-        dateMap.set(dateStr, day);
-      });
+      // Fill grid by placing each date in its correct weekday row
+      // Start from the rightmost column and work backwards
+      const today = calendarData[calendarData.length - 1]; // Last date is today
+      const todayWeekday = today.date.getDay(); // 0 = Sunday, 1 = Monday, etc.
 
-      // Fill the grid week by week
-      const currentDate = new Date(startOfWeek);
-      for (let col = 0; col < numColumns; col++) {
-        for (let row = 0; row < 7; row++) {
-          const dateStr = currentDate.toDateString();
-          const dayData = dateMap.get(dateStr);
-          
-          if (dayData) {
-            grid[row][col] = dayData;
-          }
-          
-          currentDate.setDate(currentDate.getDate() + 1);
+      // Place today in the rightmost column at its correct weekday row
+      let currentCol = numColumns - 1;
+      let currentRow = todayWeekday;
+
+      // Fill the grid backwards from today
+      for (let i = calendarData.length - 1; i >= 0; i--) {
+        const day = calendarData[i];
+        const dayWeekday = day.date.getDay();
+
+        // Place the day in the current column at its weekday row
+        grid[dayWeekday][currentCol] = day;
+
+        // Move to the previous day position
+        if (dayWeekday === 0) {
+          // If we just placed Sunday, move to previous column, Saturday
+          currentCol--;
+          currentRow = 6;
+        } else {
+          // Move up one row (previous weekday)
+          currentRow = dayWeekday - 1;
         }
       }
 

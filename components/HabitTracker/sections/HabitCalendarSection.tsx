@@ -150,7 +150,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     // Generate dates starting from the specified number of months ago to today
     // Use local date creation to avoid timezone issues
     const startDate = createLocalDate(today.getFullYear(), today.getMonth() - (monthsToShow - 1), 1);
-    const endDate = createLocalDate(today.getFullYear(), today.getMonth(), today.getDate()); // Only up to today
+    const endDate = createLocalDate(today.getFullYear(), today.getMonth() + 1, 0); // Last day of current month
 
     const days: CalendarDay[] = [];
     const currentDate = createLocalDate(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
@@ -662,7 +662,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 20,
     paddingLeft: 5, // Minimal gap from left edge
-    paddingRight: 20, // Reduced from 45 to 40 to increase scrollable area
+    paddingRight: 40, // Reduced from 45 to 40 to increase scrollable area
     backgroundColor: '#ffffff',
     maxHeight: 400,
   },
@@ -765,7 +765,7 @@ const styles = StyleSheet.create({
   },
   modalSaveButtonContainer: {
     position: 'absolute',
-    bottom: -40,
+    bottom: 40,
     left: 20,
     right: 60, // Leave space for day labels
     zIndex: 200,
