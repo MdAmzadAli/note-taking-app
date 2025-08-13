@@ -584,39 +584,42 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
           animationType="fade"
           onRequestClose={() => setShowYesNoModal(false)}
         >
-          <View style={styles.yesNoModalOverlay}>
-            <View style={styles.yesNoModalContainer}>
-              {/* Top Section - Centered header */}
-              <View style={styles.yesNoModalHeader}>
-                <Text style={styles.yesNoModalTitle}>
-                  {habit.name}
-                </Text>
-                <Text style={styles.yesNoModalDate}>
-                  {selectedDate && `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
-                </Text>
-              </View>
-
-              {/* Bottom Section - Split into two equal halves */}
-              <View style={styles.yesNoModalOptions}>
-                <TouchableOpacity
-                  style={styles.yesNoModalOption}
-                  onPress={() => handleYesNoSave(1)}
-                >
-                  <Text style={[styles.yesNoModalCheckmark, { color: habit.color || '#4ECDC4' }]}>✓</Text>
-                </TouchableOpacity>
-
-                {/* Vertical dividing line */}
-                <View style={styles.yesNoModalDivider} />
-
-                <TouchableOpacity
-                  style={styles.yesNoModalOption}
-                  onPress={() => handleYesNoSave(0)}
-                >
-                  <Text style={styles.yesNoModalCross}>✗</Text>
-                </TouchableOpacity>
-              </View>
+          <TouchableWithoutFeedback onPress={() => setShowYesNoModal(false)}>
+            <View style={styles.yesNoModalOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.yesNoModalContainer}></View>
+              </TouchableWithoutFeedback>
             </View>
-          </View>
+          </TouchableWithoutFeedback>
+              {/* Top Section - Centered header */}
+                <View style={styles.yesNoModalHeader}>
+                  <Text style={styles.yesNoModalTitle}>
+                    {habit.name}
+                  </Text>
+                  <Text style={styles.yesNoModalDate}>
+                    {selectedDate && `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                  </Text>
+                </View>
+
+                {/* Bottom Section - Split into two equal halves */}
+                <View style={styles.yesNoModalOptions}>
+                  <TouchableOpacity
+                    style={styles.yesNoModalOption}
+                    onPress={() => handleYesNoSave(1)}
+                  >
+                    <Text style={[styles.yesNoModalCheckmark, { color: habit.color || '#4ECDC4' }]}>✓</Text>
+                  </TouchableOpacity>
+
+                  {/* Vertical dividing line */}
+                  <View style={styles.yesNoModalDivider} />
+
+                  <TouchableOpacity
+                    style={styles.yesNoModalOption}
+                    onPress={() => handleYesNoSave(0)}
+                  >
+                    <Text style={styles.yesNoModalCross}>✗</Text>
+                  </TouchableOpacity>
+                </View>
         </Modal>
       )}
 
@@ -628,46 +631,49 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
           animationType="fade"
           onRequestClose={() => setShowValueModal(false)}
         >
-          <View style={styles.valueModalOverlay}>
-            <View style={styles.valueModalContainer}>
-              {/* Top Section - Centered header */}
-              <View style={styles.valueModalHeader}>
-                <Text style={styles.valueModalTitle}>
-                  Update {habit.name}
-                </Text>
-                <Text style={styles.valueModalDate}>
-                  {selectedDate && `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
-                </Text>
-              </View>
-
-              {/* Bottom Section - Input and Save Button */}
-              <View style={styles.valueModalInputSection}>
-                <View style={styles.valueModalInputContainer}>
-                  <TextInput
-                    ref={inputRef}
-                    style={styles.valueModalInput}
-                    defaultValue={inputValue.current}
-                    onChangeText={(text) => {
-                      inputValue.current = text;
-                    }}
-                    keyboardType="numeric"
-                    placeholder="0"
-                    autoFocus
-                    autoCorrect={false}
-                    textAlign="center"
-                    selectTextOnFocus={false}
-                    blurOnSubmit={false}
-                  />
-                </View>
-                <TouchableOpacity
-                  style={styles.valueModalSaveButton}
-                  onPress={handleSaveValue}
-                >
-                  <Text style={styles.valueModalSaveButtonText}>Save</Text>
-                </TouchableOpacity>
-              </View>
+          <TouchableWithoutFeedback onPress={() => setShowValueModal(false)}>
+            <View style={styles.valueModalOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.valueModalContainer}></View>
+              </TouchableWithoutFeedback>
             </View>
-          </View>
+          </TouchableWithoutFeedback>
+              {/* Top Section - Centered header */}
+                <View style={styles.valueModalHeader}>
+                  <Text style={styles.valueModalTitle}>
+                    Update {habit.name}
+                  </Text>
+                  <Text style={styles.valueModalDate}>
+                    {selectedDate && `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                  </Text>
+                </View>
+
+                {/* Bottom Section - Input and Save Button */}
+                <View style={styles.valueModalInputSection}>
+                  <View style={styles.valueModalInputContainer}>
+                    <TextInput
+                      ref={inputRef}
+                      style={styles.valueModalInput}
+                      defaultValue={inputValue.current}
+                      onChangeText={(text) => {
+                        inputValue.current = text;
+                      }}
+                      keyboardType="numeric"
+                      placeholder="0"
+                      autoFocus
+                      autoCorrect={false}
+                      textAlign="center"
+                      selectTextOnFocus={false}
+                      blurOnSubmit={false}
+                    />
+                  </View>
+                  <TouchableOpacity
+                    style={styles.valueModalSaveButton}
+                    onPress={handleSaveValue}
+                  >
+                    <Text style={styles.valueModalSaveButtonText}>Save</Text>
+                  </TouchableOpacity>
+                </View>
         </Modal>
       )}
     </View>
