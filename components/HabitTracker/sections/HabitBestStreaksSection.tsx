@@ -109,17 +109,17 @@ export default function HabitBestStreaksSection({ habit }: HabitBestStreaksSecti
       <View style={styles.streaksContainer}>
         {streaks.map((streak, index) => {
           // Calculate bar width proportional to streak length
-          const minBarWidth = 60; // Minimum bar width for readability
+          const baseBarWidth = 40; // Base width for streak of 1
           const maxBarWidth = 240; // Maximum bar width to fit container
-          const barWidth = Math.max(
-            minBarWidth,
-            Math.min(maxBarWidth, (streak.length / maxStreakLength) * maxBarWidth)
+          const barWidth = Math.min(
+            maxBarWidth,
+            baseBarWidth + ((streak.length - 1) * (maxBarWidth - baseBarWidth) / Math.max(1, maxStreakLength - 1))
           );
 
           // Calculate height proportional to streak length
-          const baseHeight = 17;
-          const maxHeight = 18;
-          const barHeight = baseHeight + ((streak.length / maxStreakLength) * (maxHeight - baseHeight));
+          const baseHeight = 16;
+          const maxHeight = 24;
+          const barHeight = baseHeight + ((streak.length - 1) * (maxHeight - baseHeight) / Math.max(1, maxStreakLength - 1));
 
           return (
             <View key={index} style={styles.streakRow}>
