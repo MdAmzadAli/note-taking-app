@@ -580,43 +580,35 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
           animationType="fade"
           onRequestClose={() => setShowYesNoModal(false)}
         >
-          <View style={styles.valueModalOverlay}>
-            <View style={styles.valueModalContainer}>
-              <View style={styles.modalHeaderSection}>
-                <Text style={styles.valueModalTitle}>
-                  Update {habit.name}
+          <View style={styles.yesNoModalOverlay}>
+            <View style={styles.yesNoModalContainer}>
+              {/* Top Section - Centered header */}
+              <View style={styles.yesNoModalHeader}>
+                <Text style={styles.yesNoModalTitle}>
+                  {habit.name}
                 </Text>
-                <Text style={styles.valueModalSubtitle}>
+                <Text style={styles.yesNoModalDate}>
                   {selectedDate && `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
                 </Text>
               </View>
 
-              <View style={styles.modalButtonSection}>
-                <View style={styles.yesNoButtons}>
-                  <TouchableOpacity
-                    style={styles.yesNoButton}
-                    onPress={() => handleYesNoSave(1)}
-                  >
-                    <Text style={styles.yesNoButtonIcon}>✓</Text>
-                    <Text style={styles.yesNoButtonText}>Yes</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.yesNoButton}
-                    onPress={() => handleYesNoSave(0)}
-                  >
-                    <Text style={styles.yesNoButtonIcon}>✗</Text>
-                    <Text style={styles.yesNoButtonText}>No</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={styles.modalCancelSection}>
+              {/* Bottom Section - Split into two equal halves */}
+              <View style={styles.yesNoModalOptions}>
                 <TouchableOpacity
-                  style={[styles.valueModalButton, styles.cancelButton, { width: '100%' }]}
-                  onPress={() => setShowYesNoModal(false)}
+                  style={styles.yesNoModalOption}
+                  onPress={() => handleYesNoSave(1)}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={[styles.yesNoModalCheckmark, { color: habit.color || '#4ECDC4' }]}>✓</Text>
+                </TouchableOpacity>
+                
+                {/* Vertical dividing line */}
+                <View style={styles.yesNoModalDivider} />
+                
+                <TouchableOpacity
+                  style={styles.yesNoModalOption}
+                  onPress={() => handleYesNoSave(0)}
+                >
+                  <Text style={styles.yesNoModalCross}>✗</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -836,41 +828,60 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#ffffff',
   },
-  modalHeaderSection: {
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  modalButtonSection: {
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  modalCancelSection: {
-    paddingTop: 16,
-  },
-  yesNoButtons: {
-    flexDirection: 'row',
+  yesNoModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
-    gap: 24,
-  },
-  yesNoButton: {
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    minWidth: 60,
   },
-  yesNoButtonIcon: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#374151',
+  yesNoModalContainer: {
+    backgroundColor: '#2c2c2e',
+    borderRadius: 20,
+    width: 280,
+    height: 200,
+    overflow: 'hidden',
   },
-  yesNoButtonText: {
+  yesNoModalHeader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  yesNoModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  yesNoModalDate: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginTop: 4,
+    color: '#8e8e93',
+    textAlign: 'center',
+  },
+  yesNoModalOptions: {
+    flexDirection: 'row',
+    height: 80,
+  },
+  yesNoModalOption: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#2c2c2e',
+  },
+  yesNoModalDivider: {
+    width: 1,
+    backgroundColor: '#48484a',
+  },
+  yesNoModalCheckmark: {
+    fontSize: 32,
+    fontWeight: 'bold',
+  },
+  yesNoModalCross: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#8e8e93',
   },
   modalSaveButtonContainer: {
     position: 'absolute',
