@@ -216,12 +216,12 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
     console.log('[HabitCalendarSection] Auto-scroll effect triggered:', {
       showModal,
       hasScrollRef: !!horizontalScrollRef.current,
-      dataLength: modalCalendarData.length,
+      dataLength: modalCalendarData?.length || 0,
       loadedMonths,
       isInitialLoad
     });
 
-    if (showModal && horizontalScrollRef.current && baseModalCalendarData.length > 0 && isInitialLoad) {
+    if (showModal && horizontalScrollRef.current && baseModalCalendarData && baseModalCalendarData.length > 0 && isInitialLoad) {
       console.log('[HabitCalendarSection] Initiating auto-scroll sequence for initial load');
 
       // Single scroll to end after a brief delay for layout completion
@@ -243,7 +243,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
 
   // Effect to handle data loading completion and maintain exact scroll position
   useEffect(() => {
-    if (!isInitialLoad && baseModalCalendarData.length > previousDataLengthRef.current) {
+    if (!isInitialLoad && baseModalCalendarData && baseModalCalendarData.length > previousDataLengthRef.current) {
       const dataLengthDifference = baseModalCalendarData.length - previousDataLengthRef.current;
       console.log('[HabitCalendarSection] Data length increased:', {
         previousLength: previousDataLengthRef.current,
@@ -430,7 +430,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
 
     // Calculate which column is at the leftmost visible edge
     const leftmostVisibleColumn = Math.floor(leftVisibleX / totalCellWidth);
-    const totalColumns = Math.ceil(baseModalCalendarData.length / 7); // 7 rows per column
+    const totalColumns = Math.ceil((baseModalCalendarData?.length || 0) / 7); // 7 rows per column
 
     console.log('[HabitCalendarSection] Scroll intersection check:', {
       contentOffsetX: contentOffset.x,
@@ -462,7 +462,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         preLoadScrollPositionRef.current = contentOffset.x;
 
         // Store data length before change
-        previousDataLengthRef.current = baseModalCalendarData.length;
+        previousDataLengthRef.current = baseModalCalendarData?.length || 0;
 
         // Load new data
         setLoadedMonths(newMonthCount);
@@ -524,13 +524,15 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                       <Text style={styles.loadingText}>Loading...</Text>
                     </View>
                   )}
-                  <HabitCalendar
-                    habit={habit}
-                    calendarData={modalCalendarData}
-                    onDatePress={handleDatePress}
-                    cellSize={32}
-                    isModal={true}
-                  />
+                  {modalCalendarData && modalCalendarData.length > 0 && (
+                    <HabitCalendar
+                      habit={habit}
+                      calendarData={modalCalendarData}
+                      onDatePress={handleDatePress}
+                      cellSize={32}
+                      isModal={true}
+                    />
+                  )}
                 </ScrollView>
               </ScrollView>
 
