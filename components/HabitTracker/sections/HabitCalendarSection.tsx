@@ -836,9 +836,9 @@ const styles = StyleSheet.create({
   },
   yesNoModalContainer: {
     backgroundColor: '#2c2c2e',
-    borderRadius: 20,
-    width: 280,
-    height: 200,
+    borderRadius: 0,
+    width: 220,
+    height: 130,
     overflow: 'hidden',
   },
   yesNoModalHeader: {
@@ -849,20 +849,20 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   yesNoModalTitle: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '600',
     color: '#ffffff',
     textAlign: 'center',
     marginBottom: 8,
   },
   yesNoModalDate: {
-    fontSize: 14,
+    fontSize: 11,
     color: '#8e8e93',
     textAlign: 'center',
   },
   yesNoModalOptions: {
     flexDirection: 'row',
-    height: 80,
+    height: 40,
   },
   yesNoModalOption: {
     flex: 1,
@@ -875,11 +875,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#48484a',
   },
   yesNoModalCheckmark: {
-    fontSize: 32,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   yesNoModalCross: {
-    fontSize: 32,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#8e8e93',
   },
