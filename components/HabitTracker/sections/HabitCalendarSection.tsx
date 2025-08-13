@@ -765,7 +765,7 @@ const styles = StyleSheet.create({
   },
   modalSaveButtonContainer: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 40,
     left: 20,
     right: 60, // Leave space for day labels
     zIndex: 200,
