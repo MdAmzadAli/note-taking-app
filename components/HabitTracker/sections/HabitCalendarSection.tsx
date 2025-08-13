@@ -837,6 +837,8 @@ const styles = StyleSheet.create({
   yesNoModalContainer: {
     backgroundColor: '#2c2c2e',
     borderRadius: 0,
+    borderWidth: 2,
+    borderColor: '#ffffff',
     width: 220,
     height: 130,
     overflow: 'hidden',
