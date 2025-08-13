@@ -189,13 +189,13 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       previousDataLength: previousDataLengthRef.current
     });
 
-    return { modalCalendarData: days, totalMonths: totalAvailableMonths };
+    return { baseModalCalendarData: days, totalMonths: totalAvailableMonths };
   }, [completionMap, loadedMonths, habit.goalType]);
 
   // Apply pending changes to calendar data efficiently
   const modalCalendarData = useMemo(() => {
-    if (Object.keys(pendingChanges).length === 0) {
-      return baseModalCalendarData;
+    if (!baseModalCalendarData || Object.keys(pendingChanges).length === 0) {
+      return baseModalCalendarData || [];
     }
 
     // Only update the days that have pending changes
@@ -239,7 +239,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
         clearTimeout(timeoutId);
       };
     }
-  }, [showModal, baseModalCalendarData.length, isInitialLoad]); // Include dependencies for proper triggering
+  }, [showModal, baseModalCalendarData?.length || 0, isInitialLoad]); // Include dependencies for proper triggering
 
   // Effect to handle data loading completion and maintain exact scroll position
   useEffect(() => {
