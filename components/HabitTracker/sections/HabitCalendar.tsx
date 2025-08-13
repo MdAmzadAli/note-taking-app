@@ -64,57 +64,90 @@ const HabitCalendar = React.memo(function HabitCalendar({
   const getMonthHeaders = (data: CalendarDay[], grid: CalendarDay[][]) => {
     const headers: { month: string; startCol: number; endCol: number; width: number }[] = [];
 
-    // Sort data by date first to ensure proper month grouping
-    const sortedData = [...data].sort((a, b) => a.date.getTime() - b.date.getTime());
+    if (!grid || grid.length === 0) return headers;
 
-    // Track which columns belong to which months
-    const monthColumns: { [key: string]: { columns: number[], year: number, monthName: string } } = {};
+    // Find the maximum number of columns in the grid
+    const maxColumns = Math.max(...grid.map(row => row ? row.length : 0));
 
-    // Map each day to its column position
-    grid.forEach((weekRow, weekIndex) => {
-      weekRow.forEach((day, dayIndex) => {
-        const monthYear = `${day.monthName} ${day.date.getFullYear()}`;
-        if (!monthColumns[monthYear]) {
-          monthColumns[monthYear] = {
-            columns: [],
-            year: day.date.getFullYear(),
-            monthName: day.monthName
-          };
+    // Track which columns contain which months and their visible dates
+    const columnMonths: { [colIndex: number]: string } = {};
+    const columnDays: { [colIndex: number]: CalendarDay[] } = {};
+
+    const today = new Date();
+
+    // For each column, find what month it represents and collect all days
+    for (let colIndex = 0; colIndex < maxColumns; colIndex++) {
+      columnDays[colIndex] = [];
+      for (let rowIndex = 0; rowIndex < grid.length; rowIndex++) {
+        if (grid[rowIndex] && grid[rowIndex][colIndex]) {
+          const day = grid[rowIndex][colIndex];
+          const monthKey = day.monthName; // e.g., "Aug 25"
+          columnMonths[colIndex] = monthKey;
+          columnDays[colIndex].push(day);
         }
-        monthColumns[monthYear].columns.push(dayIndex);
-      });
-    });
-
-    // Sort month entries by year and month
-    const sortedMonthEntries = Object.entries(monthColumns).sort((a, b) => {
-      const [, aData] = a;
-      const [, bData] = b;
-      if (aData.year !== bData.year) {
-        return aData.year - bData.year;
       }
-      const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return monthOrder.indexOf(aData.monthName) - monthOrder.indexOf(bData.monthName);
-    });
+    }
 
-    // Create headers based on column spans, showing year only when it changes
-    let lastYear: number | null = null;
-    sortedMonthEntries.forEach(([monthYear, data]) => {
-      if (data.columns.length > 0) {
-        const uniqueColumns = [...new Set(data.columns)].sort((a, b) => a - b);
-        const startCol = uniqueColumns[0];
-        const endCol = uniqueColumns[uniqueColumns.length - 1];
-        const width = (endCol - startCol + 1) * (cellSize + 2); // Include margin
+    // Group consecutive columns by month
+    const monthGroups: { [monthKey: string]: { startCol: number; endCol: number; hasCurrentMonth: boolean } } = {};
+    let currentMonth = '';
+    let startCol = 0;
 
-        // Show year only when it changes
-        const showYear = lastYear !== data.year;
-        const yearSuffix = data.year.toString().slice(-2); // Get last 2 digits
-        const displayText = data.monthName;
-        lastYear = data.year;
+    for (let colIndex = 0; colIndex < maxColumns; colIndex++) {
+      const monthKey = columnMonths[colIndex];
 
+      if (!monthKey) continue; // Skip empty columns
+
+      if (currentMonth !== monthKey) {
+        // Finish the previous month group
+        if (currentMonth && monthGroups[currentMonth]) {
+          monthGroups[currentMonth].endCol = colIndex - 1;
+        }
+
+        // Check if this month contains today's date
+        const hasCurrentMonth = columnDays[colIndex].some(day => 
+          day.date.getMonth() === today.getMonth() && day.date.getFullYear() === today.getFullYear()
+        );
+
+        // Start a new month group
+        currentMonth = monthKey;
+        startCol = colIndex;
+        monthGroups[currentMonth] = { startCol, endCol: colIndex, hasCurrentMonth };
+      }
+    }
+
+    // Close the last month group
+    if (currentMonth && monthGroups[currentMonth]) {
+      monthGroups[currentMonth].endCol = maxColumns - 1;
+    }
+
+    // Convert month groups to headers, with special handling for current month
+    const sortedMonths = Object.entries(monthGroups).sort((a, b) => a[1].startCol - b[1].startCol);
+
+    sortedMonths.forEach(([monthKey, { startCol, endCol, hasCurrentMonth }]) => {
+      if (startCol <= endCol && columnMonths[startCol]) {
+        let finalStartCol = startCol;
+        let finalEndCol = endCol;
+
+        // For current month, only span columns that have visible (non-future) dates
+        if (hasCurrentMonth) {
+          // Find the rightmost column that contains a non-future date for this month
+          let lastVisibleCol = startCol;
+          for (let colIndex = startCol; colIndex <= endCol; colIndex++) {
+            const daysInColumn = columnDays[colIndex] || [];
+            const hasVisibleDays = daysInColumn.some(day => day.date <= today);
+            if (hasVisibleDays) {
+              lastVisibleCol = colIndex;
+            }
+          }
+          finalEndCol = lastVisibleCol;
+        }
+
+        const width = (finalEndCol - finalStartCol + 1) * (cellSize + 2);
         headers.push({
-          month: displayText,
-          startCol,
-          endCol,
+          month: monthKey,
+          startCol: finalStartCol,
+          endCol: finalEndCol,
           width
         });
       }
@@ -256,7 +289,7 @@ const HabitCalendar = React.memo(function HabitCalendar({
                     const CellComponent = onDatePress ? TouchableOpacity : View;
                     const today = new Date();
                     const isDateInFuture = day.date > today;
-                    
+
                     // Hide future dates by making them invisible
                     if (isDateInFuture) {
                       return (
@@ -273,7 +306,7 @@ const HabitCalendar = React.memo(function HabitCalendar({
                         </View>
                       );
                     }
-                    
+
                     return (
                       <CellComponent
                         key={dayIndex}
