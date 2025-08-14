@@ -375,25 +375,17 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
   };
 
   const handleSaveValue = async () => {
-    // Dismiss keyboard first to prevent interference
-    // Keyboard.dismiss();
-
     if (selectedDate) {
       const dateStr = formatDateString(selectedDate);
       const newValue = parseInt(inputValue.current) || 0;
-      // requestAnimationFrame(() => Keyboard.dismiss());
+      
       // Apply local update immediately for instant visual feedback
       setLocalUpdates(prev => ({
         ...prev,
         [dateStr]: newValue
       }));
 
-      // Close modal first
-      setShowValueModal(false);
-      setSelectedDate(null);
-      inputValue.current = '';
-      setTimeout(() => Keyboard.dismiss(), 80);
-      // Then persist to storage asynchronously
+      // Persist to storage first
       if (onSaveValue) {
         try {
           await onSaveValue(habit.id, dateStr, newValue);
@@ -414,6 +406,16 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
           });
         }
       }
+
+      // Then close modal and dismiss keyboard
+      setShowValueModal(false);
+      setSelectedDate(null);
+      inputValue.current = '';
+      
+      // Dismiss keyboard after modal operations
+      setTimeout(() => {
+        Keyboard.dismiss();
+      }, 100);
     }
   };
 
@@ -614,12 +616,13 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                                     }}
                                     keyboardType="numeric"
                                     placeholder="0"
-                                    autoFocus
+                                    autoFocus={true}
                                     autoCorrect={false}
                                     textAlign="center"
-                                    selectTextOnFocus={false}
-                                    blurOnSubmit={false}
+                                    selectTextOnFocus={true}
+                                    blurOnSubmit={true}
                                     onSubmitEditing={handleSaveValue}
+                                    returnKeyType="done"
                                   />
                                 </View>
                                 <TouchableOpacity
@@ -1015,5 +1018,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 1000,
+    backgroundColor: 'transparent',
   },
 });
