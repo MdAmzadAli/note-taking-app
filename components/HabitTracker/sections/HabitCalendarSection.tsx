@@ -573,6 +573,69 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                     ))}
                   </View>
                 </View>
+
+                {/* Value dialog inside the calendar modal overlay (instead of separate Modal) */}
+                {habit.goalType !== 'yes_no' && showValueModal && (
+                  <View style={styles.valueDialogAbsoluteContainer}>
+                    <KeyboardAvoidingView
+                      style={{ flex: 1 }}
+                      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+                    >
+                      <TouchableWithoutFeedback onPress={() => {
+                        setShowValueModal(false);
+                      }}>
+                        <View style={styles.valueModalOverlay}>
+                          <TouchableWithoutFeedback onPress={() => {}}>
+                            <View 
+                              style={styles.valueModalContainer}
+                              onStartShouldSetResponder={() => true}
+                            >
+                              {/* Top Section - Centered header */}
+                              <View style={styles.valueModalHeader}>
+                                <Text style={styles.valueModalTitle}>
+                                  Update {habit.name}
+                                </Text>
+                                <Text style={styles.valueModalDate}>
+                                  {selectedDate && `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                                </Text>
+                              </View>
+
+                              {/* Bottom Section - Input and Save Button */}
+                              <View style={styles.valueModalInputSection}>
+                                <View style={styles.valueModalInputContainer}>
+                                  <TextInput
+                                    ref={inputRef}
+                                    style={styles.valueModalInput}
+                                    defaultValue={inputValue.current}
+                                    onChangeText={(text) => {
+                                      inputValue.current = text;
+                                    }}
+                                    keyboardType="numeric"
+                                    placeholder="0"
+                                    autoFocus
+                                    autoCorrect={false}
+                                    textAlign="center"
+                                    selectTextOnFocus={false}
+                                    blurOnSubmit={false}
+                                    onSubmitEditing={handleSaveValue}
+                                  />
+                                </View>
+                                <TouchableOpacity
+                                  style={styles.valueModalSaveButton}
+                                  onPress={handleSaveValue}
+                                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                >
+                                  <Text style={styles.valueModalSaveButtonText}>Save</Text>
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          </TouchableWithoutFeedback>
+                        </View>
+                      </TouchableWithoutFeedback>
+                    </KeyboardAvoidingView>
+                  </View>
+                )}
               </View>
             </TouchableWithoutFeedback>
           </View>
@@ -628,31 +691,28 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       )}
 
       {/* Value Input Modal - Only for measurable habits */}
-      {habit.goalType !== 'yes_no' && (
+      {/* {habit.goalType !== 'yes_no' && (
         <Modal
           visible={showValueModal}
           transparent
           animationType="fade"
-          onRequestClose={() => {setShowValueModal(false);
-          }
-          }
+          onRequestClose={() => {
+            setShowValueModal(false);
+          }}
         >
           <KeyboardAvoidingView
             style={{ flex: 1 }}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0} // tweak for your header height
           >
-          <TouchableWithoutFeedback onPress={() => {setShowValueModal(false);
-              }
-          }>
-           
-            <View style={styles.valueModalOverlay}>
-              {/* <TouchableWithoutFeedback onPress={() => {}}> */}
+            <TouchableWithoutFeedback onPress={() => {
+              setShowValueModal(false);
+            }}>
+              <View style={styles.valueModalOverlay}>
                 <View 
                   style={styles.valueModalContainer}
                   onStartShouldSetResponder={() => true}
-                  >
-                  {/* Top Section - Centered header */}
+                >
                   <View style={styles.valueModalHeader}>
                     <Text style={styles.valueModalTitle}>
                       Update {habit.name}
@@ -662,7 +722,6 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                     </Text>
                   </View>
 
-                  {/* Bottom Section - Input and Save Button */}
                   <View style={styles.valueModalInputSection}>
                     <View style={styles.valueModalInputContainer}>
                       <TextInput
@@ -684,19 +743,18 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                     </View>
                     <TouchableOpacity
                       style={styles.valueModalSaveButton}
-                      onPress={handleSaveValue}   // use onPress
+                      onPress={handleSaveValue}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
                       <Text style={styles.valueModalSaveButtonText}>Save</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
-              {/* </TouchableWithoutFeedback> */}
-            </View>
-          </TouchableWithoutFeedback>
-            </KeyboardAvoidingView>
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
         </Modal>
-      )}
+      )} */}
     </View>
   );
 }
@@ -948,5 +1006,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#6b7280',
+  },
+  valueDialogAbsoluteContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
   },
 });
