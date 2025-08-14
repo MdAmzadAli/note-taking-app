@@ -544,7 +544,8 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                       contentContainerStyle={styles.modalScrollContainer}
                       scrollEventThrottle={16}
                       onScroll={handleScroll}
-                      scrollEnabled={!scrollLocked} // Disable scrolling when locked
+                      scrollEnabled={!scrollLocked}
+                    keyboardShouldPersistTaps="handled"
                     >
                       {/* Loading indicator positioned at exact loading position */}
                       {isLoadingMore && (
