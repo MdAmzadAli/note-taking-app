@@ -376,12 +376,12 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
 
   const handleSaveValue = async () => {
     // Dismiss keyboard first to prevent interference
-    Keyboard.dismiss();
+    // Keyboard.dismiss();
 
     if (selectedDate) {
       const dateStr = formatDateString(selectedDate);
       const newValue = parseInt(inputValue.current) || 0;
-
+      // requestAnimationFrame(() => Keyboard.dismiss());
       // Apply local update immediately for instant visual feedback
       setLocalUpdates(prev => ({
         ...prev,
@@ -392,7 +392,7 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
       setShowValueModal(false);
       setSelectedDate(null);
       inputValue.current = '';
-
+      setTimeout(() => Keyboard.dismiss(), 80);
       // Then persist to storage asynchronously
       if (onSaveValue) {
         try {
@@ -532,7 +532,10 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
             <TouchableWithoutFeedback onPress={() => {}}>
               <View style={styles.modalContainer}>
                 <View style={styles.modalContentWithLabels}>
-                  <ScrollView style={styles.modalContent}>
+                  <ScrollView 
+                    style={styles.modalContent}
+                    keyboardShouldPersistTaps="handled"
+                    >
                     <ScrollView
                       ref={horizontalScrollRef}
                       horizontal
@@ -630,18 +633,25 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
           visible={showValueModal}
           transparent
           animationType="fade"
-          onRequestClose={() => setShowValueModal(false)}
+          onRequestClose={() => {setShowValueModal(false);
+          }
+          }
         >
           <KeyboardAvoidingView
             style={{ flex: 1 }}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0} // tweak for your header height
           >
-          <TouchableWithoutFeedback onPress={() => setShowValueModal(false)}>
+          <TouchableWithoutFeedback onPress={() => {setShowValueModal(false);
+              }
+          }>
            
             <View style={styles.valueModalOverlay}>
-              <TouchableWithoutFeedback onPress={() => {}}>
-                <View style={styles.valueModalContainer}>
+              {/* <TouchableWithoutFeedback onPress={() => {}}> */}
+                <View 
+                  style={styles.valueModalContainer}
+                  onStartShouldSetResponder={() => true}
+                  >
                   {/* Top Section - Centered header */}
                   <View style={styles.valueModalHeader}>
                     <Text style={styles.valueModalTitle}>
@@ -669,17 +679,19 @@ export default function HabitCalendarSection({ habit, onSaveValue }: HabitCalend
                         textAlign="center"
                         selectTextOnFocus={false}
                         blurOnSubmit={false}
+                        onSubmitEditing={handleSaveValue}
                       />
                     </View>
                     <TouchableOpacity
                       style={styles.valueModalSaveButton}
-                      onPress={()=>{ Keyboard.dismiss(); handleSaveValue();}}
+                      onPress={handleSaveValue}   // use onPress
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
                       <Text style={styles.valueModalSaveButtonText}>Save</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
-              </TouchableWithoutFeedback>
+              {/* </TouchableWithoutFeedback> */}
             </View>
           </TouchableWithoutFeedback>
             </KeyboardAvoidingView>
