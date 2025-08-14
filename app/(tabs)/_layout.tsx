@@ -76,10 +76,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="templates"
+        name="expert"
         options={{
-          title: 'Templates',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="document.badge.plus" color={color} />,
+          title: 'Expert',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="person.crop.circle.badge.plus" color={color} />,
         }}
       />
       <Tabs.Screen
