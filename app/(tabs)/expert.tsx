@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -58,7 +57,7 @@ export default function ExpertTab() {
     try {
       const filesData = await AsyncStorage.getItem('expert_single_files');
       const workspacesData = await AsyncStorage.getItem('expert_workspaces');
-      
+
       if (filesData) {
         setSingleFiles(JSON.parse(filesData));
       }
@@ -191,7 +190,7 @@ export default function ExpertTab() {
     const aiResponse = selectedFile 
       ? `Based on "${selectedFile.name}", here's my analysis: ${currentMessage}`
       : `Based on workspace "${selectedWorkspace?.name}" with ${selectedWorkspace?.files.length} files, here's my analysis: ${currentMessage}`;
-    
+
     const sources = selectedFile 
       ? [selectedFile.name]
       : selectedWorkspace?.files.map(f => f.name) || [];
@@ -206,8 +205,17 @@ export default function ExpertTab() {
 
   const renderFileCard = ({ item }: { item: SingleFile }) => (
     <TouchableOpacity style={styles.fileCard} onPress={() => openFileChat(item)}>
-      <Text style={styles.fileName}>{item.name}</Text>
-      <Text style={styles.fileDate}>Uploaded: {item.uploadDate}</Text>
+      <View style={styles.filePreview}>
+        {/* Placeholder for file preview */}
+        <Text style={styles.previewPlaceholder}>Preview</Text>
+      </View>
+      <View style={styles.fileInfo}>
+        <Text style={styles.fileName}>{item.name}</Text>
+        <Text style={styles.fileDate}>Uploaded: {item.uploadDate}</Text>
+      </View>
+      <TouchableOpacity style={styles.chatButton} onPress={() => openFileChat(item)}>
+        <IconSymbol size={20} name="chatbubble.left.ellipsis.fill" color="#FFFFFF" />
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 
@@ -291,6 +299,7 @@ export default function ExpertTab() {
             numColumns={2}
             columnWrapperStyle={styles.fileRow}
             showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.filesList}
           />
         )}
       </View>
@@ -307,14 +316,14 @@ export default function ExpertTab() {
                     <Text style={styles.menuCloseText}>Close</Text>
                   </TouchableOpacity>
                 </View>
-                
+
                 <FlatList
                   data={workspaces}
                   renderItem={renderWorkspaceItem}
                   keyExtractor={(item) => item.id}
                   style={styles.workspaceList}
                 />
-                
+
                 <View style={styles.menuFooter}>
                   <TouchableOpacity
                     style={styles.createWorkspaceButton}
@@ -338,7 +347,7 @@ export default function ExpertTab() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Upload Single File</Text>
             <Text style={styles.modalSubtitle}>Select a file to chat with AI</Text>
-            
+
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.modalButton} onPress={handleUploadSingleFile}>
                 <Text style={styles.modalButtonText}>Choose File</Text>
@@ -360,14 +369,14 @@ export default function ExpertTab() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Create New Workspace</Text>
             <Text style={styles.modalSubtitle}>Upload up to 5 files for collaborative AI chat</Text>
-            
+
             <TextInput
               style={styles.workspaceNameInput}
               value={workspaceName}
               onChangeText={setWorkspaceName}
               placeholder="Enter workspace name"
             />
-            
+
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.modalButton} onPress={handleCreateWorkspace}>
                 <Text style={styles.modalButtonText}>Create & Upload Files</Text>
@@ -454,26 +463,57 @@ const styles = StyleSheet.create({
   fileRow: {
     justifyContent: 'space-between',
   },
+  filesList: {
+    paddingBottom: 20, // Add padding at the bottom of the list
+  },
   fileCard: {
-    width: '48%',
+    width: '48%', // Adjust width for two columns
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
-    padding: 16,
+    padding: 12, // Reduced padding slightly
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    justifyContent: 'space-between', // Distribute space for preview, info, and button
+  },
+  filePreview: {
+    width: '100%',
+    height: 100, // Fixed height for preview
+    backgroundColor: '#E5E7EB', // Placeholder background
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  previewPlaceholder: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontFamily: 'Inter',
+  },
+  fileInfo: {
+    flex: 1, // Take available space
+    marginBottom: 8, // Space before the chat button
   },
   fileName: {
     fontSize: 14,
     fontWeight: 'bold',
     color: '#000000',
-    marginBottom: 4,
     fontFamily: 'Inter',
+    marginBottom: 4,
+    flexShrink: 1, // Allow text to shrink if necessary
   },
   fileDate: {
     fontSize: 12,
     color: '#6B7280',
     fontFamily: 'Inter',
+  },
+  chatButton: {
+    backgroundColor: '#000000',
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 'auto', // Push button to the bottom
   },
   menuOverlay: {
     position: 'absolute',
