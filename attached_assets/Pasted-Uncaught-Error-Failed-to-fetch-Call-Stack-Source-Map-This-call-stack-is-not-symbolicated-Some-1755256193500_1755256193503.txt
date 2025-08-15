@@ -1,0 +1,77 @@
+Uncaught Error
+Failed to fetch
+Call Stack
+
+Source Map
+This call stack is not symbolicated. Some features are unavailable such as viewing the function name or tapping to open files.
+window.fetch
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:218642
+Object.apply
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/__replco/static/devtools/injected.js:253:39
+FileService.checkHealth
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:62762:32
+checkBackendConnection
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:60608:54
+<unknown>
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:60603:7
+react-stack-bottom-frame
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:144294:20
+runWithFiberInDEV
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:132777:16
+commitHookEffectListMount
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:137891:620
+commitHookPassiveMountEffects
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:137928:58
+reconnectPassiveEffects
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138882:11
+recursivelyTraverseReconnectPassiveEffects
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138873:68
+commitPassiveMountOnFiber
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138860:538
+recursivelyTraversePassiveMountEffects
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138826:106
+commitPassiveMountOnFiber
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138868:11
+recursivelyTraversePassiveMountEffects
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138826:106
+commitPassiveMountOnFiber
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138868:11
+recursivelyTraversePassiveMountEffects
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138826:106
+commitPassiveMountOnFiber
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138868:11
+recursivelyTraversePassiveMountEffects
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138826:106
+commitPassiveMountOnFiber
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138834:11
+recursivelyTraversePassiveMountEffects
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138826:106
+commitPassiveMountOnFiber
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138834:11
+recursivelyTraversePassiveMountEffects
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138826:106
+commitPassiveMountOnFiber
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138834:11
+recursivelyTraversePassiveMountEffects
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138826:106
+commitPassiveMountOnFiber
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138868:11
+recursivelyTraversePassiveMountEffects
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138826:106
+commitPassiveMountOnFiber
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138868:11
+recursivelyTraversePassiveMountEffects
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138826:106
+commitPassiveMountOnFiber
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138834:11
+recursivelyTraversePassiveMountEffects
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138826:106
+commitPassiveMountOnFiber
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138868:11
+recursivelyTraversePassiveMountEffects
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138826:106
+commitPassiveMountOnFiber
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138868:11
+recursivelyTraversePassiveMountEffects
+https://74e13b3a-4f40-4ef6-88fa-e56214bece18-00-3kchvdimt8d40.pike.replit.dev/node_modules/expo-router/entry.bundle:138826:106
+Showing all frames
