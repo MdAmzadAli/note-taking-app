@@ -200,11 +200,14 @@ app.post('/upload', upload.single('file'), async (req, res) => {
 
     // Generate preview immediately after upload
     console.log('🖼️ Generating preview...');
+    console.log('🖼️ File info for preview:', JSON.stringify(fileInfo, null, 2));
     try {
       await fileService.generatePreview(fileInfo);
       console.log('✅ Preview generated successfully');
     } catch (previewError) {
-      console.warn('⚠️ Preview generation failed:', previewError.message);
+      console.error('❌ Preview generation failed with error:', previewError);
+      console.error('❌ Preview error stack:', previewError.stack);
+      console.error('❌ File path exists?', require('fs').existsSync(fileInfo.path));
       // Don't fail the upload if preview fails
     }
 

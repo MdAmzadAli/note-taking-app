@@ -8,8 +8,17 @@ const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
 
 class PDFService {
   constructor() {
-    // Configure PDF.js for Node.js environment without NodeCanvasFactory
-    // We'll use the canvas package directly instead
+    try {
+      // Configure PDF.js for Node.js environment
+      const NodeCanvasFactory = require('pdfjs-dist/lib/canvas').NodeCanvasFactory;
+      this.canvasFactory = new NodeCanvasFactory();
+    } catch (error) {
+      console.warn('⚠️ NodeCanvasFactory not available, using fallback');
+      this.canvasFactory = null;
+    }
+    
+    // Disable worker for Node.js environment
+    pdfjsLib.GlobalWorkerOptions.workerSrc = null;
   }
 
   /**
@@ -30,14 +39,26 @@ class PDFService {
       // Read PDF file
       const pdfBuffer = await fs.readFile(pdfPath);
       
+      console.log('📄 Starting PDF rendering for:', pdfPath);
+      console.log('📄 PDF buffer size:', pdfBuffer.length, 'bytes');
+      
       // Load PDF document
-      const loadingTask = pdfjsLib.getDocument({
+      const documentConfig = {
         data: pdfBuffer,
         useSystemFonts: true,
-        disableFontFace: false
-      });
+        disableFontFace: false,
+        disableWebGL: true,
+        verbosity: 0 // Reduce logging
+      };
       
+      if (this.canvasFactory) {
+        documentConfig.canvasFactory = this.canvasFactory;
+      }
+      
+      const loadingTask = pdfjsLib.getDocument(documentConfig);
       const pdfDocument = await loadingTask.promise;
+      
+      console.log('📄 PDF loaded successfully, pages:', pdfDocument.numPages);
       
       // Validate page number
       if (pageNumber < 1 || pageNumber > pdfDocument.numPages) {
@@ -46,9 +67,11 @@ class PDFService {
 
       // Get the specified page
       const page = await pdfDocument.getPage(pageNumber);
+      console.log('📄 Page', pageNumber, 'loaded successfully');
       
       // Calculate viewport
       const viewport = page.getViewport({ scale });
+      console.log('📄 Viewport size:', viewport.width, 'x', viewport.height);
       
       // Create canvas using the canvas package
       const canvas = createCanvas(viewport.width, viewport.height);
@@ -60,7 +83,13 @@ class PDFService {
         viewport: viewport
       };
       
+      if (this.canvasFactory) {
+        renderContext.canvasFactory = this.canvasFactory;
+      }
+      
+      console.log('📄 Starting page render...');
       await page.render(renderContext).promise;
+      console.log('📄 Page render completed successfully');
       
       // Convert to JPEG buffer
       const buffer = canvas.toBuffer('image/jpeg', { quality: quality / 100 });
