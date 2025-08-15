@@ -278,19 +278,21 @@ export default function ExpertTab() {
     return mime.includes('csv') || fileExt === 'csv';
   };
 
-  const parseCSVPreview = (csvContent: string): string => {
+  const parseCSVPreview = (csvContent: string, isPreview: boolean = true): string => {
     try {
-      const lines = csvContent.split('\n').slice(0, 4); // First 4 rows
-      const table = lines.map(line => {
-        const cells = line.split(',').slice(0, 4); // First 4 columns
-        return `<tr>${cells.map(cell => `<td style="border: 1px solid #ddd; padding: 8px;">${cell.trim()}</td>`).join('')}</tr>`;
+      const lines = csvContent.split('\n');
+      const rowsToShow = isPreview ? Math.min(4, lines.length) : lines.length;
+      const table = lines.slice(0, rowsToShow).map(line => {
+        const cells = line.split(',');
+        const cellsToShow = isPreview ? Math.min(4, cells.length) : cells.length;
+        return `<tr>${cells.slice(0, cellsToShow).map(cell => `<td style="border: 1px solid #ddd; padding: 8px; font-size: ${isPreview ? '10px' : '12px'};">${cell.trim()}</td>`).join('')}</tr>`;
       }).join('');
       
       return `
-        <table style="border-collapse: collapse; width: 100%; font-size: 12px;">
+        <table style="border-collapse: collapse; width: 100%; font-size: ${isPreview ? '10px' : '12px'};">
           ${table}
         </table>
-        <p style="margin-top: 10px; font-size: 10px; color: #666;">Showing first 4 rows and columns</p>
+        ${isPreview ? '<p style="margin-top: 10px; font-size: 8px; color: #666;">Preview - First 4 rows and columns</p>' : ''}
       `;
     } catch (error) {
       return '<p>Error parsing CSV content</p>';
@@ -327,17 +329,50 @@ export default function ExpertTab() {
         />
       );
     } else if (isPDFFile(file.mimeType, file.name)) {
+      // Show PDF preview using WebView with first page
       return (
         <View style={styles.previewPDF}>
-          <Text style={styles.fileIcon}>📕</Text>
-          <Text style={styles.previewText}>PDF</Text>
+          <WebView
+            source={{ uri: file.uri }}
+            style={styles.pdfPreviewWebView}
+            startInLoadingState={false}
+            scrollEnabled={false}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            pointerEvents="none"
+            onError={() => {
+              // Fallback to icon if WebView fails
+              console.log('PDF preview failed, showing fallback');
+            }}
+            renderError={() => (
+              <View style={styles.previewPDFFallback}>
+                <Text style={styles.fileIcon}>📕</Text>
+                <Text style={styles.previewText}>PDF</Text>
+              </View>
+            )}
+          />
         </View>
       );
     } else if (isCSVFile(file.mimeType, file.name)) {
+      // Show CSV preview with actual data
+      const csvPreviewHTML = parseCSVPreview(file.content, true);
       return (
         <View style={styles.previewCSV}>
-          <Text style={styles.fileIcon}>📊</Text>
-          <Text style={styles.previewText}>CSV</Text>
+          <WebView
+            source={{ html: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="margin: 4px; font-family: -apple-system;">${csvPreviewHTML}</body></html>` }}
+            style={styles.csvPreviewWebView}
+            startInLoadingState={false}
+            scrollEnabled={false}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            pointerEvents="none"
+            renderError={() => (
+              <View style={styles.previewCSVFallback}>
+                <Text style={styles.fileIcon}>📊</Text>
+                <Text style={styles.previewText}>CSV</Text>
+              </View>
+            )}
+          />
         </View>
       );
     } else {
@@ -359,26 +394,42 @@ export default function ExpertTab() {
         />
       );
     } else if (isPDFFile(file.mimeType, file.name)) {
-      const pdfUri = Platform.OS === 'android' ? `file://${file.uri}` : file.uri;
       return (
         <WebView
-          source={{ uri: pdfUri }}
+          source={{ uri: file.uri }}
           style={styles.webViewContainer}
           startInLoadingState={true}
+          showsHorizontalScrollIndicator={true}
+          showsVerticalScrollIndicator={true}
+          allowsFullscreenVideo={false}
           renderLoading={() => (
             <View style={styles.loadingContainer}>
               <Text>Loading PDF...</Text>
             </View>
           )}
+          renderError={() => (
+            <View style={styles.fullPreviewPlaceholder}>
+              <Text style={styles.fullPreviewIcon}>📕</Text>
+              <Text style={styles.fullPreviewText}>PDF Preview Unavailable</Text>
+              <Text style={styles.fullPreviewSubtext}>
+                This PDF cannot be displayed in the preview
+              </Text>
+              <Text style={styles.fullPreviewSubtext}>
+                Use the Chat button to analyze this file with AI
+              </Text>
+            </View>
+          )}
         />
       );
     } else if (isCSVFile(file.mimeType, file.name)) {
-      const csvHTML = parseCSVPreview(file.content);
+      const csvHTML = parseCSVPreview(file.content, false);
       return (
         <WebView
-          source={{ html: `<html><body style="margin: 16px;">${csvHTML}</body></html>` }}
+          source={{ html: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="margin: 16px; font-family: -apple-system;">${csvHTML}</body></html>` }}
           style={styles.webViewContainer}
           startInLoadingState={true}
+          showsHorizontalScrollIndicator={true}
+          showsVerticalScrollIndicator={true}
         />
       );
     } else {
@@ -1082,5 +1133,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F9FAFB',
+  },
+  pdfPreviewWebView: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'transparent',
+  },
+  csvPreviewWebView: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'transparent',
+  },
+  previewPDFFallback: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
+  },
+  previewCSVFallback: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
   },
 });
