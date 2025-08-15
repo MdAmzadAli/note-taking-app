@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -16,8 +17,10 @@ import {
   ScrollView,
   Image,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface SingleFile {
@@ -27,6 +30,8 @@ interface SingleFile {
   content: string;
   uri: string;
   mimeType?: string;
+  base64?: string;
+  fileSize?: number;
 }
 
 interface Workspace {
@@ -82,6 +87,21 @@ export default function ExpertTab() {
     }
   };
 
+  const readFileContent = async (uri: string, mimeType?: string): Promise<string> => {
+    try {
+      if (mimeType?.includes('text') || mimeType?.includes('csv')) {
+        return await FileSystem.readAsStringAsync(uri);
+      } else {
+        return await FileSystem.readAsStringAsync(uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      }
+    } catch (error) {
+      console.error('Error reading file:', error);
+      return '';
+    }
+  };
+
   const openMenu = () => {
     setIsMenuVisible(true);
     Animated.timing(slideAnim, {
@@ -110,13 +130,17 @@ export default function ExpertTab() {
 
       if (!result.canceled && result.assets[0]) {
         const file = result.assets[0];
+        const content = await readFileContent(file.uri, file.mimeType);
+        
         const newFile: SingleFile = {
           id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
           name: file.name,
           uploadDate: new Date().toLocaleDateString(),
-          content: 'File content placeholder', // In real app, you'd read the file content
+          content: content,
           uri: file.uri,
           mimeType: file.mimeType,
+          base64: file.mimeType?.includes('text') ? undefined : content,
+          fileSize: file.size,
         };
 
         const updatedFiles = [...singleFiles, newFile];
@@ -145,14 +169,23 @@ export default function ExpertTab() {
       });
 
       if (!results.canceled) {
-        const files: SingleFile[] = results.assets.slice(0, 5).map((file, index) => ({
-          id: Date.now().toString() + index + Math.random().toString(36).substr(2, 9),
-          name: file.name,
-          uploadDate: new Date().toLocaleDateString(),
-          content: 'File content placeholder',
-          uri: file.uri,
-          mimeType: file.mimeType,
-        }));
+        const files: SingleFile[] = [];
+        
+        for (let i = 0; i < Math.min(results.assets.length, 5); i++) {
+          const file = results.assets[i];
+          const content = await readFileContent(file.uri, file.mimeType);
+          
+          files.push({
+            id: Date.now().toString() + i + Math.random().toString(36).substr(2, 9),
+            name: file.name,
+            uploadDate: new Date().toLocaleDateString(),
+            content: content,
+            uri: file.uri,
+            mimeType: file.mimeType,
+            base64: file.mimeType?.includes('text') ? undefined : content,
+            fileSize: file.size,
+          });
+        }
 
         const newWorkspace: Workspace = {
           id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
@@ -227,6 +260,43 @@ export default function ExpertTab() {
     return mime.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileExt);
   };
 
+  const isPDFFile = (mimeType?: string, fileName?: string) => {
+    if (!mimeType && !fileName) return false;
+    
+    const fileExt = fileName?.toLowerCase().split('.').pop() || '';
+    const mime = mimeType?.toLowerCase() || '';
+    
+    return mime.includes('pdf') || fileExt === 'pdf';
+  };
+
+  const isCSVFile = (mimeType?: string, fileName?: string) => {
+    if (!mimeType && !fileName) return false;
+    
+    const fileExt = fileName?.toLowerCase().split('.').pop() || '';
+    const mime = mimeType?.toLowerCase() || '';
+    
+    return mime.includes('csv') || fileExt === 'csv';
+  };
+
+  const parseCSVPreview = (csvContent: string): string => {
+    try {
+      const lines = csvContent.split('\n').slice(0, 4); // First 4 rows
+      const table = lines.map(line => {
+        const cells = line.split(',').slice(0, 4); // First 4 columns
+        return `<tr>${cells.map(cell => `<td style="border: 1px solid #ddd; padding: 8px;">${cell.trim()}</td>`).join('')}</tr>`;
+      }).join('');
+      
+      return `
+        <table style="border-collapse: collapse; width: 100%; font-size: 12px;">
+          ${table}
+        </table>
+        <p style="margin-top: 10px; font-size: 10px; color: #666;">Showing first 4 rows and columns</p>
+      `;
+    } catch (error) {
+      return '<p>Error parsing CSV content</p>';
+    }
+  };
+
   const sendMessage = () => {
     if (!currentMessage.trim()) return;
 
@@ -247,6 +317,90 @@ export default function ExpertTab() {
     setCurrentMessage('');
   };
 
+  const renderFilePreview = (file: SingleFile) => {
+    if (isImageFile(file.mimeType, file.name)) {
+      return (
+        <Image 
+          source={{ uri: file.uri }} 
+          style={styles.previewImage} 
+          resizeMode="cover"
+        />
+      );
+    } else if (isPDFFile(file.mimeType, file.name)) {
+      return (
+        <View style={styles.previewPDF}>
+          <Text style={styles.fileIcon}>📕</Text>
+          <Text style={styles.previewText}>PDF</Text>
+        </View>
+      );
+    } else if (isCSVFile(file.mimeType, file.name)) {
+      return (
+        <View style={styles.previewCSV}>
+          <Text style={styles.fileIcon}>📊</Text>
+          <Text style={styles.previewText}>CSV</Text>
+        </View>
+      );
+    } else {
+      return (
+        <View style={styles.previewIcon}>
+          <Text style={styles.fileIcon}>{getFileIcon(file.mimeType, file.name)}</Text>
+        </View>
+      );
+    }
+  };
+
+  const renderFullFileContent = (file: SingleFile) => {
+    if (isImageFile(file.mimeType, file.name)) {
+      return (
+        <Image 
+          source={{ uri: file.uri }} 
+          style={styles.fullPreviewImage} 
+          resizeMode="contain"
+        />
+      );
+    } else if (isPDFFile(file.mimeType, file.name)) {
+      const pdfUri = Platform.OS === 'android' ? `file://${file.uri}` : file.uri;
+      return (
+        <WebView
+          source={{ uri: pdfUri }}
+          style={styles.webViewContainer}
+          startInLoadingState={true}
+          renderLoading={() => (
+            <View style={styles.loadingContainer}>
+              <Text>Loading PDF...</Text>
+            </View>
+          )}
+        />
+      );
+    } else if (isCSVFile(file.mimeType, file.name)) {
+      const csvHTML = parseCSVPreview(file.content);
+      return (
+        <WebView
+          source={{ html: `<html><body style="margin: 16px;">${csvHTML}</body></html>` }}
+          style={styles.webViewContainer}
+          startInLoadingState={true}
+        />
+      );
+    } else {
+      return (
+        <View style={styles.fullPreviewPlaceholder}>
+          <Text style={styles.fullPreviewIcon}>
+            {getFileIcon(file.mimeType, file.name)}
+          </Text>
+          <Text style={styles.fullPreviewText}>
+            {file.name}
+          </Text>
+          <Text style={styles.fullPreviewSubtext}>
+            File preview not available for this format
+          </Text>
+          <Text style={styles.fullPreviewSubtext}>
+            Use the Chat button to analyze this file with AI
+          </Text>
+        </View>
+      );
+    }
+  };
+
   const renderFileCard = ({ item }: { item: SingleFile }) => (
     <View style={styles.fileCard}>
       <TouchableOpacity 
@@ -254,20 +408,10 @@ export default function ExpertTab() {
         onPress={() => openFilePreview(item)}
         activeOpacity={0.7}
       >
-        {isImageFile(item.mimeType, item.name) ? (
-          <Image 
-            source={{ uri: item.uri }} 
-            style={styles.previewImage} 
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.previewIcon}>
-            <Text style={styles.fileIcon}>{getFileIcon(item.mimeType, item.name)}</Text>
-          </View>
-        )}
+        {renderFilePreview(item)}
       </TouchableOpacity>
       <View style={styles.fileInfo}>
-        <Text style={styles.fileName}>{item.name}</Text>
+        <Text style={styles.fileName} numberOfLines={2}>{item.name}</Text>
         <Text style={styles.fileDate}>Uploaded: {item.uploadDate}</Text>
       </View>
       <TouchableOpacity 
@@ -306,7 +450,7 @@ export default function ExpertTab() {
                 <Text style={styles.messageText}>{msg.user}</Text>
               </View>
               <View style={styles.aiMessage}>
-                <Text style={styles.messageText}>{msg.ai}</Text>
+                <Text style={[styles.messageText, { color: '#000000' }]}>{msg.ai}</Text>
                 {msg.sources && msg.sources.length > 0 && (
                   <Text style={styles.sourcesText}>
                     Sources: {msg.sources.join(', ')}
@@ -476,30 +620,9 @@ export default function ExpertTab() {
               </TouchableOpacity>
             </View>
             
-            <ScrollView style={styles.previewModalBody} showsVerticalScrollIndicator={false}>
-              {previewFile && isImageFile(previewFile.mimeType, previewFile.name) ? (
-                <Image 
-                  source={{ uri: previewFile.uri }} 
-                  style={styles.fullPreviewImage} 
-                  resizeMode="contain"
-                />
-              ) : (
-                <View style={styles.fullPreviewPlaceholder}>
-                  <Text style={styles.fullPreviewIcon}>
-                    {getFileIcon(previewFile?.mimeType, previewFile?.name)}
-                  </Text>
-                  <Text style={styles.fullPreviewText}>
-                    {previewFile?.name}
-                  </Text>
-                  <Text style={styles.fullPreviewSubtext}>
-                    File preview not available for this format
-                  </Text>
-                  <Text style={styles.fullPreviewSubtext}>
-                    Use the Chat button to analyze this file with AI
-                  </Text>
-                </View>
-              )}
-            </ScrollView>
+            <View style={styles.previewModalBody}>
+              {previewFile && renderFullFileContent(previewFile)}
+            </View>
           </View>
         </View>
       </Modal>
@@ -573,22 +696,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   filesList: {
-    paddingBottom: 20, // Add padding at the bottom of the list
+    paddingBottom: 20,
   },
   fileCard: {
-    width: '48%', // Adjust width for two columns
+    width: '48%',
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
-    padding: 12, // Reduced padding slightly
+    padding: 12,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    justifyContent: 'space-between', // Distribute space for preview, info, and button
+    justifyContent: 'space-between',
   },
   filePreview: {
     width: '100%',
-    height: 100, // Fixed height for preview
-    backgroundColor: '#E5E7EB', // Placeholder background
+    height: 100,
+    backgroundColor: '#E5E7EB',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -604,17 +727,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  previewPDF: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewCSV: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewText: {
+    fontSize: 10,
+    color: '#6B7280',
+    marginTop: 4,
+    fontFamily: 'Inter',
+  },
   fileIcon: {
     fontSize: 32,
   },
-  previewPlaceholder: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontFamily: 'Inter',
-  },
   fileInfo: {
-    flex: 1, // Take available space
-    marginBottom: 8, // Space before the chat button
+    flex: 1,
+    marginBottom: 8,
   },
   fileName: {
     fontSize: 14,
@@ -622,7 +754,6 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontFamily: 'Inter',
     marginBottom: 4,
-    flexShrink: 1, // Allow text to shrink if necessary
   },
   fileDate: {
     fontSize: 12,
@@ -635,7 +766,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 'auto', // Push button to the bottom
+    marginTop: 'auto',
   },
   menuOverlay: {
     position: 'absolute',
@@ -908,7 +1039,6 @@ const styles = StyleSheet.create({
   },
   previewModalBody: {
     flex: 1,
-    padding: 16,
   },
   fullPreviewImage: {
     width: '100%',
@@ -938,5 +1068,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 4,
     fontFamily: 'Inter',
+  },
+  webViewContainer: {
+    flex: 1,
+    minHeight: 400,
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
   },
 });
