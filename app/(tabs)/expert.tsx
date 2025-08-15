@@ -14,6 +14,7 @@ import {
   TextInput,
   Alert,
   ScrollView,
+  Image,
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import * as DocumentPicker from 'expo-document-picker';
@@ -25,6 +26,7 @@ interface SingleFile {
   uploadDate: string;
   content: string;
   uri: string;
+  mimeType?: string;
 }
 
 interface Workspace {
@@ -39,8 +41,10 @@ export default function ExpertTab() {
   const [isUploadModalVisible, setIsUploadModalVisible] = useState(false);
   const [isWorkspaceModalVisible, setIsWorkspaceModalVisible] = useState(false);
   const [isChatVisible, setIsChatVisible] = useState(false);
+  const [isFilePreviewVisible, setIsFilePreviewVisible] = useState(false);
   const [selectedFile, setSelectedFile] = useState<SingleFile | null>(null);
   const [selectedWorkspace, setSelectedWorkspace] = useState<Workspace | null>(null);
+  const [previewFile, setPreviewFile] = useState<SingleFile | null>(null);
   const [workspaceName, setWorkspaceName] = useState('');
   const [singleFiles, setSingleFiles] = useState<SingleFile[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -112,6 +116,7 @@ export default function ExpertTab() {
           uploadDate: new Date().toLocaleDateString(),
           content: 'File content placeholder', // In real app, you'd read the file content
           uri: file.uri,
+          mimeType: file.mimeType,
         };
 
         const updatedFiles = [...singleFiles, newFile];
@@ -146,6 +151,7 @@ export default function ExpertTab() {
           uploadDate: new Date().toLocaleDateString(),
           content: 'File content placeholder',
           uri: file.uri,
+          mimeType: file.mimeType,
         }));
 
         const newWorkspace: Workspace = {
@@ -168,6 +174,11 @@ export default function ExpertTab() {
     }
   };
 
+  const openFilePreview = (file: SingleFile) => {
+    setPreviewFile(file);
+    setIsFilePreviewVisible(true);
+  };
+
   const openFileChat = (file: SingleFile) => {
     setSelectedFile(file);
     setSelectedWorkspace(null);
@@ -181,6 +192,39 @@ export default function ExpertTab() {
     setChatMessages([]);
     setIsChatVisible(true);
     closeMenu();
+  };
+
+  const getFileIcon = (mimeType?: string, fileName?: string) => {
+    if (!mimeType && !fileName) return '📄';
+    
+    const fileExt = fileName?.toLowerCase().split('.').pop() || '';
+    const mime = mimeType?.toLowerCase() || '';
+    
+    if (mime.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileExt)) {
+      return '🖼️';
+    }
+    if (mime.includes('pdf') || fileExt === 'pdf') {
+      return '📕';
+    }
+    if (mime.includes('spreadsheet') || ['csv', 'xlsx', 'xls'].includes(fileExt)) {
+      return '📊';
+    }
+    if (mime.includes('document') || ['doc', 'docx', 'txt'].includes(fileExt)) {
+      return '📝';
+    }
+    if (mime.includes('presentation') || ['ppt', 'pptx'].includes(fileExt)) {
+      return '📊';
+    }
+    return '📄';
+  };
+
+  const isImageFile = (mimeType?: string, fileName?: string) => {
+    if (!mimeType && !fileName) return false;
+    
+    const fileExt = fileName?.toLowerCase().split('.').pop() || '';
+    const mime = mimeType?.toLowerCase() || '';
+    
+    return mime.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileExt);
   };
 
   const sendMessage = () => {
@@ -204,19 +248,36 @@ export default function ExpertTab() {
   };
 
   const renderFileCard = ({ item }: { item: SingleFile }) => (
-    <TouchableOpacity style={styles.fileCard} onPress={() => openFileChat(item)}>
-      <View style={styles.filePreview}>
-        {/* Placeholder for file preview */}
-        <Text style={styles.previewPlaceholder}>Preview</Text>
-      </View>
+    <View style={styles.fileCard}>
+      <TouchableOpacity 
+        style={styles.filePreview} 
+        onPress={() => openFilePreview(item)}
+        activeOpacity={0.7}
+      >
+        {isImageFile(item.mimeType, item.name) ? (
+          <Image 
+            source={{ uri: item.uri }} 
+            style={styles.previewImage} 
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.previewIcon}>
+            <Text style={styles.fileIcon}>{getFileIcon(item.mimeType, item.name)}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
       <View style={styles.fileInfo}>
         <Text style={styles.fileName}>{item.name}</Text>
         <Text style={styles.fileDate}>Uploaded: {item.uploadDate}</Text>
       </View>
-      <TouchableOpacity style={styles.chatButton} onPress={() => openFileChat(item)}>
+      <TouchableOpacity 
+        style={styles.chatButton} 
+        onPress={() => openFileChat(item)}
+        activeOpacity={0.7}
+      >
         <IconSymbol size={20} name="chatbubble.left.ellipsis.fill" color="#FFFFFF" />
       </TouchableOpacity>
-    </TouchableOpacity>
+    </View>
   );
 
   const renderWorkspaceItem = ({ item }: { item: Workspace }) => (
@@ -394,6 +455,54 @@ export default function ExpertTab() {
           </View>
         </View>
       </Modal>
+
+      {/* File Preview Modal */}
+      <Modal visible={isFilePreviewVisible} transparent animationType="fade">
+        <View style={styles.previewModalOverlay}>
+          <TouchableWithoutFeedback onPress={() => setIsFilePreviewVisible(false)}>
+            <View style={styles.previewModalBackground} />
+          </TouchableWithoutFeedback>
+          
+          <View style={styles.previewModalContent}>
+            <View style={styles.previewModalHeader}>
+              <Text style={styles.previewModalTitle} numberOfLines={1}>
+                {previewFile?.name}
+              </Text>
+              <TouchableOpacity 
+                onPress={() => setIsFilePreviewVisible(false)}
+                style={styles.closeButton}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.previewModalBody} showsVerticalScrollIndicator={false}>
+              {previewFile && isImageFile(previewFile.mimeType, previewFile.name) ? (
+                <Image 
+                  source={{ uri: previewFile.uri }} 
+                  style={styles.fullPreviewImage} 
+                  resizeMode="contain"
+                />
+              ) : (
+                <View style={styles.fullPreviewPlaceholder}>
+                  <Text style={styles.fullPreviewIcon}>
+                    {getFileIcon(previewFile?.mimeType, previewFile?.name)}
+                  </Text>
+                  <Text style={styles.fullPreviewText}>
+                    {previewFile?.name}
+                  </Text>
+                  <Text style={styles.fullPreviewSubtext}>
+                    File preview not available for this format
+                  </Text>
+                  <Text style={styles.fullPreviewSubtext}>
+                    Use the Chat button to analyze this file with AI
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -484,6 +593,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
+    overflow: 'hidden',
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  previewIcon: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fileIcon: {
+    fontSize: 32,
   },
   previewPlaceholder: {
     fontSize: 12,
@@ -733,5 +855,88 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  previewModalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewModalBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  previewModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    width: '90%',
+    maxWidth: 500,
+    maxHeight: '80%',
+    overflow: 'hidden',
+  },
+  previewModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  previewModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000000',
+    fontFamily: 'Inter',
+    flex: 1,
+    marginRight: 12,
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontWeight: 'bold',
+  },
+  previewModalBody: {
+    flex: 1,
+    padding: 16,
+  },
+  fullPreviewImage: {
+    width: '100%',
+    minHeight: 300,
+    maxHeight: 500,
+  },
+  fullPreviewPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  fullPreviewIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  fullPreviewText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#000000',
+    textAlign: 'center',
+    marginBottom: 8,
+    fontFamily: 'Inter',
+  },
+  fullPreviewSubtext: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 4,
+    fontFamily: 'Inter',
   },
 });
