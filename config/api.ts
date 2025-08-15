@@ -9,7 +9,9 @@ const getApiBaseUrl = () => {
     // In browser, use same domain but port 5000
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
-    return `${protocol}//${hostname}:5000`;
+    const baseUrl = `${protocol}//${hostname}:5000`;
+    console.log('🔗 API Base URL:', baseUrl);
+    return baseUrl;
   }
   return 'http://0.0.0.0:5000';
 };

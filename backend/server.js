@@ -71,6 +71,14 @@ app.use(limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Request logging middleware for debugging
+app.use((req, res, next) => {
+  if (req.path !== '/health') { // Don't spam logs with health checks
+    console.log(`🌐 ${req.method} ${req.path} - Content-Type: ${req.get('Content-Type')} - Origin: ${req.get('Origin')}`);
+  }
+  next();
+});
+
 // Ensure uploads directory exists
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 const PREVIEWS_DIR = path.join(__dirname, 'previews');
@@ -145,9 +153,22 @@ app.get('/health', (req, res) => {
 // File upload endpoint
 app.post('/upload', upload.single('file'), async (req, res) => {
   try {
+    console.log('📤 Upload request received');
+    console.log('🔍 Request file:', req.file ? 'Present' : 'Missing');
+    console.log('🔍 Request body keys:', Object.keys(req.body || {}));
+    
     if (!req.file) {
+      console.error('❌ No file in request');
       return res.status(400).json({ error: 'No file uploaded' });
     }
+
+    console.log('📄 File details:', {
+      originalName: req.file.originalname,
+      filename: req.file.filename,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      path: req.file.path
+    });
 
     const fileInfo = {
       id: path.parse(req.file.filename).name,
@@ -159,18 +180,22 @@ app.post('/upload', upload.single('file'), async (req, res) => {
       path: req.file.path
     };
 
+    console.log('💾 Saving file metadata...');
+    // Save file metadata
+    await fileService.saveFileMetadata(fileInfo);
+    console.log('✅ File metadata saved');
+
     // Generate preview immediately after upload
+    console.log('🖼️ Generating preview...');
     try {
       await fileService.generatePreview(fileInfo);
+      console.log('✅ Preview generated successfully');
     } catch (previewError) {
       console.warn('⚠️ Preview generation failed:', previewError.message);
       // Don't fail the upload if preview fails
     }
 
-    // Save file metadata
-    await fileService.saveFileMetadata(fileInfo);
-
-    res.status(201).json({
+    const response = {
       success: true,
       file: {
         id: fileInfo.id,
@@ -179,10 +204,14 @@ app.post('/upload', upload.single('file'), async (req, res) => {
         size: fileInfo.size,
         uploadDate: fileInfo.uploadDate
       }
-    });
+    };
+
+    console.log('📤 Sending success response:', response);
+    res.status(201).json(response);
 
   } catch (error) {
     console.error('❌ Upload error:', error);
+    console.error('❌ Stack trace:', error.stack);
     res.status(500).json({ error: 'Upload failed', details: error.message });
   }
 });
@@ -353,11 +382,17 @@ app.get('/metadata/:id', async (req, res) => {
 // Error handling middleware
 app.use((error, req, res, next) => {
   console.error('❌ Unhandled error:', error);
+  console.error('❌ Error stack:', error.stack);
   
   if (error instanceof multer.MulterError) {
+    console.error('❌ Multer error:', error.code);
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({ error: 'File too large. Maximum size is 50MB.' });
     }
+    if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({ error: 'Unexpected field name. Use "file" as field name.' });
+    }
+    return res.status(400).json({ error: `File upload error: ${error.message}` });
   }
   
   res.status(500).json({ 

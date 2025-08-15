@@ -1,32 +1,52 @@
 import { API_ENDPOINTS, ApiResponse, FileUploadResponse, FileMetadata } from '../config/api';
 
 class FileService {
-  async uploadFile(uri: string, filename: string): Promise<FileUploadResponse> {
+  async uploadFile(file: File | { uri: string; name: string; type?: string }, filename?: string): Promise<FileUploadResponse> {
     try {
+      console.log('📤 Starting file upload...', { file, filename });
+      
       const formData = new FormData();
-      formData.append('file', {
-        uri,
-        name: filename,
-        type: 'application/octet-stream'
-      } as any);
+      
+      // Handle web File object vs mobile file object
+      if (file instanceof File) {
+        // Web File object
+        formData.append('file', file);
+        console.log('🌐 Web file upload:', file.name, file.type, file.size, 'bytes');
+      } else if (file && typeof file === 'object' && 'uri' in file) {
+        // Mobile file object
+        const mobileFile = {
+          uri: file.uri,
+          name: filename || file.name || 'unknown',
+          type: file.type || 'application/octet-stream'
+        };
+        formData.append('file', mobileFile as any);
+        console.log('📱 Mobile file upload:', mobileFile);
+      } else {
+        throw new Error('Invalid file format provided');
+      }
 
+      console.log('🔄 Sending upload request to:', API_ENDPOINTS.upload);
+      
       const response = await fetch(API_ENDPOINTS.upload, {
         method: 'POST',
         body: formData,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        // Don't set Content-Type header - let the browser set it with boundary
       });
 
-      const result: ApiResponse<{ file: FileUploadResponse }> = await response.json();
-
+      console.log('📨 Upload response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error(result.error || 'Upload failed');
+        const errorText = await response.text();
+        console.error('❌ Upload failed with status:', response.status, 'Error:', errorText);
+        throw new Error(`Upload failed: ${response.status} - ${errorText}`);
       }
+
+      const result: ApiResponse<{ file: FileUploadResponse }> = await response.json();
+      console.log('✅ Upload successful:', result);
 
       return result.file!;
     } catch (error) {
-      console.error('File upload error:', error);
+      console.error('❌ File upload error:', error);
       throw error;
     }
   }

@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -149,10 +148,10 @@ export default function ExpertTab() {
 
       if (!result.canceled && result.assets[0]) {
         const file = result.assets[0];
-        
+
         // Upload to backend
         const uploadedFile = await fileService.uploadFile(file.uri, file.name);
-        
+
         const newFile: SingleFile = {
           id: uploadedFile.id,
           name: uploadedFile.originalName,
@@ -197,13 +196,13 @@ export default function ExpertTab() {
 
       if (!results.canceled) {
         const files: SingleFile[] = [];
-        
+
         for (let i = 0; i < Math.min(results.assets.length, 5); i++) {
           const file = results.assets[i];
-          
+
           try {
             const uploadedFile = await fileService.uploadFile(file.uri, file.name);
-            
+
             files.push({
               id: uploadedFile.id,
               name: uploadedFile.originalName,
@@ -266,10 +265,10 @@ export default function ExpertTab() {
 
   const getFileIcon = (mimeType?: string, fileName?: string) => {
     if (!mimeType && !fileName) return '📄';
-    
+
     const fileExt = fileName?.toLowerCase().split('.').pop() || '';
     const mime = mimeType?.toLowerCase() || '';
-    
+
     if (mime.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileExt)) {
       return '🖼️';
     }
@@ -299,7 +298,7 @@ export default function ExpertTab() {
 
     // Use backend preview endpoint
     const previewUrl = fileService.getPreviewUrl(file.id);
-    
+
     return (
       <Image 
         source={{ uri: previewUrl }} 
@@ -324,7 +323,7 @@ export default function ExpertTab() {
     }
 
     const fileUrl = fileService.getFileUrl(file.id);
-    
+
     // For common file types, show in WebView
     if (file.mimetype?.includes('pdf') || file.mimetype?.includes('text') || file.mimetype?.includes('csv')) {
       return (
@@ -366,7 +365,7 @@ export default function ExpertTab() {
         </View>
       );
     }
-    
+
     // For images, show directly
     if (file.mimetype?.startsWith('image/')) {
       return (
@@ -553,7 +552,7 @@ export default function ExpertTab() {
             <Text style={styles.refreshText}>Refresh Connection</Text>
           </TouchableOpacity>
         </View>
-        
+
         {singleFiles.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>No files uploaded yet</Text>
@@ -701,7 +700,7 @@ export default function ExpertTab() {
           <TouchableWithoutFeedback onPress={() => setIsFilePreviewVisible(false)}>
             <View style={styles.previewModalBackground} />
           </TouchableWithoutFeedback>
-          
+
           <View style={styles.previewModalContent}>
             <View style={styles.previewModalHeader}>
               <Text style={styles.previewModalTitle} numberOfLines={1}>
@@ -714,7 +713,7 @@ export default function ExpertTab() {
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
             </View>
-            
+
             <View style={styles.previewModalBody}>
               {previewFile && renderFullFileContent(previewFile)}
             </View>
