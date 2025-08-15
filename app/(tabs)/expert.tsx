@@ -16,24 +16,21 @@ import {
   Alert,
   ScrollView,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
-import * as IntentLauncher from 'expo-intent-launcher';
-import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import fileService from '../../services/fileService';
 
 interface SingleFile {
   id: string;
   name: string;
   uploadDate: string;
-  content: string;
-  uri: string;
-  mimeType?: string;
-  base64?: string;
-  fileSize?: number;
+  mimetype?: string;
+  size?: number;
+  isUploaded?: boolean;
 }
 
 interface Workspace {
@@ -57,12 +54,41 @@ export default function ExpertTab() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [chatMessages, setChatMessages] = useState<{user: string, ai: string, sources?: string[]}[]>([]);
   const [currentMessage, setCurrentMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isBackendConnected, setIsBackendConnected] = useState(false);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
 
-  // Load data on component mount
+  // Check backend connectivity on mount
   useEffect(() => {
+    checkBackendConnection();
     loadData();
   }, []);
+
+  const checkBackendConnection = async () => {
+    try {
+      const isHealthy = await fileService.checkHealth();
+      setIsBackendConnected(isHealthy);
+      if (!isHealthy) {
+        Alert.alert(
+          'Backend Connection Failed',
+          'The backend server is not responding. Please ensure the server is running on port 5000.',
+          [
+            {
+              text: 'Retry',
+              onPress: checkBackendConnection
+            },
+            {
+              text: 'Continue Offline',
+              style: 'cancel'
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Backend connection check failed:', error);
+      setIsBackendConnected(false);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -89,21 +115,6 @@ export default function ExpertTab() {
     }
   };
 
-  const readFileContent = async (uri: string, mimeType?: string): Promise<string> => {
-    try {
-      if (mimeType?.includes('text') || mimeType?.includes('csv')) {
-        return await FileSystem.readAsStringAsync(uri);
-      } else {
-        return await FileSystem.readAsStringAsync(uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-      }
-    } catch (error) {
-      console.error('Error reading file:', error);
-      return '';
-    }
-  };
-
   const openMenu = () => {
     setIsMenuVisible(true);
     Animated.timing(slideAnim, {
@@ -124,7 +135,13 @@ export default function ExpertTab() {
   };
 
   const handleUploadSingleFile = async () => {
+    if (!isBackendConnected) {
+      Alert.alert('Backend Not Available', 'Backend server is not connected. Please check the connection.');
+      return;
+    }
+
     try {
+      setIsLoading(true);
       const result = await DocumentPicker.getDocumentAsync({
         type: '*/*',
         copyToCacheDirectory: true,
@@ -132,17 +149,17 @@ export default function ExpertTab() {
 
       if (!result.canceled && result.assets[0]) {
         const file = result.assets[0];
-        const content = await readFileContent(file.uri, file.mimeType);
+        
+        // Upload to backend
+        const uploadedFile = await fileService.uploadFile(file.uri, file.name);
         
         const newFile: SingleFile = {
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          name: file.name,
-          uploadDate: new Date().toLocaleDateString(),
-          content: content,
-          uri: file.uri,
-          mimeType: file.mimeType,
-          base64: file.mimeType?.includes('text') ? undefined : content,
-          fileSize: file.size,
+          id: uploadedFile.id,
+          name: uploadedFile.originalName,
+          uploadDate: new Date(uploadedFile.uploadDate).toLocaleDateString(),
+          mimetype: uploadedFile.mimetype,
+          size: uploadedFile.size,
+          isUploaded: true,
         };
 
         const updatedFiles = [...singleFiles, newFile];
@@ -153,7 +170,9 @@ export default function ExpertTab() {
       }
     } catch (error) {
       console.error('Error uploading file:', error);
-      Alert.alert('Error', 'Failed to upload file');
+      Alert.alert('Error', `Failed to upload file: ${error.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -163,7 +182,13 @@ export default function ExpertTab() {
       return;
     }
 
+    if (!isBackendConnected) {
+      Alert.alert('Backend Not Available', 'Backend server is not connected. Please check the connection.');
+      return;
+    }
+
     try {
+      setIsLoading(true);
       const results = await DocumentPicker.getDocumentAsync({
         type: '*/*',
         copyToCacheDirectory: true,
@@ -175,37 +200,47 @@ export default function ExpertTab() {
         
         for (let i = 0; i < Math.min(results.assets.length, 5); i++) {
           const file = results.assets[i];
-          const content = await readFileContent(file.uri, file.mimeType);
           
-          files.push({
-            id: Date.now().toString() + i + Math.random().toString(36).substr(2, 9),
-            name: file.name,
-            uploadDate: new Date().toLocaleDateString(),
-            content: content,
-            uri: file.uri,
-            mimeType: file.mimeType,
-            base64: file.mimeType?.includes('text') ? undefined : content,
-            fileSize: file.size,
-          });
+          try {
+            const uploadedFile = await fileService.uploadFile(file.uri, file.name);
+            
+            files.push({
+              id: uploadedFile.id,
+              name: uploadedFile.originalName,
+              uploadDate: new Date(uploadedFile.uploadDate).toLocaleDateString(),
+              mimetype: uploadedFile.mimetype,
+              size: uploadedFile.size,
+              isUploaded: true,
+            });
+          } catch (uploadError) {
+            console.error(`Failed to upload ${file.name}:`, uploadError);
+            Alert.alert('Partial Upload', `Failed to upload ${file.name}, continuing with other files.`);
+          }
         }
 
-        const newWorkspace: Workspace = {
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          name: workspaceName,
-          files,
-          createdDate: new Date().toLocaleDateString(),
-        };
+        if (files.length > 0) {
+          const newWorkspace: Workspace = {
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            name: workspaceName,
+            files,
+            createdDate: new Date().toLocaleDateString(),
+          };
 
-        const updatedWorkspaces = [...workspaces, newWorkspace];
-        setWorkspaces(updatedWorkspaces);
-        await saveData(singleFiles, updatedWorkspaces);
-        setWorkspaceName('');
-        setIsWorkspaceModalVisible(false);
-        Alert.alert('Success', `Workspace "${workspaceName}" created with ${files.length} files!`);
+          const updatedWorkspaces = [...workspaces, newWorkspace];
+          setWorkspaces(updatedWorkspaces);
+          await saveData(singleFiles, updatedWorkspaces);
+          setWorkspaceName('');
+          setIsWorkspaceModalVisible(false);
+          Alert.alert('Success', `Workspace "${workspaceName}" created with ${files.length} files!`);
+        } else {
+          Alert.alert('Error', 'No files were successfully uploaded.');
+        }
       }
     } catch (error) {
       console.error('Error creating workspace:', error);
       Alert.alert('Error', 'Failed to create workspace');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -253,180 +288,125 @@ export default function ExpertTab() {
     return '📄';
   };
 
-  const isImageFile = (mimeType?: string, fileName?: string) => {
-    if (!mimeType && !fileName) return false;
-    
-    const fileExt = fileName?.toLowerCase().split('.').pop() || '';
-    const mime = mimeType?.toLowerCase() || '';
-    
-    return mime.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileExt);
-  };
-
-  const isPDFFile = (mimeType?: string, fileName?: string) => {
-    if (!mimeType && !fileName) return false;
-    
-    const fileExt = fileName?.toLowerCase().split('.').pop() || '';
-    const mime = mimeType?.toLowerCase() || '';
-    
-    return mime.includes('pdf') || fileExt === 'pdf';
-  };
-
-  const isCSVFile = (mimeType?: string, fileName?: string) => {
-    if (!mimeType && !fileName) return false;
-    
-    const fileExt = fileName?.toLowerCase().split('.').pop() || '';
-    const mime = mimeType?.toLowerCase() || '';
-    
-    return mime.includes('csv') || fileExt === 'csv';
-  };
-
-  const parseCSVPreview = (csvContent: string, isPreview: boolean = true): string => {
-    try {
-      const lines = csvContent.split('\n');
-      const rowsToShow = isPreview ? Math.min(4, lines.length) : lines.length;
-      const table = lines.slice(0, rowsToShow).map(line => {
-        const cells = line.split(',');
-        const cellsToShow = isPreview ? Math.min(4, cells.length) : cells.length;
-        return `<tr>${cells.slice(0, cellsToShow).map(cell => `<td style="border: 1px solid #ddd; padding: 8px; font-size: ${isPreview ? '10px' : '12px'};">${cell.trim()}</td>`).join('')}</tr>`;
-      }).join('');
-      
-      return `
-        <table style="border-collapse: collapse; width: 100%; font-size: ${isPreview ? '10px' : '12px'};">
-          ${table}
-        </table>
-        ${isPreview ? '<p style="margin-top: 10px; font-size: 8px; color: #666;">Preview - First 4 rows and columns</p>' : ''}
-      `;
-    } catch (error) {
-      return '<p>Error parsing CSV content</p>';
+  const renderFilePreview = (file: SingleFile) => {
+    if (!file.isUploaded) {
+      return (
+        <View style={styles.previewIcon}>
+          <Text style={styles.fileIcon}>{getFileIcon(file.mimetype, file.name)}</Text>
+        </View>
+      );
     }
+
+    // Use backend preview endpoint
+    const previewUrl = fileService.getPreviewUrl(file.id);
+    
+    return (
+      <Image 
+        source={{ uri: previewUrl }} 
+        style={styles.previewImage} 
+        resizeMode="cover"
+        onError={() => {
+          console.warn(`Failed to load preview for file ${file.name}`);
+        }}
+      />
+    );
   };
 
-  const openFileExternally = async (file: SingleFile) => {
-    try {
-      if (Platform.OS === 'android') {
-        // For Android, use intent launcher
-        const contentUri = await FileSystem.getContentUriAsync(file.uri);
-        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-          data: contentUri,
-          flags: 1,
-          type: file.mimeType || '*/*',
-        });
-      } else {
-        // For iOS, use sharing
-        await Sharing.shareAsync(file.uri, {
-          mimeType: file.mimeType,
-          dialogTitle: `Open ${file.name}`,
-        });
-      }
-    } catch (error) {
-      console.error('Error opening file externally:', error);
-      Alert.alert('Error', 'Unable to open file with external app');
+  const renderFullFileContent = (file: SingleFile) => {
+    if (!file.isUploaded) {
+      return (
+        <View style={styles.fullPreviewPlaceholder}>
+          <Text style={styles.fullPreviewIcon}>{getFileIcon(file.mimetype, file.name)}</Text>
+          <Text style={styles.fullPreviewText}>{file.name}</Text>
+          <Text style={styles.fullPreviewSubtext}>File not uploaded to backend</Text>
+        </View>
+      );
     }
-  };
 
-  const createPDFViewerHTML = (base64Content: string, isPreview: boolean = false): string => {
-    const pdfJsVersion = '3.11.174';
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfJsVersion}/pdf.min.js"></script>
-        <style>
-          body { 
-            margin: 0; 
-            padding: 8px; 
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            overflow-x: auto;
-          }
-          #pdf-container { 
-            text-align: center; 
-          }
-          canvas { 
-            border: 1px solid #ddd; 
-            margin: 4px 0;
-            max-width: 100%;
-            height: auto;
-          }
-          .page-info {
-            font-size: ${isPreview ? '10px' : '12px'};
-            color: #666;
-            margin: 8px 0;
-          }
-          .error {
-            color: #e74c3c;
-            padding: 20px;
-            text-align: center;
-          }
-        </style>
-      </head>
-      <body>
-        <div id="pdf-container">
-          <div id="loading">Loading PDF...</div>
-        </div>
-        
-        <script>
-          pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfJsVersion}/pdf.worker.min.js';
-          
-          const base64 = '${base64Content}';
-          const isPreview = ${isPreview};
-          
-          async function renderPDF() {
-            try {
-              const loadingElement = document.getElementById('loading');
-              const container = document.getElementById('pdf-container');
-              
-              const pdf = await pdfjsLib.getDocument({data: atob(base64)}).promise;
-              loadingElement.style.display = 'none';
-              
-              const maxPages = isPreview ? 1 : pdf.numPages;
-              
-              for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
-                const page = await pdf.getPage(pageNum);
-                
-                const scale = isPreview ? 0.5 : 1.2;
-                const viewport = page.getViewport({ scale });
-                
-                const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
-                
-                canvas.height = viewport.height;
-                canvas.width = viewport.width;
-                
-                await page.render({
-                  canvasContext: context,
-                  viewport: viewport
-                }).promise;
-                
-                container.appendChild(canvas);
-                
-                if (!isPreview && pdf.numPages > 1) {
-                  const pageInfo = document.createElement('div');
-                  pageInfo.className = 'page-info';
-                  pageInfo.textContent = \`Page \${pageNum} of \${pdf.numPages}\`;
-                  container.appendChild(pageInfo);
-                }
-              }
-              
-              if (isPreview && pdf.numPages > 1) {
-                const previewInfo = document.createElement('div');
-                previewInfo.className = 'page-info';
-                previewInfo.textContent = \`Preview - Page 1 of \${pdf.numPages}\`;
-                container.appendChild(previewInfo);
-              }
-              
-            } catch (error) {
-              console.error('PDF rendering error:', error);
-              document.getElementById('pdf-container').innerHTML = 
-                '<div class="error">Error loading PDF</div>';
-            }
-          }
-          
-          renderPDF();
-        </script>
-      </body>
-      </html>
-    `;
+    const fileUrl = fileService.getFileUrl(file.id);
+    
+    // For common file types, show in WebView
+    if (file.mimetype?.includes('pdf') || file.mimetype?.includes('text') || file.mimetype?.includes('csv')) {
+      return (
+        <View style={styles.webViewContainer}>
+          <WebView
+            source={{ uri: fileUrl }}
+            style={styles.webViewContainer}
+            startInLoadingState={true}
+            renderLoading={() => (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#000000" />
+                <Text>Loading file...</Text>
+              </View>
+            )}
+            renderError={() => (
+              <View style={styles.fullPreviewPlaceholder}>
+                <Text style={styles.fullPreviewIcon}>{getFileIcon(file.mimetype, file.name)}</Text>
+                <Text style={styles.fullPreviewText}>Unable to display file</Text>
+                <Text style={styles.fullPreviewSubtext}>Try downloading the file instead</Text>
+                <TouchableOpacity 
+                  style={styles.openExternallyButton}
+                  onPress={() => {
+                    const downloadUrl = fileService.getDownloadUrl(file.id);
+                    Alert.alert(
+                      'Download File',
+                      `Download URL: ${downloadUrl}`,
+                      [
+                        { text: 'Copy URL', onPress: () => {/* Copy to clipboard logic */} },
+                        { text: 'OK' }
+                      ]
+                    );
+                  }}
+                >
+                  <Text style={styles.openExternallyButtonText}>Get Download Link</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          />
+        </View>
+      );
+    }
+    
+    // For images, show directly
+    if (file.mimetype?.startsWith('image/')) {
+      return (
+        <Image 
+          source={{ uri: fileUrl }} 
+          style={styles.fullPreviewImage} 
+          resizeMode="contain"
+          onError={() => {
+            console.warn(`Failed to load image for file ${file.name}`);
+          }}
+        />
+      );
+    }
+
+    // For other file types, show download option
+    return (
+      <View style={styles.fullPreviewPlaceholder}>
+        <Text style={styles.fullPreviewIcon}>{getFileIcon(file.mimetype, file.name)}</Text>
+        <Text style={styles.fullPreviewText}>{file.name}</Text>
+        <Text style={styles.fullPreviewSubtext}>
+          File preview not available for this format
+        </Text>
+        <TouchableOpacity 
+          style={styles.openExternallyButton}
+          onPress={() => {
+            const downloadUrl = fileService.getDownloadUrl(file.id);
+            Alert.alert(
+              'Download File',
+              `Download URL: ${downloadUrl}`,
+              [
+                { text: 'Copy URL', onPress: () => {/* Copy to clipboard logic */} },
+                { text: 'OK' }
+              ]
+            );
+          }}
+        >
+          <Text style={styles.openExternallyButtonText}>Get Download Link</Text>
+        </TouchableOpacity>
+      </View>
+    );
   };
 
   const sendMessage = () => {
@@ -449,169 +429,6 @@ export default function ExpertTab() {
     setCurrentMessage('');
   };
 
-  const renderFilePreview = (file: SingleFile) => {
-    if (isImageFile(file.mimeType, file.name)) {
-      return (
-        <Image 
-          source={{ uri: file.uri }} 
-          style={styles.previewImage} 
-          resizeMode="cover"
-        />
-      );
-    } else if (isPDFFile(file.mimeType, file.name)) {
-      // Show PDF preview using PDF.js with base64 content
-      if (file.base64) {
-        return (
-          <View style={styles.previewPDF}>
-            <WebView
-              source={{ html: createPDFViewerHTML(file.base64, true) }}
-              style={styles.pdfPreviewWebView}
-              startInLoadingState={true}
-              scrollEnabled={false}
-              showsHorizontalScrollIndicator={false}
-              showsVerticalScrollIndicator={false}
-              pointerEvents="none"
-              renderError={() => (
-                <View style={styles.previewPDFFallback}>
-                  <Text style={styles.fileIcon}>📕</Text>
-                  <Text style={styles.previewText}>PDF</Text>
-                </View>
-              )}
-            />
-          </View>
-        );
-      } else {
-        return (
-          <View style={styles.previewPDFFallback}>
-            <Text style={styles.fileIcon}>📕</Text>
-            <Text style={styles.previewText}>PDF</Text>
-          </View>
-        );
-      }
-    } else if (isCSVFile(file.mimeType, file.name)) {
-      // Show CSV preview with actual data
-      const csvPreviewHTML = parseCSVPreview(file.content, true);
-      return (
-        <View style={styles.previewCSV}>
-          <WebView
-            source={{ html: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="margin: 4px; font-family: -apple-system;">${csvPreviewHTML}</body></html>` }}
-            style={styles.csvPreviewWebView}
-            startInLoadingState={false}
-            scrollEnabled={false}
-            showsHorizontalScrollIndicator={false}
-            showsVerticalScrollIndicator={false}
-            pointerEvents="none"
-            renderError={() => (
-              <View style={styles.previewCSVFallback}>
-                <Text style={styles.fileIcon}>📊</Text>
-                <Text style={styles.previewText}>CSV</Text>
-              </View>
-            )}
-          />
-        </View>
-      );
-    } else {
-      return (
-        <View style={styles.previewIcon}>
-          <Text style={styles.fileIcon}>{getFileIcon(file.mimeType, file.name)}</Text>
-        </View>
-      );
-    }
-  };
-
-  const renderFullFileContent = (file: SingleFile) => {
-    if (isImageFile(file.mimeType, file.name)) {
-      return (
-        <Image 
-          source={{ uri: file.uri }} 
-          style={styles.fullPreviewImage} 
-          resizeMode="contain"
-        />
-      );
-    } else if (isPDFFile(file.mimeType, file.name)) {
-      if (file.base64) {
-        return (
-          <View style={styles.webViewContainer}>
-            <WebView
-              source={{ html: createPDFViewerHTML(file.base64, false) }}
-              style={styles.webViewContainer}
-              startInLoadingState={true}
-              showsHorizontalScrollIndicator={true}
-              showsVerticalScrollIndicator={true}
-              renderLoading={() => (
-                <View style={styles.loadingContainer}>
-                  <Text>Loading PDF...</Text>
-                </View>
-              )}
-              renderError={() => (
-                <View style={styles.fullPreviewPlaceholder}>
-                  <Text style={styles.fullPreviewIcon}>📕</Text>
-                  <Text style={styles.fullPreviewText}>PDF Preview Unavailable</Text>
-                  <Text style={styles.fullPreviewSubtext}>
-                    This PDF cannot be displayed in the preview
-                  </Text>
-                  <TouchableOpacity 
-                    style={styles.openExternallyButton}
-                    onPress={() => openFileExternally(file)}
-                  >
-                    <Text style={styles.openExternallyButtonText}>Open Externally</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            />
-          </View>
-        );
-      } else {
-        return (
-          <View style={styles.fullPreviewPlaceholder}>
-            <Text style={styles.fullPreviewIcon}>📕</Text>
-            <Text style={styles.fullPreviewText}>PDF Preview Unavailable</Text>
-            <Text style={styles.fullPreviewSubtext}>
-              No content available for preview
-            </Text>
-            <TouchableOpacity 
-              style={styles.openExternallyButton}
-              onPress={() => openFileExternally(file)}
-            >
-              <Text style={styles.openExternallyButtonText}>Open Externally</Text>
-            </TouchableOpacity>
-          </View>
-        );
-      }
-    } else if (isCSVFile(file.mimeType, file.name)) {
-      const csvHTML = parseCSVPreview(file.content, false);
-      return (
-        <WebView
-          source={{ html: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="margin: 16px; font-family: -apple-system;">${csvHTML}</body></html>` }}
-          style={styles.webViewContainer}
-          startInLoadingState={true}
-          showsHorizontalScrollIndicator={true}
-          showsVerticalScrollIndicator={true}
-        />
-      );
-    } else {
-      return (
-        <View style={styles.fullPreviewPlaceholder}>
-          <Text style={styles.fullPreviewIcon}>
-            {getFileIcon(file.mimeType, file.name)}
-          </Text>
-          <Text style={styles.fullPreviewText}>
-            {file.name}
-          </Text>
-          <Text style={styles.fullPreviewSubtext}>
-            File preview not available for this format
-          </Text>
-          <TouchableOpacity 
-            style={styles.openExternallyButton}
-            onPress={() => openFileExternally(file)}
-          >
-            <Text style={styles.openExternallyButtonText}>Open Externally</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-  };
-
   const renderFileCard = ({ item }: { item: SingleFile }) => (
     <View style={styles.fileCard}>
       <TouchableOpacity 
@@ -620,10 +437,21 @@ export default function ExpertTab() {
         activeOpacity={0.7}
       >
         {renderFilePreview(item)}
+        {!item.isUploaded && (
+          <View style={styles.uploadBadge}>
+            <Text style={styles.uploadBadgeText}>Local</Text>
+          </View>
+        )}
       </TouchableOpacity>
       <View style={styles.fileInfo}>
         <Text style={styles.fileName} numberOfLines={2}>{item.name}</Text>
-        <Text style={styles.fileDate}>Uploaded: {item.uploadDate}</Text>
+        <Text style={styles.fileDate}>
+          Uploaded: {item.uploadDate}
+          {item.size && ` • ${(item.size / 1024).toFixed(1)}KB`}
+        </Text>
+        {!isBackendConnected && (
+          <Text style={styles.offlineText}>Backend offline</Text>
+        )}
       </View>
       <TouchableOpacity 
         style={styles.chatButton} 
@@ -638,7 +466,10 @@ export default function ExpertTab() {
   const renderWorkspaceItem = ({ item }: { item: Workspace }) => (
     <TouchableOpacity style={styles.workspaceItem} onPress={() => openWorkspaceChat(item)}>
       <Text style={styles.workspaceName}>{item.name}</Text>
-      <Text style={styles.workspaceFileCount}>{item.files.length} files</Text>
+      <Text style={styles.workspaceFileCount}>
+        {item.files.length} files
+        {item.files.some(f => f.isUploaded) && ' (Backend integrated)'}
+      </Text>
     </TouchableOpacity>
   );
 
@@ -694,18 +525,43 @@ export default function ExpertTab() {
         <TouchableOpacity style={styles.iconButton} onPress={openMenu}>
           <IconSymbol size={24} name="line.horizontal.3" color="#FFFFFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Expert AI</Text>
-        <TouchableOpacity style={styles.iconButton} onPress={() => setIsUploadModalVisible(true)}>
-          <IconSymbol size={24} name="plus" color="#FFFFFF" />
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Expert AI</Text>
+          <View style={[styles.connectionBadge, { backgroundColor: isBackendConnected ? '#10B981' : '#EF4444' }]}>
+            <Text style={styles.connectionBadgeText}>
+              {isBackendConnected ? '● Online' : '● Offline'}
+            </Text>
+          </View>
+        </View>
+        <TouchableOpacity 
+          style={styles.iconButton} 
+          onPress={() => setIsUploadModalVisible(true)}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <IconSymbol size={24} name="plus" color="#FFFFFF" />
+          )}
         </TouchableOpacity>
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.sectionTitle}>Single Files</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Single Files</Text>
+          <TouchableOpacity onPress={checkBackendConnection}>
+            <Text style={styles.refreshText}>Refresh Connection</Text>
+          </TouchableOpacity>
+        </View>
+        
         {singleFiles.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>No files uploaded yet</Text>
-            <Text style={styles.emptySubtext}>Tap + to upload your first file</Text>
+            <Text style={styles.emptySubtext}>
+              {isBackendConnected 
+                ? 'Tap + to upload your first file' 
+                : 'Backend is offline. Check connection and try again.'}
+            </Text>
           </View>
         ) : (
           <FlatList
@@ -742,11 +598,12 @@ export default function ExpertTab() {
 
                 <View style={styles.menuFooter}>
                   <TouchableOpacity
-                    style={styles.createWorkspaceButton}
+                    style={[styles.createWorkspaceButton, { opacity: isBackendConnected ? 1 : 0.5 }]}
                     onPress={() => {
                       closeMenu();
                       setIsWorkspaceModalVisible(true);
                     }}
+                    disabled={!isBackendConnected || isLoading}
                   >
                     <Text style={styles.createWorkspaceButtonText}>+ Create New Workspace</Text>
                   </TouchableOpacity>
@@ -762,15 +619,28 @@ export default function ExpertTab() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Upload Single File</Text>
-            <Text style={styles.modalSubtitle}>Select a file to chat with AI</Text>
+            <Text style={styles.modalSubtitle}>
+              {isBackendConnected 
+                ? 'Select a file to upload and chat with AI'
+                : 'Backend is offline. File will be stored locally.'}
+            </Text>
 
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.modalButton} onPress={handleUploadSingleFile}>
-                <Text style={styles.modalButtonText}>Choose File</Text>
+              <TouchableOpacity 
+                style={[styles.modalButton, { opacity: isLoading ? 0.5 : 1 }]} 
+                onPress={handleUploadSingleFile}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalButtonText}>Choose File</Text>
+                )}
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.cancelButton]} 
                 onPress={() => setIsUploadModalVisible(false)}
+                disabled={isLoading}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -784,18 +654,31 @@ export default function ExpertTab() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Create New Workspace</Text>
-            <Text style={styles.modalSubtitle}>Upload up to 5 files for collaborative AI chat</Text>
+            <Text style={styles.modalSubtitle}>
+              {isBackendConnected 
+                ? 'Upload up to 5 files for collaborative AI chat'
+                : 'Backend is offline. Files will be stored locally.'}
+            </Text>
 
             <TextInput
               style={styles.workspaceNameInput}
               value={workspaceName}
               onChangeText={setWorkspaceName}
               placeholder="Enter workspace name"
+              editable={!isLoading}
             />
 
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.modalButton} onPress={handleCreateWorkspace}>
-                <Text style={styles.modalButtonText}>Create & Upload Files</Text>
+              <TouchableOpacity 
+                style={[styles.modalButton, { opacity: isLoading ? 0.5 : 1 }]} 
+                onPress={handleCreateWorkspace}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalButtonText}>Create & Upload Files</Text>
+                )}
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.cancelButton]} 
@@ -803,6 +686,7 @@ export default function ExpertTab() {
                   setIsWorkspaceModalVisible(false);
                   setWorkspaceName('');
                 }}
+                disabled={isLoading}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -857,11 +741,26 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
   },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#FFFFFF',
     fontFamily: 'Inter',
+  },
+  connectionBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  connectionBadgeText: {
+    fontSize: 10,
+    color: '#FFFFFF',
+    fontWeight: '500',
   },
   iconButton: {
     paddingHorizontal: 12,
@@ -875,11 +774,21 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#000000',
-    marginBottom: 16,
+    fontFamily: 'Inter',
+  },
+  refreshText: {
+    fontSize: 14,
+    color: '#007AFF',
     fontFamily: 'Inter',
   },
   emptyState: {
@@ -928,6 +837,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
     overflow: 'hidden',
+    position: 'relative',
   },
   previewImage: {
     width: '100%',
@@ -938,22 +848,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  previewPDF: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  previewCSV: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  previewText: {
-    fontSize: 10,
-    color: '#6B7280',
-    marginTop: 4,
-    fontFamily: 'Inter',
-  },
   fileIcon: {
     fontSize: 32,
+  },
+  uploadBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  uploadBadgeText: {
+    fontSize: 8,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
   },
   fileInfo: {
     flex: 1,
@@ -970,6 +880,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     fontFamily: 'Inter',
+  },
+  offlineText: {
+    fontSize: 10,
+    color: '#EF4444',
+    fontFamily: 'Inter',
+    marginTop: 2,
   },
   chatButton: {
     backgroundColor: '#000000',
@@ -1104,6 +1020,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   modalButtonText: {
     color: '#FFFFFF',
@@ -1293,26 +1211,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F9FAFB',
-  },
-  pdfPreviewWebView: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'transparent',
-  },
-  csvPreviewWebView: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'transparent',
-  },
-  previewPDFFallback: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    flex: 1,
-  },
-  previewCSVFallback: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    flex: 1,
+    gap: 8,
   },
   openExternallyButton: {
     backgroundColor: '#000000',
