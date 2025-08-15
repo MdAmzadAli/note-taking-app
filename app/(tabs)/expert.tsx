@@ -275,6 +275,12 @@ export default function ExpertTab() {
   };
 
   const openFilePreview = (file: SingleFile) => {
+    console.log('🔍 Opening file preview for:', {
+      fileName: file.name,
+      mimetype: file.mimetype,
+      isUploaded: file.isUploaded,
+      fileId: file.id
+    });
     setPreviewFile(file);
     setIsFilePreviewVisible(true);
   };
@@ -343,7 +349,15 @@ export default function ExpertTab() {
   };
 
   const renderFullFileContent = (file: SingleFile) => {
+    console.log('🎯 Rendering full file content for:', {
+      fileName: file.name,
+      mimetype: file.mimetype,
+      isUploaded: file.isUploaded,
+      fileId: file.id
+    });
+
     if (!file.isUploaded) {
+      console.log('❌ File not uploaded to backend, showing placeholder');
       return (
         <View style={styles.fullPreviewPlaceholder}>
           <Text style={styles.fullPreviewIcon}>{getFileIcon(file.mimetype, file.name)}</Text>
@@ -354,9 +368,12 @@ export default function ExpertTab() {
     }
 
     const fileUrl = fileService.getFileUrl(file.id);
+    console.log('🔗 Generated file URL:', fileUrl);
 
     // For PDF files, show in WebView with proper configuration
     if (file.mimetype?.includes('pdf')) {
+      console.log('📕 Rendering PDF in WebView with URL:', fileUrl);
+      
       return (
         <View style={styles.webViewContainer}>
           <WebView
@@ -372,39 +389,65 @@ export default function ExpertTab() {
             showsVerticalScrollIndicator={true}
             originWhitelist={['*']}
             mixedContentMode="compatibility"
-            renderLoading={() => (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#000000" />
-                <Text>Loading PDF...</Text>
-              </View>
-            )}
+            onLoadStart={() => {
+              console.log('📕 WebView started loading PDF');
+            }}
+            onLoadEnd={() => {
+              console.log('📕 WebView finished loading PDF');
+            }}
+            onLoad={() => {
+              console.log('📕 WebView PDF load successful');
+            }}
+            renderLoading={() => {
+              console.log('📕 WebView showing loading indicator');
+              return (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#000000" />
+                  <Text>Loading PDF...</Text>
+                </View>
+              );
+            }}
             onError={(syntheticEvent) => {
               const { nativeEvent } = syntheticEvent;
-              console.warn('WebView error: ', nativeEvent);
+              console.error('❌ WebView PDF loading error:', nativeEvent);
+              console.error('❌ Error details:', {
+                description: nativeEvent.description,
+                code: nativeEvent.code,
+                url: nativeEvent.url
+              });
             }}
-            renderError={() => (
-              <View style={styles.fullPreviewPlaceholder}>
-                <Text style={styles.fullPreviewIcon}>📕</Text>
-                <Text style={styles.fullPreviewText}>Unable to display PDF</Text>
-                <Text style={styles.fullPreviewSubtext}>The PDF couldn't be loaded in the viewer</Text>
-                <TouchableOpacity 
-                  style={styles.openExternallyButton}
-                  onPress={() => {
-                    const downloadUrl = fileService.getDownloadUrl(file.id);
-                    Alert.alert(
-                      'Download PDF',
-                      `You can download the PDF using this URL: ${downloadUrl}`,
-                      [
-                        { text: 'Copy URL', onPress: () => {/* Copy to clipboard logic */} },
-                        { text: 'OK' }
-                      ]
-                    );
-                  }}
-                >
-                  <Text style={styles.openExternallyButtonText}>Download PDF</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            onHttpError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.error('❌ WebView HTTP error:', nativeEvent);
+            }}
+            renderError={(errorDomain, errorCode, errorDesc) => {
+              console.error('❌ WebView render error:', { errorDomain, errorCode, errorDesc });
+              return (
+                <View style={styles.fullPreviewPlaceholder}>
+                  <Text style={styles.fullPreviewIcon}>📕</Text>
+                  <Text style={styles.fullPreviewText}>Unable to display PDF</Text>
+                  <Text style={styles.fullPreviewSubtext}>The PDF couldn't be loaded in the viewer</Text>
+                  <Text style={styles.fullPreviewSubtext}>Error: {errorDesc}</Text>
+                  <TouchableOpacity 
+                    style={styles.openExternallyButton}
+                    onPress={() => {
+                      const downloadUrl = fileService.getDownloadUrl(file.id);
+                      console.log('🔗 Opening download URL:', downloadUrl);
+                      Alert.alert(
+                        'Download PDF',
+                        `You can download the PDF using this URL: ${downloadUrl}`,
+                        [
+                          { text: 'Copy URL', onPress: () => {/* Copy to clipboard logic */} },
+                          { text: 'OK' }
+                        ]
+                      );
+                    }}
+                  >
+                    <Text style={styles.openExternallyButtonText}>Download PDF</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            }}
           />
         </View>
       );

@@ -137,6 +137,16 @@ const upload = multer({
 
 // Handle preflight requests explicitly
 app.options('*', (req, res) => {
+  console.log('🔄 CORS preflight request for:', req.path);
+  res.sendStatus(200);
+});
+
+// Specific OPTIONS handler for file endpoints
+app.options('/file/:id', (req, res) => {
+  console.log('🔄 CORS preflight request for file:', req.params.id);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Range, Content-Range, Content-Length, Content-Type');
   res.sendStatus(200);
 });
 
@@ -265,21 +275,66 @@ app.get('/preview/:id', async (req, res) => {
 app.get('/file/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    console.log('📄 File request received for ID:', id);
+    console.log('📄 Request headers:', {
+      'user-agent': req.get('User-Agent'),
+      'accept': req.get('Accept'),
+      'origin': req.get('Origin')
+    });
+    
     const fileInfo = await fileService.getFileMetadata(id);
 
     if (!fileInfo) {
+      console.error('❌ File not found for ID:', id);
       return res.status(404).json({ error: 'File not found' });
     }
 
+    console.log('📄 File info retrieved:', {
+      originalName: fileInfo.originalName,
+      mimetype: fileInfo.mimetype,
+      size: fileInfo.size,
+      path: fileInfo.path
+    });
+
     const { mimetype, originalName, path: filePath } = fileInfo;
+
+    // Check if file exists on disk
+    try {
+      await fs.access(filePath);
+      console.log('✅ File exists on disk:', filePath);
+    } catch (accessError) {
+      console.error('❌ File not found on disk:', filePath);
+      return res.status(404).json({ error: 'File not found on disk' });
+    }
 
     // For common types, serve directly
     if (fileService.isCommonType(mimetype)) {
-      res.setHeader('Content-Type', mimetype);
-      res.setHeader('Content-Disposition', `inline; filename="${originalName}"`);
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      res.sendFile(path.resolve(filePath));
+      console.log('📄 Serving file directly - mimetype:', mimetype);
+      
+      // Special handling for PDFs to ensure they display inline
+      if (mimetype === 'application/pdf') {
+        console.log('📕 Setting PDF-specific headers for inline display');
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${originalName}"`);
+        res.setHeader('Accept-Ranges', 'bytes');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        
+        // Add CORS headers for PDF viewing
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Range, Content-Range, Content-Length');
+        
+        console.log('📕 Sending PDF file:', path.resolve(filePath));
+        res.sendFile(path.resolve(filePath));
+      } else {
+        console.log('📄 Setting standard headers for mimetype:', mimetype);
+        res.setHeader('Content-Type', mimetype);
+        res.setHeader('Content-Disposition', `inline; filename="${originalName}"`);
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.sendFile(path.resolve(filePath));
+      }
     } else {
+      console.log('📄 File type not common, providing download link');
       // For uncommon types, provide download link
       res.json({
         downloadUrl: `/download/${id}`,
@@ -291,6 +346,7 @@ app.get('/file/:id', async (req, res) => {
     }
   } catch (error) {
     console.error('❌ File serving error:', error);
+    console.error('❌ Error stack:', error.stack);
     res.status(500).json({ error: 'File serving failed', details: error.message });
   }
 });
