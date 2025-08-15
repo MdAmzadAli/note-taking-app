@@ -42,9 +42,13 @@ class PDFService {
       console.log('📄 Starting PDF rendering for:', pdfPath);
       console.log('📄 PDF buffer size:', pdfBuffer.length, 'bytes');
       
+      // Convert Buffer to Uint8Array for PDF.js compatibility
+      const pdfData = new Uint8Array(pdfBuffer);
+      console.log('📄 Converted to Uint8Array, size:', pdfData.length, 'bytes');
+      
       // Load PDF document
       const documentConfig = {
-        data: pdfBuffer,
+        data: pdfData,
         useSystemFonts: true,
         disableFontFace: false,
         disableWebGL: true,
@@ -114,7 +118,8 @@ class PDFService {
   async getPDFInfo(pdfPath) {
     try {
       const pdfBuffer = await fs.readFile(pdfPath);
-      const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer });
+      const pdfData = new Uint8Array(pdfBuffer);
+      const loadingTask = pdfjsLib.getDocument({ data: pdfData });
       const pdfDocument = await loadingTask.promise;
       
       const metadata = await pdfDocument.getMetadata();
