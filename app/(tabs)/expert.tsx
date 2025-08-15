@@ -21,6 +21,8 @@ import { WebView } from 'react-native-webview';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
+import * as IntentLauncher from 'expo-intent-launcher';
+import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface SingleFile {
@@ -299,6 +301,134 @@ export default function ExpertTab() {
     }
   };
 
+  const openFileExternally = async (file: SingleFile) => {
+    try {
+      if (Platform.OS === 'android') {
+        // For Android, use intent launcher
+        const contentUri = await FileSystem.getContentUriAsync(file.uri);
+        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+          data: contentUri,
+          flags: 1,
+          type: file.mimeType || '*/*',
+        });
+      } else {
+        // For iOS, use sharing
+        await Sharing.shareAsync(file.uri, {
+          mimeType: file.mimeType,
+          dialogTitle: `Open ${file.name}`,
+        });
+      }
+    } catch (error) {
+      console.error('Error opening file externally:', error);
+      Alert.alert('Error', 'Unable to open file with external app');
+    }
+  };
+
+  const createPDFViewerHTML = (base64Content: string, isPreview: boolean = false): string => {
+    const pdfJsVersion = '3.11.174';
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfJsVersion}/pdf.min.js"></script>
+        <style>
+          body { 
+            margin: 0; 
+            padding: 8px; 
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            overflow-x: auto;
+          }
+          #pdf-container { 
+            text-align: center; 
+          }
+          canvas { 
+            border: 1px solid #ddd; 
+            margin: 4px 0;
+            max-width: 100%;
+            height: auto;
+          }
+          .page-info {
+            font-size: ${isPreview ? '10px' : '12px'};
+            color: #666;
+            margin: 8px 0;
+          }
+          .error {
+            color: #e74c3c;
+            padding: 20px;
+            text-align: center;
+          }
+        </style>
+      </head>
+      <body>
+        <div id="pdf-container">
+          <div id="loading">Loading PDF...</div>
+        </div>
+        
+        <script>
+          pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfJsVersion}/pdf.worker.min.js';
+          
+          const base64 = '${base64Content}';
+          const isPreview = ${isPreview};
+          
+          async function renderPDF() {
+            try {
+              const loadingElement = document.getElementById('loading');
+              const container = document.getElementById('pdf-container');
+              
+              const pdf = await pdfjsLib.getDocument({data: atob(base64)}).promise;
+              loadingElement.style.display = 'none';
+              
+              const maxPages = isPreview ? 1 : pdf.numPages;
+              
+              for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                
+                const scale = isPreview ? 0.5 : 1.2;
+                const viewport = page.getViewport({ scale });
+                
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                
+                await page.render({
+                  canvasContext: context,
+                  viewport: viewport
+                }).promise;
+                
+                container.appendChild(canvas);
+                
+                if (!isPreview && pdf.numPages > 1) {
+                  const pageInfo = document.createElement('div');
+                  pageInfo.className = 'page-info';
+                  pageInfo.textContent = \`Page \${pageNum} of \${pdf.numPages}\`;
+                  container.appendChild(pageInfo);
+                }
+              }
+              
+              if (isPreview && pdf.numPages > 1) {
+                const previewInfo = document.createElement('div');
+                previewInfo.className = 'page-info';
+                previewInfo.textContent = \`Preview - Page 1 of \${pdf.numPages}\`;
+                container.appendChild(previewInfo);
+              }
+              
+            } catch (error) {
+              console.error('PDF rendering error:', error);
+              document.getElementById('pdf-container').innerHTML = 
+                '<div class="error">Error loading PDF</div>';
+            }
+          }
+          
+          renderPDF();
+        </script>
+      </body>
+      </html>
+    `;
+  };
+
   const sendMessage = () => {
     if (!currentMessage.trim()) return;
 
@@ -329,30 +459,35 @@ export default function ExpertTab() {
         />
       );
     } else if (isPDFFile(file.mimeType, file.name)) {
-      // Show PDF preview using WebView with first page
-      return (
-        <View style={styles.previewPDF}>
-          <WebView
-            source={{ uri: file.uri }}
-            style={styles.pdfPreviewWebView}
-            startInLoadingState={false}
-            scrollEnabled={false}
-            showsHorizontalScrollIndicator={false}
-            showsVerticalScrollIndicator={false}
-            pointerEvents="none"
-            onError={() => {
-              // Fallback to icon if WebView fails
-              console.log('PDF preview failed, showing fallback');
-            }}
-            renderError={() => (
-              <View style={styles.previewPDFFallback}>
-                <Text style={styles.fileIcon}>📕</Text>
-                <Text style={styles.previewText}>PDF</Text>
-              </View>
-            )}
-          />
-        </View>
-      );
+      // Show PDF preview using PDF.js with base64 content
+      if (file.base64) {
+        return (
+          <View style={styles.previewPDF}>
+            <WebView
+              source={{ html: createPDFViewerHTML(file.base64, true) }}
+              style={styles.pdfPreviewWebView}
+              startInLoadingState={true}
+              scrollEnabled={false}
+              showsHorizontalScrollIndicator={false}
+              showsVerticalScrollIndicator={false}
+              pointerEvents="none"
+              renderError={() => (
+                <View style={styles.previewPDFFallback}>
+                  <Text style={styles.fileIcon}>📕</Text>
+                  <Text style={styles.previewText}>PDF</Text>
+                </View>
+              )}
+            />
+          </View>
+        );
+      } else {
+        return (
+          <View style={styles.previewPDFFallback}>
+            <Text style={styles.fileIcon}>📕</Text>
+            <Text style={styles.previewText}>PDF</Text>
+          </View>
+        );
+      }
     } else if (isCSVFile(file.mimeType, file.name)) {
       // Show CSV preview with actual data
       const csvPreviewHTML = parseCSVPreview(file.content, true);
@@ -394,33 +529,55 @@ export default function ExpertTab() {
         />
       );
     } else if (isPDFFile(file.mimeType, file.name)) {
-      return (
-        <WebView
-          source={{ uri: file.uri }}
-          style={styles.webViewContainer}
-          startInLoadingState={true}
-          showsHorizontalScrollIndicator={true}
-          showsVerticalScrollIndicator={true}
-          allowsFullscreenVideo={false}
-          renderLoading={() => (
-            <View style={styles.loadingContainer}>
-              <Text>Loading PDF...</Text>
-            </View>
-          )}
-          renderError={() => (
-            <View style={styles.fullPreviewPlaceholder}>
-              <Text style={styles.fullPreviewIcon}>📕</Text>
-              <Text style={styles.fullPreviewText}>PDF Preview Unavailable</Text>
-              <Text style={styles.fullPreviewSubtext}>
-                This PDF cannot be displayed in the preview
-              </Text>
-              <Text style={styles.fullPreviewSubtext}>
-                Use the Chat button to analyze this file with AI
-              </Text>
-            </View>
-          )}
-        />
-      );
+      if (file.base64) {
+        return (
+          <View style={styles.webViewContainer}>
+            <WebView
+              source={{ html: createPDFViewerHTML(file.base64, false) }}
+              style={styles.webViewContainer}
+              startInLoadingState={true}
+              showsHorizontalScrollIndicator={true}
+              showsVerticalScrollIndicator={true}
+              renderLoading={() => (
+                <View style={styles.loadingContainer}>
+                  <Text>Loading PDF...</Text>
+                </View>
+              )}
+              renderError={() => (
+                <View style={styles.fullPreviewPlaceholder}>
+                  <Text style={styles.fullPreviewIcon}>📕</Text>
+                  <Text style={styles.fullPreviewText}>PDF Preview Unavailable</Text>
+                  <Text style={styles.fullPreviewSubtext}>
+                    This PDF cannot be displayed in the preview
+                  </Text>
+                  <TouchableOpacity 
+                    style={styles.openExternallyButton}
+                    onPress={() => openFileExternally(file)}
+                  >
+                    <Text style={styles.openExternallyButtonText}>Open Externally</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
+          </View>
+        );
+      } else {
+        return (
+          <View style={styles.fullPreviewPlaceholder}>
+            <Text style={styles.fullPreviewIcon}>📕</Text>
+            <Text style={styles.fullPreviewText}>PDF Preview Unavailable</Text>
+            <Text style={styles.fullPreviewSubtext}>
+              No content available for preview
+            </Text>
+            <TouchableOpacity 
+              style={styles.openExternallyButton}
+              onPress={() => openFileExternally(file)}
+            >
+              <Text style={styles.openExternallyButtonText}>Open Externally</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
     } else if (isCSVFile(file.mimeType, file.name)) {
       const csvHTML = parseCSVPreview(file.content, false);
       return (
@@ -444,9 +601,12 @@ export default function ExpertTab() {
           <Text style={styles.fullPreviewSubtext}>
             File preview not available for this format
           </Text>
-          <Text style={styles.fullPreviewSubtext}>
-            Use the Chat button to analyze this file with AI
-          </Text>
+          <TouchableOpacity 
+            style={styles.openExternallyButton}
+            onPress={() => openFileExternally(file)}
+          >
+            <Text style={styles.openExternallyButtonText}>Open Externally</Text>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -1153,5 +1313,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     flex: 1,
+  },
+  openExternallyButton: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginTop: 12,
+  },
+  openExternallyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+    fontFamily: 'Inter',
   },
 });
