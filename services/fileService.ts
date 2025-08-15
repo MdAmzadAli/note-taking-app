@@ -1,4 +1,3 @@
-
 import { API_ENDPOINTS, ApiResponse, FileUploadResponse, FileMetadata } from '../config/api';
 
 class FileService {
@@ -20,7 +19,7 @@ class FileService {
       });
 
       const result: ApiResponse<{ file: FileUploadResponse }> = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(result.error || 'Upload failed');
       }
@@ -35,7 +34,7 @@ class FileService {
   async getFileMetadata(id: string): Promise<FileMetadata> {
     try {
       const response = await fetch(API_ENDPOINTS.metadata(id));
-      
+
       if (!response.ok) {
         throw new Error('Failed to get file metadata');
       }
@@ -66,7 +65,7 @@ class FileService {
   async getCsvPage(id: string, page: number, limit: number = 20) {
     try {
       const response = await fetch(`${API_ENDPOINTS.csvPage(id, page)}?limit=${limit}`);
-      
+
       if (!response.ok) {
         throw new Error('Failed to get CSV data');
       }
@@ -80,10 +79,29 @@ class FileService {
 
   async checkHealth(): Promise<boolean> {
     try {
-      const response = await fetch(API_ENDPOINTS.health);
-      return response.ok;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      const response = await fetch(API_ENDPOINTS.health, {
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.status === 'healthy';
     } catch (error) {
-      console.error('Health check failed:', error);
+      if (error.name === 'AbortError') {
+        console.error('Health check timeout - backend server may not be running');
+      } else {
+        console.error('Health check failed:', error.message || error);
+      }
       return false;
     }
   }
