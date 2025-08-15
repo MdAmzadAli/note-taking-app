@@ -1,7 +1,5 @@
 
-const API_BASE_URL = process.env.NODE_ENV === 'development' 
-  ? `https://${process.env.REPLIT_DEV_DOMAIN}:5000`
-  : 'http://0.0.0.0:5000';
+const API_BASE_URL = 'http://0.0.0.0:5000';
 
 export const API_ENDPOINTS = {
   upload: `${API_BASE_URL}/upload`,

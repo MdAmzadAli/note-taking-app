@@ -18,8 +18,8 @@ const imageService = require('./services/imageService');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Trust proxy - required for Replit environment
-app.set('trust proxy', true);
+// Trust proxy - required for Replit environment with proper configuration
+app.set('trust proxy', 1); // trust first proxy
 
 // Security middleware
 app.use(helmet());
@@ -28,11 +28,14 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
+// Rate limiting with proper trust proxy handling
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
+  message: 'Too many requests from this IP, please try again later.',
+  trustProxy: true, // explicitly trust proxy for rate limiting
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
 });
 app.use(limiter);
 
