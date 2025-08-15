@@ -56,22 +56,12 @@ export default function ExpertTab() {
   const [isLoading, setIsLoading] = useState(false);
   const [isBackendConnected, setIsBackendConnected] = useState(false);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
-  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-
 
   // Check backend connectivity on mount
   useEffect(() => {
     checkBackendConnection();
     loadData();
   }, []);
-
-  // Close dropdown when scrolling or interacting elsewhere
-  useEffect(() => {
-    if (activeDropdown) {
-      const timer = setTimeout(() => setActiveDropdown(null), 3000); // Auto close after 3 seconds
-      return () => clearTimeout(timer);
-    }
-  }, [activeDropdown]);
 
   const checkBackendConnection = async () => {
     try {
@@ -152,11 +142,10 @@ export default function ExpertTab() {
     try {
       setIsLoading(true);
       console.log('🎯 Starting file selection process...');
-
+      
       const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/pdf', // Restrict to PDF only
+        type: '*/*',
         copyToCacheDirectory: true,
-        multiple: false,
       });
 
       console.log('📄 Document picker result:', JSON.stringify(result, null, 2));
@@ -221,7 +210,7 @@ export default function ExpertTab() {
     try {
       setIsLoading(true);
       const results = await DocumentPicker.getDocumentAsync({
-        type: 'application/pdf', // Restrict to PDF only
+        type: '*/*',
         copyToCacheDirectory: true,
         multiple: true,
       });
@@ -234,7 +223,7 @@ export default function ExpertTab() {
 
           try {
             console.log(`📤 Uploading workspace file ${i + 1}:`, JSON.stringify(file, null, 2));
-
+            
             const fileToUpload = {
               uri: file.uri,
               name: file.name,
@@ -251,7 +240,7 @@ export default function ExpertTab() {
               size: uploadedFile.size,
               isUploaded: true,
             });
-
+            
             console.log(`✅ Successfully uploaded workspace file: ${file.name}`);
           } catch (uploadError) {
             console.error(`❌ Failed to upload workspace file ${file.name}:`, uploadError);
@@ -342,9 +331,9 @@ export default function ExpertTab() {
     const previewUrl = fileService.getPreviewUrl(file.id);
 
     return (
-      <Image
-        source={{ uri: previewUrl }}
-        style={styles.previewImage}
+      <Image 
+        source={{ uri: previewUrl }} 
+        style={styles.previewImage} 
         resizeMode="cover"
         onError={() => {
           console.warn(`Failed to load preview for file ${file.name}`);
@@ -385,7 +374,7 @@ export default function ExpertTab() {
                 <Text style={styles.fullPreviewIcon}>{getFileIcon(file.mimetype, file.name)}</Text>
                 <Text style={styles.fullPreviewText}>Unable to display file</Text>
                 <Text style={styles.fullPreviewSubtext}>Try downloading the file instead</Text>
-                <TouchableOpacity
+                <TouchableOpacity 
                   style={styles.openExternallyButton}
                   onPress={() => {
                     const downloadUrl = fileService.getDownloadUrl(file.id);
@@ -393,7 +382,7 @@ export default function ExpertTab() {
                       'Download File',
                       `Download URL: ${downloadUrl}`,
                       [
-                        { text: 'Copy URL', onPress: () => {/* Copy to clipboard logic */ } },
+                        { text: 'Copy URL', onPress: () => {/* Copy to clipboard logic */} },
                         { text: 'OK' }
                       ]
                     );
@@ -411,9 +400,9 @@ export default function ExpertTab() {
     // For images, show directly
     if (file.mimetype?.startsWith('image/')) {
       return (
-        <Image
-          source={{ uri: fileUrl }}
-          style={styles.fullPreviewImage}
+        <Image 
+          source={{ uri: fileUrl }} 
+          style={styles.fullPreviewImage} 
           resizeMode="contain"
           onError={() => {
             console.warn(`Failed to load image for file ${file.name}`);
@@ -430,7 +419,7 @@ export default function ExpertTab() {
         <Text style={styles.fullPreviewSubtext}>
           File preview not available for this format
         </Text>
-        <TouchableOpacity
+        <TouchableOpacity 
           style={styles.openExternallyButton}
           onPress={() => {
             const downloadUrl = fileService.getDownloadUrl(file.id);
@@ -438,7 +427,7 @@ export default function ExpertTab() {
               'Download File',
               `Download URL: ${downloadUrl}`,
               [
-                { text: 'Copy URL', onPress: () => {/* Copy to clipboard logic */ } },
+                { text: 'Copy URL', onPress: () => {/* Copy to clipboard logic */} },
                 { text: 'OK' }
               ]
             );
@@ -454,11 +443,11 @@ export default function ExpertTab() {
     if (!currentMessage.trim()) return;
 
     // Simulate AI response
-    const aiResponse = selectedFile
+    const aiResponse = selectedFile 
       ? `Based on "${selectedFile.name}", here's my analysis: ${currentMessage}`
       : `Based on workspace "${selectedWorkspace?.name}" with ${selectedWorkspace?.files.length} files, here's my analysis: ${currentMessage}`;
 
-    const sources = selectedFile
+    const sources = selectedFile 
       ? [selectedFile.name]
       : selectedWorkspace?.files.map(f => f.name) || [];
 
@@ -470,93 +459,37 @@ export default function ExpertTab() {
     setCurrentMessage('');
   };
 
-  const deleteFile = async (fileId: string) => {
-    try {
-      // Remove from state
-      const updatedFiles = singleFiles.filter(file => file.id !== fileId);
-      setSingleFiles(updatedFiles);
-
-      // Update AsyncStorage
-      await AsyncStorage.setItem('expert_single_files', JSON.stringify(updatedFiles));
-
-      console.log('🗑️ File deleted successfully:', fileId);
-    } catch (error) {
-      console.error('Error deleting file:', error);
-      Alert.alert('Error', 'Failed to delete file');
-    }
-  };
-
-  const handleDeleteFile = (fileId: string, fileName: string) => {
-    Alert.alert(
-      'Delete File',
-      `Are you sure you want to delete "${fileName}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteFile(fileId)
-        },
-      ]
-    );
-  };
-
   const renderFileCard = ({ item }: { item: SingleFile }) => (
     <View style={styles.fileCard}>
-      <TouchableOpacity
-        style={styles.fileCardContent}
+      <TouchableOpacity 
+        style={styles.filePreview} 
         onPress={() => openFilePreview(item)}
+        activeOpacity={0.7}
       >
-        <View style={styles.fileInfo}>
-          <Text style={styles.fileName} numberOfLines={2}>{item.name}</Text>
-          <Text style={styles.fileDate}>
-            Uploaded: {item.uploadDate}
-            {item.size && ` • ${(item.size / 1024).toFixed(1)}KB`}
-          </Text>
-          {item.size && (
-            <Text style={styles.fileSize}>
-              Size: {(item.size / 1024 / 1024).toFixed(2)} MB
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.previewContainer}>
-          <Image
-            source={{ uri: fileService.getPreviewUrl(item.id) }}
-            style={styles.previewImage}
-            onError={() => console.log('Preview failed to load for:', item.id)}
-          />
-        </View>
+        {renderFilePreview(item)}
+        {!item.isUploaded && (
+          <View style={styles.uploadBadge}>
+            <Text style={styles.uploadBadgeText}>Local</Text>
+          </View>
+        )}
       </TouchableOpacity>
-
-      <View style={styles.menuContainer}>
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={() => setActiveDropdown(activeDropdown === item.id ? null : item.id)}
-        >
-          <Text style={styles.menuDots}>⋮</Text>
-        </TouchableOpacity>
-
-        {activeDropdown === item.id && (
-          <TouchableWithoutFeedback onPress={() => setActiveDropdown(null)}>
-            <View style={styles.dropdownOverlay}>
-              <TouchableWithoutFeedback>
-                <View style={styles.dropdown}>
-                  <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setActiveDropdown(null);
-                      handleDeleteFile(item.id, item.name);
-                    }}
-                  >
-                    <Text style={styles.dropdownText}>🗑️ Delete</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableWithoutFeedback>
-            </View>
-          </TouchableWithoutFeedback>
+      <View style={styles.fileInfo}>
+        <Text style={styles.fileName} numberOfLines={2}>{item.name}</Text>
+        <Text style={styles.fileDate}>
+          Uploaded: {item.uploadDate}
+          {item.size && ` • ${(item.size / 1024).toFixed(1)}KB`}
+        </Text>
+        {!isBackendConnected && (
+          <Text style={styles.offlineText}>Backend offline</Text>
         )}
       </View>
+      <TouchableOpacity 
+        style={styles.chatButton} 
+        onPress={() => openFileChat(item)}
+        activeOpacity={0.7}
+      >
+        <IconSymbol size={20} name="chatbubble.left.ellipsis.fill" color="#FFFFFF" />
+      </TouchableOpacity>
     </View>
   );
 
@@ -630,8 +563,8 @@ export default function ExpertTab() {
             </Text>
           </View>
         </View>
-        <TouchableOpacity
-          style={styles.iconButton}
+        <TouchableOpacity 
+          style={styles.iconButton} 
           onPress={() => setIsUploadModalVisible(true)}
           disabled={isLoading}
         >
@@ -655,8 +588,8 @@ export default function ExpertTab() {
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>No files uploaded yet</Text>
             <Text style={styles.emptySubtext}>
-              {isBackendConnected
-                ? 'Tap + to upload your first file'
+              {isBackendConnected 
+                ? 'Tap + to upload your first file' 
                 : 'Backend is offline. Check connection and try again.'}
             </Text>
           </View>
@@ -717,14 +650,14 @@ export default function ExpertTab() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Upload Single File</Text>
             <Text style={styles.modalSubtitle}>
-              {isBackendConnected
+              {isBackendConnected 
                 ? 'Select a file to upload and chat with AI'
                 : 'Backend is offline. File will be stored locally.'}
             </Text>
 
             <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, { opacity: isLoading ? 0.5 : 1 }]}
+              <TouchableOpacity 
+                style={[styles.modalButton, { opacity: isLoading ? 0.5 : 1 }]} 
                 onPress={handleUploadSingleFile}
                 disabled={isLoading}
               >
@@ -734,8 +667,8 @@ export default function ExpertTab() {
                   <Text style={styles.modalButtonText}>Choose File</Text>
                 )}
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
                 onPress={() => setIsUploadModalVisible(false)}
                 disabled={isLoading}
               >
@@ -752,7 +685,7 @@ export default function ExpertTab() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Create New Workspace</Text>
             <Text style={styles.modalSubtitle}>
-              {isBackendConnected
+              {isBackendConnected 
                 ? 'Upload up to 5 files for collaborative AI chat'
                 : 'Backend is offline. Files will be stored locally.'}
             </Text>
@@ -766,8 +699,8 @@ export default function ExpertTab() {
             />
 
             <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, { opacity: isLoading ? 0.5 : 1 }]}
+              <TouchableOpacity 
+                style={[styles.modalButton, { opacity: isLoading ? 0.5 : 1 }]} 
                 onPress={handleCreateWorkspace}
                 disabled={isLoading}
               >
@@ -777,8 +710,8 @@ export default function ExpertTab() {
                   <Text style={styles.modalButtonText}>Create & Upload Files</Text>
                 )}
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
                 onPress={() => {
                   setIsWorkspaceModalVisible(false);
                   setWorkspaceName('');
@@ -804,7 +737,7 @@ export default function ExpertTab() {
               <Text style={styles.previewModalTitle} numberOfLines={1}>
                 {previewFile?.name}
               </Text>
-              <TouchableOpacity
+              <TouchableOpacity 
                 onPress={() => setIsFilePreviewVisible(false)}
                 style={styles.closeButton}
               >
@@ -916,19 +849,14 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   fileCard: {
-    backgroundColor: '#FFFFFF',
+    width: '48%',
+    backgroundColor: '#F9FAFB',
     borderRadius: 12,
-    marginBottom: 16,
+    padding: 12,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    position: 'relative',
-  },
-  fileCardContent: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    padding: 16,
-    flex: 1,
+    justifyContent: 'space-between',
   },
   filePreview: {
     width: '100%',
@@ -983,12 +911,6 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontFamily: 'Inter',
   },
-  fileSize: {
-    fontSize: 10,
-    color: '#6B7280',
-    fontFamily: 'Inter',
-    marginTop: 2,
-  },
   offlineText: {
     fontSize: 10,
     color: '#EF4444',
@@ -1002,55 +924,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 'auto',
-  },
-  menuContainer: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    zIndex: 1,
-  },
-  menuButton: {
-    padding: 8,
-  },
-  menuDots: {
-    fontSize: 24,
-    color: '#6B7280',
-  },
-  dropdownOverlay: {
-    position: 'absolute',
-    top: 30,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    zIndex: 10,
-  },
-  dropdown: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    minWidth: 120,
-    zIndex: 11,
-  },
-  dropdownItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  dropdownText: {
-    fontSize: 14,
-    color: '#000000',
-    fontFamily: 'Inter',
   },
   menuOverlay: {
     position: 'absolute',
