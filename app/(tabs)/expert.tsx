@@ -355,14 +355,70 @@ export default function ExpertTab() {
 
     const fileUrl = fileService.getFileUrl(file.id);
 
-    // For common file types, show in WebView
-    if (file.mimetype?.includes('pdf') || file.mimetype?.includes('text') || file.mimetype?.includes('csv')) {
+    // For PDF files, show in WebView with proper configuration
+    if (file.mimetype?.includes('pdf')) {
       return (
         <View style={styles.webViewContainer}>
           <WebView
             source={{ uri: fileUrl }}
             style={styles.webViewContainer}
             startInLoadingState={true}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            allowsInlineMediaPlayback={true}
+            mediaPlaybackRequiresUserAction={false}
+            scalesPageToFit={true}
+            showsHorizontalScrollIndicator={true}
+            showsVerticalScrollIndicator={true}
+            originWhitelist={['*']}
+            mixedContentMode="compatibility"
+            renderLoading={() => (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#000000" />
+                <Text>Loading PDF...</Text>
+              </View>
+            )}
+            onError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.warn('WebView error: ', nativeEvent);
+            }}
+            renderError={() => (
+              <View style={styles.fullPreviewPlaceholder}>
+                <Text style={styles.fullPreviewIcon}>📕</Text>
+                <Text style={styles.fullPreviewText}>Unable to display PDF</Text>
+                <Text style={styles.fullPreviewSubtext}>The PDF couldn't be loaded in the viewer</Text>
+                <TouchableOpacity 
+                  style={styles.openExternallyButton}
+                  onPress={() => {
+                    const downloadUrl = fileService.getDownloadUrl(file.id);
+                    Alert.alert(
+                      'Download PDF',
+                      `You can download the PDF using this URL: ${downloadUrl}`,
+                      [
+                        { text: 'Copy URL', onPress: () => {/* Copy to clipboard logic */} },
+                        { text: 'OK' }
+                      ]
+                    );
+                  }}
+                >
+                  <Text style={styles.openExternallyButtonText}>Download PDF</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          />
+        </View>
+      );
+    }
+
+    // For text and CSV files, show in WebView
+    if (file.mimetype?.includes('text') || file.mimetype?.includes('csv')) {
+      return (
+        <View style={styles.webViewContainer}>
+          <WebView
+            source={{ uri: fileUrl }}
+            style={styles.webViewContainer}
+            startInLoadingState={true}
+            javaScriptEnabled={false}
             renderLoading={() => (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#000000" />

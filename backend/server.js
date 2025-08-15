@@ -1,4 +1,3 @@
-
 const express = require('express');
 const multer = require('multer');
 const sharp = require('sharp');
@@ -29,23 +28,23 @@ const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
-    
+
     // Allow any replit.dev subdomain
     if (origin.includes('replit.dev')) {
       return callback(null, true);
     }
-    
+
     // Allow localhost for development
     if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
       return callback(null, true);
     }
-    
+
     // Allow custom origins from environment variable
     const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    
+
     return callback(null, true); // Allow all for development
   },
   credentials: true,
@@ -127,7 +126,7 @@ const upload = multer({
       'image/webp',
       'text/plain'
     ];
-    
+
     if (allowedMimes.includes(file.mimetype) || file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
@@ -158,7 +157,7 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     console.log('🔍 Request file:', req.file ? 'Present' : 'Missing');
     console.log('🔍 Request body keys:', Object.keys(req.body || {}));
     console.log('🔍 Request body:', JSON.stringify(req.body, null, 2));
-    
+
     if (req.file) {
       console.log('📄 Multer parsed file:', JSON.stringify(req.file, null, 2));
     } else {
@@ -169,7 +168,7 @@ app.post('/upload', upload.single('file'), async (req, res) => {
       console.error('   - File size too large');
       console.error('   - Malformed multipart data');
     }
-    
+
     if (!req.file) {
       console.error('❌ No file in request');
       return res.status(400).json({ error: 'No file uploaded' });
@@ -237,7 +236,7 @@ app.get('/preview/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const previewPath = path.join(PREVIEWS_DIR, `${id}.jpg`);
-    
+
     // Check if preview exists
     try {
       await fs.access(previewPath);
@@ -267,7 +266,7 @@ app.get('/file/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const fileInfo = await fileService.getFileMetadata(id);
-    
+
     if (!fileInfo) {
       return res.status(404).json({ error: 'File not found' });
     }
@@ -301,7 +300,7 @@ app.get('/download/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const fileInfo = await fileService.getFileMetadata(id);
-    
+
     if (!fileInfo) {
       return res.status(404).json({ error: 'File not found' });
     }
@@ -320,7 +319,7 @@ app.get('/pdf/:id/page/:pageNumber', async (req, res) => {
   try {
     const { id, pageNumber } = req.params;
     const page = parseInt(pageNumber);
-    
+
     if (isNaN(page) || page < 1) {
       return res.status(400).json({ error: 'Invalid page number' });
     }
@@ -331,7 +330,7 @@ app.get('/pdf/:id/page/:pageNumber', async (req, res) => {
     }
 
     const pageImage = await pdfService.renderPage(fileInfo.path, page);
-    
+
     res.setHeader('Content-Type', 'image/jpeg');
     res.setHeader('Cache-Control', 'public, max-age=3600');
     res.send(pageImage);
@@ -347,7 +346,7 @@ app.get('/csv/:id/page/:pageNumber', async (req, res) => {
     const { id, pageNumber } = req.params;
     const page = parseInt(pageNumber);
     const limit = parseInt(req.query.limit) || 20;
-    
+
     if (isNaN(page) || page < 1) {
       return res.status(400).json({ error: 'Invalid page number' });
     }
@@ -358,7 +357,7 @@ app.get('/csv/:id/page/:pageNumber', async (req, res) => {
     }
 
     const csvData = await csvService.getPaginatedData(fileInfo.path, page, limit);
-    
+
     res.json({
       data: csvData.rows,
       pagination: {
@@ -381,7 +380,7 @@ app.get('/metadata/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const fileInfo = await fileService.getFileMetadata(id);
-    
+
     if (!fileInfo) {
       return res.status(404).json({ error: 'File not found' });
     }
@@ -401,12 +400,12 @@ app.use((error, req, res, next) => {
   console.error('❌ Error type:', error.constructor.name);
   console.error('❌ Error message:', error.message);
   console.error('❌ Error stack:', error.stack);
-  
+
   if (error instanceof multer.MulterError) {
     console.error('❌ Multer-specific error detected');
     console.error('❌ Multer error code:', error.code);
     console.error('❌ Multer error field:', error.field);
-    
+
     if (error.code === 'LIMIT_FILE_SIZE') {
       console.error('❌ File size limit exceeded');
       return res.status(400).json({ error: 'File too large. Maximum size is 50MB.' });
@@ -435,11 +434,11 @@ app.use((error, req, res, next) => {
       console.error('❌ Too many fields');
       return res.status(400).json({ error: 'Too many fields.' });
     }
-    
+
     console.error('❌ Unknown multer error code:', error.code);
     return res.status(400).json({ error: `File upload error: ${error.message}` });
   }
-  
+
   res.status(500).json({ 
     error: 'Internal server error',
     details: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
@@ -454,7 +453,7 @@ app.use((req, res) => {
 // Start server
 async function startServer() {
   await ensureDirectories();
-  
+
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 File Preview API running on http://0.0.0.0:${PORT}`);
     console.log(`📁 Uploads directory: ${UPLOADS_DIR}`);
