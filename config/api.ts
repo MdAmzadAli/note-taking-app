@@ -1,5 +1,7 @@
-
-const API_BASE_URL = 'http://0.0.0.0:5000';
+// Use the external Replit URL that maps to port 5000
+const API_BASE_URL = typeof window !== 'undefined' 
+  ? `https://${window.location.hostname.split('-')[0]}-5000-00-${window.location.hostname.split('-00-')[1]}`
+  : 'http://0.0.0.0:5000';
 
 export const API_ENDPOINTS = {
   upload: `${API_BASE_URL}/upload`,
