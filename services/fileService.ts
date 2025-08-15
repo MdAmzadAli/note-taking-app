@@ -79,33 +79,26 @@ class FileService {
 
   async checkHealth(): Promise<boolean> {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort('Health check timeout'), 3000); // 3 second timeout
-
+      console.log('🔍 Checking backend health at:', API_ENDPOINTS.health);
       const response = await fetch(API_ENDPOINTS.health, {
         method: 'GET',
-        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
         },
+        mode: 'cors', // Explicitly set CORS mode
       });
-      
-      clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      return data.status === 'healthy';
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        console.error('Health check timeout - backend server may not be running');
-      } else if (error.message?.includes('Failed to fetch')) {
-        console.error('Health check failed: Cannot connect to backend server');
+      if (response.ok) {
+        console.log('✅ Backend health check successful');
+        return true;
       } else {
-        console.error('Health check failed:', error.message || error);
+        console.error('❌ Backend health check failed with status:', response.status);
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Health check failed:', error);
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        console.error('🌐 Network error - check if backend is running on port 5000');
       }
       return false;
     }

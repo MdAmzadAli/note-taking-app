@@ -3,15 +3,26 @@ const API_BASE_URL = typeof window !== 'undefined'
   ? `${window.location.protocol}//${window.location.hostname}:5000`
   : 'http://0.0.0.0:5000';
 
+// For Replit environment, ensure we're using the correct protocol
+const getApiBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    // In browser, use same domain but port 5000
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    return `${protocol}//${hostname}:5000`;
+  }
+  return 'http://0.0.0.0:5000';
+};
+
 export const API_ENDPOINTS = {
-  upload: `${API_BASE_URL}/upload`,
-  preview: (id: string) => `${API_BASE_URL}/preview/${id}`,
-  file: (id: string) => `${API_BASE_URL}/file/${id}`,
-  metadata: (id: string) => `${API_BASE_URL}/metadata/${id}`,
-  pdfPage: (id: string, page: number) => `${API_BASE_URL}/pdf/${id}/page/${page}`,
-  csvPage: (id: string, page: number) => `${API_BASE_URL}/csv/${id}/page/${page}`,
-  download: (id: string) => `${API_BASE_URL}/download/${id}`,
-  health: `${API_BASE_URL}/health`
+  upload: `${getApiBaseUrl()}/upload`,
+  preview: (id: string) => `${getApiBaseUrl()}/preview/${id}`,
+  file: (id: string) => `${getApiBaseUrl()}/file/${id}`,
+  metadata: (id: string) => `${getApiBaseUrl()}/metadata/${id}`,
+  pdfPage: (id: string, page: number) => `${getApiBaseUrl()}/pdf/${id}/page/${page}`,
+  csvPage: (id: string, page: number) => `${getApiBaseUrl()}/csv/${id}/page/${page}`,
+  download: (id: string) => `${getApiBaseUrl()}/download/${id}`,
+  health: `${getApiBaseUrl()}/health`
 };
 
 export interface ApiResponse<T = any> {

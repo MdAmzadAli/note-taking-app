@@ -23,10 +23,38 @@ app.set('trust proxy', 1); // trust first proxy
 
 // Security middleware
 app.use(helmet());
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['*'],
-  credentials: true
-}));
+
+// CORS configuration for Replit environment
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    // Allow any replit.dev subdomain
+    if (origin.includes('replit.dev')) {
+      return callback(null, true);
+    }
+    
+    // Allow localhost for development
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return callback(null, true);
+    }
+    
+    // Allow custom origins from environment variable
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    return callback(null, true); // Allow all for development
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 200 // For legacy browser support
+};
+
+app.use(cors(corsOptions));
 
 // Rate limiting with proper trust proxy handling
 const limiter = rateLimit({
@@ -98,6 +126,11 @@ const upload = multer({
       cb(new Error(`File type ${file.mimetype} not allowed`), false);
     }
   }
+});
+
+// Handle preflight requests explicitly
+app.options('*', (req, res) => {
+  res.sendStatus(200);
 });
 
 // Health check endpoint
