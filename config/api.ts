@@ -1,6 +1,6 @@
-// Use the external Replit URL that maps to port 5000
+// Use Replit's port forwarding - same domain with :5000 port
 const API_BASE_URL = typeof window !== 'undefined' 
-  ? `https://${window.location.hostname.split('-')[0]}-5000-00-${window.location.hostname.split('-00-')[1]}`
+  ? `${window.location.protocol}//${window.location.hostname}:5000`
   : 'http://0.0.0.0:5000';
 
 export const API_ENDPOINTS = {
