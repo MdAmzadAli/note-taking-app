@@ -13,13 +13,14 @@ class FileService {
         formData.append('file', file);
         console.log('🌐 Web file upload:', file.name, file.type, file.size, 'bytes');
       } else if (file && typeof file === 'object' && 'uri' in file) {
-        // Mobile file object
+        // Mobile file object - React Native specific format
         const mobileFile = {
           uri: file.uri,
           name: filename || file.name || 'unknown',
           type: file.type || 'application/octet-stream'
-        };
-        formData.append('file', mobileFile as any);
+        } as any;
+        
+        formData.append('file', mobileFile);
         console.log('📱 Mobile file upload:', mobileFile);
       } else {
         throw new Error('Invalid file format provided');
