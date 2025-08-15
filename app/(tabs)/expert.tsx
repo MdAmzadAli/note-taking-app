@@ -144,7 +144,7 @@ export default function ExpertTab() {
       console.log('🎯 Starting file selection process...');
       
       const result = await DocumentPicker.getDocumentAsync({
-        type: '*/*',
+        type: 'application/pdf',
         copyToCacheDirectory: true,
       });
 
@@ -210,7 +210,7 @@ export default function ExpertTab() {
     try {
       setIsLoading(true);
       const results = await DocumentPicker.getDocumentAsync({
-        type: '*/*',
+        type: 'application/pdf',
         copyToCacheDirectory: true,
         multiple: true,
       });
