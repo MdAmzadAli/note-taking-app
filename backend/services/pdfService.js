@@ -8,9 +8,8 @@ const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
 
 class PDFService {
   constructor() {
-    // Configure PDF.js for Node.js environment
-    const NodeCanvasFactory = require('pdfjs-dist/legacy/build/pdf.js').NodeCanvasFactory;
-    this.canvasFactory = new NodeCanvasFactory();
+    // Configure PDF.js for Node.js environment without NodeCanvasFactory
+    // We'll use the canvas package directly instead
   }
 
   /**
@@ -51,7 +50,7 @@ class PDFService {
       // Calculate viewport
       const viewport = page.getViewport({ scale });
       
-      // Create canvas
+      // Create canvas using the canvas package
       const canvas = createCanvas(viewport.width, viewport.height);
       const context = canvas.getContext('2d');
       
