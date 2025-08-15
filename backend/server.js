@@ -154,8 +154,21 @@ app.get('/health', (req, res) => {
 app.post('/upload', upload.single('file'), async (req, res) => {
   try {
     console.log('📤 Upload request received');
+    console.log('🔍 Request headers:', JSON.stringify(req.headers, null, 2));
     console.log('🔍 Request file:', req.file ? 'Present' : 'Missing');
     console.log('🔍 Request body keys:', Object.keys(req.body || {}));
+    console.log('🔍 Request body:', JSON.stringify(req.body, null, 2));
+    
+    if (req.file) {
+      console.log('📄 Multer parsed file:', JSON.stringify(req.file, null, 2));
+    } else {
+      console.error('❌ No file in request - multer did not parse any file');
+      console.error('❌ This could be due to:');
+      console.error('   - Incorrect field name (should be "file")');
+      console.error('   - Unsupported content type');
+      console.error('   - File size too large');
+      console.error('   - Malformed multipart data');
+    }
     
     if (!req.file) {
       console.error('❌ No file in request');
@@ -381,17 +394,46 @@ app.get('/metadata/:id', async (req, res) => {
 
 // Error handling middleware
 app.use((error, req, res, next) => {
-  console.error('❌ Unhandled error:', error);
+  console.error('❌ Unhandled error occurred');
+  console.error('❌ Error type:', error.constructor.name);
+  console.error('❌ Error message:', error.message);
   console.error('❌ Error stack:', error.stack);
   
   if (error instanceof multer.MulterError) {
-    console.error('❌ Multer error:', error.code);
+    console.error('❌ Multer-specific error detected');
+    console.error('❌ Multer error code:', error.code);
+    console.error('❌ Multer error field:', error.field);
+    
     if (error.code === 'LIMIT_FILE_SIZE') {
+      console.error('❌ File size limit exceeded');
       return res.status(400).json({ error: 'File too large. Maximum size is 50MB.' });
     }
     if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+      console.error('❌ Unexpected field name used');
       return res.status(400).json({ error: 'Unexpected field name. Use "file" as field name.' });
     }
+    if (error.code === 'LIMIT_PART_COUNT') {
+      console.error('❌ Too many parts in multipart data');
+      return res.status(400).json({ error: 'Too many parts in multipart data.' });
+    }
+    if (error.code === 'LIMIT_FILE_COUNT') {
+      console.error('❌ Too many files uploaded');
+      return res.status(400).json({ error: 'Too many files uploaded.' });
+    }
+    if (error.code === 'LIMIT_FIELD_KEY') {
+      console.error('❌ Field name too long');
+      return res.status(400).json({ error: 'Field name too long.' });
+    }
+    if (error.code === 'LIMIT_FIELD_VALUE') {
+      console.error('❌ Field value too long');
+      return res.status(400).json({ error: 'Field value too long.' });
+    }
+    if (error.code === 'LIMIT_FIELD_COUNT') {
+      console.error('❌ Too many fields');
+      return res.status(400).json({ error: 'Too many fields.' });
+    }
+    
+    console.error('❌ Unknown multer error code:', error.code);
     return res.status(400).json({ error: `File upload error: ${error.message}` });
   }
   

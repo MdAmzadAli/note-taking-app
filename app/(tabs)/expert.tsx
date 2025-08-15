@@ -141,16 +141,32 @@ export default function ExpertTab() {
 
     try {
       setIsLoading(true);
+      console.log('🎯 Starting file selection process...');
+      
       const result = await DocumentPicker.getDocumentAsync({
         type: '*/*',
         copyToCacheDirectory: true,
       });
 
+      console.log('📄 Document picker result:', JSON.stringify(result, null, 2));
+
       if (!result.canceled && result.assets[0]) {
         const file = result.assets[0];
+        console.log('📄 Selected file details:', JSON.stringify(file, null, 2));
+
+        // Create proper file object for upload
+        const fileToUpload = {
+          uri: file.uri,
+          name: file.name,
+          type: file.mimeType || 'application/octet-stream'
+        };
+
+        console.log('📤 Preparing file for upload:', JSON.stringify(fileToUpload, null, 2));
 
         // Upload to backend
-        const uploadedFile = await fileService.uploadFile(file.uri, file.name);
+        const uploadedFile = await fileService.uploadFile(fileToUpload);
+
+        console.log('✅ File uploaded successfully:', JSON.stringify(uploadedFile, null, 2));
 
         const newFile: SingleFile = {
           id: uploadedFile.id,
@@ -166,9 +182,14 @@ export default function ExpertTab() {
         await saveData(updatedFiles, workspaces);
         setIsUploadModalVisible(false);
         Alert.alert('Success', 'File uploaded successfully!');
+      } else {
+        console.log('📄 File selection was canceled or no file selected');
       }
     } catch (error) {
-      console.error('Error uploading file:', error);
+      console.error('❌ File upload process failed');
+      console.error('❌ Error type:', error.constructor.name);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error stack:', error.stack);
       Alert.alert('Error', `Failed to upload file: ${error.message}`);
     } finally {
       setIsLoading(false);
@@ -201,7 +222,15 @@ export default function ExpertTab() {
           const file = results.assets[i];
 
           try {
-            const uploadedFile = await fileService.uploadFile(file.uri, file.name);
+            console.log(`📤 Uploading workspace file ${i + 1}:`, JSON.stringify(file, null, 2));
+            
+            const fileToUpload = {
+              uri: file.uri,
+              name: file.name,
+              type: file.mimeType || 'application/octet-stream'
+            };
+
+            const uploadedFile = await fileService.uploadFile(fileToUpload);
 
             files.push({
               id: uploadedFile.id,
@@ -211,8 +240,10 @@ export default function ExpertTab() {
               size: uploadedFile.size,
               isUploaded: true,
             });
+            
+            console.log(`✅ Successfully uploaded workspace file: ${file.name}`);
           } catch (uploadError) {
-            console.error(`Failed to upload ${file.name}:`, uploadError);
+            console.error(`❌ Failed to upload workspace file ${file.name}:`, uploadError);
             Alert.alert('Partial Upload', `Failed to upload ${file.name}, continuing with other files.`);
           }
         }
