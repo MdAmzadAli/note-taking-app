@@ -240,42 +240,38 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     await fileService.saveFileMetadata(fileInfo);
     console.log('✅ File metadata saved');
 
-    // Upload to Cloudinary if it's a PDF
-    let cloudinaryResult = null;
-    if (fileInfo.mimetype === 'application/pdf') {
-      console.log('☁️ Starting Cloudinary upload...');
-      try {
-        cloudinaryResult = await fileService.uploadToCloudinary(fileInfo);
-        console.log('✅ Cloudinary upload successful');
-      } catch (cloudinaryError) {
-        console.error('❌ Cloudinary upload failed:', cloudinaryError);
-        // Don't fail the upload if Cloudinary fails
-      }
-    }
-
-    // Generate preview immediately after upload
-    console.log('🖼️ Generating preview...');
-    console.log('🖼️ File info for preview:', JSON.stringify(fileInfo, null, 2));
+    // Process file upload (including Cloudinary upload if configured)
+    console.log('🔄 Processing file upload...');
+    let processedFile;
     try {
-      await fileService.generatePreview(fileInfo);
-      console.log('✅ Preview generated successfully');
-    } catch (previewError) {
-      console.error('❌ Preview generation failed with error:', previewError);
-      console.error('❌ Preview error stack:', previewError.stack);
-      console.error('❌ File path exists?', require('fs').existsSync(fileInfo.path));
-      // Don't fail the upload if preview fails
-    }
-
-    const response = {
-      success: true,
-      file: {
+      processedFile = await fileService.processFileUpload(fileInfo);
+      console.log('✅ File processing completed');
+    } catch (processError) {
+      console.error('❌ File processing failed:', processError);
+      // Continue with basic file info if processing fails
+      processedFile = {
         id: fileInfo.id,
         originalName: fileInfo.originalName,
         mimetype: fileInfo.mimetype,
         size: fileInfo.size,
         uploadDate: fileInfo.uploadDate,
-        cloudinary:cloudinaryResult
-      }
+        cloudinary: null
+      };
+    }
+
+    // Generate preview immediately after upload
+    console.log('🖼️ Generating preview...');
+    try {
+      await fileService.generatePreview(fileInfo);
+      console.log('✅ Preview generated successfully');
+    } catch (previewError) {
+      console.error('❌ Preview generation failed:', previewError);
+      // Don't fail the upload if preview fails
+    }
+
+    const response = {
+      success: true,
+      file: processedFile
     };
 
     console.log('📤 Sending success response:', response);
@@ -288,22 +284,42 @@ app.post('/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// Get file preview (redirects to Cloudinary thumbnail)
+// Get file preview (redirects to Cloudinary thumbnail or serves local preview)
 app.get('/preview/:id', async (req, res) => {
   try {
     const { id } = req.params;
     console.log(`🔍 Getting preview for file ID: ${id}`);
 
-    const fileUrls = await fileService.getFileUrls(id);
-
-    if (!fileUrls || !fileUrls.urls || !fileUrls.urls.thumbnailUrl) {
-      console.log(`❌ Thumbnail URL not found for file: ${id}`);
-      return res.status(404).json({ error: 'Preview not found' });
+    try {
+      const fileUrls = await fileService.getFileUrls(id);
+      
+      if (fileUrls && fileUrls.urls && fileUrls.urls.thumbnailUrl) {
+        console.log(`✅ Redirecting to Cloudinary thumbnail: ${fileUrls.urls.thumbnailUrl}`);
+        return res.redirect(fileUrls.urls.thumbnailUrl);
+      }
+    } catch (urlError) {
+      console.log(`⚠️ Cloudinary URLs not available for file: ${id}, trying local preview`);
     }
 
-    console.log(`✅ Redirecting to Cloudinary thumbnail: ${fileUrls.urls.thumbnailUrl}`);
-    // Redirect to Cloudinary thumbnail URL
-    res.redirect(fileUrls.urls.thumbnailUrl);
+    // Fallback to local preview if Cloudinary not available
+    const fileInfo = await fileService.getFileMetadata(id);
+    if (!fileInfo) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    const previewPath = path.join(PREVIEWS_DIR, `${id}.jpg`);
+    
+    // Check if local preview exists
+    try {
+      await fs.access(previewPath);
+      console.log(`✅ Serving local preview: ${previewPath}`);
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.sendFile(path.resolve(previewPath));
+    } catch (previewError) {
+      console.log(`❌ No preview available for file: ${id}`);
+      res.status(404).json({ error: 'Preview not found' });
+    }
 
   } catch (error) {
     console.error('❌ Preview error:', error);
@@ -311,32 +327,45 @@ app.get('/preview/:id', async (req, res) => {
   }
 });
 
-// Get full file (redirects to Cloudinary URL)
+// Get full file (redirects to Cloudinary URL or serves local file)
 app.get('/file/:id', async (req, res) => {
   try {
     const { id } = req.params;
     console.log(`🔍 Getting file: ${id}`);
 
-    const fileUrls = await fileService.getFileUrls(id);
+    try {
+      const fileUrls = await fileService.getFileUrls(id);
+      
+      if (fileUrls && fileUrls.urls) {
+        // Determine which URL to use based on file type
+        let redirectUrl;
+        if (fileUrls.mimetype === 'application/pdf' && fileUrls.urls.fullPdfUrl) {
+          redirectUrl = fileUrls.urls.fullPdfUrl;
+        } else if (fileUrls.urls.fullUrl) {
+          redirectUrl = fileUrls.urls.fullUrl;
+        } else {
+          redirectUrl = fileUrls.urls.secureUrl;
+        }
 
-    if (!fileUrls || !fileUrls.urls) {
-      console.log(`❌ File URLs not found for: ${id}`);
+        if (redirectUrl) {
+          console.log(`✅ Redirecting to Cloudinary URL: ${redirectUrl}`);
+          return res.redirect(redirectUrl);
+        }
+      }
+    } catch (urlError) {
+      console.log(`⚠️ Cloudinary URLs not available for file: ${id}, serving local file`);
+    }
+
+    // Fallback to local file if Cloudinary not available
+    const fileInfo = await fileService.getFileMetadata(id);
+    if (!fileInfo) {
       return res.status(404).json({ error: 'File not found' });
     }
 
-    // Determine which URL to use based on file type
-    let redirectUrl;
-    if (fileUrls.mimetype === 'application/pdf' && fileUrls.urls.fullPdfUrl) {
-      redirectUrl = fileUrls.urls.fullPdfUrl;
-    } else if (fileUrls.urls.fullUrl) {
-      redirectUrl = fileUrls.urls.fullUrl;
-    } else {
-      redirectUrl = fileUrls.urls.secureUrl;
-    }
-
-    console.log(`✅ Redirecting to Cloudinary URL: ${redirectUrl}`);
-    // Redirect to Cloudinary URL
-    res.redirect(redirectUrl);
+    console.log(`✅ Serving local file: ${fileInfo.path}`);
+    res.setHeader('Content-Type', fileInfo.mimetype);
+    res.setHeader('Content-Disposition', `inline; filename="${fileInfo.originalName}"`);
+    res.sendFile(path.resolve(fileInfo.path));
 
   } catch (error) {
     console.error('❌ File serving error:', error);

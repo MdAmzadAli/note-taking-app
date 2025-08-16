@@ -108,10 +108,22 @@ class FileService {
     try {
       console.log('📤 Processing file upload:', fileInfo.originalName);
 
-      // Upload to Cloudinary
-      const cloudinaryResult = await this.uploadToCloudinary(fileInfo);
+      let cloudinaryResult = null;
+      
+      // Only upload to Cloudinary if it's configured
+      if (cloudinaryService.isConfigured()) {
+        try {
+          cloudinaryResult = await this.uploadToCloudinary(fileInfo);
+          console.log('✅ Cloudinary upload successful');
+        } catch (cloudinaryError) {
+          console.error('❌ Cloudinary upload failed, but continuing without it:', cloudinaryError);
+          // Don't throw error, just continue without Cloudinary
+        }
+      } else {
+        console.log('⚠️ Cloudinary not configured, skipping cloud upload');
+      }
 
-      // Prepare response with Cloudinary URLs
+      // Prepare response with Cloudinary URLs (if available)
       const processedFile = {
         id: fileInfo.id,
         originalName: fileInfo.originalName,
@@ -121,16 +133,11 @@ class FileService {
         cloudinary: cloudinaryResult
       };
 
-      // Clean up local file after successful upload
-      await this.cleanupLocalFile(fileInfo.path);
-
       console.log('✅ File processing completed:', fileInfo.originalName);
       return processedFile;
 
     } catch (error) {
       console.error('❌ File processing failed:', error);
-      // Clean up local file even if upload fails
-      await this.cleanupLocalFile(fileInfo.path);
       throw error;
     }
   }
