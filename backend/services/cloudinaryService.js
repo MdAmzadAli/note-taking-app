@@ -27,12 +27,9 @@ class CloudinaryService {
 
       const uploadResult = await cloudinary.uploader.upload(filePath, {
         public_id: publicId,
-        resource_type: 'image', // Use 'image' for PDF page conversion
+        resource_type: "image", // Required for PDF transformations
         format: 'pdf',
-        pages: true, // Enable page extraction
         quality: 'auto:good',
-        fetch_format: 'auto',
-        flags: 'progressive',
         transformation: [
           { width: 800, height: 1200, crop: 'fill', quality: 'auto:good' }
         ]
@@ -46,25 +43,22 @@ class CloudinaryService {
       const totalPages = uploadResult.pages || 1;
       
       for (let i = 1; i <= totalPages; i++) {
-        const pageUrl = cloudinary.url(`${publicId}.pdf`, {
-          resource_type: 'image',
-          page: i,
-          format: 'jpg',
-          width: 800,
-          height: 1200,
-          crop: 'fill',
-          quality: 'auto:good'
+        const pageUrl = cloudinary.url(publicId, {
+          width: 300,
+          crop: "scale",
+          pg: i, // Use 'pg' instead of 'page'
+          resource_type: "image"
         });
         pageUrls.push(pageUrl);
       }
 
       // Generate thumbnail URL (first page, smaller size)
-      const thumbnailUrl = cloudinary.url(`${publicId}.pdf`, {
+      const thumbnailUrl = cloudinary.url(`${publicId}`, {
         resource_type: 'image',
-        page: 1,
+        // page: 1,
         format: 'jpg',
-        width: 200,
-        height: 300,
+        width:212,
+        height: 321,
         crop: 'fill',
         quality: 'auto:good'
       });
@@ -81,7 +75,7 @@ class CloudinaryService {
         cloudinaryId: uploadResult.public_id,
         thumbnailUrl,
         pageUrls,
-        fullPdfUrl,
+        fullPdfUrl:uploadResult.secure_url,
         totalPages,
         secureUrl: uploadResult.secure_url,
         originalUrl: uploadResult.url
