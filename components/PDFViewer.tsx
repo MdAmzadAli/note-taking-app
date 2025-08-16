@@ -9,6 +9,8 @@ import {
   Image,
   ActivityIndicator,
   Dimensions,
+  Platform,
+  FlatList,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { IconSymbol } from './ui/IconSymbol';
@@ -21,17 +23,19 @@ interface PDFViewerProps {
       pageUrls: string[];
       totalPages: number;
       fullPdfUrl: string;
+      secureUrl: string;
     };
   };
 }
 
 export default function PDFViewer({ file }: PDFViewerProps) {
-  const [viewMode, setViewMode] = useState<'pages' | 'full'>('full'); // Default to full PDF view
+  const [viewMode, setViewMode] = useState<'pages' | 'full'>('full');
   const [currentPage, setCurrentPage] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const screenWidth = Dimensions.get('window').width;
 
   console.log('📕 PDFViewer initialized with file:', file.name);
+  console.log('📕 Platform:', Platform.OS);
   console.log('📕 Cloudinary data:', file.cloudinary);
 
   if (!file.cloudinary) {
@@ -44,9 +48,9 @@ export default function PDFViewer({ file }: PDFViewerProps) {
     );
   }
 
-  const { pageUrls, totalPages, fullPdfUrl } = file.cloudinary;
+  const { pageUrls, totalPages, fullPdfUrl, secureUrl } = file.cloudinary;
   console.log('📕 PDF has', totalPages, 'pages');
-  console.log('📕 Full PDF URL:', fullPdfUrl);
+  console.log('📕 Secure URL:', secureUrl);
 
   const goToNextPage = () => {
     if (currentPage < totalPages - 1) {
@@ -60,77 +64,126 @@ export default function PDFViewer({ file }: PDFViewerProps) {
     }
   };
 
-  // Render full PDF view using WebView
+  // Render full PDF view using WebView (iOS) or lazy-loaded images (Android)
   const renderFullPDFView = () => {
-    console.log('📕 Rendering full PDF view with URL:', fullPdfUrl);
-    
-    return (
-      <View style={styles.fullPdfContainer}>
-        <WebView
-          source={{ uri: fullPdfUrl }}
-          style={styles.webView}
-          startInLoadingState={true}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          allowsInlineMediaPlayback={true}
-          mediaPlaybackRequiresUserAction={false}
-          scalesPageToFit={true}
-          showsHorizontalScrollIndicator={true}
-          showsVerticalScrollIndicator={true}
-          originWhitelist={['*']}
-          mixedContentMode="compatibility"
-          onLoadStart={() => {
-            console.log('📕 WebView started loading full PDF');
-            setIsLoading(true);
-          }}
-          onLoadEnd={() => {
-            console.log('📕 WebView finished loading full PDF');
-            setIsLoading(false);
-          }}
-          onLoad={() => {
-            console.log('📕 WebView full PDF load successful');
-            setIsLoading(false);
-          }}
-          renderLoading={() => (
+    if (Platform.OS === 'ios') {
+      // iOS: Use WebView with secureUrl for native PDF viewing
+      console.log('📕 Rendering full PDF in iOS WebView with secureUrl:', secureUrl);
+      
+      return (
+        <View style={styles.fullPdfContainer}>
+          <WebView
+            source={{ uri: secureUrl }}
+            style={styles.webView}
+            startInLoadingState={true}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            allowsInlineMediaPlayback={true}
+            mediaPlaybackRequiresUserAction={false}
+            scalesPageToFit={true}
+            showsHorizontalScrollIndicator={true}
+            showsVerticalScrollIndicator={true}
+            originWhitelist={['*']}
+            mixedContentMode="compatibility"
+            onLoadStart={() => {
+              console.log('📕 iOS WebView started loading PDF');
+              setIsLoading(true);
+            }}
+            onLoadEnd={() => {
+              console.log('📕 iOS WebView finished loading PDF');
+              setIsLoading(false);
+            }}
+            onLoad={() => {
+              console.log('📕 iOS WebView PDF load successful');
+              setIsLoading(false);
+            }}
+            renderLoading={() => (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator size="large" color="#000000" />
+                <Text style={styles.loadingText}>Loading PDF...</Text>
+              </View>
+            )}
+            onError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.error('❌ iOS WebView PDF loading error:', nativeEvent);
+              setIsLoading(false);
+            }}
+            renderError={(errorDomain, errorCode, errorDesc) => {
+              console.error('❌ iOS WebView render error:', { errorDomain, errorCode, errorDesc });
+              return (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>Unable to display PDF</Text>
+                  <Text style={styles.errorSubtext}>The PDF couldn't be loaded in the viewer</Text>
+                  <Text style={styles.errorSubtext}>Error: {errorDesc}</Text>
+                  <TouchableOpacity 
+                    style={styles.retryButton}
+                    onPress={() => setViewMode('pages')}
+                  >
+                    <Text style={styles.retryButtonText}>Try Page View</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            }}
+          />
+          
+          {isLoading && (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color="#000000" />
               <Text style={styles.loadingText}>Loading PDF...</Text>
             </View>
           )}
-          onError={(syntheticEvent) => {
-            const { nativeEvent } = syntheticEvent;
-            console.error('❌ WebView PDF loading error:', nativeEvent);
-            setIsLoading(false);
-          }}
-          renderError={(errorDomain, errorCode, errorDesc) => {
-            console.error('❌ WebView render error:', { errorDomain, errorCode, errorDesc });
-            return (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>Unable to display PDF</Text>
-                <Text style={styles.errorSubtext}>The PDF couldn't be loaded in the viewer</Text>
-                <Text style={styles.errorSubtext}>Error: {errorDesc}</Text>
-                <TouchableOpacity 
-                  style={styles.retryButton}
-                  onPress={() => setViewMode('pages')}
-                >
-                  <Text style={styles.retryButtonText}>Try Page View</Text>
-                </TouchableOpacity>
-              </View>
-            );
-          }}
-        />
-        
-        {isLoading && (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color="#000000" />
-            <Text style={styles.loadingText}>Loading PDF...</Text>
-          </View>
-        )}
-      </View>
-    );
+        </View>
+      );
+    } else {
+      // Android: Use lazy-loaded FlatList with page images
+      console.log('📕 Rendering full PDF in Android with lazy-loaded images');
+      
+      const renderPage = ({ item, index }: { item: string; index: number }) => (
+        <View style={styles.androidPageContainer}>
+          <Image
+            source={{ uri: item }}
+            style={[styles.androidPdfPage, { width: screenWidth - 32 }]}
+            resizeMode="contain"
+            onLoadStart={() => {
+              console.log(`Loading Android PDF page ${index + 1} from:`, item);
+            }}
+            onLoadEnd={() => {
+              console.log(`Successfully loaded Android PDF page ${index + 1}`);
+            }}
+            onError={(error) => {
+              console.error(`Failed to load Android PDF page ${index + 1}`, error);
+              console.error(`Page URL:`, item);
+            }}
+          />
+          <Text style={styles.androidPageNumber}>Page {index + 1}</Text>
+        </View>
+      );
+
+      return (
+        <View style={styles.fullPdfContainer}>
+          <FlatList
+            data={pageUrls}
+            renderItem={renderPage}
+            keyExtractor={(item, index) => `page-${index}`}
+            showsVerticalScrollIndicator={true}
+            initialNumToRender={2}
+            maxToRenderPerBatch={3}
+            windowSize={5}
+            removeClippedSubviews={true}
+            getItemLayout={(data, index) => ({
+              length: 600, // Estimated height per page
+              offset: 600 * index,
+              index,
+            })}
+            onEndReachedThreshold={0.5}
+            contentContainerStyle={styles.androidFlatListContent}
+          />
+        </View>
+      );
+    }
   };
 
-  // Render individual page view
+  // Render individual page view (original implementation)
   const renderPageView = () => {
     return (
       <View style={styles.container}>
@@ -232,7 +285,7 @@ export default function PDFViewer({ file }: PDFViewerProps) {
           onPress={() => setViewMode('full')}
         >
           <Text style={[styles.toggleButtonText, viewMode === 'full' && styles.activeToggleText]}>
-            Full PDF
+            {Platform.OS === 'ios' ? 'Full PDF' : 'All Pages'}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -240,7 +293,7 @@ export default function PDFViewer({ file }: PDFViewerProps) {
           onPress={() => setViewMode('pages')}
         >
           <Text style={[styles.toggleButtonText, viewMode === 'pages' && styles.activeToggleText]}>
-            Page View
+            Single Page
           </Text>
         </TouchableOpacity>
       </View>
@@ -291,6 +344,33 @@ const styles = StyleSheet.create({
   },
   webView: {
     flex: 1,
+  },
+  androidPageContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  androidPdfPage: {
+    minHeight: 500,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  androidPageNumber: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  androidFlatListContent: {
+    paddingVertical: 16,
   },
   pageContainer: {
     flex: 1,
