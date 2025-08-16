@@ -63,11 +63,10 @@ class CloudinaryService {
         quality: 'auto:good'
       });
 
-      // Generate full PDF URL for download
-      const fullPdfUrl = cloudinary.url(`${publicId}.pdf`, {
+      // Generate full PDF URL for viewing in browser
+      const fullPdfUrl = cloudinary.url(`${publicId}`, {
         resource_type: 'image',
-        format: 'pdf',
-        flags: 'attachment'
+        format: 'pdf'
       });
 
       return {
@@ -75,7 +74,7 @@ class CloudinaryService {
         cloudinaryId: uploadResult.public_id,
         thumbnailUrl,
         pageUrls,
-        fullPdfUrl:uploadResult.secure_url,
+        fullPdfUrl,
         totalPages,
         secureUrl: uploadResult.secure_url,
         originalUrl: uploadResult.url
