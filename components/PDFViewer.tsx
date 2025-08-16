@@ -137,46 +137,61 @@ export default function PDFViewer({ file }: PDFViewerProps) {
     } else {
       // Android: Use lazy-loaded FlatList with page images
       console.log('📕 Rendering full PDF in Android with lazy-loaded images');
+      console.log('📕 PageUrls array:', pageUrls);
+      console.log('📕 Total pages to render:', pageUrls.length);
       
-      const renderPage = ({ item, index }: { item: string; index: number }) => (
-        <View style={styles.androidPageContainer}>
-          <Image
-            source={{ uri: item }}
-            style={[styles.androidPdfPage, { width: screenWidth - 32 }]}
-            resizeMode="contain"
-            onLoadStart={() => {
-              console.log(`Loading Android PDF page ${index + 1} from:`, item);
-            }}
-            onLoadEnd={() => {
-              console.log(`Successfully loaded Android PDF page ${index + 1}`);
-            }}
-            onError={(error) => {
-              console.error(`Failed to load Android PDF page ${index + 1}`, error);
-              console.error(`Page URL:`, item);
-            }}
-          />
-          <Text style={styles.androidPageNumber}>Page {index + 1}</Text>
-        </View>
-      );
+      const renderPage = ({ item, index }: { item: string; index: number }) => {
+        console.log(`📕 Rendering Android page ${index + 1} with URL:`, item);
+        
+        return (
+          <View style={styles.androidPageContainer}>
+            <Text style={styles.androidPageHeader}>Page {index + 1} of {totalPages}</Text>
+            <Image
+              source={{ uri: item }}
+              style={styles.androidPdfPage}
+              resizeMode="contain"
+              onLoadStart={() => {
+                console.log(`📕 Started loading Android PDF page ${index + 1}`);
+              }}
+              onLoadEnd={() => {
+                console.log(`✅ Successfully loaded Android PDF page ${index + 1}`);
+              }}
+              onError={(error) => {
+                console.error(`❌ Failed to load Android PDF page ${index + 1}:`, error.nativeEvent);
+                console.error(`📕 Failed URL:`, item);
+              }}
+            />
+          </View>
+        );
+      };
+
+      if (!pageUrls || pageUrls.length === 0) {
+        console.error('❌ No pageUrls available for Android rendering');
+        return (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>No PDF pages available</Text>
+            <Text style={styles.errorSubtext}>PageUrls array is empty</Text>
+          </View>
+        );
+      }
 
       return (
-        <View style={styles.fullPdfContainer}>
+        <View style={styles.androidFullContainer}>
+          <Text style={styles.androidTitle}>{file.name}</Text>
           <FlatList
             data={pageUrls}
             renderItem={renderPage}
-            keyExtractor={(item, index) => `page-${index}`}
+            keyExtractor={(item, index) => `android-page-${index}`}
             showsVerticalScrollIndicator={true}
-            initialNumToRender={2}
-            maxToRenderPerBatch={3}
-            windowSize={5}
-            removeClippedSubviews={true}
-            getItemLayout={(data, index) => ({
-              length: 600, // Estimated height per page
-              offset: 600 * index,
-              index,
-            })}
-            onEndReachedThreshold={0.5}
+            initialNumToRender={1}
+            maxToRenderPerBatch={2}
+            windowSize={3}
+            removeClippedSubviews={false}
             contentContainerStyle={styles.androidFlatListContent}
+            ItemSeparatorComponent={() => <View style={styles.androidPageSeparator} />}
+            onEndReachedThreshold={0.5}
+            bounces={true}
+            scrollEventThrottle={16}
           />
         </View>
       );
@@ -345,13 +360,38 @@ const styles = StyleSheet.create({
   webView: {
     flex: 1,
   },
+  androidFullContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  androidTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000000',
+    textAlign: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: '#F9FAFB',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
   androidPageContainer: {
     alignItems: 'center',
-    marginBottom: 16,
     paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  androidPageHeader: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+    textAlign: 'center',
   },
   androidPdfPage: {
-    minHeight: 500,
+    width: '100%',
+    aspectRatio: 0.7, // Typical PDF page ratio
+    minHeight: 400,
+    maxHeight: 800,
     borderRadius: 8,
     backgroundColor: '#FFFFFF',
     shadowColor: '#000',
@@ -363,14 +403,12 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  androidPageNumber: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 8,
-    textAlign: 'center',
+  androidPageSeparator: {
+    height: 20,
+    backgroundColor: 'transparent',
   },
   androidFlatListContent: {
-    paddingVertical: 16,
+    paddingBottom: 32,
   },
   pageContainer: {
     flex: 1,
