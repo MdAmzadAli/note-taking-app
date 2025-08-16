@@ -28,6 +28,7 @@
     "assemblyai": "^4.14.0",
     "canvas": "^2.11.2",
     "cloudinary": "^2.7.0",
+    "dotenv": "^17.2.1",
     "expo": "~53.0.9",
     "expo-av": "^15.1.7",
     "expo-blur": "~14.1.4",

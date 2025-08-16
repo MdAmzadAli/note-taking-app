@@ -1,4 +1,7 @@
 
+// Load environment variables from .env file
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+
 const cloudinaryService = require('./services/cloudinaryService');
 
 async function testCloudinaryConfig() {

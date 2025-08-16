@@ -1,4 +1,7 @@
 
+// Load environment variables from .env file
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
+
 const cloudinary = require('cloudinary').v2;
 const fs = require('fs').promises;
 
@@ -6,9 +9,9 @@ class CloudinaryService {
   constructor() {
     // Configure Cloudinary with environment variables
     cloudinary.config({
-      cloud_name: process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME,
-      api_key: process.env.EXPO_PUBLIC_CLOUDINARY_API_KEY,
-      api_secret: process.env.EXPO_PUBLIC_CLOUDINARY_API_SECRET,
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
     });
   }
 
