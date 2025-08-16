@@ -37,6 +37,7 @@ interface SingleFile {
     pageUrls: string[];
     fullPdfUrl: string;
     totalPages: number;
+    secureUrl: string;
   };
 }
 
@@ -65,7 +66,7 @@ export default function ExpertTab() {
   const [isBackendConnected, setIsBackendConnected] = useState(false);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
 
-  
+
 
   // Check backend connectivity on mount
   useEffect(() => {
@@ -407,18 +408,18 @@ export default function ExpertTab() {
     if (file.mimetype?.includes('pdf')) {
       if (file.cloudinary) {
         console.log('📕 Rendering PDF with Cloudinary URLs');
-        console.log('📕 Original cloudinary data:', JSON.stringify(file.cloudinary, null, 2));
-        
-        // Map the expert tab cloudinary structure to PDFViewer expected structure
+        console.log('📕 Originalcloudinary data:', JSON.stringify(file.cloudinary, null, 2));
+
+        // Map the expert tabcloudinary structure to PDFViewer expected structure
         const pdfViewerCloudinaryData = {
           pageUrls: file.cloudinary.pageUrls || [],
           totalPages: file.cloudinary.totalPages || 1,
           fullPdfUrl: file.cloudinary.secureUrl || fileUrl, // Use secureUrl as fullPdfUrl
           secureUrl: file.cloudinary.secureUrl || fileUrl
         };
-        
-        console.log('📕 Mapped cloudinary data for PDFViewer:', JSON.stringify(pdfViewerCloudinaryData, null, 2));
-        
+
+        console.log('📕 Mappedcloudinary data for PDFViewer:', JSON.stringify(pdfViewerCloudinaryData, null, 2));
+
         return <PDFViewer 
                  file={{
                    id: file.id,
@@ -493,7 +494,7 @@ export default function ExpertTab() {
                         'Download PDF',
                         `You can download the PDF using this URL: ${downloadUrl}`,
                         [
-                          { text: 'Copy URL', onPress: () => {/* Copy to clipboard logic */} },
+                          { text: 'Copy URL', onPress: () => {/* Copy to clipboard logic */ } },
                           { text: 'OK' }
                         ]
                       );
@@ -540,7 +541,7 @@ export default function ExpertTab() {
                       'Download File',
                       `Download URL: ${downloadUrl}`,
                       [
-                        { text: 'Copy URL', onPress: () => {/* Copy to clipboard logic */} },
+                        { text: 'Copy URL', onPress: () => {/* Copy to clipboard logic */ } },
                         { text: 'OK' }
                       ]
                     );
@@ -585,7 +586,7 @@ export default function ExpertTab() {
               'Download File',
               `Download URL: ${downloadUrl}`,
               [
-                { text: 'Copy URL', onPress: () => {/* Copy to clipboard logic */} },
+                { text: 'Copy URL', onPress: () => {/* Copy to clipboard logic */ } },
                 { text: 'OK' }
               ]
             );
@@ -707,7 +708,7 @@ export default function ExpertTab() {
     );
   }
 
-  
+
 
 
   return (
@@ -889,7 +890,10 @@ export default function ExpertTab() {
       {/* File Preview Modal */}
       <Modal visible={isFilePreviewVisible} transparent animationType="fade">
         <View style={styles.previewModalOverlay}>
-          <TouchableWithoutFeedback onPress={() => setIsFilePreviewVisible(false)}>
+          <TouchableWithoutFeedback onPress={() => {
+            console.log('🎯 MODAL DEBUG: Background pressed - closing modal');
+            setIsFilePreviewVisible(false);
+          }}>
             <View style={styles.previewModalBackground} />
           </TouchableWithoutFeedback>
 
@@ -899,7 +903,10 @@ export default function ExpertTab() {
                 {previewFile?.name}
               </Text>
               <TouchableOpacity 
-                onPress={() => setIsFilePreviewVisible(false)}
+                onPress={() => {
+                  console.log('🎯 MODAL DEBUG: Close button pressed');
+                  setIsFilePreviewVisible(false);
+                }}
                 style={styles.closeButton}
               >
                 <Text style={styles.closeButtonText}>✕</Text>
@@ -907,23 +914,43 @@ export default function ExpertTab() {
             </View>
 
             <View style={styles.previewModalBody}>
-              {previewFile && previewFile.mimetype?.includes('pdf') && previewFile.cloudinary ? (
-                <PDFViewer 
-                  file={{
+              {(() => {
+                console.log('🎯 MODAL DEBUG: Rendering modal body');
+                console.log('🎯 MODAL DEBUG: previewFile exists:', !!previewFile);
+                console.log('🎯 MODAL DEBUG: previewFile name:', previewFile?.name);
+                console.log('🎯 MODAL DEBUG: previewFile mimetype:', previewFile?.mimetype);
+                console.log('🎯 MODAL DEBUG: previewFilecloudinary:', !!previewFile?.cloudinary);
+                console.log('🎯 MODAL DEBUG: Is PDF:', previewFile?.mimetype?.includes('pdf'));
+                console.log('🎯 MODAL DEBUG: Has cloudinary data:', !!previewFile?.cloudinary);
+
+                if (previewFile && previewFile.mimetype?.includes('pdf') && previewFile.cloudinary) {
+                  console.log('🎯 MODAL DEBUG: Rendering PDFViewer component');
+                  console.log('🎯 MODAL DEBUG: PDFViewer props:', {
                     id: previewFile.id,
                     name: previewFile.name,
                     cloudinary: previewFile.cloudinary
-                  }}
-                />
-              ) : (
-                previewFile && renderFullFileContent(previewFile)
-              )}
+                  });
+
+                  return (
+                    <PDFViewer 
+                      file={{
+                        id: previewFile.id,
+                        name: previewFile.name,
+                        cloudinary: previewFile.cloudinary
+                      }}
+                    />
+                  );
+                } else {
+                  console.log('🎯 MODAL DEBUG: Rendering fallback content via renderFullFileContent');
+                  return previewFile && renderFullFileContent(previewFile);
+                }
+              })()}
             </View>
           </View>
         </View>
       </Modal>
 
-      
+
 
     </SafeAreaView>
   );
@@ -1430,5 +1457,5 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontFamily: 'Inter',
   },
-  
+
 });
