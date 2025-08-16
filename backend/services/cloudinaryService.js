@@ -48,7 +48,7 @@ class CloudinaryService {
           format: "jpg",
           transformation: [
             { page: i }, // specific page number
-            { width: 300, crop: "fill", quality: "auto:good" }
+            { width: 600, crop: "fill", quality: "auto:best" }
           ]
         });
         pageUrls.push(pageUrl);
