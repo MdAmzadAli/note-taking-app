@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { IconSymbol } from './ui/IconSymbol';
 
 interface PDFViewerProps {
@@ -25,6 +26,7 @@ interface PDFViewerProps {
 }
 
 export default function PDFViewer({ file }: PDFViewerProps) {
+  const [viewMode, setViewMode] = useState<'pages' | 'full'>('full'); // Default to full PDF view
   const [currentPage, setCurrentPage] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const screenWidth = Dimensions.get('window').width;
@@ -42,9 +44,9 @@ export default function PDFViewer({ file }: PDFViewerProps) {
     );
   }
 
-  const { pageUrls, totalPages } = file.cloudinary;
+  const { pageUrls, totalPages, fullPdfUrl } = file.cloudinary;
   console.log('📕 PDF has', totalPages, 'pages');
-  console.log('📕 Page URLs:', pageUrls);
+  console.log('📕 Full PDF URL:', fullPdfUrl);
 
   const goToNextPage = () => {
     if (currentPage < totalPages - 1) {
@@ -58,94 +60,193 @@ export default function PDFViewer({ file }: PDFViewerProps) {
     }
   };
 
-  return (
-    <View style={styles.container}>
-      {/* PDF Page Display */}
-      <ScrollView 
-        style={styles.pageContainer}
-        showsVerticalScrollIndicator={true}
-        maximumZoomScale={3}
-        minimumZoomScale={1}
-        zoomEnabled={true}
-      >
-        <Image
-          source={{ uri: pageUrls[currentPage] }}
-          style={[styles.pdfPage, { width: screenWidth - 32 }]}
-          resizeMode="contain"
+  // Render full PDF view using WebView
+  const renderFullPDFView = () => {
+    console.log('📕 Rendering full PDF view with URL:', fullPdfUrl);
+    
+    return (
+      <View style={styles.fullPdfContainer}>
+        <WebView
+          source={{ uri: fullPdfUrl }}
+          style={styles.webView}
+          startInLoadingState={true}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          allowsInlineMediaPlayback={true}
+          mediaPlaybackRequiresUserAction={false}
+          scalesPageToFit={true}
+          showsHorizontalScrollIndicator={true}
+          showsVerticalScrollIndicator={true}
+          originWhitelist={['*']}
+          mixedContentMode="compatibility"
           onLoadStart={() => {
-            console.log(`Loading PDF page ${currentPage + 1} from:`, pageUrls[currentPage]);
+            console.log('📕 WebView started loading full PDF');
             setIsLoading(true);
           }}
           onLoadEnd={() => {
-            console.log(`Successfully loaded PDF page ${currentPage + 1}`);
+            console.log('📕 WebView finished loading full PDF');
             setIsLoading(false);
           }}
-          onError={(error) => {
-            console.error(`Failed to load PDF page ${currentPage + 1}`, error);
-            console.error(`Page URL:`, pageUrls[currentPage]);
+          onLoad={() => {
+            console.log('📕 WebView full PDF load successful');
             setIsLoading(false);
+          }}
+          renderLoading={() => (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="large" color="#000000" />
+              <Text style={styles.loadingText}>Loading PDF...</Text>
+            </View>
+          )}
+          onError={(syntheticEvent) => {
+            const { nativeEvent } = syntheticEvent;
+            console.error('❌ WebView PDF loading error:', nativeEvent);
+            setIsLoading(false);
+          }}
+          renderError={(errorDomain, errorCode, errorDesc) => {
+            console.error('❌ WebView render error:', { errorDomain, errorCode, errorDesc });
+            return (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>Unable to display PDF</Text>
+                <Text style={styles.errorSubtext}>The PDF couldn't be loaded in the viewer</Text>
+                <Text style={styles.errorSubtext}>Error: {errorDesc}</Text>
+                <TouchableOpacity 
+                  style={styles.retryButton}
+                  onPress={() => setViewMode('pages')}
+                >
+                  <Text style={styles.retryButtonText}>Try Page View</Text>
+                </TouchableOpacity>
+              </View>
+            );
           }}
         />
         
         {isLoading && (
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="large" color="#000000" />
-            <Text style={styles.loadingText}>Loading page {currentPage + 1}...</Text>
+            <Text style={styles.loadingText}>Loading PDF...</Text>
           </View>
         )}
-      </ScrollView>
+      </View>
+    );
+  };
 
-      {/* Navigation Controls */}
-      <View style={styles.controls}>
-        <TouchableOpacity
-          style={[styles.navButton, currentPage === 0 && styles.navButtonDisabled]}
-          onPress={goToPrevPage}
-          disabled={currentPage === 0}
+  // Render individual page view
+  const renderPageView = () => {
+    return (
+      <View style={styles.container}>
+        <ScrollView 
+          style={styles.pageContainer}
+          showsVerticalScrollIndicator={true}
+          maximumZoomScale={3}
+          minimumZoomScale={1}
+          zoomEnabled={true}
         >
-          <IconSymbol size={24} name="chevron.left" color={currentPage === 0 ? "#999999" : "#000000"} />
-        </TouchableOpacity>
+          <Image
+            source={{ uri: pageUrls[currentPage] }}
+            style={[styles.pdfPage, { width: screenWidth - 32 }]}
+            resizeMode="contain"
+            onLoadStart={() => {
+              console.log(`Loading PDF page ${currentPage + 1} from:`, pageUrls[currentPage]);
+              setIsLoading(true);
+            }}
+            onLoadEnd={() => {
+              console.log(`Successfully loaded PDF page ${currentPage + 1}`);
+              setIsLoading(false);
+            }}
+            onError={(error) => {
+              console.error(`Failed to load PDF page ${currentPage + 1}`, error);
+              console.error(`Page URL:`, pageUrls[currentPage]);
+              setIsLoading(false);
+            }}
+          />
+          
+          {isLoading && (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="large" color="#000000" />
+              <Text style={styles.loadingText}>Loading page {currentPage + 1}...</Text>
+            </View>
+          )}
+        </ScrollView>
 
-        <View style={styles.pageInfo}>
-          <Text style={styles.pageText}>
-            {currentPage + 1} of {totalPages}
-          </Text>
+        {/* Navigation Controls for page view */}
+        <View style={styles.controls}>
+          <TouchableOpacity
+            style={[styles.navButton, currentPage === 0 && styles.navButtonDisabled]}
+            onPress={goToPrevPage}
+            disabled={currentPage === 0}
+          >
+            <IconSymbol size={24} name="chevron.left" color={currentPage === 0 ? "#999999" : "#000000"} />
+          </TouchableOpacity>
+
+          <View style={styles.pageInfo}>
+            <Text style={styles.pageText}>
+              {currentPage + 1} of {totalPages}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.navButton, currentPage === totalPages - 1 && styles.navButtonDisabled]}
+            onPress={goToNextPage}
+            disabled={currentPage === totalPages - 1}
+          >
+            <IconSymbol size={24} name="chevron.right" color={currentPage === totalPages - 1 ? "#999999" : "#000000"} />
+          </TouchableOpacity>
         </View>
 
+        {/* Page Thumbnails for page view */}
+        {totalPages > 1 && (
+          <ScrollView
+            horizontal
+            style={styles.thumbnailContainer}
+            showsHorizontalScrollIndicator={false}
+          >
+            {pageUrls.map((pageUrl, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.thumbnail,
+                  currentPage === index && styles.activeThumbnail
+                ]}
+                onPress={() => setCurrentPage(index)}
+              >
+                <Image
+                  source={{ uri: pageUrl }}
+                  style={styles.thumbnailImage}
+                  resizeMode="cover"
+                />
+                <Text style={styles.thumbnailPageNumber}>{index + 1}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      {/* View Mode Toggle */}
+      <View style={styles.viewModeToggle}>
         <TouchableOpacity
-          style={[styles.navButton, currentPage === totalPages - 1 && styles.navButtonDisabled]}
-          onPress={goToNextPage}
-          disabled={currentPage === totalPages - 1}
+          style={[styles.toggleButton, viewMode === 'full' && styles.activeToggleButton]}
+          onPress={() => setViewMode('full')}
         >
-          <IconSymbol size={24} name="chevron.right" color={currentPage === totalPages - 1 ? "#999999" : "#000000"} />
+          <Text style={[styles.toggleButtonText, viewMode === 'full' && styles.activeToggleText]}>
+            Full PDF
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.toggleButton, viewMode === 'pages' && styles.activeToggleButton]}
+          onPress={() => setViewMode('pages')}
+        >
+          <Text style={[styles.toggleButtonText, viewMode === 'pages' && styles.activeToggleText]}>
+            Page View
+          </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Page Thumbnails */}
-      {totalPages > 1 && (
-        <ScrollView
-          horizontal
-          style={styles.thumbnailContainer}
-          showsHorizontalScrollIndicator={false}
-        >
-          {pageUrls.map((pageUrl, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.thumbnail,
-                currentPage === index && styles.activeThumbnail
-              ]}
-              onPress={() => setCurrentPage(index)}
-            >
-              <Image
-                source={{ uri: pageUrl }}
-                style={styles.thumbnailImage}
-                resizeMode="cover"
-              />
-              <Text style={styles.thumbnailPageNumber}>{index + 1}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
+      {/* Render based on view mode */}
+      {viewMode === 'full' ? renderFullPDFView() : renderPageView()}
     </View>
   );
 }
@@ -154,6 +255,42 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  viewModeToggle: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    margin: 16,
+    borderRadius: 8,
+    padding: 4,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  activeToggleButton: {
+    backgroundColor: '#000000',
+  },
+  toggleButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  activeToggleText: {
+    color: '#FFFFFF',
+  },
+  fullPdfContainer: {
+    flex: 1,
+    margin: 16,
+    marginTop: 0,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#F9FAFB',
+  },
+  webView: {
+    flex: 1,
   },
   pageContainer: {
     flex: 1,
@@ -248,10 +385,24 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#000000',
     marginBottom: 8,
+    textAlign: 'center',
   },
   errorSubtext: {
     fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
+    marginBottom: 4,
+  },
+  retryButton: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginTop: 16,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
