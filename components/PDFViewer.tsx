@@ -29,7 +29,11 @@ export default function PDFViewer({ file }: PDFViewerProps) {
   const [isLoading, setIsLoading] = useState(false);
   const screenWidth = Dimensions.get('window').width;
 
+  console.log('📕 PDFViewer initialized with file:', file.name);
+  console.log('📕 Cloudinary data:', file.cloudinary);
+
   if (!file.cloudinary) {
+    console.error('❌ No Cloudinary data found for PDF:', file.name);
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>PDF not available</Text>
@@ -39,6 +43,8 @@ export default function PDFViewer({ file }: PDFViewerProps) {
   }
 
   const { pageUrls, totalPages } = file.cloudinary;
+  console.log('📕 PDF has', totalPages, 'pages');
+  console.log('📕 Page URLs:', pageUrls);
 
   const goToNextPage = () => {
     if (currentPage < totalPages - 1) {
@@ -66,10 +72,17 @@ export default function PDFViewer({ file }: PDFViewerProps) {
           source={{ uri: pageUrls[currentPage] }}
           style={[styles.pdfPage, { width: screenWidth - 32 }]}
           resizeMode="contain"
-          onLoadStart={() => setIsLoading(true)}
-          onLoadEnd={() => setIsLoading(false)}
-          onError={() => {
-            console.error(`Failed to load PDF page ${currentPage + 1}`);
+          onLoadStart={() => {
+            console.log(`Loading PDF page ${currentPage + 1} from:`, pageUrls[currentPage]);
+            setIsLoading(true);
+          }}
+          onLoadEnd={() => {
+            console.log(`Successfully loaded PDF page ${currentPage + 1}`);
+            setIsLoading(false);
+          }}
+          onError={(error) => {
+            console.error(`Failed to load PDF page ${currentPage + 1}`, error);
+            console.error(`Page URL:`, pageUrls[currentPage]);
             setIsLoading(false);
           }}
         />
