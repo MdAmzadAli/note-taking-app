@@ -385,7 +385,8 @@ export default function ExpertTab() {
       fileName: file.name,
       mimetype: file.mimetype,
       isUploaded: file.isUploaded,
-      fileId: file.id
+      fileId: file.id,
+      cloudinaryData: file.cloudinary
     });
 
     if (!file.isUploaded) {
@@ -406,11 +407,23 @@ export default function ExpertTab() {
     if (file.mimetype?.includes('pdf')) {
       if (file.cloudinary) {
         console.log('📕 Rendering PDF with Cloudinary URLs');
+        console.log('📕 Original cloudinary data:', JSON.stringify(file.cloudinary, null, 2));
+        
+        // Map the expert tab cloudinary structure to PDFViewer expected structure
+        const pdfViewerCloudinaryData = {
+          pageUrls: file.cloudinary.pageUrls || [],
+          totalPages: file.cloudinary.totalPages || 1,
+          fullPdfUrl: file.cloudinary.secureUrl || fileUrl, // Use secureUrl as fullPdfUrl
+          secureUrl: file.cloudinary.secureUrl || fileUrl
+        };
+        
+        console.log('📕 Mapped cloudinary data for PDFViewer:', JSON.stringify(pdfViewerCloudinaryData, null, 2));
+        
         return <PDFViewer 
                  file={{
                    id: file.id,
                    name: file.name,
-                   cloudinary: file.cloudinary
+                   cloudinary: pdfViewerCloudinaryData
                  }}
                />;
       }
