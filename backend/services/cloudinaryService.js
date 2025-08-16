@@ -44,14 +44,16 @@ class CloudinaryService {
       
       for (let i = 1; i <= totalPages; i++) {
         const pageUrl = cloudinary.url(publicId, {
-          width: 300,
-          crop: "scale",
-          format: 'jpg',
-          pg: i, // Use 'pg' instead of 'page'
-          resource_type: "image"
+          resource_type: "image", // treat PDF as images
+          format: "jpg",
+          transformation: [
+            { page: i }, // specific page number
+            { width: 300, crop: "fill", quality: "auto:good" }
+          ]
         });
         pageUrls.push(pageUrl);
       }
+
 
       // Generate thumbnail URL (first page, smaller size)
       const thumbnailUrl = pageUrls[0];
