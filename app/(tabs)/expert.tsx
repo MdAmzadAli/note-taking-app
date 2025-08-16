@@ -1365,7 +1365,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     width: '90%',
     maxWidth: 500,
-    maxHeight: '80%',
+    height: Dimensions.get('window').height * 0.8,
     overflow: 'hidden',
   },
   previewModalHeader: {
@@ -1399,6 +1399,7 @@ const styles = StyleSheet.create({
   },
   previewModalBody: {
     flex: 1,
+    height: '100%',
   },
   fullPreviewImage: {
     width: '100%',
