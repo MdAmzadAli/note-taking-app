@@ -11,6 +11,9 @@ import {
   Dimensions,
   Platform,
   FlatList,
+  TextInput,
+  Modal,
+  Alert,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { IconSymbol } from './ui/IconSymbol';
@@ -32,6 +35,9 @@ export default function PDFViewer({ file }: PDFViewerProps) {
   const [viewMode, setViewMode] = useState<'pages' | 'full'>('full');
   const [currentPage, setCurrentPage] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [searchPageNumber, setSearchPageNumber] = useState('');
   const screenWidth = Dimensions.get('window').width;
 
   console.log('📕 PDFViewer initialized with file:', file.name);
@@ -61,6 +67,33 @@ export default function PDFViewer({ file }: PDFViewerProps) {
   const goToPrevPage = () => {
     if (currentPage > 0) {
       setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleZoomIn = () => {
+    if (zoomLevel < 3) {
+      setZoomLevel(zoomLevel + 0.25);
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (zoomLevel > 0.5) {
+      setZoomLevel(zoomLevel - 0.25);
+    }
+  };
+
+  const resetZoom = () => {
+    setZoomLevel(1);
+  };
+
+  const handleSearchPage = () => {
+    const pageNum = parseInt(searchPageNumber, 10);
+    if (pageNum >= 1 && pageNum <= totalPages) {
+      setCurrentPage(pageNum - 1);
+      setIsSearchVisible(false);
+      setSearchPageNumber('');
+    } else {
+      Alert.alert('Invalid Page', `Please enter a page number between 1 and ${totalPages}`);
     }
   };
 
@@ -177,22 +210,63 @@ export default function PDFViewer({ file }: PDFViewerProps) {
 
       return (
         <View style={styles.androidFullContainer}>
-          <Text style={styles.androidTitle}>{file.name}</Text>
-          <FlatList
-            data={pageUrls}
-            renderItem={renderPage}
-            keyExtractor={(item, index) => `android-page-${index}`}
+          <View style={styles.androidHeader}>
+            <Text style={styles.androidTitle}>{file.name}</Text>
+            <View style={styles.androidControls}>
+              <TouchableOpacity
+                style={styles.controlButton}
+                onPress={() => setIsSearchVisible(true)}
+              >
+                <IconSymbol size={18} name="magnifyingglass" color="#000000" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.controlButton}
+                onPress={handleZoomOut}
+                disabled={zoomLevel <= 0.5}
+              >
+                <Text style={[styles.controlButtonText, { opacity: zoomLevel <= 0.5 ? 0.5 : 1 }]}>-</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.controlButton}
+                onPress={resetZoom}
+              >
+                <Text style={styles.controlButtonText}>{Math.round(zoomLevel * 100)}%</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.controlButton}
+                onPress={handleZoomIn}
+                disabled={zoomLevel >= 3}
+              >
+                <Text style={[styles.controlButtonText, { opacity: zoomLevel >= 3 ? 0.5 : 1 }]}>+</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          
+          <ScrollView
+            style={styles.androidScrollContainer}
             showsVerticalScrollIndicator={true}
-            initialNumToRender={1}
-            maxToRenderPerBatch={2}
-            windowSize={3}
-            removeClippedSubviews={false}
-            contentContainerStyle={styles.androidFlatListContent}
-            ItemSeparatorComponent={() => <View style={styles.androidPageSeparator} />}
-            onEndReachedThreshold={0.5}
-            bounces={true}
-            scrollEventThrottle={16}
-          />
+            maximumZoomScale={3}
+            minimumZoomScale={0.5}
+            zoomScale={zoomLevel}
+            contentContainerStyle={styles.androidScrollContent}
+          >
+            <FlatList
+              data={pageUrls}
+              renderItem={(props) => (
+                <View style={[styles.androidPageContainer, { transform: [{ scale: zoomLevel }] }]}>
+                  {renderPage(props)}
+                </View>
+              )}
+              keyExtractor={(item, index) => `android-page-${index}`}
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={false}
+              initialNumToRender={1}
+              maxToRenderPerBatch={2}
+              windowSize={3}
+              removeClippedSubviews={false}
+              ItemSeparatorComponent={() => <View style={[styles.androidPageSeparator, { transform: [{ scale: zoomLevel }] }]} />}
+            />
+          </ScrollView>
         </View>
       );
     }
@@ -202,16 +276,55 @@ export default function PDFViewer({ file }: PDFViewerProps) {
   const renderPageView = () => {
     return (
       <View style={styles.container}>
+        {/* Zoom and Search Controls */}
+        <View style={styles.pageControls}>
+          <TouchableOpacity
+            style={styles.controlButton}
+            onPress={() => setIsSearchVisible(true)}
+          >
+            <IconSymbol size={18} name="magnifyingglass" color="#000000" />
+          </TouchableOpacity>
+          <View style={styles.zoomControls}>
+            <TouchableOpacity
+              style={styles.controlButton}
+              onPress={handleZoomOut}
+              disabled={zoomLevel <= 0.5}
+            >
+              <Text style={[styles.controlButtonText, { opacity: zoomLevel <= 0.5 ? 0.5 : 1 }]}>-</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.controlButton}
+              onPress={resetZoom}
+            >
+              <Text style={styles.controlButtonText}>{Math.round(zoomLevel * 100)}%</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.controlButton}
+              onPress={handleZoomIn}
+              disabled={zoomLevel >= 3}
+            >
+              <Text style={[styles.controlButtonText, { opacity: zoomLevel >= 3 ? 0.5 : 1 }]}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <ScrollView 
           style={styles.pageContainer}
           showsVerticalScrollIndicator={true}
           maximumZoomScale={3}
-          minimumZoomScale={1}
-          zoomEnabled={true}
+          minimumZoomScale={0.5}
+          zoomScale={zoomLevel}
+          contentContainerStyle={styles.pageScrollContent}
         >
           <Image
             source={{ uri: pageUrls[currentPage] }}
-            style={[styles.pdfPage, { width: screenWidth - 32 }]}
+            style={[
+              styles.pdfPage, 
+              { 
+                width: (screenWidth - 32) * zoomLevel, 
+                transform: [{ scale: zoomLevel }] 
+              }
+            ]}
             resizeMode="contain"
             onLoadStart={() => {
               console.log(`Loading PDF page ${currentPage + 1} from:`, pageUrls[currentPage]);
@@ -315,6 +428,51 @@ export default function PDFViewer({ file }: PDFViewerProps) {
 
       {/* Render based on view mode */}
       {viewMode === 'full' ? renderFullPDFView() : renderPageView()}
+
+      {/* Search Modal */}
+      <Modal
+        visible={isSearchVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsSearchVisible(false)}
+      >
+        <View style={styles.searchModalOverlay}>
+          <View style={styles.searchModalContent}>
+            <Text style={styles.searchModalTitle}>Go to Page</Text>
+            <Text style={styles.searchModalSubtitle}>
+              Enter page number (1-{totalPages})
+            </Text>
+            
+            <TextInput
+              style={styles.searchInput}
+              value={searchPageNumber}
+              onChangeText={setSearchPageNumber}
+              placeholder="Page number"
+              keyboardType="numeric"
+              autoFocus
+              selectTextOnFocus
+            />
+            
+            <View style={styles.searchModalButtons}>
+              <TouchableOpacity
+                style={[styles.searchButton, styles.searchButtonPrimary]}
+                onPress={handleSearchPage}
+              >
+                <Text style={styles.searchButtonTextPrimary}>Go</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.searchButton, styles.searchButtonSecondary]}
+                onPress={() => {
+                  setIsSearchVisible(false);
+                  setSearchPageNumber('');
+                }}
+              >
+                <Text style={styles.searchButtonTextSecondary}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -522,5 +680,126 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '500',
+  },
+  pageControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#F9FAFB',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  zoomControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  controlButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minWidth: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  controlButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  androidHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#F9FAFB',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  androidControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  androidScrollContainer: {
+    flex: 1,
+  },
+  androidScrollContent: {
+    flexGrow: 1,
+  },
+  pageScrollContent: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  searchModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    width: '80%',
+    maxWidth: 300,
+    alignItems: 'center',
+  },
+  searchModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000000',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  searchModalSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    width: '100%',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  searchModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  searchButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  searchButtonPrimary: {
+    backgroundColor: '#000000',
+  },
+  searchButtonSecondary: {
+    backgroundColor: '#F3F4F6',
+  },
+  searchButtonTextPrimary: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  searchButtonTextSecondary: {
+    color: '#374151',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
