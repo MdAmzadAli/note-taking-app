@@ -1,5 +1,19 @@
 import { API_ENDPOINTS, ApiResponse, FileUploadResponse, FileMetadata } from '../config/api';
 
+export interface FileUploadResponse {
+  id: string;
+  originalName: string;
+  mimetype: string;
+  size: number;
+  uploadDate: string;
+  cloudinary?: {
+    thumbnailUrl: string;
+    pageUrls: string[];
+    fullPdfUrl: string;
+    totalPages: number;
+  };
+}
+
 class FileService {
   async uploadFile(file: File | { uri: string; name: string; type?: string }, filename?: string): Promise<FileUploadResponse> {
     try {

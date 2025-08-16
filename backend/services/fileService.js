@@ -1,4 +1,3 @@
-
 const fs = require('fs').promises;
 const path = require('path');
 const sharp = require('sharp');
@@ -6,6 +5,7 @@ const sharp = require('sharp');
 const pdfService = require('./pdfService');
 const csvService = require('./csvService');
 const imageService = require('./imageService');
+const cloudinaryService = require('./cloudinaryService'); // Assuming cloudinaryService is available
 
 const METADATA_DIR = path.join(__dirname, '..', 'metadata');
 const PREVIEWS_DIR = path.join(__dirname, '..', 'previews');
@@ -57,7 +57,43 @@ class FileService {
   }
 
   /**
-   * Generate preview image for any file type
+   * Upload file to Cloudinary (for PDFs)
+   */
+  async uploadToCloudinary(fileInfo) {
+    try {
+      if (!cloudinaryService.isConfigured()) {
+        console.warn('⚠️ Cloudinary not configured, skipping upload');
+        return null;
+      }
+
+      if (fileInfo.mimetype !== 'application/pdf') {
+        console.log('📄 File is not PDF, skipping Cloudinary upload');
+        return null;
+      }
+
+      console.log('☁️ Starting Cloudinary upload for PDF:', fileInfo.originalName);
+
+      const publicId = `pdfs/${fileInfo.id}`;
+      const cloudinaryResult = await cloudinaryService.uploadPDF(fileInfo.path, publicId);
+
+      // Save Cloudinary URLs to metadata
+      const metadata = await this.getFileMetadata(fileInfo.id);
+      if (metadata) {
+        metadata.cloudinary = cloudinaryResult;
+        await this.saveFileMetadata(metadata);
+      }
+
+      console.log('✅ Cloudinary upload completed for:', fileInfo.originalName);
+      return cloudinaryResult;
+
+    } catch (error) {
+      console.error('❌ Cloudinary upload failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate preview for uploaded file
    * @param {Object} fileInfo - File information object
    */
   async generatePreview(fileInfo) {
@@ -85,7 +121,7 @@ class FileService {
       console.log(`✅ Preview generated for ${fileInfo.originalName}`);
     } catch (error) {
       console.error(`❌ Preview generation failed for ${fileInfo.originalName}:`, error);
-      
+
       // Generate fallback preview
       const fallbackBuffer = await this.generateGenericPreview(fileInfo);
       await fs.writeFile(previewPath, fallbackBuffer);
@@ -99,11 +135,11 @@ class FileService {
    */
   async generateGenericPreview(fileInfo) {
     const { originalName, mimetype, size } = fileInfo;
-    
+
     // Create a simple preview with file info
     const extension = path.extname(originalName).toUpperCase().replace('.', '') || 'FILE';
     const sizeText = this.formatFileSize(size);
-    
+
     // Create SVG with file information
     const svg = `
       <svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">
@@ -135,11 +171,11 @@ class FileService {
    */
   formatFileSize(bytes) {
     if (bytes === 0) return '0 B';
-    
+
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
+
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
@@ -156,7 +192,7 @@ class FileService {
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'text/plain'
     ];
-    
+
     return commonTypes.includes(mimetype) || mimetype.startsWith('image/');
   }
 
@@ -173,11 +209,11 @@ class FileService {
 
       // Delete original file
       await fs.unlink(fileInfo.path);
-      
+
       // Delete metadata
       const metadataPath = path.join(METADATA_DIR, `${fileId}.json`);
       await fs.unlink(metadataPath);
-      
+
       // Delete preview
       const previewPath = path.join(PREVIEWS_DIR, `${fileId}.jpg`);
       try {

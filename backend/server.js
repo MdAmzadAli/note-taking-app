@@ -207,6 +207,19 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     await fileService.saveFileMetadata(fileInfo);
     console.log('✅ File metadata saved');
 
+    // Upload to Cloudinary if it's a PDF
+    let cloudinaryResult = null;
+    if (fileInfo.mimetype === 'application/pdf') {
+      console.log('☁️ Starting Cloudinary upload...');
+      try {
+        cloudinaryResult = await fileService.uploadToCloudinary(fileInfo);
+        console.log('✅ Cloudinary upload successful');
+      } catch (cloudinaryError) {
+        console.error('❌ Cloudinary upload failed:', cloudinaryError);
+        // Don't fail the upload if Cloudinary fails
+      }
+    }
+
     // Generate preview immediately after upload
     console.log('🖼️ Generating preview...');
     console.log('🖼️ File info for preview:', JSON.stringify(fileInfo, null, 2));
@@ -227,7 +240,8 @@ app.post('/upload', upload.single('file'), async (req, res) => {
         originalName: fileInfo.originalName,
         mimetype: fileInfo.mimetype,
         size: fileInfo.size,
-        uploadDate: fileInfo.uploadDate
+        uploadDate: fileInfo.uploadDate,
+        cloudinary: cloudinaryResult
       }
     };
 

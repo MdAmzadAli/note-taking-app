@@ -22,6 +22,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import fileService from '../../services/fileService';
+import PDFViewer from '@/components/PDFViewer';
 
 interface SingleFile {
   id: string;
@@ -30,6 +31,12 @@ interface SingleFile {
   mimetype?: string;
   size?: number;
   isUploaded?: boolean;
+  cloudinary?: {
+    thumbnailUrl: string;
+    pageUrls: string[];
+    fullPdfUrl: string;
+    totalPages: number;
+  };
 }
 
 interface Workspace {
@@ -175,6 +182,7 @@ export default function ExpertTab() {
           mimetype: uploadedFile.mimetype,
           size: uploadedFile.size,
           isUploaded: true,
+          cloudinary: uploadedFile.cloudinary,
         };
 
         const updatedFiles = [...singleFiles, newFile];
@@ -239,6 +247,7 @@ export default function ExpertTab() {
               mimetype: uploadedFile.mimetype,
               size: uploadedFile.size,
               isUploaded: true,
+              cloudinary: uploadedFile.cloudinary,
             });
             
             console.log(`✅ Successfully uploaded workspace file: ${file.name}`);
@@ -333,7 +342,21 @@ export default function ExpertTab() {
       );
     }
 
-    // Use backend preview endpoint
+    // Use Cloudinary thumbnail for PDFs if available
+    if (file.cloudinary && file.mimetype === 'application/pdf') {
+      return (
+        <Image 
+          source={{ uri: file.cloudinary.thumbnailUrl }} 
+          style={styles.previewImage} 
+          resizeMode="cover"
+          onError={() => {
+            console.warn(`Failed to load Cloudinary thumbnail for file ${file.name}`);
+          }}
+        />
+      );
+    }
+
+    // Fallback to backend preview endpoint
     const previewUrl = fileService.getPreviewUrl(file.id);
 
     return (
@@ -370,8 +393,13 @@ export default function ExpertTab() {
     const fileUrl = fileService.getFileUrl(file.id);
     console.log('🔗 Generated file URL:', fileUrl);
 
-    // For PDF files, show in WebView with proper configuration
+    // For PDF files, use PDFViewer if Cloudinary data is available, otherwise use WebView
     if (file.mimetype?.includes('pdf')) {
+      if (file.cloudinary) {
+        console.log('📕 Rendering PDF with Cloudinary URLs');
+        return <PDFViewer file={file} />;
+      }
+
       console.log('📕 Rendering PDF in WebView with URL:', fileUrl);
       
       return (
