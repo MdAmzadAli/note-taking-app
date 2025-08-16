@@ -46,6 +46,7 @@ class CloudinaryService {
         const pageUrl = cloudinary.url(publicId, {
           width: 300,
           crop: "scale",
+          format: 'jpg',
           pg: i, // Use 'pg' instead of 'page'
           resource_type: "image"
         });
@@ -53,28 +54,28 @@ class CloudinaryService {
       }
 
       // Generate thumbnail URL (first page, smaller size)
-      const thumbnailUrl = cloudinary.url(`${publicId}`, {
-        resource_type: 'image',
-        // page: 1,
-        format: 'jpg',
-        width:212,
-        height: 321,
-        crop: 'fill',
-        quality: 'auto:good'
-      });
+      const thumbnailUrl = pageUrls[0];
+      //   cloudinary.url(`${publicId}`, {
+      //   resource_type: 'image',
+      //   // page: 1,
+      //   format: 'jpg',
+      //   width:212,
+      //   height: 321,
+      //   crop: 'fill',
+      //   quality: 'auto:good'
+      // });
 
       // Generate full PDF URL for viewing in browser
-      const fullPdfUrl = cloudinary.url(`${publicId}`, {
-        resource_type: 'image',
-        format: 'pdf'
-      });
+      // const fullPdfUrl = cloudinary.url(`${publicId}`, {
+      //   resource_type: 'image',
+      //   format: 'pdf'
+      // });
 
       return {
         success: true,
         cloudinaryId: uploadResult.public_id,
         thumbnailUrl,
         pageUrls,
-        fullPdfUrl,
         totalPages,
         secureUrl: uploadResult.secure_url,
         originalUrl: uploadResult.url
