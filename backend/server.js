@@ -152,11 +152,44 @@ app.options('/file/:id', (req, res) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
+  console.log('💗 Health check requested');
+  res.json({ status: 'healthy', timestamp: new Date().toISOString(), uptime: process.uptime() });
+});
+
+// List all files
+app.get('/files', async (req, res) => {
+  try {
+    console.log('📋 Listing all files...');
+    const files = await fileService.listFiles();
+
+    const response = {
+      success: true,
+      files: files,
+      count: files.length
+    };
+
+    console.log(`✅ Found ${files.length} files`);
+    res.json(response);
+  } catch (error) {
+    console.error('❌ Failed to list files:', error);
+    res.status(500).json({ error: 'Failed to list files', details: error.message });
+  }
+});
+
+// Delete file
+app.delete('/file/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`🗑️ Deleting file: ${id}`);
+
+    await fileService.deleteFile(id);
+
+    console.log(`✅ File deleted successfully: ${id}`);
+    res.json({ success: true, message: 'File deleted successfully' });
+  } catch (error) {
+    console.error('❌ Failed to delete file:', error);
+    res.status(500).json({ error: 'Failed to delete file', details: error.message });
+  }
 });
 
 // File upload endpoint
@@ -241,7 +274,7 @@ app.post('/upload', upload.single('file'), async (req, res) => {
         mimetype: fileInfo.mimetype,
         size: fileInfo.size,
         uploadDate: fileInfo.uploadDate,
-        cloudinary: cloudinaryResult
+        cloudinary:cloudinaryResult
       }
     };
 
@@ -255,113 +288,59 @@ app.post('/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// Get file preview (always returns an image)
+// Get file preview (redirects to Cloudinary thumbnail)
 app.get('/preview/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const previewPath = path.join(PREVIEWS_DIR, `${id}.jpg`);
+    console.log(`🔍 Getting preview for file ID: ${id}`);
 
-    // Check if preview exists
-    try {
-      await fs.access(previewPath);
-      res.setHeader('Content-Type', 'image/jpeg');
-      res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hour cache
-      res.sendFile(previewPath);
-    } catch {
-      // Generate preview if it doesn't exist
-      const fileInfo = await fileService.getFileMetadata(id);
-      if (!fileInfo) {
-        return res.status(404).json({ error: 'File not found' });
-      }
+    const fileUrls = await fileService.getFileUrls(id);
 
-      await fileService.generatePreview(fileInfo);
-      res.setHeader('Content-Type', 'image/jpeg');
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      res.sendFile(previewPath);
+    if (!fileUrls || !fileUrls.urls || !fileUrls.urls.thumbnailUrl) {
+      console.log(`❌ Thumbnail URL not found for file: ${id}`);
+      return res.status(404).json({ error: 'Preview not found' });
     }
+
+    console.log(`✅ Redirecting to Cloudinary thumbnail: ${fileUrls.urls.thumbnailUrl}`);
+    // Redirect to Cloudinary thumbnail URL
+    res.redirect(fileUrls.urls.thumbnailUrl);
+
   } catch (error) {
     console.error('❌ Preview error:', error);
-    res.status(500).json({ error: 'Preview generation failed', details: error.message });
+    res.status(500).json({ error: 'Failed to serve preview' });
   }
 });
 
-// Get full file or download link
+// Get full file (redirects to Cloudinary URL)
 app.get('/file/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    console.log('📄 File request received for ID:', id);
-    console.log('📄 Request headers:', {
-      'user-agent': req.get('User-Agent'),
-      'accept': req.get('Accept'),
-      'origin': req.get('Origin')
-    });
-    
-    const fileInfo = await fileService.getFileMetadata(id);
+    console.log(`🔍 Getting file: ${id}`);
 
-    if (!fileInfo) {
-      console.error('❌ File not found for ID:', id);
+    const fileUrls = await fileService.getFileUrls(id);
+
+    if (!fileUrls || !fileUrls.urls) {
+      console.log(`❌ File URLs not found for: ${id}`);
       return res.status(404).json({ error: 'File not found' });
     }
 
-    console.log('📄 File info retrieved:', {
-      originalName: fileInfo.originalName,
-      mimetype: fileInfo.mimetype,
-      size: fileInfo.size,
-      path: fileInfo.path
-    });
-
-    const { mimetype, originalName, path: filePath } = fileInfo;
-
-    // Check if file exists on disk
-    try {
-      await fs.access(filePath);
-      console.log('✅ File exists on disk:', filePath);
-    } catch (accessError) {
-      console.error('❌ File not found on disk:', filePath);
-      return res.status(404).json({ error: 'File not found on disk' });
-    }
-
-    // For common types, serve directly
-    if (fileService.isCommonType(mimetype)) {
-      console.log('📄 Serving file directly - mimetype:', mimetype);
-      
-      // Special handling for PDFs to ensure they display inline
-      if (mimetype === 'application/pdf') {
-        console.log('📕 Setting PDF-specific headers for inline display');
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `inline; filename="${originalName}"`);
-        res.setHeader('Accept-Ranges', 'bytes');
-        res.setHeader('Cache-Control', 'public, max-age=3600');
-        
-        // Add CORS headers for PDF viewing
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Range, Content-Range, Content-Length');
-        
-        console.log('📕 Sending PDF file:', path.resolve(filePath));
-        res.sendFile(path.resolve(filePath));
-      } else {
-        console.log('📄 Setting standard headers for mimetype:', mimetype);
-        res.setHeader('Content-Type', mimetype);
-        res.setHeader('Content-Disposition', `inline; filename="${originalName}"`);
-        res.setHeader('Cache-Control', 'public, max-age=3600');
-        res.sendFile(path.resolve(filePath));
-      }
+    // Determine which URL to use based on file type
+    let redirectUrl;
+    if (fileUrls.mimetype === 'application/pdf' && fileUrls.urls.fullPdfUrl) {
+      redirectUrl = fileUrls.urls.fullPdfUrl;
+    } else if (fileUrls.urls.fullUrl) {
+      redirectUrl = fileUrls.urls.fullUrl;
     } else {
-      console.log('📄 File type not common, providing download link');
-      // For uncommon types, provide download link
-      res.json({
-        downloadUrl: `/download/${id}`,
-        filename: originalName,
-        mimetype,
-        size: fileInfo.size,
-        message: 'This file type requires native viewer. Use downloadUrl to download.'
-      });
+      redirectUrl = fileUrls.urls.secureUrl;
     }
+
+    console.log(`✅ Redirecting to Cloudinary URL: ${redirectUrl}`);
+    // Redirect to Cloudinary URL
+    res.redirect(redirectUrl);
+
   } catch (error) {
     console.error('❌ File serving error:', error);
-    console.error('❌ Error stack:', error.stack);
-    res.status(500).json({ error: 'File serving failed', details: error.message });
+    res.status(500).json({ error: 'Failed to serve file' });
   }
 });
 
@@ -509,7 +488,7 @@ app.use((error, req, res, next) => {
     return res.status(400).json({ error: `File upload error: ${error.message}` });
   }
 
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Internal server error',
     details: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
   });

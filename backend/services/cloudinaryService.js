@@ -144,6 +144,110 @@ class CloudinaryService {
   }
 
   /**
+   * Upload image to Cloudinary
+   * @param {string} filePath - Path to the image file
+   * @param {string} publicId - Public ID for the image
+   * @returns {Object} Upload result with URLs
+   */
+  async uploadImage(filePath, publicId) {
+    try {
+      console.log('☁️ Uploading image to Cloudinary:', publicId);
+
+      const uploadResult = await cloudinary.uploader.upload(filePath, {
+        public_id: publicId,
+        resource_type: 'image',
+        quality: 'auto:good',
+        fetch_format: 'auto',
+        flags: 'progressive'
+      });
+
+      console.log('✅ Image uploaded successfully to Cloudinary');
+
+      // Generate thumbnail URL
+      const thumbnailUrl = cloudinary.url(publicId, {
+        resource_type: 'image',
+        width: 300,
+        height: 300,
+        crop: 'fill',
+        quality: 'auto:good'
+      });
+
+      return {
+        success: true,
+        cloudinaryId: uploadResult.public_id,
+        thumbnailUrl,
+        fullUrl: uploadResult.secure_url,
+        originalUrl: uploadResult.url,
+        secureUrl: uploadResult.secure_url
+      };
+
+    } catch (error) {
+      console.error('❌ Cloudinary image upload failed:', error);
+      throw new Error(`Cloudinary image upload failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Upload raw file to Cloudinary
+   * @param {string} filePath - Path to the file
+   * @param {string} publicId - Public ID for the file
+   * @returns {Object} Upload result with URLs
+   */
+  async uploadRaw(filePath, publicId) {
+    try {
+      console.log('☁️ Uploading raw file to Cloudinary:', publicId);
+
+      const uploadResult = await cloudinary.uploader.upload(filePath, {
+        public_id: publicId,
+        resource_type: 'raw',
+        flags: 'attachment'
+      });
+
+      console.log('✅ Raw file uploaded successfully to Cloudinary');
+
+      return {
+        success: true,
+        cloudinaryId: uploadResult.public_id,
+        fullUrl: uploadResult.secure_url,
+        originalUrl: uploadResult.url,
+        secureUrl: uploadResult.secure_url
+      };
+
+    } catch (error) {
+      console.error('❌ Cloudinary raw file upload failed:', error);
+      throw new Error(`Cloudinary raw file upload failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Delete file from Cloudinary
+   * @param {string} publicId - Public ID of the file to delete
+   */
+  async deleteFile(publicId) {
+    try {
+      console.log('🗑️ Deleting file from Cloudinary:', publicId);
+      
+      // Try deleting as image first, then raw
+      let result;
+      try {
+        result = await cloudinary.uploader.destroy(publicId, {
+          resource_type: 'image'
+        });
+      } catch (error) {
+        result = await cloudinary.uploader.destroy(publicId, {
+          resource_type: 'raw'
+        });
+      }
+      
+      console.log('✅ File deleted from Cloudinary:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Cloudinary delete failed:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Check if Cloudinary is configured
    * @returns {boolean} Configuration status
    */
