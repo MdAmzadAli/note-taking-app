@@ -65,17 +65,12 @@ export default function ExpertTab() {
   const [isBackendConnected, setIsBackendConnected] = useState(false);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
 
-  // State for file listing and preview
-  const [uploadedFiles, setUploadedFiles] = useState<FileUploadResponse[]>([]);
-  const [showFullPreview, setShowFullPreview] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  
 
   // Check backend connectivity on mount
   useEffect(() => {
     checkBackendConnection();
     loadData();
-    loadUploadedFiles(); // Load uploaded files on component mount
   }, []);
 
   const checkBackendConnection = async () => {
@@ -204,7 +199,6 @@ export default function ExpertTab() {
         setSingleFiles(updatedFiles);
         await saveData(updatedFiles, workspaces);
         setIsUploadModalVisible(false);
-        await loadUploadedFiles(); // Refresh the file list to get the latest uploads
       } else {
         console.log('📄 File selection was canceled or no file selected');
       }
@@ -700,76 +694,7 @@ export default function ExpertTab() {
     );
   }
 
-  const handleFileUpload = async () => {
-    if (!isBackendConnected) {
-      Alert.alert('Backend Not Available', 'Backend server is not connected. Please check the connection.');
-      return;
-    }
-
-    try {
-      setIsUploading(true);
-      console.log('🎯 Starting file selection process...');
-
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain', 'text/csv'],
-        copyToCacheDirectory: true,
-      });
-
-      console.log('📄 Document picker result:', JSON.stringify(result, null, 2));
-
-      if (!result.canceled && result.assets[0]) {
-        const file = result.assets[0];
-        console.log('📄 Selected file details:', JSON.stringify(file, null, 2));
-
-        const fileToUpload = {
-          uri: file.uri,
-          name: file.name,
-          type: file.mimeType || 'application/octet-stream'
-        };
-
-        console.log('📤 Preparing file for upload:', JSON.stringify(fileToUpload, null, 2));
-
-        const uploadResult = await fileService.uploadFile(fileToUpload);
-        console.log('✅ File uploaded successfully:', JSON.stringify(uploadResult, null, 2));
-
-        // Refresh the file list to get the latest uploads
-        await loadUploadedFiles();
-
-        Alert.alert('Success', 'File uploaded successfully!');
-      } else {
-        console.log('📄 File selection was canceled or no file selected');
-      }
-    } catch (error) {
-      console.error('❌ File upload process failed');
-      Alert.alert('Error', `Failed to upload file: ${error.message}`);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const loadUploadedFiles = async () => {
-    try {
-      setIsLoadingFiles(true);
-      console.log('📋 Loading uploaded files...');
-
-      const response = await fetch(`${API_ENDPOINTS.upload.replace('/upload', '/files')}`);
-      if (!response.ok) {
-        throw new Error(`Failed to load files: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('✅ Files loaded:', data);
-
-      if (data.success && data.files) {
-        setUploadedFiles(data.files);
-      }
-    } catch (error) {
-      console.error('❌ Failed to load uploaded files:', error);
-      Alert.alert('Error', 'Failed to load uploaded files');
-    } finally {
-      setIsLoadingFiles(false);
-    }
-  };
+  
 
 
   return (
@@ -969,148 +894,23 @@ export default function ExpertTab() {
             </View>
 
             <View style={styles.previewModalBody}>
-              {previewFile && renderFullFileContent(previewFile)}
+              {previewFile && previewFile.mimetype?.includes('pdf') && previewFile.cloudinary ? (
+                <PDFViewer 
+                  file={{
+                    id: previewFile.id,
+                    name: previewFile.name,
+                    cloudinary: previewFile.cloudinary
+                  }}
+                />
+              ) : (
+                previewFile && renderFullFileContent(previewFile)
+              )}
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* File Upload Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📁 File Upload</Text>
-          <Text style={styles.sectionDescription}>
-            Upload PDFs, documents, and images for AI analysis
-          </Text>
-
-          <TouchableOpacity
-            style={[styles.uploadButton, isUploading && styles.uploadButtonDisabled]}
-            onPress={handleFileUpload}
-            disabled={isUploading}
-          >
-            {isUploading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text style={styles.uploadButtonText}>
-                📤 {uploadedFiles.length > 0 ? 'Upload Another File' : 'Upload File'}
-              </Text>
-            )}
-          </TouchableOpacity>
-
-          {/* Uploaded Files Grid */}
-          {isLoadingFiles ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#000000" />
-              <Text style={styles.loadingText}>Loading files...</Text>
-            </View>
-          ) : uploadedFiles.length > 0 ? (
-            <View style={styles.filesContainer}>
-              <Text style={styles.filesTitle}>Uploaded Files ({uploadedFiles.length})</Text>
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                style={styles.filesScroll}
-              >
-                {uploadedFiles.map((file) => (
-                  <TouchableOpacity
-                    key={file.id}
-                    style={styles.fileCard}
-                    onPress={() => {
-                      setSelectedFile(file);
-                      setShowFullPreview(true);
-                    }}
-                  >
-                    {file.cloudinary?.thumbnailUrl ? (
-                      <Image
-                        source={{ uri: file.cloudinary.thumbnailUrl }}
-                        style={styles.fileThumbnail}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View style={styles.filePlaceholder}>
-                        <Text style={styles.filePlaceholderIcon}>📄</Text>
-                      </View>
-                    )}
-                    <Text style={styles.fileName} numberOfLines={2}>
-                      {file.originalName}
-                    </Text>
-                    <Text style={styles.fileSize}>
-                      {(file.size / 1024 / 1024).toFixed(1)} MB
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          ) : null}
-        </View>
-
-      {/* Full Preview Modal */}
-      <Modal
-        visible={showFullPreview}
-        animationType="slide"
-        presentationStyle="fullScreen"
-      >
-        <View style={styles.fullPreviewContainer}>
-          <View style={styles.fullPreviewHeader}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => {
-                setShowFullPreview(false);
-                setSelectedFile(null);
-              }}
-            >
-              <Text style={styles.closeButtonText}>✕</Text>
-            </TouchableOpacity>
-            <Text style={styles.fullPreviewTitle} numberOfLines={1}>
-              {selectedFile?.originalName}
-            </Text>
-            <View style={styles.closeButton} />
-          </View>
-
-          {selectedFile ? (
-            selectedFile.mimetype === 'application/pdf' && selectedFile.cloudinary ? (
-              <PDFViewer 
-                file={{
-                  id: selectedFile.id,
-                  name: selectedFile.originalName,
-                  cloudinary: selectedFile.cloudinary
-                }}
-              />
-            ) : selectedFile.mimetype === 'application/pdf' ? (
-              <WebView
-                source={{ uri: fileService.getFileUrl(selectedFile.id) }}
-                style={styles.fullPreviewContent}
-                startInLoadingState={true}
-                renderLoading={() => (
-                  <View style={styles.fullPreviewPlaceholder}>
-                    <ActivityIndicator size="large" color="#000000" />
-                    <Text style={styles.fullPreviewText}>Loading PDF...</Text>
-                  </View>
-                )}
-                onError={(syntheticEvent) => {
-                  const { nativeEvent } = syntheticEvent;
-                  console.error('❌ WebView PDF loading error:', nativeEvent);
-                }}
-                renderError={(errorDomain, errorCode, errorDesc) => {
-                  console.error('❌ WebView render error:', { errorDomain, errorCode, errorDesc });
-                  return (
-                    <View style={styles.fullPreviewPlaceholder}>
-                      <Text style={styles.fullPreviewIcon}>📕</Text>
-                      <Text style={styles.fullPreviewText}>Unable to display PDF</Text>
-                      <Text style={styles.fullPreviewSubtext}>Error: {errorDesc}</Text>
-                    </View>
-                  );
-                }}
-              />
-            ) : (
-              <View style={styles.fullPreviewPlaceholder}>
-                <Text style={styles.fullPreviewIcon}>📄</Text>
-                <Text style={styles.fullPreviewText}>{selectedFile.originalName}</Text>
-                <Text style={styles.fullPreviewSubtext}>{selectedFile.mimetype}</Text>
-              </View>
-            )
-          ) : null}
-        </View>
-      </Modal>
+      
 
     </SafeAreaView>
   );
@@ -1617,98 +1417,5 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontFamily: 'Inter',
   },
-  // Styles for the new file listing section
-  section: {
-    marginTop: 20,
-    padding: 16,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  sectionDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontFamily: 'Inter',
-    marginBottom: 16,
-    lineHeight: 22,
-  },
-  uploadButton: {
-    backgroundColor: '#000000',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 44,
-  },
-  uploadButtonDisabled: {
-    opacity: 0.6,
-  },
-  uploadButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
-    fontFamily: 'Inter',
-  },
-  filesContainer: {
-    marginTop: 20,
-  },
-  filesTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000000',
-    fontFamily: 'Inter',
-    marginBottom: 12,
-  },
-  filesScroll: {
-    flexGrow: 0,
-  },
-  fileThumbnail: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    backgroundColor: '#E5E7EB',
-  },
-  filePlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    backgroundColor: '#E5E7EB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  filePlaceholderIcon: {
-    fontSize: 32,
-  },
-  fileSize: {
-    fontSize: 10,
-    color: '#6B7280',
-    fontFamily: 'Inter',
-    marginTop: 4,
-  },
-  fullPreviewContainer: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  fullPreviewHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
-    gap: 16,
-  },
-  fullPreviewTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000000',
-    fontFamily: 'Inter',
-    flex: 1,
-    marginRight: 12,
-  },
-  fullPreviewContent: {
-    flex: 1,
-  },
+  
 });
