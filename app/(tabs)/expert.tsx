@@ -185,11 +185,17 @@ export default function ExpertTab() {
           cloudinary: uploadedFile.cloudinary,
         };
 
+        // Show different success message based on Cloudinary availability
+        const successMessage = uploadedFile.cloudinary 
+          ? 'File uploaded and processed successfully! PDF preview available.'
+          : 'File uploaded successfully! (Cloudinary not configured - using basic preview)';
+        
+        Alert.alert('Success', successMessage);
+
         const updatedFiles = [...singleFiles, newFile];
         setSingleFiles(updatedFiles);
         await saveData(updatedFiles, workspaces);
         setIsUploadModalVisible(false);
-        Alert.alert('Success', 'File uploaded successfully!');
       } else {
         console.log('📄 File selection was canceled or no file selected');
       }

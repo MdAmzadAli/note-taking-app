@@ -88,7 +88,9 @@ class FileService {
 
     } catch (error) {
       console.error('❌ Cloudinary upload failed:', error);
-      throw error;
+      console.warn('⚠️ PDF will work with basic preview instead of Cloudinary URLs');
+      // Don't throw error - allow upload to continue without Cloudinary
+      return null;
     }
   }
 
