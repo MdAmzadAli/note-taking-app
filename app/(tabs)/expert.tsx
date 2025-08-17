@@ -179,7 +179,7 @@ export default function ExpertTab() {
           cloudinary: uploadedFile.cloudinary,
         };
 
-        const successMessage = uploadedFile.cloudinary 
+        const successMessage = uploadedFile.cloudinary
           ? 'File uploaded and processed successfully! PDF preview available.'
           : 'File uploaded successfully! (Cloudinary not configured - using basic preview)';
 
@@ -320,7 +320,7 @@ export default function ExpertTab() {
 
     const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)];
 
-    const sources = selectedFile 
+    const sources = selectedFile
       ? [selectedFile.name]
       : selectedWorkspace?.files.map(f => f.name) || [];
 
@@ -330,6 +330,98 @@ export default function ExpertTab() {
       sources
     }]);
     setCurrentMessage('');
+  };
+
+  const handleDeleteWorkspaceFile = async (workspaceId: string, fileId: string) => {
+    try {
+      const updatedWorkspaces = workspaces.map(workspace => {
+        if (workspace.id === workspaceId) {
+          return {
+            ...workspace,
+            files: workspace.files.filter(file => file.id !== fileId)
+          };
+        }
+        return workspace;
+      });
+
+      setWorkspaces(updatedWorkspaces);
+
+      // Update selected workspace if it's the current one
+      if (selectedWorkspace && selectedWorkspace.id === workspaceId) {
+        const updatedWorkspace = updatedWorkspaces.find(w => w.id === workspaceId);
+        setSelectedWorkspace(updatedWorkspace || null);
+      }
+
+      await saveData(singleFiles, updatedWorkspaces);
+      Alert.alert('Success', 'File removed from workspace');
+    } catch (error) {
+      console.error('Error deleting workspace file:', error);
+      Alert.alert('Error', 'Failed to delete file from workspace');
+    }
+  };
+
+  const handleAddWorkspaceFile = async (workspaceId: string) => {
+    if (!isBackendConnected) {
+      Alert.alert('Backend Not Available', 'Backend server is not connected. Please check the connection.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      if (!result.canceled && result.assets.length > 0) {
+        const file = result.assets[0];
+
+        const fileToUpload = {
+          uri: file.uri,
+          name: file.name,
+          type: file.mimeType || 'application/octet-stream'
+        };
+
+        const uploadedFile = await fileService.uploadFile(fileToUpload);
+
+        const newFile: SingleFile = {
+          id: uploadedFile.id,
+          name: uploadedFile.originalName,
+          uploadDate: new Date(uploadedFile.uploadDate).toLocaleDateString(),
+          mimetype: uploadedFile.mimetype,
+          size: uploadedFile.size,
+          isUploaded: true,
+          cloudinary: uploadedFile.cloudinary,
+        };
+
+        const updatedWorkspaces = workspaces.map(workspace => {
+          if (workspace.id === workspaceId && workspace.files.length < 5) {
+            return {
+              ...workspace,
+              files: [...workspace.files, newFile]
+            };
+          }
+          return workspace;
+        });
+
+        setWorkspaces(updatedWorkspaces);
+
+        // Update selected workspace if it's the current one
+        if (selectedWorkspace && selectedWorkspace.id === workspaceId) {
+          const updatedWorkspace = updatedWorkspaces.find(w => w.id === workspaceId);
+          setSelectedWorkspace(updatedWorkspace || null);
+        }
+
+        await saveData(singleFiles, updatedWorkspaces);
+        Alert.alert('Success', 'File added to workspace successfully!');
+      }
+    } catch (error) {
+      console.error('Error adding file to workspace:', error);
+      Alert.alert('Error', 'Failed to add file to workspace');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isChatVisible) {
@@ -343,6 +435,10 @@ export default function ExpertTab() {
         onSendMessage={sendMessage}
         onBack={() => setIsChatVisible(false)}
         onFilePreview={openFilePreview}
+        onDeleteWorkspaceFile={handleDeleteWorkspaceFile}
+        onAddWorkspaceFile={handleAddWorkspaceFile}
+        isBackendConnected={isBackendConnected}
+        isLoading={isLoading}
       />
     );
   }

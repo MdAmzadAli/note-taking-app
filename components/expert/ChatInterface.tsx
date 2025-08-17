@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   View, 
   Text, 
@@ -51,6 +51,8 @@ interface ChatInterfaceProps {
   onSendMessage: () => void;
   onBack: () => void;
   onFilePreview: (file: SingleFile) => void;
+  onDeleteWorkspaceFile?: (workspaceId: string, fileId: string) => void;
+  onAddWorkspaceFile?: (workspaceId: string) => void;
 }
 
 export default function ChatInterface({
@@ -61,8 +63,11 @@ export default function ChatInterface({
   setCurrentMessage,
   onSendMessage,
   onBack,
-  onFilePreview
+  onFilePreview,
+  onDeleteWorkspaceFile,
+  onAddWorkspaceFile
 }: ChatInterfaceProps) {
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const getFileSize = (file: SingleFile) => {
     if (!file.size) return 'Unknown';
     const kb = file.size / 1024;
@@ -106,8 +111,8 @@ export default function ChatInterface({
           </TouchableOpacity>
         </View>
 
-        {/* File Info Section */}
-        {selectedFile && (
+        {/* File Info Section - Single File */}
+        {selectedFile && !selectedWorkspace && (
           <TouchableOpacity 
             style={styles.pdfFileInfoSection}
             onPress={() => onFilePreview(selectedFile)}
@@ -131,6 +136,85 @@ export default function ChatInterface({
             </View>
             <Text style={styles.pdfFileSizeText}>{getFileSize(selectedFile)}</Text>
           </TouchableOpacity>
+        )}
+
+        {/* Workspace Files Dropdown */}
+        {selectedWorkspace && (
+          <View style={styles.workspaceFilesContainer}>
+            <TouchableOpacity 
+              style={styles.workspaceDropdownHeader}
+              onPress={() => setIsDropdownOpen(!isDropdownOpen)}
+            >
+              <View style={styles.pdfFileInfoLeft}>
+                <View style={styles.pdfFileIconContainer}>
+                  <IconSymbol size={20} name="folder" color="#FFFFFF" />
+                </View>
+                <View style={styles.pdfFileDetails}>
+                  <Text style={styles.pdfFileName} numberOfLines={1}>
+                    {selectedWorkspace.files.length} Files in Workspace
+                  </Text>
+                  <View style={styles.pdfFileStatus}>
+                    <Text style={styles.pdfFileType}>WORKSPACE</Text>
+                    <View style={styles.pdfIndexedBadge}>
+                      <IconSymbol size={12} name="checkmark" color="#FFFFFF" />
+                      <Text style={styles.pdfIndexedText}>ALL INDEXED</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+              <IconSymbol 
+                size={16} 
+                name={isDropdownOpen ? "chevron.up" : "chevron.down"} 
+                color="#FFFFFF" 
+              />
+            </TouchableOpacity>
+
+            {isDropdownOpen && (
+              <View style={styles.workspaceDropdownContent}>
+                {selectedWorkspace.files.map((file, index) => (
+                  <View key={file.id} style={styles.workspaceFileItem}>
+                    <TouchableOpacity 
+                      style={styles.workspaceFileInfo}
+                      onPress={() => onFilePreview(file)}
+                    >
+                      <View style={styles.workspaceFileIconContainer}>
+                        <IconSymbol size={16} name="doc.text" color="#FFFFFF" />
+                      </View>
+                      <View style={styles.workspaceFileDetails}>
+                        <Text style={styles.workspaceFileName} numberOfLines={1}>
+                          {file.name}
+                        </Text>
+                        <Text style={styles.workspaceFileSize}>
+                          {getFileSize(file)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.deleteFileButton}
+                      onPress={() => onDeleteWorkspaceFile?.(selectedWorkspace.id, file.id)}
+                    >
+                      <IconSymbol size={16} name="trash" color="#FF4444" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                
+                {/* Add File Button */}
+                <TouchableOpacity 
+                  style={[
+                    styles.addFileButton, 
+                    { opacity: selectedWorkspace.files.length >= 5 ? 0.5 : 1 }
+                  ]}
+                  disabled={selectedWorkspace.files.length >= 5}
+                  onPress={() => onAddWorkspaceFile?.(selectedWorkspace.id)}
+                >
+                  <IconSymbol size={16} name="plus" color="#007AFF" />
+                  <Text style={styles.addFileText}>
+                    Add File ({selectedWorkspace.files.length}/5)
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
         )}
 
         {/* Chat Messages Container */}
@@ -419,6 +503,77 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#10B981',
     marginLeft: 4,
+    fontWeight: '500',
+  },
+  workspaceFilesContainer: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  workspaceDropdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+  },
+  workspaceDropdownContent: {
+    borderTopWidth: 1,
+    borderTopColor: '#333333',
+  },
+  workspaceFileItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  workspaceFileInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  workspaceFileIconContainer: {
+    width: 24,
+    height: 24,
+    backgroundColor: '#333333',
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  workspaceFileDetails: {
+    flex: 1,
+  },
+  workspaceFileName: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  workspaceFileSize: {
+    fontSize: 10,
+    color: '#10B981',
+  },
+  deleteFileButton: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#2A2A2A',
+  },
+  addFileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#2A2A2A',
+  },
+  addFileText: {
+    fontSize: 12,
+    color: '#007AFF',
+    marginLeft: 6,
     fontWeight: '500',
   },
 });
