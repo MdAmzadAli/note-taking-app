@@ -164,7 +164,7 @@ export default function ChatInterface({
     initializeRAG();
 
     // Test basic backend connectivity first
-    testBackendConnection();
+    // testBackendConnection();
   }, [selectedFile, selectedWorkspace]);
 
   const testBackendConnection = async () => {

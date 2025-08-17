@@ -1,5 +1,26 @@
+const getApiBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    // In Replit web environment, use the backend port forwarding
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://cbee8c74-e2df-4e47-a6fb-3d3c3b7ab0eb-00-2g13a021txtf3.pike.replit.dev:5000';
+    // For Replit, the backend runs on port 5000
+    if (hostname.includes('replit.dev')) {
+      // Use the same domain with port 5000
+      const baseUrl = `${protocol}//${hostname}:5000`;
+      console.log('🔗 API Base URL (Replit):', baseUrl);
+      return baseUrl;
+    } else {
+      // For local development
+      const baseUrl = `${protocol}//${hostname}:5000`;
+      console.log('🔗 API Base URL (Local):', baseUrl);
+      return baseUrl;
+    }
+  }
+  return 'http://0.0.0.0:5000';
+};
+const API_BASE_URL = getApiBaseUrl();
+  // process.env.EXPO_PUBLIC_API_URL || 'https://cbee8c74-e2df-4e47-a6fb-3d3c3b7ab0eb-00-2g13a021txtf3.pike.replit.dev:5000';
 
 export interface RAGResponse {
   success: boolean;
@@ -34,8 +55,8 @@ export interface IndexResponse {
 class RAGService {
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
     // Use the correct backend URL for Replit environment
-    const backendUrl = this.getBackendUrl();
-    const fullUrl = `${backendUrl}${endpoint}`;
+    // const backendUrl = this.getBackendUrl();
+    const fullUrl = `${API_BASE_URL}${endpoint}`;
     
     console.log(`🌐 RAG API Request Starting`);
     console.log(`📍 Full URL: ${fullUrl}`);

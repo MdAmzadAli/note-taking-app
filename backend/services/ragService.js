@@ -4,6 +4,8 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const pdfParse = require('pdf-parse');
 const fs = require('fs').promises;
 const path = require('path');
+const { v5: uuidv5 } = require('uuid');
+const POINT_NS = '2d3c0d3e-1e1a-4f6a-9e84-1b8de377e9c9';
 
 class RAGService {
   constructor() {
@@ -164,18 +166,24 @@ class RAGService {
   // Generate embeddings using Gemini
   async generateEmbedding(text) {
     try {
-      if (!this.gemini) {
-        throw new Error('Gemini not initialized');
+      if (!this.embeddingModel) {
+        // Cache the model once instead of recreating every call
+        this.embeddingModel = this.gemini.getGenerativeModel({ model: 'embedding-001' });
       }
 
-      const model = this.gemini.getGenerativeModel({ model: 'embedding-001' });
-      const result = await model.embedContent(text);
+      const result = await this.embeddingModel.embedContent(text);
+
+      if (!result?.embedding?.values) {
+        throw new Error("No embedding values returned");
+      }
+
       return result.embedding.values;
     } catch (error) {
-      console.error('❌ Embedding generation failed:', error);
+      console.error("❌ Embedding generation failed:", error.message || error);
       throw error;
     }
   }
+
 
   // Index a document
   async indexDocument(fileId, filePath, fileName, workspaceId = null, cloudinaryData = null) {
@@ -216,7 +224,7 @@ class RAGService {
         const pageUrl = cloudinaryData?.pageUrls?.[estimatedPage - 1] || cloudinaryData?.secureUrl;
         
         points.push({
-          id: `${fileId}_chunk_${i}`,
+          id: uuidv5(`${fileId}:${i}`, POINT_NS),
           vector: embedding,
           payload: {
             text: chunk.text,

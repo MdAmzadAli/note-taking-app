@@ -5,6 +5,7 @@ const express = require('express');
 const multer = require('multer');
 const sharp = require('sharp');
 const fs = require('fs').promises;
+const fsSync = require('fs'); 
 const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -485,70 +486,15 @@ app.get('/metadata/:id', async (req, res) => {
   }
 });
 
-// Error handling middleware
-app.use((error, req, res, next) => {
-  console.error('❌ Unhandled error occurred');
-  console.error('❌ Error type:', error.constructor.name);
-  console.error('❌ Error message:', error.message);
-  console.error('❌ Error stack:', error.stack);
-
-  if (error instanceof multer.MulterError) {
-    console.error('❌ Multer-specific error detected');
-    console.error('❌ Multer error code:', error.code);
-    console.error('❌ Multer error field:', error.field);
-
-    if (error.code === 'LIMIT_FILE_SIZE') {
-      console.error('❌ File size limit exceeded');
-      return res.status(400).json({ error: 'File too large. Maximum size is 50MB.' });
-    }
-    if (error.code === 'LIMIT_UNEXPECTED_FILE') {
-      console.error('❌ Unexpected field name used');
-      return res.status(400).json({ error: 'Unexpected field name. Use "file" as field name.' });
-    }
-    if (error.code === 'LIMIT_PART_COUNT') {
-      console.error('❌ Too many parts in multipart data');
-      return res.status(400).json({ error: 'Too many parts in multipart data.' });
-    }
-    if (error.code === 'LIMIT_FILE_COUNT') {
-      console.error('❌ Too many files uploaded');
-      return res.status(400).json({ error: 'Too many files uploaded.' });
-    }
-    if (error.code === 'LIMIT_FIELD_KEY') {
-      console.error('❌ Field name too long');
-      return res.status(400).json({ error: 'Field name too long.' });
-    }
-    if (error.code === 'LIMIT_FIELD_VALUE') {
-      console.error('❌ Field value too long');
-      return res.status(400).json({ error: 'Field value too long.' });
-    }
-    if (error.code === 'LIMIT_FIELD_COUNT') {
-      console.error('❌ Too many fields');
-      return res.status(400).json({ error: 'Too many fields.' });
-    }
-
-    console.error('❌ Unknown multer error code:', error.code);
-    return res.status(400).json({ error: `File upload error: ${error.message}` });
-  }
-
-  res.status(500).json({
-    error: 'Internal server error',
-    details: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
-  });
-});
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Endpoint not found' });
-});
 
 // RAG endpoints
 app.post('/rag/index/:id', async (req, res) => {
-  const startTime = Date.now();
+  
   console.log(`🔄 RAG: Received indexing request`);
   console.log(`📄 File ID: ${req.params.id}`);
   console.log(`🏢 Request body:`, JSON.stringify(req.body, null, 2));
   console.log(`📍 Request headers:`, JSON.stringify(req.headers, null, 2));
-
+  const startTime = Date.now();
   try {
     const { id } = req.params;
     const { workspaceId } = req.body;
@@ -558,21 +504,21 @@ app.post('/rag/index/:id', async (req, res) => {
     // Get file metadata
     const metadataPath = path.join(__dirname, 'metadata', `${id}.json`);
     console.log(`📁 Metadata path: ${metadataPath}`);
-    console.log(`📁 Metadata exists: ${fs.existsSync(metadataPath)}`);
+    console.log(`📁 Metadata exists: ${fsSync.existsSync(metadataPath)}`);
 
-    if (!fs.existsSync(metadataPath)) {
+    if (!fsSync.existsSync(metadataPath)) {
       console.error(`❌ Metadata file not found: ${metadataPath}`);
       return res.status(404).json({ error: 'File not found' });
     }
 
-    const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+    const metadata = JSON.parse(fsSync.readFileSync(metadataPath, 'utf8'));
     console.log(`📊 File metadata:`, JSON.stringify(metadata, null, 2));
 
     const filePath = path.join(__dirname, 'uploads', `${id}.${metadata.originalName.split('.').pop()}`);
     console.log(`📁 File path: ${filePath}`);
-    console.log(`📁 File exists: ${fs.existsSync(filePath)}`);
+    console.log(`📁 File exists: ${fsSync.existsSync(filePath)}`);
 
-    if (!fs.existsSync(filePath)) {
+    if (!fsSync.existsSync(filePath)) {
       console.error(`❌ File not found on disk: ${filePath}`);
       return res.status(404).json({ error: 'File not found on disk' });
     }
@@ -714,6 +660,62 @@ app.get('/rag/health', async (req, res) => {
     });
   }
 });
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Endpoint not found' });
+});
+// Error handling middleware
+app.use((error, req, res, next) => {
+  console.error('❌ Unhandled error occurred');
+  console.error('❌ Error type:', error.constructor.name);
+  console.error('❌ Error message:', error.message);
+  console.error('❌ Error stack:', error.stack);
+
+  if (error instanceof multer.MulterError) {
+    console.error('❌ Multer-specific error detected');
+    console.error('❌ Multer error code:', error.code);
+    console.error('❌ Multer error field:', error.field);
+
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      console.error('❌ File size limit exceeded');
+      return res.status(400).json({ error: 'File too large. Maximum size is 50MB.' });
+    }
+    if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+      console.error('❌ Unexpected field name used');
+      return res.status(400).json({ error: 'Unexpected field name. Use "file" as field name.' });
+    }
+    if (error.code === 'LIMIT_PART_COUNT') {
+      console.error('❌ Too many parts in multipart data');
+      return res.status(400).json({ error: 'Too many parts in multipart data.' });
+    }
+    if (error.code === 'LIMIT_FILE_COUNT') {
+      console.error('❌ Too many files uploaded');
+      return res.status(400).json({ error: 'Too many files uploaded.' });
+    }
+    if (error.code === 'LIMIT_FIELD_KEY') {
+      console.error('❌ Field name too long');
+      return res.status(400).json({ error: 'Field name too long.' });
+    }
+    if (error.code === 'LIMIT_FIELD_VALUE') {
+      console.error('❌ Field value too long');
+      return res.status(400).json({ error: 'Field value too long.' });
+    }
+    if (error.code === 'LIMIT_FIELD_COUNT') {
+      console.error('❌ Too many fields');
+      return res.status(400).json({ error: 'Too many fields.' });
+    }
+
+    console.error('❌ Unknown multer error code:', error.code);
+    return res.status(400).json({ error: `File upload error: ${error.message}` });
+  }
+
+  res.status(500).json({
+    error: 'Internal server error',
+    details: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
+  });
+});
+
+
 
 // Start server
 async function startServer() {
