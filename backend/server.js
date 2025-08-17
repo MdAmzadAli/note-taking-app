@@ -296,7 +296,7 @@ app.get('/preview/:id', async (req, res) => {
 
     try {
       const fileUrls = await fileService.getFileUrls(id);
-      
+
       if (fileUrls && fileUrls.urls && fileUrls.urls.thumbnailUrl) {
         console.log(`✅ Redirecting to Cloudinary thumbnail: ${fileUrls.urls.thumbnailUrl}`);
         return res.redirect(fileUrls.urls.thumbnailUrl);
@@ -312,7 +312,7 @@ app.get('/preview/:id', async (req, res) => {
     }
 
     const previewPath = path.join(PREVIEWS_DIR, `${id}.jpg`);
-    
+
     // Check if local preview exists
     try {
       await fs.access(previewPath);
@@ -339,7 +339,7 @@ app.get('/file/:id', async (req, res) => {
 
     try {
       const fileUrls = await fileService.getFileUrls(id);
-      
+
       if (fileUrls && fileUrls.urls) {
         // Determine which URL to use based on file type
         let redirectUrl;
@@ -537,7 +537,7 @@ app.post('/rag/index/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { workspaceId } = req.body;
-    
+
     const fileInfo = await fileService.getFileMetadata(id);
     if (!fileInfo) {
       return res.status(404).json({ error: 'File not found' });
@@ -557,8 +557,8 @@ app.post('/rag/index/:id', async (req, res) => {
     }
 
     const result = await ragService.indexDocument(
-      id, 
-      fileInfo.path, 
+      id,
+      fileInfo.path,
       fileInfo.originalName,
       workspaceId,
       cloudinaryData
@@ -572,9 +572,9 @@ app.post('/rag/index/:id', async (req, res) => {
 
   } catch (error) {
     console.error('❌ RAG indexing error:', error);
-    res.status(500).json({ 
-      error: 'Failed to index document', 
-      details: error.message 
+    res.status(500).json({
+      error: 'Failed to index document',
+      details: error.message
     });
   }
 });
@@ -583,7 +583,7 @@ app.delete('/rag/index/:id', async (req, res) => {
   try {
     const { id } = req.params;
     await ragService.removeDocument(id);
-    
+
     res.json({
       success: true,
       message: 'Document removed from index'
@@ -591,9 +591,9 @@ app.delete('/rag/index/:id', async (req, res) => {
 
   } catch (error) {
     console.error('❌ RAG removal error:', error);
-    res.status(500).json({ 
-      error: 'Failed to remove document from index', 
-      details: error.message 
+    res.status(500).json({
+      error: 'Failed to remove document from index',
+      details: error.message
     });
   }
 });
@@ -617,9 +617,9 @@ app.post('/rag/query', async (req, res) => {
 
   } catch (error) {
     console.error('❌ RAG query error:', error);
-    res.status(500).json({ 
-      error: 'Failed to process query', 
-      details: error.message 
+    res.status(500).json({
+      error: 'Failed to process query',
+      details: error.message
     });
   }
 });
@@ -629,9 +629,9 @@ app.get('/rag/health', async (req, res) => {
     const health = await ragService.healthCheck();
     res.json(health);
   } catch (error) {
-    res.status(500).json({ 
-      status: 'error', 
-      message: error.message 
+    res.status(500).json({
+      status: 'error',
+      message: error.message
     });
   }
 });
@@ -639,7 +639,7 @@ app.get('/rag/health', async (req, res) => {
 // Start server
 async function startServer() {
   await ensureDirectories();
-  
+
   // Initialize RAG service
   try {
     await ragService.initialize();
@@ -648,7 +648,8 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 File Preview API running on http://0.0.0.0:${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🌐 Server accessible at http://0.0.0.0:${PORT}`);
     console.log(`📁 Uploads directory: ${UPLOADS_DIR}`);
     console.log(`🖼️ Previews directory: ${PREVIEWS_DIR}`);
     console.log(`🛡️ Environment: ${process.env.NODE_ENV || 'development'}`);

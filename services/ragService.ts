@@ -1,5 +1,5 @@
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://cbee8c74-e2df-4e47-a6fb-3d3c3b7ab0eb-00-2g13a021txtf3.pike.replit.dev';
 
 export interface RAGResponse {
   success: boolean;
