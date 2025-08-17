@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, TextInput } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 
 interface UploadModalProps {
@@ -26,12 +27,29 @@ export default function UploadModal({
 
   const handleMainButtonPress = () => {
     if (uploadMode === 'phone') {
-      onUpload();
+      handlePhoneUpload();
     } else {
       // Handle URL upload
       if (urlInput.trim() && onUploadFromUrl) {
         onUploadFromUrl(urlInput.trim());
       }
+    }
+  };
+
+  const handlePhoneUpload = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const file = result.assets[0];
+        // Call the existing onUpload function with the file
+        onUpload(file);
+      }
+    } catch (error) {
+      console.error('Error picking document:', error);
     }
   };
 
@@ -64,10 +82,10 @@ export default function UploadModal({
             {/* Document Icon with Upload Arrow */}
             <View style={styles.iconContainer}>
               <View style={styles.documentIcon}>
-                <IconSymbol size={32} name="doc.text" color="#E5E7EB" />
+                <IconSymbol size={24} name="doc.text" color="#E5E7EB" />
               </View>
               <View style={styles.uploadArrowContainer}>
-                <IconSymbol size={16} name="arrow.up" color="#FFFFFF" />
+                <IconSymbol size={12} name="arrow.up" color="#FFFFFF" />
               </View>
             </View>
 
@@ -92,7 +110,7 @@ export default function UploadModal({
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <>
-                    <IconSymbol size={20} name="arrow.up.circle" color="#FFFFFF" />
+                    <IconSymbol size={16} name="arrow.up.circle" color="#FFFFFF" />
                     <Text style={styles.uploadButtonText}>
                       {uploadMode === 'phone' ? 'Upload PDF' : 'Upload from URL'}
                     </Text>
@@ -106,7 +124,7 @@ export default function UploadModal({
                 onPress={() => setShowDropdown(!showDropdown)}
                 disabled={isLoading}
               >
-                <IconSymbol size={16} name="chevron.down" color="#FFFFFF" />
+                <IconSymbol size={12} name="chevron.down" color="#FFFFFF" />
               </TouchableOpacity>
             </View>
 
@@ -133,7 +151,7 @@ export default function UploadModal({
                   style={styles.dropdownOption}
                   onPress={() => handleDropdownOptionPress('phone')}
                 >
-                  <IconSymbol size={16} name="phone" color="#4B5563" />
+                  <IconSymbol size={14} name="phone" color="#4B5563" />
                   <Text style={styles.dropdownOptionText}>From phone</Text>
                 </TouchableOpacity>
                 
@@ -143,7 +161,7 @@ export default function UploadModal({
                   style={styles.dropdownOption}
                   onPress={() => handleDropdownOptionPress('url')}
                 >
-                  <IconSymbol size={16} name="link" color="#4B5563" />
+                  <IconSymbol size={14} name="link" color="#4B5563" />
                   <Text style={styles.dropdownOptionText}>From URL</Text>
                 </TouchableOpacity>
               </View>
@@ -165,9 +183,9 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    width: '100%',
-    maxWidth: 400,
+    borderRadius: 12,
+    width: '90%',
+    maxWidth: 320,
     position: 'relative',
   },
   closeButton: {
@@ -183,26 +201,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   uploadArea: {
-    padding: 40,
+    padding: 24,
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#8B5CF6',
     borderStyle: 'dashed',
     borderRadius: 12,
-    margin: 20,
+    margin: 16,
     backgroundColor: '#F8F4FF',
-    minHeight: 300,
+    minHeight: 220,
     justifyContent: 'center',
+    position: 'relative',
   },
   iconContainer: {
     position: 'relative',
     marginBottom: 24,
   },
   documentIcon: {
-    width: 64,
-    height: 80,
+    width: 48,
+    height: 60,
     backgroundColor: '#F3F4F6',
-    borderRadius: 8,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000000',
@@ -216,12 +235,12 @@ const styles = StyleSheet.create({
   },
   uploadArrowContainer: {
     position: 'absolute',
-    bottom: -8,
-    right: -8,
-    width: 32,
-    height: 32,
+    bottom: -6,
+    right: -6,
+    width: 24,
+    height: 24,
     backgroundColor: '#1F2937',
-    borderRadius: 16,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000000',
@@ -234,19 +253,19 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   uploadText: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 12,
+    marginBottom: 8,
     textAlign: 'center',
     fontFamily: 'Inter',
   },
   statusText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#6B7280',
     textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 20,
+    marginBottom: 20,
+    lineHeight: 16,
     fontFamily: 'Inter',
   },
   uploadButtonContainer: {
@@ -264,24 +283,24 @@ const styles = StyleSheet.create({
   },
   uploadButton: {
     backgroundColor: '#8B5CF6',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     flex: 1,
   },
   uploadButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     fontFamily: 'Inter',
   },
   dropdownArrow: {
     backgroundColor: '#8B5CF6',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     borderLeftWidth: 1,
     borderLeftColor: '#FFFFFF',
     alignItems: 'center',
@@ -304,14 +323,14 @@ const styles = StyleSheet.create({
   },
   dropdownContainer: {
     position: 'absolute',
-    top: '100%',
-    left: 20,
-    right: 20,
+    top: 56,
+    left: 0,
+    right: 0,
     backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    marginTop: 4,
+    marginTop: 2,
     shadowColor: '#000000',
     shadowOffset: {
       width: 0,
@@ -325,12 +344,12 @@ const styles = StyleSheet.create({
   dropdownOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
   },
   dropdownOptionText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#4B5563',
     fontFamily: 'Inter',
   },
