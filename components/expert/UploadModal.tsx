@@ -323,14 +323,14 @@ const styles = StyleSheet.create({
   },
   dropdownContainer: {
     position: 'absolute',
-    top: 56,
+    top: '100%',
     left: 0,
     right: 0,
     backgroundColor: '#FFFFFF',
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    marginTop: 2,
+    marginTop: 4,
     shadowColor: '#000000',
     shadowOffset: {
       width: 0,
