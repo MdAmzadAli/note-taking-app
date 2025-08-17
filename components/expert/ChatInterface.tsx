@@ -9,7 +9,9 @@ import {
   Platform, 
   TextInput, 
   ScrollView,
-  KeyboardAvoidingView 
+  KeyboardAvoidingView,
+  Modal,
+  ActivityIndicator
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 
@@ -53,6 +55,7 @@ interface ChatInterfaceProps {
   onFilePreview: (file: SingleFile) => void;
   onDeleteWorkspaceFile?: (workspaceId: string, fileId: string) => void;
   onAddWorkspaceFile?: (workspaceId: string) => void;
+  isLoading?: boolean;
 }
 
 export default function ChatInterface({
@@ -65,9 +68,12 @@ export default function ChatInterface({
   onBack,
   onFilePreview,
   onDeleteWorkspaceFile,
-  onAddWorkspaceFile
+  onAddWorkspaceFile,
+  isLoading = false
 }: ChatInterfaceProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState<{workspaceId: string, fileId: string} | null>(null);
   const getFileSize = (file: SingleFile) => {
     if (!file.size) return 'Unknown';
     const kb = file.size / 1024;
@@ -76,6 +82,24 @@ export default function ChatInterface({
     if (mb > 10) return 'Large File';
     if (mb > 2) return 'Medium File';
     return 'Small File';
+  };
+
+  const handleDeletePress = (workspaceId: string, fileId: string) => {
+    setFileToDelete({ workspaceId, fileId });
+    setShowDeleteConfirmation(true);
+  };
+
+  const confirmDelete = () => {
+    if (fileToDelete && onDeleteWorkspaceFile) {
+      onDeleteWorkspaceFile(fileToDelete.workspaceId, fileToDelete.fileId);
+    }
+    setShowDeleteConfirmation(false);
+    setFileToDelete(null);
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirmation(false);
+    setFileToDelete(null);
   };
 
   return (
@@ -191,7 +215,7 @@ export default function ChatInterface({
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={styles.deleteFileButton}
-                      onPress={() => onDeleteWorkspaceFile?.(selectedWorkspace.id, file.id)}
+                      onPress={() => handleDeletePress(selectedWorkspace.id, file.id)}
                     >
                       <IconSymbol size={16} name="trash" color="#FF4444" />
                     </TouchableOpacity>
@@ -202,14 +226,18 @@ export default function ChatInterface({
                 <TouchableOpacity 
                   style={[
                     styles.addFileButton, 
-                    { opacity: selectedWorkspace.files.length >= 5 ? 0.5 : 1 }
+                    { opacity: (selectedWorkspace.files.length >= 5 || isLoading) ? 0.5 : 1 }
                   ]}
-                  disabled={selectedWorkspace.files.length >= 5}
+                  disabled={selectedWorkspace.files.length >= 5 || isLoading}
                   onPress={() => onAddWorkspaceFile?.(selectedWorkspace.id)}
                 >
-                  <IconSymbol size={16} name="plus" color="#007AFF" />
+                  {isLoading ? (
+                    <ActivityIndicator size={16} color="#007AFF" />
+                  ) : (
+                    <IconSymbol size={16} name="plus" color="#007AFF" />
+                  )}
                   <Text style={styles.addFileText}>
-                    Add File ({selectedWorkspace.files.length}/5)
+                    {isLoading ? 'Adding...' : `Add File (${selectedWorkspace.files.length}/5)`}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -282,6 +310,37 @@ export default function ChatInterface({
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={showDeleteConfirmation}
+        transparent
+        animationType="fade"
+        onRequestClose={cancelDelete}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmationModal}>
+            <Text style={styles.confirmationTitle}>Delete File</Text>
+            <Text style={styles.confirmationText}>
+              Are you sure you want to remove this file from the workspace?
+            </Text>
+            <View style={styles.confirmationButtons}>
+              <TouchableOpacity 
+                style={[styles.confirmationButton, styles.cancelButton]}
+                onPress={cancelDelete}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.confirmationButton, styles.deleteButton]}
+                onPress={confirmDelete}
+              >
+                <Text style={styles.deleteButtonText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -574,6 +633,60 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#007AFF',
     marginLeft: 6,
+    fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmationModal: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 12,
+    padding: 20,
+    marginHorizontal: 20,
+    minWidth: 280,
+  },
+  confirmationTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  confirmationText: {
+    fontSize: 14,
+    color: '#CCCCCC',
+    marginBottom: 20,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  confirmationButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  confirmationButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#333333',
+  },
+  deleteButton: {
+    backgroundColor: '#FF4444',
+  },
+  cancelButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  deleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '500',
   },
 });

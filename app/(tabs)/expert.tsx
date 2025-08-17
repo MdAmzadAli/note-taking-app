@@ -437,7 +437,6 @@ export default function ExpertTab() {
         onFilePreview={openFilePreview}
         onDeleteWorkspaceFile={handleDeleteWorkspaceFile}
         onAddWorkspaceFile={handleAddWorkspaceFile}
-        isBackendConnected={isBackendConnected}
         isLoading={isLoading}
       />
     );
