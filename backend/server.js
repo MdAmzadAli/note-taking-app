@@ -547,17 +547,27 @@ app.post('/rag/index/:id', async (req, res) => {
       return res.status(400).json({ error: 'Only PDF files can be indexed' });
     }
 
+    // Get Cloudinary data if available
+    let cloudinaryData = null;
+    try {
+      const fileUrls = await fileService.getFileUrls(id);
+      cloudinaryData = fileUrls?.urls || null;
+    } catch (error) {
+      console.log('⚠️ No Cloudinary data available for file:', id);
+    }
+
     const result = await ragService.indexDocument(
       id, 
       fileInfo.path, 
       fileInfo.originalName,
-      workspaceId
+      workspaceId,
+      cloudinaryData
     );
 
     res.json({
-      success: true,
-      message: 'Document indexed successfully',
-      chunksCount: result.chunksCount
+      success: result.success,
+      message: result.success ? 'Document indexed successfully' : result.message || 'Indexing failed',
+      chunksCount: result.chunksCount || 0
     });
 
   } catch (error) {

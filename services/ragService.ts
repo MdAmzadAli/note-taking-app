@@ -17,6 +17,10 @@ export interface RAGSource {
   chunkIndex: number;
   originalText: string;
   relevanceScore: number;
+  estimatedPage?: number;
+  pageUrl?: string;
+  cloudinaryUrl?: string;
+  thumbnailUrl?: string;
 }
 
 export interface IndexResponse {

@@ -120,8 +120,8 @@ export default function ChatInterface({
         const health = await ragService.checkHealth();
         setRagHealth(health);
         
-        if (health.status === 'healthy') {
-          // Auto-index documents if not already indexed
+        if (health.status === 'healthy' || health.status === 'degraded') {
+          // Auto-index documents if RAG is available
           if (selectedFile) {
             try {
               await ragService.indexDocument(selectedFile.id);
@@ -142,6 +142,7 @@ export default function ChatInterface({
         }
       } catch (error) {
         console.error('RAG initialization failed:', error);
+        setRagHealth({ status: 'error', qdrant: false, gemini: false });
       }
     };
 
@@ -375,7 +376,7 @@ export default function ChatInterface({
             <TouchableOpacity 
               style={styles.pdfSendButton} 
               onPress={() => {
-                if (ragHealth.status === 'healthy' && onSendRAGMessage) {
+                if ((ragHealth.status === 'healthy' || ragHealth.status === 'degraded') && onSendRAGMessage) {
                   onSendRAGMessage(currentMessage);
                 } else {
                   onSendMessage();
@@ -452,7 +453,7 @@ export default function ChatInterface({
                 <View key={source.id} style={styles.sourceItem}>
                   <View style={styles.sourceHeader}>
                     <Text style={styles.sourceFileName}>
-                      📄 {source.fileName}
+                      📄 {source.fileName} {source.estimatedPage ? `(Page ${source.estimatedPage})` : ''}
                     </Text>
                     <Text style={styles.sourceScore}>
                       {Math.round(source.relevanceScore * 100)}% match
@@ -463,6 +464,17 @@ export default function ChatInterface({
                       {source.originalText}
                     </Text>
                   </View>
+                  {source.pageUrl && (
+                    <TouchableOpacity 
+                      style={styles.viewPageButton}
+                      onPress={() => {
+                        // You can implement page viewing here
+                        console.log('View page:', source.pageUrl);
+                      }}
+                    >
+                      <Text style={styles.viewPageText}>View Page</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               ))}
             </ScrollView>
@@ -905,5 +917,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#CCCCCC',
     lineHeight: 20,
+  },
+  viewPageButton: {
+    marginTop: 12,
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  viewPageText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

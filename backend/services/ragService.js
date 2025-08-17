@@ -17,25 +17,37 @@ class RAGService {
 
   async initialize() {
     try {
-      // Initialize Qdrant client
-      this.qdrant =new QdrantClient({
-            url: process.env.QDRANT_URL,
-            apiKey: process.env.QDRANT_API_KEY,
+      // Check if required environment variables are available
+      if (!process.env.QDRANT_URL && !process.env.GEMINI_API_KEY) {
+        console.warn('⚠️ RAG environment variables not configured, running in mock mode');
+        this.isInitialized = false;
+        return;
+      }
+
+      // Initialize Qdrant client only if URL is provided
+      if (process.env.QDRANT_URL) {
+        this.qdrant = new QdrantClient({
+          url: process.env.QDRANT_URL,
+          apiKey: process.env.QDRANT_API_KEY,
         });
+      }
 
       // Initialize Gemini AI
       if (process.env.GEMINI_API_KEY) {
         this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
       }
 
-      // Create collection if it doesn't exist
-      await this.ensureCollection();
+      // Only create collection if Qdrant is available
+      if (this.qdrant) {
+        await this.ensureCollection();
+      }
       
       this.isInitialized = true;
       console.log('✅ RAG Service initialized successfully');
     } catch (error) {
       console.error('❌ RAG Service initialization failed:', error);
-      throw error;
+      this.isInitialized = false;
+      // Don't throw error, allow app to continue without RAG
     }
   }
 
@@ -146,9 +158,14 @@ class RAGService {
   }
 
   // Index a document
-  async indexDocument(fileId, filePath, fileName, workspaceId = null) {
+  async indexDocument(fileId, filePath, fileName, workspaceId = null, cloudinaryData = null) {
     try {
       console.log(`🔄 Indexing document: ${fileName}`);
+
+      if (!this.isInitialized || !this.qdrant) {
+        console.warn('⚠️ RAG service not properly initialized, skipping indexing');
+        return { chunksCount: 0, success: false, message: 'RAG service not available' };
+      }
 
       // Extract text from PDF
       const text = await this.extractTextFromPDF(filePath);
@@ -162,7 +179,8 @@ class RAGService {
         fileId,
         fileName,
         workspaceId,
-        filePath
+        filePath,
+        cloudinaryData
       });
 
       console.log(`📄 Created ${chunks.length} chunks for ${fileName}`);
@@ -172,6 +190,10 @@ class RAGService {
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
         const embedding = await this.generateEmbedding(chunk.text);
+        
+        // Calculate which page this chunk likely belongs to
+        const estimatedPage = Math.ceil((chunk.metadata.chunkIndex + 1) / 2); // Rough estimate
+        const pageUrl = cloudinaryData?.pageUrls?.[estimatedPage - 1] || cloudinaryData?.secureUrl;
         
         points.push({
           id: `${fileId}_chunk_${i}`,
@@ -183,6 +205,10 @@ class RAGService {
             chunkIndex: i,
             workspaceId: workspaceId,
             totalChunks: chunks.length,
+            estimatedPage: estimatedPage,
+            pageUrl: pageUrl,
+            cloudinaryUrl: cloudinaryData?.secureUrl,
+            thumbnailUrl: cloudinaryData?.thumbnailUrl,
             ...chunk.metadata
           }
         });
@@ -265,7 +291,11 @@ class RAGService {
           fileId: result.payload.fileId,
           fileName: result.payload.fileName,
           chunkIndex: result.payload.chunkIndex,
-          workspaceId: result.payload.workspaceId
+          workspaceId: result.payload.workspaceId,
+          estimatedPage: result.payload.estimatedPage,
+          pageUrl: result.payload.pageUrl,
+          cloudinaryUrl: result.payload.cloudinaryUrl,
+          thumbnailUrl: result.payload.thumbnailUrl
         }
       }));
 
@@ -325,14 +355,18 @@ Answer:`;
       const result = await model.generateContent(prompt);
       const answer = result.response.text();
 
-      // Prepare sources with original text
+      // Prepare sources with original text and page references
       const sources = relevantChunks.map((chunk, index) => ({
         id: `source_${index + 1}`,
         fileName: chunk.metadata.fileName,
         fileId: chunk.metadata.fileId,
         chunkIndex: chunk.metadata.chunkIndex,
         originalText: chunk.text,
-        relevanceScore: chunk.score
+        relevanceScore: chunk.score,
+        estimatedPage: chunk.metadata.estimatedPage || 1,
+        pageUrl: chunk.metadata.pageUrl,
+        cloudinaryUrl: chunk.metadata.cloudinaryUrl,
+        thumbnailUrl: chunk.metadata.thumbnailUrl
       }));
 
       console.log(`✅ Generated answer with ${sources.length} sources`);
@@ -352,10 +386,23 @@ Answer:`;
   // Health check
   async healthCheck() {
     try {
-      await this.qdrant.getCollections();
+      if (!this.isInitialized) {
+        return { 
+          status: 'degraded', 
+          qdrant: false, 
+          gemini: false,
+          initialized: false,
+          message: 'RAG service not configured (missing environment variables)'
+        };
+      }
+
+      if (this.qdrant) {
+        await this.qdrant.getCollections();
+      }
+
       return { 
-        status: 'healthy', 
-        qdrant: true, 
+        status: this.qdrant ? 'healthy' : 'degraded', 
+        qdrant: !!this.qdrant, 
         gemini: !!this.gemini,
         initialized: this.isInitialized 
       };
