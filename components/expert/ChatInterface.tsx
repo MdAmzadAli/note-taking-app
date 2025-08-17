@@ -14,6 +14,7 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import FilePreviewModal from './FilePreviewModal';
 
 interface SingleFile {
   id: string;
@@ -52,7 +53,7 @@ interface ChatInterfaceProps {
   setCurrentMessage: (message: string) => void;
   onSendMessage: () => void;
   onBack: () => void;
-  onFilePreview: (file: SingleFile) => void;
+  onFilePreview?: (file: SingleFile) => void;
   onDeleteWorkspaceFile?: (workspaceId: string, fileId: string) => void;
   onAddWorkspaceFile?: (workspaceId: string) => void;
   isLoading?: boolean;
@@ -74,6 +75,8 @@ export default function ChatInterface({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<{workspaceId: string, fileId: string} | null>(null);
+  const [isFilePreviewVisible, setIsFilePreviewVisible] = useState(false);
+  const [previewFile, setPreviewFile] = useState<SingleFile | null>(null);
   const getFileSize = (file: SingleFile) => {
     if (!file.size) return 'Unknown';
     const kb = file.size / 1024;
@@ -100,6 +103,17 @@ export default function ChatInterface({
   const cancelDelete = () => {
     setShowDeleteConfirmation(false);
     setFileToDelete(null);
+  };
+
+  const handleFilePreview = (file: SingleFile) => {
+    console.log('🔍 Opening file preview in chat interface for:', {
+      fileName: file.name,
+      mimetype: file.mimetype,
+      isUploaded: file.isUploaded,
+      fileId: file.id
+    });
+    setPreviewFile(file);
+    setIsFilePreviewVisible(true);
   };
 
   return (
@@ -139,7 +153,7 @@ export default function ChatInterface({
         {selectedFile && !selectedWorkspace && (
           <TouchableOpacity 
             style={styles.pdfFileInfoSection}
-            onPress={() => onFilePreview(selectedFile)}
+            onPress={() => handleFilePreview(selectedFile)}
           >
             <View style={styles.pdfFileInfoLeft}>
               <View style={styles.pdfFileIconContainer}>
@@ -199,7 +213,7 @@ export default function ChatInterface({
                   <View key={file.id} style={styles.workspaceFileItem}>
                     <TouchableOpacity 
                       style={styles.workspaceFileInfo}
-                      onPress={() => onFilePreview(file)}
+                      onPress={() => handleFilePreview(file)}
                     >
                       <View style={styles.workspaceFileIconContainer}>
                         <IconSymbol size={16} name="doc.text" color="#FFFFFF" />
@@ -341,6 +355,16 @@ export default function ChatInterface({
           </View>
         </View>
       </Modal>
+
+      {/* File Preview Modal */}
+      <FilePreviewModal
+        isVisible={isFilePreviewVisible}
+        file={previewFile}
+        onClose={() => {
+          setIsFilePreviewVisible(false);
+          setPreviewFile(null);
+        }}
+      />
     </SafeAreaView>
   );
 }

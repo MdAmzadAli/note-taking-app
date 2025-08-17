@@ -434,7 +434,6 @@ export default function ExpertTab() {
         setCurrentMessage={setCurrentMessage}
         onSendMessage={sendMessage}
         onBack={() => setIsChatVisible(false)}
-        onFilePreview={openFilePreview}
         onDeleteWorkspaceFile={handleDeleteWorkspaceFile}
         onAddWorkspaceFile={handleAddWorkspaceFile}
         isLoading={isLoading}
