@@ -309,6 +309,7 @@ const styles = StyleSheet.create({
   urlInputContainer: {
     width: '100%',
     marginTop: 16,
+    // height:40,
   },
   urlInput: {
     backgroundColor: '#FFFFFF',
@@ -324,13 +325,14 @@ const styles = StyleSheet.create({
   dropdownContainer: {
     position: 'absolute',
     top: '100%',
-    left: 0,
+    left: 22,
     right: 0,
+    width:'103%',
     backgroundColor: '#FFFFFF',
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    marginTop: 4,
+    marginTop: 25,
     shadowColor: '#000000',
     shadowOffset: {
       width: 0,
@@ -345,11 +347,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 6,
     gap: 8,
   },
   dropdownOptionText: {
-    fontSize: 14,
+    fontSize: 10,
     color: '#4B5563',
     fontFamily: 'Inter',
   },
