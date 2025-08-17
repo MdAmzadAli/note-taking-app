@@ -1,12 +1,13 @@
 
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, TextInput } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 
 interface UploadModalProps {
   isVisible: boolean;
   onClose: () => void;
   onUpload: () => void;
+  onUploadFromUrl?: (url: string) => void;
   isBackendConnected: boolean;
   isLoading: boolean;
 }
@@ -15,15 +16,46 @@ export default function UploadModal({
   isVisible,
   onClose,
   onUpload,
+  onUploadFromUrl,
   isBackendConnected,
   isLoading
 }: UploadModalProps) {
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [uploadMode, setUploadMode] = useState<'phone' | 'url'>('phone');
+  const [urlInput, setUrlInput] = useState('');
+
+  const handleMainButtonPress = () => {
+    if (uploadMode === 'phone') {
+      onUpload();
+    } else {
+      // Handle URL upload
+      if (urlInput.trim() && onUploadFromUrl) {
+        onUploadFromUrl(urlInput.trim());
+      }
+    }
+  };
+
+  const handleDropdownOptionPress = (mode: 'phone' | 'url') => {
+    setUploadMode(mode);
+    setShowDropdown(false);
+    if (mode === 'phone') {
+      setUrlInput('');
+    }
+  };
+
+  const handleClose = () => {
+    setShowDropdown(false);
+    setUploadMode('phone');
+    setUrlInput('');
+    onClose();
+  };
+
   return (
     <Modal visible={isVisible} transparent animationType="fade">
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           {/* Close button */}
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
             <IconSymbol size={24} name="xmark" color="#666666" />
           </TouchableOpacity>
 
@@ -49,22 +81,73 @@ export default function UploadModal({
                 : 'Backend is offline. File will be stored locally.'}
             </Text>
 
-            {/* Upload Button */}
-            <TouchableOpacity 
-              style={[styles.uploadButton, { opacity: isLoading ? 0.7 : 1 }]} 
-              onPress={onUpload}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <IconSymbol size={20} name="arrow.up.circle" color="#FFFFFF" />
-                  <Text style={styles.uploadButtonText}>Upload PDF</Text>
-                  <IconSymbol size={16} name="chevron.down" color="#FFFFFF" />
-                </>
-              )}
-            </TouchableOpacity>
+            {/* Upload Button with Dropdown */}
+            <View style={styles.uploadButtonContainer}>
+              <TouchableOpacity 
+                style={[styles.uploadButton, { opacity: isLoading ? 0.7 : 1 }]} 
+                onPress={handleMainButtonPress}
+                disabled={isLoading || (uploadMode === 'url' && !urlInput.trim())}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <IconSymbol size={20} name="arrow.up.circle" color="#FFFFFF" />
+                    <Text style={styles.uploadButtonText}>
+                      {uploadMode === 'phone' ? 'Upload PDF' : 'Upload from URL'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              
+              {/* Dropdown Arrow */}
+              <TouchableOpacity 
+                style={styles.dropdownArrow}
+                onPress={() => setShowDropdown(!showDropdown)}
+                disabled={isLoading}
+              >
+                <IconSymbol size={16} name="chevron.down" color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+
+            {/* URL Input Field (shown when uploadMode is 'url') */}
+            {uploadMode === 'url' && (
+              <View style={styles.urlInputContainer}>
+                <TextInput
+                  style={styles.urlInput}
+                  value={urlInput}
+                  onChangeText={setUrlInput}
+                  placeholder="Enter PDF URL..."
+                  placeholderTextColor="#999999"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                />
+              </View>
+            )}
+
+            {/* Dropdown Options */}
+            {showDropdown && (
+              <View style={styles.dropdownContainer}>
+                <TouchableOpacity 
+                  style={styles.dropdownOption}
+                  onPress={() => handleDropdownOptionPress('phone')}
+                >
+                  <IconSymbol size={16} name="phone" color="#4B5563" />
+                  <Text style={styles.dropdownOptionText}>From phone</Text>
+                </TouchableOpacity>
+                
+                <View style={styles.dropdownSeparator} />
+                
+                <TouchableOpacity 
+                  style={styles.dropdownOption}
+                  onPress={() => handleDropdownOptionPress('url')}
+                >
+                  <IconSymbol size={16} name="link" color="#4B5563" />
+                  <Text style={styles.dropdownOptionText}>From URL</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -166,16 +249,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontFamily: 'Inter',
   },
-  uploadButton: {
-    backgroundColor: '#8B5CF6',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
+  uploadButtonContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    minWidth: 180,
+    borderRadius: 12,
+    overflow: 'hidden',
     shadowColor: '#8B5CF6',
     shadowOffset: {
       width: 0,
@@ -185,10 +262,81 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
+  uploadButton: {
+    backgroundColor: '#8B5CF6',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    flex: 1,
+  },
   uploadButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
     fontFamily: 'Inter',
+  },
+  dropdownArrow: {
+    backgroundColor: '#8B5CF6',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderLeftWidth: 1,
+    borderLeftColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  urlInputContainer: {
+    width: '100%',
+    marginTop: 16,
+  },
+  urlInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#1F2937',
+    fontFamily: 'Inter',
+  },
+  dropdownContainer: {
+    position: 'absolute',
+    top: '100%',
+    left: 20,
+    right: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    marginTop: 4,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 1000,
+  },
+  dropdownOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  dropdownOptionText: {
+    fontSize: 16,
+    color: '#4B5563',
+    fontFamily: 'Inter',
+  },
+  dropdownSeparator: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginHorizontal: 16,
   },
 });
