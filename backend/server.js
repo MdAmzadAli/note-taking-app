@@ -16,6 +16,7 @@ const fileService = require('./services/fileService');
 const pdfService = require('./services/pdfService');
 const csvService = require('./services/csvService');
 const imageService = require('./services/imageService');
+const ragService = require('./services/ragService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -531,9 +532,110 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
 });
 
+// RAG endpoints
+app.post('/rag/index/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { workspaceId } = req.body;
+    
+    const fileInfo = await fileService.getFileMetadata(id);
+    if (!fileInfo) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    if (fileInfo.mimetype !== 'application/pdf') {
+      return res.status(400).json({ error: 'Only PDF files can be indexed' });
+    }
+
+    const result = await ragService.indexDocument(
+      id, 
+      fileInfo.path, 
+      fileInfo.originalName,
+      workspaceId
+    );
+
+    res.json({
+      success: true,
+      message: 'Document indexed successfully',
+      chunksCount: result.chunksCount
+    });
+
+  } catch (error) {
+    console.error('❌ RAG indexing error:', error);
+    res.status(500).json({ 
+      error: 'Failed to index document', 
+      details: error.message 
+    });
+  }
+});
+
+app.delete('/rag/index/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await ragService.removeDocument(id);
+    
+    res.json({
+      success: true,
+      message: 'Document removed from index'
+    });
+
+  } catch (error) {
+    console.error('❌ RAG removal error:', error);
+    res.status(500).json({ 
+      error: 'Failed to remove document from index', 
+      details: error.message 
+    });
+  }
+});
+
+app.post('/rag/query', async (req, res) => {
+  try {
+    const { query, fileIds, workspaceId } = req.body;
+
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
+
+    const result = await ragService.generateAnswer(query, fileIds, workspaceId);
+
+    res.json({
+      success: true,
+      answer: result.answer,
+      sources: result.sources,
+      confidence: result.confidence
+    });
+
+  } catch (error) {
+    console.error('❌ RAG query error:', error);
+    res.status(500).json({ 
+      error: 'Failed to process query', 
+      details: error.message 
+    });
+  }
+});
+
+app.get('/rag/health', async (req, res) => {
+  try {
+    const health = await ragService.healthCheck();
+    res.json(health);
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'error', 
+      message: error.message 
+    });
+  }
+});
+
 // Start server
 async function startServer() {
   await ensureDirectories();
+  
+  // Initialize RAG service
+  try {
+    await ragService.initialize();
+  } catch (error) {
+    console.warn('⚠️ RAG service initialization failed, continuing without RAG features');
+  }
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 File Preview API running on http://0.0.0.0:${PORT}`);

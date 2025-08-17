@@ -19,6 +19,9 @@ import WorkspaceModal from '../../components/expert/WorkspaceModal';
 import ChatInterface from '../../components/expert/ChatInterface';
 import FilePreviewModal from '../../components/expert/FilePreviewModal';
 
+// Import RAG service
+import { ragService } from '../../services/ragService';
+
 interface SingleFile {
   id: string;
   name: string;
@@ -42,6 +45,14 @@ interface Workspace {
   createdDate: string;
 }
 
+interface ChatMessage {
+  user: string;
+  ai: string;
+  sources?: string[];
+  isLoading?: boolean;
+}
+
+
 export default function ExpertTab() {
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [isUploadModalVisible, setIsUploadModalVisible] = useState(false);
@@ -54,7 +65,7 @@ export default function ExpertTab() {
   const [workspaceName, setWorkspaceName] = useState('');
   const [singleFiles, setSingleFiles] = useState<SingleFile[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [chatMessages, setChatMessages] = useState<{user: string, ai: string, sources?: string[]}[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isBackendConnected, setIsBackendConnected] = useState(false);
@@ -269,7 +280,7 @@ export default function ExpertTab() {
           await saveData(singleFiles, updatedWorkspaces);
           setWorkspaceName('');
           setIsWorkspaceModalVisible(false);
-          
+
           // Navigate directly to the created workspace
           openWorkspaceChat(newWorkspace);
         } else {
@@ -310,28 +321,78 @@ export default function ExpertTab() {
     closeMenu();
   };
 
-  const sendMessage = () => {
+  const handleSendMessage = () => {
     if (!currentMessage.trim()) return;
 
-    const aiResponses = [
-      "According to the information provided in the document, the total fare for the ticket is 407.25, which includes the ticket fare of 395.00, the IRCTC Convenience Fee (including GST) of 11.80, and the Travel Insurance Premium (including GST) of 0.45.",
-      "Travel insurance is a type of insurance policy that provides coverage for various risks and expenses that may arise during a trip. Some common benefits of travel insurance include:\n\n- Trip cancellation or interruption coverage",
-      "Based on the document content, I can provide you with detailed information about the specific topic you're asking about. The document contains comprehensive details that directly address your question.",
-      "The information in this PDF indicates that the specific details you're looking for can be found in the document. Let me extract the relevant information for you.",
-    ];
-
-    const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)];
-
-    const sources = selectedFile
-      ? [selectedFile.name]
-      : selectedWorkspace?.files.map(f => f.name) || [];
-
-    setChatMessages(prev => [...prev, {
+    const newMessage: ChatMessage = {
       user: currentMessage,
-      ai: randomResponse,
-      sources
-    }]);
+      ai: "I'm analyzing your document. This feature will be enhanced with AI capabilities soon.",
+    };
+
+    setChatMessages(prev => [...prev, newMessage]);
     setCurrentMessage('');
+  };
+
+  const handleSendRAGMessage = async (message: string) => {
+    if (!message.trim()) return;
+
+    // Add user message and loading AI message
+    const loadingMessage: ChatMessage = {
+      user: message,
+      ai: '',
+      isLoading: true
+    };
+
+    setChatMessages(prev => [...prev, loadingMessage]);
+    setCurrentMessage('');
+
+    try {
+      // Determine context for RAG query
+      let fileIds: string[] | undefined;
+      let workspaceId: string | undefined;
+
+      if (selectedFile) {
+        fileIds = [selectedFile.id];
+      } else if (selectedWorkspace) {
+        fileIds = selectedWorkspace.files.map(f => f.id);
+        workspaceId = selectedWorkspace.id;
+      }
+
+      // Query RAG service
+      const response = await ragService.queryDocuments(message, fileIds, workspaceId);
+
+      // Update message with response
+      setChatMessages(prev => 
+        prev.map((msg, index) => 
+          index === prev.length - 1 
+            ? {
+                ...msg,
+                ai: response.success 
+                  ? response.answer || 'No response generated'
+                  : response.error || 'Failed to generate response',
+                sources: response.sources || [],
+                isLoading: false
+              }
+            : msg
+        )
+      );
+
+    } catch (error) {
+      console.error('RAG message error:', error);
+
+      // Update with error message
+      setChatMessages(prev => 
+        prev.map((msg, index) => 
+          index === prev.length - 1 
+            ? {
+                ...msg,
+                ai: 'Sorry, I encountered an error while processing your request. Please try again.',
+                isLoading: false
+              }
+            : msg
+        )
+      );
+    }
   };
 
   const handleDeleteWorkspaceFile = async (workspaceId: string, fileId: string) => {
@@ -426,6 +487,20 @@ export default function ExpertTab() {
     }
   };
 
+  // Handlers for navigating back from chat or preview
+  const handleBackToFiles = () => {
+    setSelectedFile(null);
+    setSelectedWorkspace(null);
+    setChatMessages([]);
+    setIsChatVisible(false);
+  };
+
+  const handleFilePreview = (file: SingleFile) => {
+    setPreviewFile(file);
+    setIsFilePreviewVisible(true);
+  };
+
+
   if (isChatVisible) {
     return (
       <ChatInterface
@@ -434,8 +509,10 @@ export default function ExpertTab() {
         chatMessages={chatMessages}
         currentMessage={currentMessage}
         setCurrentMessage={setCurrentMessage}
-        onSendMessage={sendMessage}
-        onBack={() => setIsChatVisible(false)}
+        onSendMessage={handleSendMessage}
+        onSendRAGMessage={handleSendRAGMessage}
+        onBack={handleBackToFiles}
+        onFilePreview={handleFilePreview}
         onDeleteWorkspaceFile={handleDeleteWorkspaceFile}
         onAddWorkspaceFile={handleAddWorkspaceFile}
         isLoading={isLoading}

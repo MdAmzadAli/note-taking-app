@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -11,10 +11,12 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Modal,
-  ActivityIndicator
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import FilePreviewModal from './FilePreviewModal';
+import { ragService, RAGSource } from '@/services/ragService';
 
 interface SingleFile {
   id: string;
@@ -42,7 +44,8 @@ interface Workspace {
 interface ChatMessage {
   user: string;
   ai: string;
-  sources?: string[];
+  sources?: RAGSource[];
+  isLoading?: boolean;
 }
 
 interface ChatInterfaceProps {
@@ -52,6 +55,7 @@ interface ChatInterfaceProps {
   currentMessage: string;
   setCurrentMessage: (message: string) => void;
   onSendMessage: () => void;
+  onSendRAGMessage?: (message: string) => Promise<void>;
   onBack: () => void;
   onFilePreview?: (file: SingleFile) => void;
   onDeleteWorkspaceFile?: (workspaceId: string, fileId: string) => void;
@@ -66,6 +70,7 @@ export default function ChatInterface({
   currentMessage,
   setCurrentMessage,
   onSendMessage,
+  onSendRAGMessage,
   onBack,
   onFilePreview,
   onDeleteWorkspaceFile,
@@ -77,6 +82,9 @@ export default function ChatInterface({
   const [fileToDelete, setFileToDelete] = useState<{workspaceId: string, fileId: string} | null>(null);
   const [isFilePreviewVisible, setIsFilePreviewVisible] = useState(false);
   const [previewFile, setPreviewFile] = useState<SingleFile | null>(null);
+  const [showSourceModal, setShowSourceModal] = useState(false);
+  const [selectedSources, setSelectedSources] = useState<RAGSource[]>([]);
+  const [ragHealth, setRagHealth] = useState({ status: 'unknown', qdrant: false, gemini: false });
   const getFileSize = (file: SingleFile) => {
     if (!file.size) return 'Unknown';
     const kb = file.size / 1024;
@@ -103,6 +111,46 @@ export default function ChatInterface({
   const cancelDelete = () => {
     setShowDeleteConfirmation(false);
     setFileToDelete(null);
+  };
+
+  // Check RAG health and index documents on mount
+  useEffect(() => {
+    const initializeRAG = async () => {
+      try {
+        const health = await ragService.checkHealth();
+        setRagHealth(health);
+        
+        if (health.status === 'healthy') {
+          // Auto-index documents if not already indexed
+          if (selectedFile) {
+            try {
+              await ragService.indexDocument(selectedFile.id);
+            } catch (error) {
+              console.log('Document may already be indexed:', error);
+            }
+          }
+          
+          if (selectedWorkspace) {
+            for (const file of selectedWorkspace.files) {
+              try {
+                await ragService.indexDocument(file.id, selectedWorkspace.id);
+              } catch (error) {
+                console.log('Document may already be indexed:', error);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('RAG initialization failed:', error);
+      }
+    };
+
+    initializeRAG();
+  }, [selectedFile, selectedWorkspace]);
+
+  const handleSourceClick = (sources: RAGSource[]) => {
+    setSelectedSources(sources);
+    setShowSourceModal(true);
   };
 
   const handleFilePreview = (file: SingleFile) => {
@@ -285,12 +333,26 @@ export default function ChatInterface({
               {/* AI Response */}
               <View style={styles.pdfAiMessageContainer}>
                 <View style={styles.pdfAiMessage}>
-                  <Text style={styles.pdfAiMessageText}>{msg.ai}</Text>
-                  {msg.sources && msg.sources.length > 0 && (
-                    <TouchableOpacity style={styles.pdfSourceButton}>
-                      <IconSymbol size={12} name="link" color="#007AFF" />
-                      <Text style={styles.pdfSourceText}>Source</Text>
-                    </TouchableOpacity>
+                  {msg.isLoading ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                      <Text style={styles.loadingText}>Analyzing documents...</Text>
+                    </View>
+                  ) : (
+                    <>
+                      <Text style={styles.pdfAiMessageText}>{msg.ai}</Text>
+                      {msg.sources && msg.sources.length > 0 && (
+                        <TouchableOpacity 
+                          style={styles.pdfSourceButton}
+                          onPress={() => handleSourceClick(msg.sources!)}
+                        >
+                          <IconSymbol size={12} name="link" color="#007AFF" />
+                          <Text style={styles.pdfSourceText}>
+                            {msg.sources.length} Source{msg.sources.length > 1 ? 's' : ''}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </>
                   )}
                 </View>
               </View>
@@ -312,10 +374,20 @@ export default function ChatInterface({
             />
             <TouchableOpacity 
               style={styles.pdfSendButton} 
-              onPress={onSendMessage}
-              disabled={!currentMessage.trim()}
+              onPress={() => {
+                if (ragHealth.status === 'healthy' && onSendRAGMessage) {
+                  onSendRAGMessage(currentMessage);
+                } else {
+                  onSendMessage();
+                }
+              }}
+              disabled={!currentMessage.trim() || isLoading}
             >
-              <IconSymbol size={20} name="arrow.up" color="#FFFFFF" />
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <IconSymbol size={20} name="arrow.up" color="#FFFFFF" />
+              )}
             </TouchableOpacity>
           </View>
           <View style={styles.pdfStrictlyFromFileContainer}>
@@ -352,6 +424,48 @@ export default function ChatInterface({
                 <Text style={styles.deleteButtonText}>Delete</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Source Citations Modal */}
+      <Modal
+        visible={showSourceModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowSourceModal(false)}
+      >
+        <View style={styles.sourceModalOverlay}>
+          <View style={styles.sourceModalContent}>
+            <View style={styles.sourceModalHeader}>
+              <Text style={styles.sourceModalTitle}>Source Citations</Text>
+              <TouchableOpacity 
+                style={styles.sourceCloseButton}
+                onPress={() => setShowSourceModal(false)}
+              >
+                <IconSymbol size={24} name="xmark" color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.sourceScrollView}>
+              {selectedSources.map((source, index) => (
+                <View key={source.id} style={styles.sourceItem}>
+                  <View style={styles.sourceHeader}>
+                    <Text style={styles.sourceFileName}>
+                      📄 {source.fileName}
+                    </Text>
+                    <Text style={styles.sourceScore}>
+                      {Math.round(source.relevanceScore * 100)}% match
+                    </Text>
+                  </View>
+                  <View style={styles.sourceTextContainer}>
+                    <Text style={styles.sourceText}>
+                      {source.originalText}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -712,5 +826,84 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '500',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  loadingText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    marginLeft: 8,
+  },
+  sourceModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'flex-end',
+  },
+  sourceModalContent: {
+    backgroundColor: '#1A1A1A',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+  },
+  sourceModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  sourceModalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  sourceCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#333333',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sourceScrollView: {
+    flex: 1,
+  },
+  sourceItem: {
+    margin: 16,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    padding: 16,
+  },
+  sourceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sourceFileName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    flex: 1,
+  },
+  sourceScore: {
+    fontSize: 12,
+    color: '#10B981',
+    fontWeight: '500',
+  },
+  sourceTextContainer: {
+    backgroundColor: '#333333',
+    borderRadius: 8,
+    padding: 12,
+  },
+  sourceText: {
+    fontSize: 14,
+    color: '#CCCCCC',
+    lineHeight: 20,
   },
 });
