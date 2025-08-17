@@ -16,6 +16,7 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -680,126 +681,132 @@ export default function ExpertTab() {
 
     return (
       <SafeAreaView style={styles.pdfChatContainer}>
-        {/* Custom Header */}
-        <View style={styles.pdfChatHeader}>
-          <TouchableOpacity onPress={() => setIsChatVisible(false)}>
-            <IconSymbol size={24} name="chevron.left" color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text style={styles.pdfChatHeaderTitle} numberOfLines={1}>
-            {selectedFile ? selectedFile.name : selectedWorkspace?.name}
-          </Text>
-          <TouchableOpacity>
-            <IconSymbol size={24} name="line.horizontal.3" color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
+        <KeyboardAvoidingView 
+          style={styles.pdfChatKeyboardContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          {/* Custom Header */}
+          <View style={styles.pdfChatHeader}>
+            <TouchableOpacity onPress={() => setIsChatVisible(false)}>
+              <IconSymbol size={24} name="chevron.left" color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={styles.pdfChatHeaderTitle} numberOfLines={1}>
+              {selectedFile ? selectedFile.name : selectedWorkspace?.name}
+            </Text>
+            <TouchableOpacity>
+              <IconSymbol size={24} name="line.horizontal.3" color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
 
-        {/* Tab Options */}
-        <View style={styles.pdfChatTabs}>
-          <TouchableOpacity style={[styles.pdfChatTab, styles.activePdfChatTab]}>
-            <Text style={[styles.pdfChatTabText, styles.activePdfChatTabText]}>Chat</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.pdfChatTab}>
-            <Text style={styles.pdfChatTabText}>Summary</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.pdfChatTab}>
-            <Text style={styles.pdfChatTabText}>Flashcards</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.pdfChatTab}>
-            <Text style={styles.pdfChatTabText}>Quiz</Text>
-          </TouchableOpacity>
-        </View>
+          {/* Tab Options */}
+          <View style={styles.pdfChatTabs}>
+            <TouchableOpacity style={[styles.pdfChatTab, styles.activePdfChatTab]}>
+              <Text style={[styles.pdfChatTabText, styles.activePdfChatTabText]}>Chat</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.pdfChatTab}>
+              <Text style={styles.pdfChatTabText}>Summary</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.pdfChatTab}>
+              <Text style={styles.pdfChatTabText}>Flashcards</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.pdfChatTab}>
+              <Text style={styles.pdfChatTabText}>Quiz</Text>
+            </TouchableOpacity>
+          </View>
 
-        {/* File Info Section */}
-        {selectedFile && (
-          <TouchableOpacity 
-            style={styles.pdfFileInfoSection}
-            onPress={() => openFilePreview(selectedFile)}
-          >
-            <View style={styles.pdfFileInfoLeft}>
-              <View style={styles.pdfFileIconContainer}>
-                <IconSymbol size={20} name="doc.text" color="#FFFFFF" />
-              </View>
-              <View style={styles.pdfFileDetails}>
-                <Text style={styles.pdfFileName} numberOfLines={1}>
-                  {selectedFile.name}
-                </Text>
-                <View style={styles.pdfFileStatus}>
-                  <Text style={styles.pdfFileType}>PDF</Text>
-                  <View style={styles.pdfIndexedBadge}>
-                    <IconSymbol size={12} name="checkmark" color="#FFFFFF" />
-                    <Text style={styles.pdfIndexedText}>FULLY INDEXED</Text>
+          {/* File Info Section */}
+          {selectedFile && (
+            <TouchableOpacity 
+              style={styles.pdfFileInfoSection}
+              onPress={() => openFilePreview(selectedFile)}
+            >
+              <View style={styles.pdfFileInfoLeft}>
+                <View style={styles.pdfFileIconContainer}>
+                  <IconSymbol size={20} name="doc.text" color="#FFFFFF" />
+                </View>
+                <View style={styles.pdfFileDetails}>
+                  <Text style={styles.pdfFileName} numberOfLines={1}>
+                    {selectedFile.name}
+                  </Text>
+                  <View style={styles.pdfFileStatus}>
+                    <Text style={styles.pdfFileType}>PDF</Text>
+                    <View style={styles.pdfIndexedBadge}>
+                      <IconSymbol size={12} name="checkmark" color="#FFFFFF" />
+                      <Text style={styles.pdfIndexedText}>FULLY INDEXED</Text>
+                    </View>
                   </View>
                 </View>
               </View>
-            </View>
-            <Text style={styles.pdfFileSizeText}>{getFileSize(selectedFile)}</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Chat Messages Container */}
-        <ScrollView 
-          style={styles.pdfChatMessagesContainer}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.pdfChatMessagesContent}
-        >
-          {/* Welcome Message */}
-          {chatMessages.length === 0 && (
-            <View style={styles.pdfWelcomeMessage}>
-              <Text style={styles.pdfWelcomeText}>Ask me anything</Text>
-            </View>
+              <Text style={styles.pdfFileSizeText}>{getFileSize(selectedFile)}</Text>
+            </TouchableOpacity>
           )}
 
-          {/* Chat Messages */}
-          {chatMessages.map((msg, index) => (
-            <View key={index} style={styles.pdfMessageGroup}>
-              {/* User Message */}
-              <View style={styles.pdfUserMessageContainer}>
-                <View style={styles.pdfUserMessage}>
-                  <Text style={styles.pdfUserMessageText}>{msg.user}</Text>
-                </View>
+          {/* Chat Messages Container */}
+          <ScrollView 
+            style={styles.pdfChatMessagesContainer}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.pdfChatMessagesContent}
+          >
+            {/* Welcome Message */}
+            {chatMessages.length === 0 && (
+              <View style={styles.pdfWelcomeMessage}>
+                <Text style={styles.pdfWelcomeText}>Ask me anything</Text>
               </View>
-              
-              {/* AI Response */}
-              <View style={styles.pdfAiMessageContainer}>
-                <View style={styles.pdfAiMessage}>
-                  <Text style={styles.pdfAiMessageText}>{msg.ai}</Text>
-                  {msg.sources && msg.sources.length > 0 && (
-                    <TouchableOpacity style={styles.pdfSourceButton}>
-                      <IconSymbol size={12} name="link" color="#007AFF" />
-                      <Text style={styles.pdfSourceText}>Source</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            </View>
-          ))}
-        </ScrollView>
+            )}
 
-        {/* Chat Input Section */}
-        <View style={styles.pdfChatInputContainer}>
-          <View style={styles.pdfChatInputWrapper}>
-            <TextInput
-              style={styles.pdfChatInput}
-              value={currentMessage}
-              onChangeText={setCurrentMessage}
-              placeholder="Ask a question..."
-              placeholderTextColor="#999999"
-              multiline
-              maxHeight={80}
-            />
-            <TouchableOpacity 
-              style={styles.pdfSendButton} 
-              onPress={sendMessage}
-              disabled={!currentMessage.trim()}
-            >
-              <IconSymbol size={20} name="arrow.up" color="#FFFFFF" />
-            </TouchableOpacity>
+            {/* Chat Messages */}
+            {chatMessages.map((msg, index) => (
+              <View key={index} style={styles.pdfMessageGroup}>
+                {/* User Message */}
+                <View style={styles.pdfUserMessageContainer}>
+                  <View style={styles.pdfUserMessage}>
+                    <Text style={styles.pdfUserMessageText}>{msg.user}</Text>
+                  </View>
+                </View>
+                
+                {/* AI Response */}
+                <View style={styles.pdfAiMessageContainer}>
+                  <View style={styles.pdfAiMessage}>
+                    <Text style={styles.pdfAiMessageText}>{msg.ai}</Text>
+                    {msg.sources && msg.sources.length > 0 && (
+                      <TouchableOpacity style={styles.pdfSourceButton}>
+                        <IconSymbol size={12} name="link" color="#007AFF" />
+                        <Text style={styles.pdfSourceText}>Source</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+
+          {/* Chat Input Section */}
+          <View style={styles.pdfChatInputContainer}>
+            <View style={styles.pdfChatInputWrapper}>
+              <TextInput
+                style={styles.pdfChatInput}
+                value={currentMessage}
+                onChangeText={setCurrentMessage}
+                placeholder="Ask a question..."
+                placeholderTextColor="#999999"
+                multiline
+                maxHeight={80}
+              />
+              <TouchableOpacity 
+                style={styles.pdfSendButton} 
+                onPress={sendMessage}
+                disabled={!currentMessage.trim()}
+              >
+                <IconSymbol size={20} name="arrow.up" color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.pdfStrictlyFromFileContainer}>
+              <IconSymbol size={12} name="lock" color="#10B981" />
+              <Text style={styles.pdfStrictlyFromFileText}>Strictly from file (Faster)</Text>
+            </View>
           </View>
-          <View style={styles.pdfStrictlyFromFileContainer}>
-            <IconSymbol size={12} name="lock" color="#10B981" />
-            <Text style={styles.pdfStrictlyFromFileText}>Strictly from file (Faster)</Text>
-          </View>
-        </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     );
   }
@@ -1447,6 +1454,9 @@ const styles = StyleSheet.create({
   pdfChatContainer: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+  pdfChatKeyboardContainer: {
+    flex: 1,
   },
   pdfChatHeader: {
     flexDirection: 'row',
