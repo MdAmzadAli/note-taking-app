@@ -102,9 +102,6 @@ export default function ChatInterface({
             <Text style={styles.pdfChatTabText}>Summary</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.pdfChatTab}>
-            <Text style={styles.pdfChatTabText}>Flashcards</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.pdfChatTab}>
             <Text style={styles.pdfChatTabText}>Quiz</Text>
           </TouchableOpacity>
         </View>
@@ -219,7 +216,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingTop: Platform.OS === 'ios' ? 50 : 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 34,
     backgroundColor: '#000000',
   },
   pdfChatHeaderTitle: {
@@ -232,23 +229,26 @@ const styles = StyleSheet.create({
   },
   pdfChatTabs: {
     flexDirection: 'row',
-    backgroundColor: '#000000',
+    backgroundColor: '#1A1A1A',
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingVertical: 8,
+    marginHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 16,
   },
   pdfChatTab: {
     flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    marginHorizontal: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    marginHorizontal: 2,
     alignItems: 'center',
   },
   activePdfChatTab: {
-    backgroundColor: '#333333',
+    backgroundColor: '#000000',
   },
   pdfChatTabText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#999999',
     fontWeight: '500',
   },
