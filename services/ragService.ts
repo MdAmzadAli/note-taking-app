@@ -1,5 +1,5 @@
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://cbee8c74-e2df-4e47-a6fb-3d3c3b7ab0eb-00-2g13a021txtf3.pike.replit.dev';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://cbee8c74-e2df-4e47-a6fb-3d3c3b7ab0eb-00-2g13a021txtf3.pike.replit.dev:5000';
 
 export interface RAGResponse {
   success: boolean;
@@ -103,15 +103,8 @@ class RAGService {
       const hostname = window.location.hostname;
       const protocol = window.location.protocol;
       
-      // For Replit environment
-      if (hostname.includes('replit.dev')) {
-        // The backend should be accessible via the same domain but different internal routing
-        // In Replit, port 5000 is mapped to the backend
-        return `${protocol}//${hostname}:5000`;
-      }
-      
-      // For local development
-      return 'http://localhost:5000';
+      // For Replit environment or local development
+      return `${protocol}//${hostname}:5000`;
     }
     
     // Server-side or unknown environment

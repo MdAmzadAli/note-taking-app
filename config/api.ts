@@ -1,3 +1,4 @@
+
 // For Replit environment, use the correct URL format
 const getApiBaseUrl = () => {
   if (typeof window !== 'undefined') {
@@ -5,10 +6,10 @@ const getApiBaseUrl = () => {
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
     
-    // For Replit, the backend runs on a different port-forwarded URL
+    // For Replit, the backend runs on port 5000
     if (hostname.includes('replit.dev')) {
-      // Use the same domain but access the backend via port forwarding
-      const baseUrl = `${protocol}//${hostname.replace('-00-', '-00-2g13a021txtf3.').replace('.replit.dev', '.replit.dev')}`;
+      // Use the same domain with port 5000
+      const baseUrl = `${protocol}//${hostname}:5000`;
       console.log('🔗 API Base URL (Replit):', baseUrl);
       return baseUrl;
     } else {

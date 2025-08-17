@@ -30,30 +30,39 @@ app.use(helmet());
 // CORS configuration for Replit environment
 const corsOptions = {
   origin: function (origin, callback) {
+    console.log('🌐 CORS check for origin:', origin);
+    
     // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('✅ No origin - allowing');
+      return callback(null, true);
+    }
 
     // Allow any replit.dev subdomain
     if (origin.includes('replit.dev')) {
+      console.log('✅ Replit.dev domain - allowing');
       return callback(null, true);
     }
 
     // Allow localhost for development
     if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      console.log('✅ Localhost - allowing');
       return callback(null, true);
     }
 
     // Allow custom origins from environment variable
     const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
     if (allowedOrigins.includes(origin)) {
+      console.log('✅ Custom allowed origin - allowing');
       return callback(null, true);
     }
 
+    console.log('✅ Default allow for development');
     return callback(null, true); // Allow all for development
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Access-Control-Allow-Origin'],
   optionsSuccessStatus: 200 // For legacy browser support
 };
 
@@ -720,9 +729,11 @@ async function startServer() {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`🌐 Server accessible at http://0.0.0.0:${PORT}`);
+    console.log(`🌐 Replit external URL: https://${process.env.REPLIT_DEV_DOMAIN}:${PORT}`);
     console.log(`📁 Uploads directory: ${UPLOADS_DIR}`);
     console.log(`🖼️ Previews directory: ${PREVIEWS_DIR}`);
     console.log(`🛡️ Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔧 RAG Service initialized: ${ragService.isInitialized ? 'Yes' : 'No'}`);
   });
 }
 
