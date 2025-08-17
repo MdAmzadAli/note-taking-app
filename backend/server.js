@@ -534,47 +534,80 @@ app.use((req, res) => {
 
 // RAG endpoints
 app.post('/rag/index/:id', async (req, res) => {
+  const startTime = Date.now();
+  console.log(`🔄 RAG: Received indexing request`);
+  console.log(`📄 File ID: ${req.params.id}`);
+  console.log(`🏢 Request body:`, JSON.stringify(req.body, null, 2));
+  console.log(`📍 Request headers:`, JSON.stringify(req.headers, null, 2));
+
   try {
     const { id } = req.params;
     const { workspaceId } = req.body;
 
-    const fileInfo = await fileService.getFileMetadata(id);
-    if (!fileInfo) {
+    console.log(`🔍 Looking for file metadata: ${id}`);
+
+    // Get file metadata
+    const metadataPath = path.join(__dirname, 'metadata', `${id}.json`);
+    console.log(`📁 Metadata path: ${metadataPath}`);
+    console.log(`📁 Metadata exists: ${fs.existsSync(metadataPath)}`);
+
+    if (!fs.existsSync(metadataPath)) {
+      console.error(`❌ Metadata file not found: ${metadataPath}`);
       return res.status(404).json({ error: 'File not found' });
     }
 
-    if (fileInfo.mimetype !== 'application/pdf') {
-      return res.status(400).json({ error: 'Only PDF files can be indexed' });
+    const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+    console.log(`📊 File metadata:`, JSON.stringify(metadata, null, 2));
+
+    const filePath = path.join(__dirname, 'uploads', `${id}.${metadata.originalName.split('.').pop()}`);
+    console.log(`📁 File path: ${filePath}`);
+    console.log(`📁 File exists: ${fs.existsSync(filePath)}`);
+
+    if (!fs.existsSync(filePath)) {
+      console.error(`❌ File not found on disk: ${filePath}`);
+      return res.status(404).json({ error: 'File not found on disk' });
     }
 
-    // Get Cloudinary data if available
-    let cloudinaryData = null;
-    try {
-      const fileUrls = await fileService.getFileUrls(id);
-      cloudinaryData = fileUrls?.urls || null;
-    } catch (error) {
-      console.log('⚠️ No Cloudinary data available for file:', id);
-    }
+    console.log(`🔄 Starting RAG indexing process...`);
+    console.log(`📄 Indexing parameters:`, {
+      fileId: id,
+      filePath: filePath,
+      fileName: metadata.originalName,
+      workspaceId: workspaceId,
+      cloudinaryData: metadata.cloudinary
+    });
 
+    // Index the document
     const result = await ragService.indexDocument(
       id,
-      fileInfo.path,
-      fileInfo.originalName,
+      filePath,
+      metadata.originalName,
       workspaceId,
-      cloudinaryData
+      metadata.cloudinary
     );
 
+    const processingTime = Date.now() - startTime;
+    console.log(`✅ RAG indexing completed successfully in ${processingTime}ms`);
+    console.log(`📊 Indexing result:`, JSON.stringify(result, null, 2));
+
     res.json({
-      success: result.success,
-      message: result.success ? 'Document indexed successfully' : result.message || 'Indexing failed',
-      chunksCount: result.chunksCount || 0
+      success: true,
+      message: 'Document indexed successfully',
+      chunksCount: result.chunksCount,
+      processingTime: processingTime
     });
 
   } catch (error) {
-    console.error('❌ RAG indexing error:', error);
+    const processingTime = Date.now() - startTime;
+    console.error(`❌ RAG indexing error after ${processingTime}ms`);
+    console.error(`❌ Error type:`, error.constructor.name);
+    console.error(`❌ Error message:`, error.message);
+    console.error(`❌ Error stack:`, error.stack);
+
     res.status(500).json({
       error: 'Failed to index document',
-      details: error.message
+      details: error.message,
+      processingTime: processingTime
     });
   }
 });
@@ -582,8 +615,10 @@ app.post('/rag/index/:id', async (req, res) => {
 app.delete('/rag/index/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    console.log(`🗑️ RAG: Removing document from index: ${id}`);
     await ragService.removeDocument(id);
 
+    console.log(`✅ RAG: Document removed from index: ${id}`);
     res.json({
       success: true,
       message: 'Document removed from index'
@@ -599,39 +634,74 @@ app.delete('/rag/index/:id', async (req, res) => {
 });
 
 app.post('/rag/query', async (req, res) => {
+  const startTime = Date.now();
+  console.log(`🔍 RAG: Received query request`);
+  console.log(`❓ Query: ${req.body.query}`);
+  console.log(`📄 File IDs: ${req.body.fileIds}`);
+  console.log(`🏢 Workspace ID: ${req.body.workspaceId}`);
+  console.log(`📍 Request headers:`, JSON.stringify(req.headers, null, 2));
+
   try {
     const { query, fileIds, workspaceId } = req.body;
 
     if (!query || query.trim().length === 0) {
+      console.error('❌ RAG query error: Query is required');
       return res.status(400).json({ error: 'Query is required' });
     }
 
+    console.log(`🔄 Starting RAG query process...`);
     const result = await ragService.generateAnswer(query, fileIds, workspaceId);
+
+    const processingTime = Date.now() - startTime;
+    console.log(`✅ RAG query completed successfully in ${processingTime}ms`);
+    console.log(`💡 Answer: ${result.answer}`);
+    console.log(`📚 Sources:`, JSON.stringify(result.sources, null, 2));
+    console.log(`✅ Confidence: ${result.confidence}`);
 
     res.json({
       success: true,
       answer: result.answer,
       sources: result.sources,
-      confidence: result.confidence
+      confidence: result.confidence,
+      processingTime: processingTime
     });
 
   } catch (error) {
-    console.error('❌ RAG query error:', error);
+    const processingTime = Date.now() - startTime;
+    console.error(`❌ RAG query error after ${processingTime}ms`);
+    console.error(`❌ Error type:`, error.constructor.name);
+    console.error(`❌ Error message:`, error.message);
+    console.error(`❌ Error stack:`, error.stack);
+
     res.status(500).json({
       error: 'Failed to process query',
-      details: error.message
+      details: error.message,
+      processingTime: processingTime
     });
   }
 });
 
 app.get('/rag/health', async (req, res) => {
+  console.log(`🏥 RAG: Health check requested`);
+  console.log(`📍 Request from: ${req.ip}`);
+  console.log(`📋 User Agent: ${req.get('User-Agent')}`);
+
   try {
+    console.log(`🔄 Performing RAG service health check...`);
     const health = await ragService.healthCheck();
+    console.log(`📊 Health check result:`, JSON.stringify(health, null, 2));
+    console.log(`✅ Health check completed successfully`);
+
     res.json(health);
   } catch (error) {
+    console.error(`❌ Health check failed`);
+    console.error(`❌ Error type:`, error.constructor.name);
+    console.error(`❌ Error message:`, error.message);
+    console.error(`❌ Error stack:`, error.stack);
+
     res.status(500).json({
-      status: 'error',
-      message: error.message
+      error: 'Health check failed',
+      details: error.message
     });
   }
 });

@@ -93,14 +93,32 @@ class FileService {
 
       // Auto-index PDF files for RAG
       if (uploadedFile.mimetype === 'application/pdf') {
+        console.log(`📄 PDF detected, starting RAG indexing process`);
+        console.log(`📄 File details:`, {
+          id: uploadedFile.id,
+          name: uploadedFile.originalName,
+          size: uploadedFile.size,
+          mimetype: uploadedFile.mimetype
+        });
+        
         try {
+          console.log(`📦 Importing RAG service...`);
           const { ragService } = await import('./ragService');
-          await ragService.indexDocument(uploadedFile.id);
+          console.log(`✅ RAG service imported successfully`);
+          
+          console.log(`🔄 Starting document indexing for file: ${uploadedFile.id}`);
+          const indexResult = await ragService.indexDocument(uploadedFile.id);
           console.log('✅ Document indexed for RAG successfully');
+          console.log('📊 Indexing result:', JSON.stringify(indexResult, null, 2));
         } catch (ragError) {
-          console.log('⚠️ RAG indexing failed (non-critical):', ragError);
+          console.log('⚠️ RAG indexing failed (non-critical)');
+          console.log('❌ RAG error details:', ragError);
+          console.log('❌ RAG error type:', ragError.constructor.name);
+          console.log('❌ RAG error message:', ragError.message);
           // Don't fail the upload if RAG indexing fails
         }
+      } else {
+        console.log(`📄 File is not PDF (${uploadedFile.mimetype}), skipping RAG indexing`);
       }
 
       return uploadedFile;

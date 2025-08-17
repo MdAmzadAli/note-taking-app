@@ -33,8 +33,15 @@ export interface IndexResponse {
 
 class RAGService {
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
+    const fullUrl = `${API_BASE_URL}${endpoint}`;
+    console.log(`🌐 RAG API Request Starting`);
+    console.log(`📍 Full URL: ${fullUrl}`);
+    console.log(`🔧 Method: ${options.method || 'GET'}`);
+    console.log(`📝 Headers:`, JSON.stringify(options.headers, null, 2));
+    console.log(`📦 Body:`, options.body ? JSON.stringify(JSON.parse(options.body as string), null, 2) : 'No body');
+
     try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const response = await fetch(fullUrl, {
         headers: {
           'Content-Type': 'application/json',
           ...options.headers,
@@ -42,32 +49,71 @@ class RAGService {
         ...options,
       });
 
-      const data = await response.json();
+      console.log(`📨 Response received for ${endpoint}`);
+      console.log(`📊 Status: ${response.status} ${response.statusText}`);
+      console.log(`📋 Response headers:`, JSON.stringify([...response.headers.entries()], null, 2));
+      console.log(`✅ Response OK: ${response.ok}`);
 
-      if (!response.ok) {
-        throw new Error(data.details || data.error || 'Request failed');
+      // Try to get response text first to see what we're actually receiving
+      const responseText = await response.text();
+      console.log(`📄 Raw response text (first 500 chars):`, responseText.substring(0, 500));
+
+      // Try to parse as JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log(`✅ Successfully parsed JSON response`);
+        console.log(`📊 Parsed data:`, JSON.stringify(data, null, 2));
+      } catch (parseError) {
+        console.error(`❌ JSON parse failed for ${endpoint}`);
+        console.error(`❌ Parse error:`, parseError);
+        console.error(`❌ Raw response that failed to parse:`, responseText);
+        throw new Error(`Invalid JSON response from ${endpoint}: ${parseError.message}`);
       }
 
+      if (!response.ok) {
+        console.error(`❌ API request failed with status ${response.status}`);
+        console.error(`❌ Error data:`, data);
+        throw new Error(data.details || data.error || `Request failed with status ${response.status}`);
+      }
+
+      console.log(`✅ RAG API request successful for ${endpoint}`);
       return data;
     } catch (error) {
-      console.error(`RAG API Error (${endpoint}):`, error);
+      console.error(`❌ RAG API Error occurred for ${endpoint}`);
+      console.error(`❌ Error type:`, error.constructor.name);
+      console.error(`❌ Error message:`, error.message);
+      console.error(`❌ Error stack:`, error.stack);
+      
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        console.error(`🌐 Network error - check if backend is running and accessible at: ${fullUrl}`);
+      }
+      
       throw error;
     }
   }
 
   async indexDocument(fileId: string, workspaceId?: string): Promise<IndexResponse> {
+    console.log(`🔄 RAG: Starting document indexing process`);
+    console.log(`📄 File ID: ${fileId}`);
+    console.log(`🏢 Workspace ID: ${workspaceId || 'None'}`);
+    console.log(`📍 API Base URL: ${API_BASE_URL}`);
+    
     try {
-      console.log(`🔄 Indexing document: ${fileId}`);
+      const requestData = { workspaceId };
+      console.log(`📦 Request payload:`, JSON.stringify(requestData, null, 2));
       
       const response = await this.makeRequest(`/rag/index/${fileId}`, {
         method: 'POST',
-        body: JSON.stringify({ workspaceId })
+        body: JSON.stringify(requestData)
       });
 
       console.log(`✅ Document indexed successfully: ${fileId}`);
+      console.log(`📊 Index response:`, JSON.stringify(response, null, 2));
       return response;
     } catch (error) {
-      console.error(`❌ Failed to index document ${fileId}:`, error);
+      console.error(`❌ Failed to index document ${fileId}`);
+      console.error(`❌ Error details:`, error);
       throw error;
     }
   }
@@ -122,11 +168,17 @@ class RAGService {
     gemini: boolean;
     initialized: boolean;
   }> {
+    console.log(`🏥 RAG: Starting health check`);
+    console.log(`📍 Health check URL: ${API_BASE_URL}/rag/health`);
+    
     try {
       const response = await this.makeRequest('/rag/health');
+      console.log(`✅ RAG health check successful`);
+      console.log(`📊 Health status:`, JSON.stringify(response, null, 2));
       return response;
     } catch (error) {
-      console.error('❌ RAG health check failed:', error);
+      console.error('❌ RAG health check failed');
+      console.error('❌ Health check error:', error);
       return {
         status: 'error',
         qdrant: false,

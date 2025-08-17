@@ -16,6 +16,12 @@ class RAGService {
   }
 
   async initialize() {
+    console.log('🔄 RAG Service: Starting initialization...');
+    console.log('🔧 Environment check:');
+    console.log('   QDRANT_URL:', process.env.QDRANT_URL ? '✅ Set' : '❌ Not set');
+    console.log('   QDRANT_API_KEY:', process.env.QDRANT_API_KEY ? '✅ Set' : '⚠️ Not set (optional)');
+    console.log('   GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? '✅ Set' : '❌ Not set');
+    
     try {
       // Check if required environment variables are available
       if (!process.env.QDRANT_URL && !process.env.GEMINI_API_KEY) {
@@ -26,26 +32,40 @@ class RAGService {
 
       // Initialize Qdrant client only if URL is provided
       if (process.env.QDRANT_URL) {
+        console.log('🔄 Initializing Qdrant client...');
         this.qdrant = new QdrantClient({
           url: process.env.QDRANT_URL,
           apiKey: process.env.QDRANT_API_KEY,
         });
+        console.log('✅ Qdrant client initialized');
       }
 
       // Initialize Gemini AI
       if (process.env.GEMINI_API_KEY) {
+        console.log('🔄 Initializing Gemini AI...');
         this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        console.log('✅ Gemini AI initialized');
       }
 
       // Only create collection if Qdrant is available
       if (this.qdrant) {
+        console.log('🔄 Ensuring Qdrant collection exists...');
         await this.ensureCollection();
+        console.log('✅ Qdrant collection ready');
       }
       
       this.isInitialized = true;
       console.log('✅ RAG Service initialized successfully');
+      console.log('📊 Final state:', {
+        qdrant: !!this.qdrant,
+        gemini: !!this.gemini,
+        initialized: this.isInitialized
+      });
     } catch (error) {
-      console.error('❌ RAG Service initialization failed:', error);
+      console.error('❌ RAG Service initialization failed');
+      console.error('❌ Error type:', error.constructor.name);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error stack:', error.stack);
       this.isInitialized = false;
       // Don't throw error, allow app to continue without RAG
     }

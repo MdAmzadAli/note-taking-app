@@ -116,33 +116,49 @@ export default function ChatInterface({
   // Check RAG health and index documents on mount
   useEffect(() => {
     const initializeRAG = async () => {
+      console.log(`🤖 ChatInterface: Starting RAG initialization`);
+      console.log(`📄 Selected file:`, selectedFile ? `${selectedFile.id} (${selectedFile.originalName})` : 'None');
+      console.log(`🏢 Selected workspace:`, selectedWorkspace ? `${selectedWorkspace.id} with ${selectedWorkspace.files.length} files` : 'None');
+      
       try {
+        console.log(`🏥 ChatInterface: Performing RAG health check`);
         const health = await ragService.checkHealth();
+        console.log(`📊 RAG health result:`, JSON.stringify(health, null, 2));
         setRagHealth(health);
         
         if (health.status === 'healthy' || health.status === 'degraded') {
+          console.log(`✅ RAG is available, proceeding with document indexing`);
+          
           // Auto-index documents if RAG is available
           if (selectedFile) {
+            console.log(`📄 Indexing selected file: ${selectedFile.id}`);
             try {
-              await ragService.indexDocument(selectedFile.id);
+              const indexResult = await ragService.indexDocument(selectedFile.id);
+              console.log(`✅ File indexing completed:`, indexResult);
             } catch (error) {
-              console.log('Document may already be indexed:', error);
+              console.log('⚠️ Document indexing failed (may already be indexed):', error);
             }
           }
           
           if (selectedWorkspace) {
+            console.log(`🏢 Indexing workspace files: ${selectedWorkspace.files.length} files`);
             for (const file of selectedWorkspace.files) {
+              console.log(`📄 Indexing workspace file: ${file.id} (${file.originalName})`);
               try {
-                await ragService.indexDocument(file.id, selectedWorkspace.id);
+                const indexResult = await ragService.indexDocument(file.id, selectedWorkspace.id);
+                console.log(`✅ Workspace file indexing completed:`, indexResult);
               } catch (error) {
-                console.log('Document may already be indexed:', error);
+                console.log(`⚠️ Workspace file indexing failed (may already be indexed): ${file.id}`, error);
               }
             }
           }
+        } else {
+          console.log(`❌ RAG not available, skipping document indexing`);
         }
       } catch (error) {
-        console.error('RAG initialization failed:', error);
-        setRagHealth({ status: 'error', qdrant: false, gemini: false });
+        console.error('❌ RAG initialization failed:', error);
+        console.error('❌ Setting RAG health to error state');
+        setRagHealth({ status: 'error', qdrant: false, gemini: false, initialized: false });
       }
     };
 
