@@ -47,9 +47,12 @@ export default function WorkspaceModal({
 
           <View style={styles.modalButtons}>
             <TouchableOpacity 
-              style={[styles.modalButton, { opacity: isLoading ? 0.5 : 1 }]} 
+              style={[
+                styles.modalButton, 
+                { opacity: (isLoading || !workspaceName.trim()) ? 0.5 : 1 }
+              ]} 
               onPress={onCreate}
-              disabled={isLoading}
+              disabled={isLoading || !workspaceName.trim()}
             >
               {isLoading ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />

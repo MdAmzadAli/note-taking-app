@@ -269,7 +269,9 @@ export default function ExpertTab() {
           await saveData(singleFiles, updatedWorkspaces);
           setWorkspaceName('');
           setIsWorkspaceModalVisible(false);
-          Alert.alert('Success', `Workspace "${workspaceName}" created with ${files.length} files!`);
+          
+          // Navigate directly to the created workspace
+          openWorkspaceChat(newWorkspace);
         } else {
           Alert.alert('Error', 'No files were successfully uploaded.');
         }
