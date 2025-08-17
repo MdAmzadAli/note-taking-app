@@ -88,10 +88,22 @@ class FileService {
       }
 
       const result: ApiResponse<{ file: FileUploadResponse }> = await response.json();
-      console.log('✅ Upload successful!');
-      console.log('✅ Server response:', JSON.stringify(result, null, 2));
+      const uploadedFile = result.file!;
+      console.log('✅ File uploaded successfully:', uploadedFile);
 
-      return result.file!;
+      // Auto-index PDF files for RAG
+      if (uploadedFile.mimetype === 'application/pdf') {
+        try {
+          const { ragService } = await import('./ragService');
+          await ragService.indexDocument(uploadedFile.id);
+          console.log('✅ Document indexed for RAG successfully');
+        } catch (ragError) {
+          console.log('⚠️ RAG indexing failed (non-critical):', ragError);
+          // Don't fail the upload if RAG indexing fails
+        }
+      }
+
+      return uploadedFile;
     } catch (error) {
       console.error('❌ File upload error occurred');
       console.error('❌ Error type:', error.constructor.name);

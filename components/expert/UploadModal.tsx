@@ -46,7 +46,7 @@ export default function UploadModal({
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
         // Call the existing onUpload function with the file
-        onUpload(file);
+        await onUpload(file);
       }
     } catch (error) {
       console.error('Error picking document:', error);
