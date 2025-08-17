@@ -18,10 +18,10 @@ class RAGService {
   async initialize() {
     try {
       // Initialize Qdrant client
-      this.qdrant = new QdrantClient({
-        url: process.env.QDRANT_URL || 'http://localhost:6333',
-        apiKey: process.env.QDRANT_API_KEY
-      });
+      this.qdrant =new QdrantClient({
+            url: process.env.QDRANT_URL,
+            apiKey: process.env.QDRANT_API_KEY,
+        });
 
       // Initialize Gemini AI
       if (process.env.GEMINI_API_KEY) {
