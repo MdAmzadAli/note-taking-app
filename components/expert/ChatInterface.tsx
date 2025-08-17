@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   View, 
@@ -89,7 +88,7 @@ export default function ChatInterface({
     if (!file.size) return 'Unknown';
     const kb = file.size / 1024;
     const mb = kb / 1024;
-    
+
     if (mb > 10) return 'Large File';
     if (mb > 2) return 'Medium File';
     return 'Small File';
@@ -119,16 +118,16 @@ export default function ChatInterface({
       console.log(`🤖 ChatInterface: Starting RAG initialization`);
       console.log(`📄 Selected file:`, selectedFile ? `${selectedFile.id} (${selectedFile.originalName})` : 'None');
       console.log(`🏢 Selected workspace:`, selectedWorkspace ? `${selectedWorkspace.id} with ${selectedWorkspace.files.length} files` : 'None');
-      
+
       try {
         console.log(`🏥 ChatInterface: Performing RAG health check`);
         const health = await ragService.checkHealth();
         console.log(`📊 RAG health result:`, JSON.stringify(health, null, 2));
         setRagHealth(health);
-        
+
         if (health.status === 'healthy' || health.status === 'degraded') {
           console.log(`✅ RAG is available, proceeding with document indexing`);
-          
+
           // Auto-index documents if RAG is available
           if (selectedFile) {
             console.log(`📄 Indexing selected file: ${selectedFile.id}`);
@@ -139,7 +138,7 @@ export default function ChatInterface({
               console.log('⚠️ Document indexing failed (may already be indexed):', error);
             }
           }
-          
+
           if (selectedWorkspace) {
             console.log(`🏢 Indexing workspace files: ${selectedWorkspace.files.length} files`);
             for (const file of selectedWorkspace.files) {
@@ -163,7 +162,27 @@ export default function ChatInterface({
     };
 
     initializeRAG();
+
+    // Test basic backend connectivity first
+    testBackendConnection();
   }, [selectedFile, selectedWorkspace]);
+
+  const testBackendConnection = async () => {
+    try {
+      console.log('🔍 Testing basic backend connection...');
+      const response = await fetch('https://cbee8c74-e2df-4e47-a6fb-3d3c3b7ab0eb-00-2g13a021txtf3.pike.replit.dev/health');
+      console.log('🌐 Backend health check response:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Backend is accessible:', data);
+      } else {
+        console.error('❌ Backend health check failed:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ Backend connection test failed:', error);
+    }
+  };
 
   const handleSourceClick = (sources: RAGSource[]) => {
     setSelectedSources(sources);
@@ -300,7 +319,7 @@ export default function ChatInterface({
                     </TouchableOpacity>
                   </View>
                 ))}
-                
+
                 {/* Add File Button */}
                 <TouchableOpacity 
                   style={[
@@ -346,7 +365,7 @@ export default function ChatInterface({
                   <Text style={styles.pdfUserMessageText}>{msg.user}</Text>
                 </View>
               </View>
-              
+
               {/* AI Response */}
               <View style={styles.pdfAiMessageContainer}>
                 <View style={styles.pdfAiMessage}>
@@ -463,7 +482,7 @@ export default function ChatInterface({
                 <IconSymbol size={24} name="xmark" color="#FFFFFF" />
               </TouchableOpacity>
             </View>
-            
+
             <ScrollView style={styles.sourceScrollView}>
               {selectedSources.map((source, index) => (
                 <View key={source.id} style={styles.sourceItem}>

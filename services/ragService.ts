@@ -33,12 +33,13 @@ export interface IndexResponse {
 
 class RAGService {
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
-    const fullUrl = `${API_BASE_URL}${endpoint}`;
+    // Use the correct backend URL for Replit environment
+    const backendUrl = this.getBackendUrl();
+    const fullUrl = `${backendUrl}${endpoint}`;
+    
     console.log(`🌐 RAG API Request Starting`);
     console.log(`📍 Full URL: ${fullUrl}`);
     console.log(`🔧 Method: ${options.method || 'GET'}`);
-    console.log(`📝 Headers:`, JSON.stringify(options.headers, null, 2));
-    console.log(`📦 Body:`, options.body ? JSON.stringify(JSON.parse(options.body as string), null, 2) : 'No body');
 
     try {
       const response = await fetch(fullUrl, {
@@ -51,23 +52,28 @@ class RAGService {
 
       console.log(`📨 Response received for ${endpoint}`);
       console.log(`📊 Status: ${response.status} ${response.statusText}`);
-      console.log(`📋 Response headers:`, JSON.stringify([...response.headers.entries()], null, 2));
-      console.log(`✅ Response OK: ${response.ok}`);
+
+      // Check if response is HTML (common when endpoint doesn't exist)
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('text/html')) {
+        console.error(`❌ Received HTML response instead of JSON for ${endpoint}`);
+        console.error(`❌ This usually means the endpoint doesn't exist or backend is not running`);
+        throw new Error(`Backend endpoint ${endpoint} not found or returning HTML`);
+      }
 
       // Try to get response text first to see what we're actually receiving
       const responseText = await response.text();
-      console.log(`📄 Raw response text (first 500 chars):`, responseText.substring(0, 500));
+      console.log(`📄 Raw response text (first 200 chars):`, responseText.substring(0, 200));
 
       // Try to parse as JSON
       let data;
       try {
         data = JSON.parse(responseText);
         console.log(`✅ Successfully parsed JSON response`);
-        console.log(`📊 Parsed data:`, JSON.stringify(data, null, 2));
       } catch (parseError) {
         console.error(`❌ JSON parse failed for ${endpoint}`);
         console.error(`❌ Parse error:`, parseError);
-        console.error(`❌ Raw response that failed to parse:`, responseText);
+        console.error(`❌ Raw response that failed to parse:`, responseText.substring(0, 200));
         throw new Error(`Invalid JSON response from ${endpoint}: ${parseError.message}`);
       }
 
@@ -83,7 +89,6 @@ class RAGService {
       console.error(`❌ RAG API Error occurred for ${endpoint}`);
       console.error(`❌ Error type:`, error.constructor.name);
       console.error(`❌ Error message:`, error.message);
-      console.error(`❌ Error stack:`, error.stack);
       
       if (error instanceof TypeError && error.message.includes('fetch')) {
         console.error(`🌐 Network error - check if backend is running and accessible at: ${fullUrl}`);
@@ -91,6 +96,26 @@ class RAGService {
       
       throw error;
     }
+  }
+
+  private getBackendUrl(): string {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      const protocol = window.location.protocol;
+      
+      // For Replit environment
+      if (hostname.includes('replit.dev')) {
+        // The backend should be accessible via the same domain but different internal routing
+        // In Replit, port 5000 is mapped to the backend
+        return `${protocol}//${hostname}:5000`;
+      }
+      
+      // For local development
+      return 'http://localhost:5000';
+    }
+    
+    // Server-side or unknown environment
+    return API_BASE_URL;
   }
 
   async indexDocument(fileId: string, workspaceId?: string): Promise<IndexResponse> {

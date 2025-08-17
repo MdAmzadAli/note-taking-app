@@ -93,19 +93,12 @@ class FileService {
 
       // Auto-index PDF files for RAG
       if (uploadedFile.mimetype === 'application/pdf') {
-        console.log(`📄 PDF detected, starting RAG indexing process`);
-        console.log(`📄 File details:`, {
-          id: uploadedFile.id,
-          name: uploadedFile.originalName,
-          size: uploadedFile.size,
-          mimetype: uploadedFile.mimetype
-        });
-        
+        console.log('🔄 Starting RAG indexing for PDF...');
         try {
           console.log(`📦 Importing RAG service...`);
           const { ragService } = await import('./ragService');
           console.log(`✅ RAG service imported successfully`);
-          
+
           console.log(`🔄 Starting document indexing for file: ${uploadedFile.id}`);
           const indexResult = await ragService.indexDocument(uploadedFile.id);
           console.log('✅ Document indexed for RAG successfully');
