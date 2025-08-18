@@ -555,7 +555,7 @@ class RAGService {
         query, 
         fileIds, 
         workspaceId, 
-        8 // Get more chunks for better context
+        4 // Get more chunks for better context
       );
 
       if (relevantChunks.length === 0) {
