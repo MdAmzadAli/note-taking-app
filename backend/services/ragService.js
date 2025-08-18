@@ -1,7 +1,6 @@
 
 const { QdrantClient } = require('@qdrant/js-client-rest');
-const { GoogleAIEmbeddingClient, FunctionCallingMode } = require('@google/genai');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenAI } = require('@google/genai');
 const pdfParse = require('pdf-parse');
 const fs = require('fs').promises;
 const path = require('path');
@@ -11,8 +10,7 @@ const POINT_NS = '2d3c0d3e-1e1a-4f6a-9e84-1b8de377e9c9';
 class RAGService {
   constructor() {
     this.qdrant = null;
-    this.gemini = null;
-    this.embeddingClient = null;
+    this.genai = null;
     this.collectionName = 'documents';
     this.chunkSize = 800;
     this.chunkOverlap = 100;
@@ -23,20 +21,37 @@ class RAGService {
       // For indexing documents - optimized for storage and retrieval
       document: {
         model: 'text-embedding-004',
-        taskType: 'RETRIEVAL_DOCUMENT',
-        title: 'Document Content'
+        taskType: 'RETRIEVAL_DOCUMENT'
       },
       // For processing user queries - optimized for Q&A
       query: {
         model: 'text-embedding-004', 
-        taskType: 'QUESTION_ANSWERING',
-        title: 'User Question'
+        taskType: 'QUESTION_ANSWERING'
       },
       // For semantic similarity during search
       similarity: {
         model: 'text-embedding-004',
-        taskType: 'SEMANTIC_SIMILARITY',
-        title: 'Content Similarity'
+        taskType: 'SEMANTIC_SIMILARITY'
+      },
+      // For code-related queries
+      code: {
+        model: 'text-embedding-004',
+        taskType: 'CODE_RETRIEVAL_QUERY'
+      },
+      // For classification tasks
+      classification: {
+        model: 'text-embedding-004',
+        taskType: 'CLASSIFICATION'
+      },
+      // For clustering
+      clustering: {
+        model: 'text-embedding-004',
+        taskType: 'CLUSTERING'
+      },
+      // For fact verification
+      factVerification: {
+        model: 'text-embedding-004',
+        taskType: 'FACT_VERIFICATION'
       }
     };
   }
@@ -66,19 +81,15 @@ class RAGService {
         console.log('✅ Qdrant client initialized');
       }
 
-      // Initialize Google GenAI services
+      // Initialize Google GenAI with correct SDK usage
       if (process.env.GEMINI_API_KEY) {
-        console.log('🔄 Initializing Google GenAI services...');
+        console.log('🔄 Initializing Google GenAI...');
         
-        // Initialize advanced embedding client
-        this.embeddingClient = new GoogleAIEmbeddingClient({
-          apiKey: process.env.GEMINI_API_KEY,
+        this.genai = new GoogleGenAI({
+          apiKey: process.env.GEMINI_API_KEY
         });
         
-        // Initialize Gemini for text generation
-        this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        
-        console.log('✅ Google GenAI services initialized');
+        console.log('✅ Google GenAI initialized');
       }
 
       // Only create collection if Qdrant is available
@@ -92,8 +103,7 @@ class RAGService {
       console.log('✅ RAG Service initialized successfully');
       console.log('📊 Final state:', {
         qdrant: !!this.qdrant,
-        gemini: !!this.gemini,
-        embeddingClient: !!this.embeddingClient,
+        genai: !!this.genai,
         initialized: this.isInitialized
       });
     } catch (error) {
@@ -125,58 +135,41 @@ class RAGService {
           replication_factor: 1
         });
         console.log(`✅ Created collection: ${this.collectionName}`);
+      }
 
-        // Create payload indexes for filtering
-        console.log('🔄 Creating payload indexes...');
-        
-        // Index for fileId filtering
+      // Always ensure payload indexes exist
+      console.log('🔄 Ensuring payload indexes...');
+      
+      try {
+        // Create fileId index
         await this.qdrant.createPayloadIndex(this.collectionName, {
           field_name: 'fileId',
           field_schema: 'keyword'
         });
-        console.log('✅ Created fileId index');
+        console.log('✅ Created/verified fileId index');
+      } catch (error) {
+        if (error.message && error.message.includes('already exists')) {
+          console.log('✅ fileId index already exists');
+        } else {
+          console.warn('⚠️ Could not create fileId index:', error.message);
+        }
+      }
 
-        // Index for workspaceId filtering  
+      try {
+        // Create workspaceId index
         await this.qdrant.createPayloadIndex(this.collectionName, {
           field_name: 'workspaceId',
           field_schema: 'keyword'
         });
-        console.log('✅ Created workspaceId index');
-
-        console.log('✅ All payload indexes created successfully');
-      } else {
-        // Check if indexes exist for existing collection
-        console.log('🔄 Checking existing collection indexes...');
-        try {
-          const collectionInfo = await this.qdrant.getCollection(this.collectionName);
-          const hasFileIdIndex = collectionInfo.payload_schema && collectionInfo.payload_schema.fileId;
-          const hasWorkspaceIdIndex = collectionInfo.payload_schema && collectionInfo.payload_schema.workspaceId;
-
-          if (!hasFileIdIndex) {
-            console.log('🔄 Creating missing fileId index...');
-            await this.qdrant.createPayloadIndex(this.collectionName, {
-              field_name: 'fileId',
-              field_schema: 'keyword'
-            });
-            console.log('✅ Created fileId index');
-          }
-
-          if (!hasWorkspaceIdIndex) {
-            console.log('🔄 Creating missing workspaceId index...');
-            await this.qdrant.createPayloadIndex(this.collectionName, {
-              field_name: 'workspaceId',
-              field_schema: 'keyword'
-            });
-            console.log('✅ Created workspaceId index');
-          }
-
-          if (hasFileIdIndex && hasWorkspaceIdIndex) {
-            console.log('✅ All required indexes already exist');
-          }
-        } catch (indexError) {
-          console.warn('⚠️ Could not verify indexes, they may need to be created manually:', indexError.message);
+        console.log('✅ Created/verified workspaceId index');
+      } catch (error) {
+        if (error.message && error.message.includes('already exists')) {
+          console.log('✅ workspaceId index already exists');
+        } else {
+          console.warn('⚠️ Could not create workspaceId index:', error.message);
         }
       }
+
     } catch (error) {
       console.error('❌ Error ensuring collection:', error);
       throw error;
@@ -248,10 +241,10 @@ class RAGService {
   }
 
   // Generate task-specific embeddings using Google GenAI
-  async generateEmbedding(text, taskType = 'document', title = null) {
+  async generateEmbedding(text, taskType = 'document') {
     try {
-      if (!this.embeddingClient) {
-        throw new Error("Embedding client not initialized");
+      if (!this.genai) {
+        throw new Error("Google GenAI not initialized");
       }
 
       const config = this.embeddingConfigs[taskType];
@@ -262,23 +255,20 @@ class RAGService {
 
       console.log(`🔧 Generating ${taskType} embedding with task type: ${config.taskType}`);
 
-      const request = {
+      // Use correct Google GenAI SDK format
+      const response = await this.genai.models.embedContent({
         model: config.model,
-        content: {
-          parts: [{ text: text }]
-        },
-        taskType: config.taskType,
-        title: title || config.title
-      };
+        contents: [text],
+        taskType: config.taskType
+      });
 
-      const result = await this.embeddingClient.embedContent(request);
-
-      if (!result?.embedding?.values) {
+      if (!response?.embeddings?.[0]?.values) {
         throw new Error("No embedding values returned");
       }
 
-      console.log(`✅ Generated ${taskType} embedding (dimension: ${result.embedding.values.length})`);
-      return result.embedding.values;
+      const embedding = response.embeddings[0].values;
+      console.log(`✅ Generated ${taskType} embedding (dimension: ${embedding.length})`);
+      return embedding;
     } catch (error) {
       console.error(`❌ ${taskType} embedding generation failed:`, error.message || error);
       throw error;
@@ -290,7 +280,7 @@ class RAGService {
     try {
       console.log(`🔄 Indexing document: ${fileName}`);
 
-      if (!this.isInitialized || !this.qdrant || !this.embeddingClient) {
+      if (!this.isInitialized || !this.qdrant || !this.genai) {
         console.warn('⚠️ RAG service not properly initialized, skipping indexing');
         return { chunksCount: 0, success: false, message: 'RAG service not available' };
       }
@@ -319,11 +309,7 @@ class RAGService {
         const chunk = chunks[i];
         
         // Use RETRIEVAL_DOCUMENT task type for indexing documents
-        const embedding = await this.generateEmbedding(
-          chunk.text, 
-          'document', 
-          `${fileName} - Chunk ${i + 1}`
-        );
+        const embedding = await this.generateEmbedding(chunk.text, 'document');
         
         // Calculate which page this chunk likely belongs to
         const estimatedPage = Math.ceil((chunk.metadata.chunkIndex + 1) / 2); // Rough estimate
@@ -390,11 +376,7 @@ class RAGService {
       console.log(`🔍 Searching for: "${query}"`);
 
       // Generate query-optimized embedding using QUESTION_ANSWERING task type
-      const queryEmbedding = await this.generateEmbedding(
-        query, 
-        'query', 
-        'User Question for Document Search'
-      );
+      const queryEmbedding = await this.generateEmbedding(query, 'query');
 
       // Build filter
       const filter = { must: [] };
@@ -510,17 +492,17 @@ class RAGService {
         })
         .join('\n\n');
 
-      // Generate answer with Gemini using advanced prompting
-      const model = this.gemini.getGenerativeModel({ 
+      // Generate answer using correct Google GenAI SDK
+      const model = await this.genai.models.generateContent({
         model: 'gemini-1.5-pro',
         generationConfig: {
-          temperature: 0.3, // Lower temperature for more precise answers
+          temperature: 0.3,
           topP: 0.8,
           maxOutputTokens: 2048,
-        }
-      });
-      
-      const prompt = `You are an expert AI assistant that provides accurate, detailed answers based on document content.
+        },
+        contents: [{
+          parts: [{
+            text: `You are an expert AI assistant that provides accurate, detailed answers based on document content.
 
 CONTEXT FROM DOCUMENTS:
 ${context}
@@ -537,10 +519,12 @@ INSTRUCTIONS:
 7. Maintain a professional, helpful tone
 8. Structure your answer with clear sections if appropriate
 
-ANSWER:`;
-
-      const result = await model.generateContent(prompt);
-      const answer = result.response.text();
+ANSWER:`
+          }]
+        }]
+      });
+      
+      const answer = model.candidates[0].content.parts[0].text;
 
       // Prepare enhanced sources with additional metadata
       const sources = relevantChunks.map((chunk, index) => ({
@@ -580,8 +564,7 @@ ANSWER:`;
         return { 
           status: 'degraded', 
           qdrant: false, 
-          gemini: false,
-          embeddingClient: false,
+          genai: false,
           initialized: false,
           message: 'RAG service not configured (missing environment variables)'
         };
@@ -594,8 +577,7 @@ ANSWER:`;
       return { 
         status: this.qdrant ? 'healthy' : 'degraded', 
         qdrant: !!this.qdrant, 
-        gemini: !!this.gemini,
-        embeddingClient: !!this.embeddingClient,
+        genai: !!this.genai,
         initialized: this.isInitialized,
         embeddingConfigs: Object.keys(this.embeddingConfigs)
       };
@@ -603,8 +585,7 @@ ANSWER:`;
       return { 
         status: 'unhealthy', 
         qdrant: false, 
-        gemini: !!this.gemini,
-        embeddingClient: !!this.embeddingClient,
+        genai: !!this.genai,
         initialized: this.isInitialized,
         error: error.message 
       };
