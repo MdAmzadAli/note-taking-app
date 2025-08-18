@@ -112,10 +112,10 @@ export default function ChatInterface({
     setFileToDelete(null);
   };
 
-  // Check RAG health and index documents on mount
+  // Check RAG health on mount (no indexing - that's done during upload)
   useEffect(() => {
     const initializeRAG = async () => {
-      console.log(`🤖 ChatInterface: Starting RAG initialization`);
+      console.log(`🤖 ChatInterface: Starting RAG health check`);
       console.log(`📄 Selected file:`, selectedFile ? `${selectedFile.id} (${selectedFile.name})` : 'None');
       console.log(`🏢 Selected workspace:`, selectedWorkspace ? `${selectedWorkspace.id} with ${selectedWorkspace.files.length} files` : 'None');
 
@@ -126,62 +126,18 @@ export default function ChatInterface({
         setRagHealth(health);
 
         if (health.status === 'healthy' || health.status === 'degraded') {
-          console.log(`✅ RAG is available, checking document indexing status`);
-
-          // Auto-index documents if RAG is available and documents are uploaded
-          if (selectedFile && selectedFile.isUploaded) {
-            console.log(`📄 Checking if file needs indexing: ${selectedFile.id}`);
-            try {
-              // Only attempt to index if the file is uploaded but check if already indexed first
-              const indexResult = await ragService.indexDocument(selectedFile.id);
-              console.log(`✅ File indexing result:`, indexResult);
-            } catch (error) {
-              // Check if error indicates document is already indexed
-              if (error.message && error.message.includes('already indexed')) {
-                console.log(`ℹ️ Document already indexed: ${selectedFile.id}`);
-              } else {
-                console.log('⚠️ Document indexing failed:', error);
-              }
-            }
-          } else if (selectedFile && !selectedFile.isUploaded) {
-            console.log(`⏳ File not yet uploaded, skipping indexing: ${selectedFile.id}`);
-          }
-
-          if (selectedWorkspace) {
-            console.log(`🏢 Checking workspace files for indexing: ${selectedWorkspace.files.length} files`);
-            for (const file of selectedWorkspace.files) {
-              if (file.isUploaded) {
-                console.log(`📄 Checking workspace file for indexing: ${file.id} (${file.name})`);
-                try {
-                  const indexResult = await ragService.indexDocument(file.id, selectedWorkspace.id);
-                  console.log(`✅ Workspace file indexing result:`, indexResult);
-                } catch (error) {
-                  // Check if error indicates document is already indexed
-                  if (error.message && error.message.includes('already indexed')) {
-                    console.log(`ℹ️ Workspace document already indexed: ${file.id}`);
-                  } else {
-                    console.log(`⚠️ Workspace file indexing failed: ${file.id}`, error);
-                  }
-                }
-              } else {
-                console.log(`⏳ Workspace file not yet uploaded, skipping: ${file.id}`);
-              }
-            }
-          }
+          console.log(`✅ RAG is available and ready for querying`);
         } else {
-          console.log(`❌ RAG not available, skipping document indexing`);
+          console.log(`❌ RAG not available`);
         }
       } catch (error) {
-        console.error('❌ RAG initialization failed:', error);
+        console.error('❌ RAG health check failed:', error);
         console.error('❌ Setting RAG health to error state');
         setRagHealth({ status: 'error', qdrant: false, gemini: false, initialized: false });
       }
     };
 
     initializeRAG();
-
-    // Test basic backend connectivity first
-    // testBackendConnection();
   }, [selectedFile, selectedWorkspace]);
 
   const testBackendConnection = async () => {

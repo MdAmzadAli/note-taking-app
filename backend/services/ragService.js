@@ -349,14 +349,14 @@ class RAGService {
   async indexDocument(fileId, filePath, fileName, workspaceId = null, cloudinaryData = null) {
     try {
       console.log(`📄 Starting document indexing for: ${fileName} (${fileId})`);
-console.log("laude lag gaye!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+      
       if (!this.qdrant) {
         throw new Error("Qdrant client not initialized");
       }
 
       // Check if document is already indexed first
       try {
-        const existingPoints = await this.qdrant.scroll(this.collectionName, { // Use this.collectionName
+        const existingPoints = await this.qdrant.scroll(this.collectionName, {
           filter: {
             must: [
               { key: 'fileId', match: { value: fileId } }
@@ -368,7 +368,7 @@ console.log("laude lag gaye!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         if (existingPoints.points && existingPoints.points.length > 0) {
           console.log(`📄 Document already indexed: ${fileId} (found existing chunks)`);
           // Get total count of existing chunks
-          const allPoints = await this.qdrant.scroll(this.collectionName, { // Use this.collectionName
+          const allPoints = await this.qdrant.scroll(this.collectionName, {
             filter: {
               must: [
                 { key: 'fileId', match: { value: fileId } }

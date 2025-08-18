@@ -1,4 +1,3 @@
-
 const fs = require('fs').promises;
 const path = require('path');
 const cloudinaryService = require('./cloudinaryService');
@@ -109,7 +108,7 @@ class FileService {
       console.log('📤 Processing file upload:', fileInfo.originalName);
 
       let cloudinaryResult = null;
-      
+
       // Only upload to Cloudinary if it's configured
       if (cloudinaryService.isConfigured()) {
         try {

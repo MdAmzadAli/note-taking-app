@@ -309,7 +309,7 @@ export default function ExpertTab() {
   const openFileChat = (file: SingleFile) => {
     console.log(`💬 Opening chat for file: ${file.id} (${file.name})`);
     console.log(`📤 File upload status: ${file.isUploaded ? 'Already uploaded' : 'Not uploaded'}`);
-    
+
     setSelectedFile(file);
     setSelectedWorkspace(null);
     setChatMessages([]);
@@ -323,7 +323,7 @@ export default function ExpertTab() {
       name: f.name,
       uploaded: f.isUploaded
     })));
-    
+
     setSelectedWorkspace(workspace);
     setSelectedFile(null);
     setChatMessages([]);
@@ -457,6 +457,16 @@ export default function ExpertTab() {
         };
 
         const uploadedFile = await fileService.uploadFile(fileToUpload);
+
+        // Index the document for RAG after successful upload
+        try {
+          console.log('🔄 Starting RAG indexing for added workspace file...');
+          const indexResult = await ragService.indexDocument(uploadedFile.id, workspaceId);
+          console.log('✅ RAG indexing completed for added workspace file:', indexResult);
+        } catch (ragError) {
+          console.warn('⚠️ RAG indexing failed for added workspace file (continuing anyway):', ragError.message);
+          // Don't fail the upload if RAG indexing fails
+        }
 
         const newFile: SingleFile = {
           id: uploadedFile.id,
