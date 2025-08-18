@@ -92,6 +92,57 @@ class RAGService {
           replication_factor: 1
         });
         console.log(`✅ Created collection: ${this.collectionName}`);
+
+        // Create payload indexes for filtering
+        console.log('🔄 Creating payload indexes...');
+        
+        // Index for fileId filtering
+        await this.qdrant.createPayloadIndex(this.collectionName, {
+          field_name: 'fileId',
+          field_schema: 'keyword'
+        });
+        console.log('✅ Created fileId index');
+
+        // Index for workspaceId filtering  
+        await this.qdrant.createPayloadIndex(this.collectionName, {
+          field_name: 'workspaceId',
+          field_schema: 'keyword'
+        });
+        console.log('✅ Created workspaceId index');
+
+        console.log('✅ All payload indexes created successfully');
+      } else {
+        // Check if indexes exist for existing collection
+        console.log('🔄 Checking existing collection indexes...');
+        try {
+          const collectionInfo = await this.qdrant.getCollection(this.collectionName);
+          const hasFileIdIndex = collectionInfo.payload_schema && collectionInfo.payload_schema.fileId;
+          const hasWorkspaceIdIndex = collectionInfo.payload_schema && collectionInfo.payload_schema.workspaceId;
+
+          if (!hasFileIdIndex) {
+            console.log('🔄 Creating missing fileId index...');
+            await this.qdrant.createPayloadIndex(this.collectionName, {
+              field_name: 'fileId',
+              field_schema: 'keyword'
+            });
+            console.log('✅ Created fileId index');
+          }
+
+          if (!hasWorkspaceIdIndex) {
+            console.log('🔄 Creating missing workspaceId index...');
+            await this.qdrant.createPayloadIndex(this.collectionName, {
+              field_name: 'workspaceId',
+              field_schema: 'keyword'
+            });
+            console.log('✅ Created workspaceId index');
+          }
+
+          if (hasFileIdIndex && hasWorkspaceIdIndex) {
+            console.log('✅ All required indexes already exist');
+          }
+        } catch (indexError) {
+          console.warn('⚠️ Could not verify indexes, they may need to be created manually:', indexError.message);
+        }
       }
     } catch (error) {
       console.error('❌ Error ensuring collection:', error);
@@ -302,13 +353,49 @@ class RAGService {
         });
       }
 
-      // Search in Qdrant
-      const searchResult = await this.qdrant.search(this.collectionName, {
-        vector: queryEmbedding,
-        filter: filter.must.length > 0 ? filter : undefined,
-        limit: limit,
-        with_payload: true
-      });
+      let searchResult;
+      
+      try {
+        // Search in Qdrant with filters
+        searchResult = await this.qdrant.search(this.collectionName, {
+          vector: queryEmbedding,
+          filter: filter.must.length > 0 ? filter : undefined,
+          limit: limit,
+          with_payload: true
+        });
+      } catch (filterError) {
+        console.warn('⚠️ Search with filter failed, trying without filters:', filterError.message);
+        
+        // If filtering fails due to missing index, try search without filters
+        if (filterError.message && filterError.message.includes('Index required')) {
+          console.log('🔄 Retrying search without filters...');
+          searchResult = await this.qdrant.search(this.collectionName, {
+            vector: queryEmbedding,
+            limit: limit * 2, // Get more results to filter manually
+            with_payload: true
+          });
+          
+          // Manually filter results if we have fileIds or workspaceId
+          if (fileIds && fileIds.length > 0) {
+            searchResult = searchResult.filter(result => 
+              fileIds.includes(result.payload.fileId)
+            );
+          }
+          
+          if (workspaceId) {
+            searchResult = searchResult.filter(result => 
+              result.payload.workspaceId === workspaceId
+            );
+          }
+          
+          // Limit results
+          searchResult = searchResult.slice(0, limit);
+          
+          console.log('✅ Manual filtering applied successfully');
+        } else {
+          throw filterError;
+        }
+      }
 
       console.log(`🎯 Found ${searchResult.length} relevant chunks`);
 
