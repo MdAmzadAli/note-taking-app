@@ -258,7 +258,7 @@ class RAGService {
     return chunks;
   }
 
-  // Generate task-specific embeddings using Google GenAI
+  // Generate task-specific embeddings using Google GenAIskksssnjsdsssi
   async generateEmbedding(text, taskType = 'document') {
     try {
       if (!this.genaiEmbedding) {
