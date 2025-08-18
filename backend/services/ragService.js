@@ -1,5 +1,6 @@
 
 const { QdrantClient } = require('@qdrant/js-client-rest');
+const { GoogleAIEmbeddingClient, FunctionCallingMode } = require('@google/genai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const pdfParse = require('pdf-parse');
 const fs = require('fs').promises;
@@ -11,10 +12,33 @@ class RAGService {
   constructor() {
     this.qdrant = null;
     this.gemini = null;
+    this.embeddingClient = null;
     this.collectionName = 'documents';
     this.chunkSize = 800;
     this.chunkOverlap = 100;
     this.isInitialized = false;
+    
+    // Task-specific embedding configurations
+    this.embeddingConfigs = {
+      // For indexing documents - optimized for storage and retrieval
+      document: {
+        model: 'text-embedding-004',
+        taskType: 'RETRIEVAL_DOCUMENT',
+        title: 'Document Content'
+      },
+      // For processing user queries - optimized for Q&A
+      query: {
+        model: 'text-embedding-004', 
+        taskType: 'QUESTION_ANSWERING',
+        title: 'User Question'
+      },
+      // For semantic similarity during search
+      similarity: {
+        model: 'text-embedding-004',
+        taskType: 'SEMANTIC_SIMILARITY',
+        title: 'Content Similarity'
+      }
+    };
   }
 
   async initialize() {
@@ -42,11 +66,19 @@ class RAGService {
         console.log('✅ Qdrant client initialized');
       }
 
-      // Initialize Gemini AI
+      // Initialize Google GenAI services
       if (process.env.GEMINI_API_KEY) {
-        console.log('🔄 Initializing Gemini AI...');
+        console.log('🔄 Initializing Google GenAI services...');
+        
+        // Initialize advanced embedding client
+        this.embeddingClient = new GoogleAIEmbeddingClient({
+          apiKey: process.env.GEMINI_API_KEY,
+        });
+        
+        // Initialize Gemini for text generation
         this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        console.log('✅ Gemini AI initialized');
+        
+        console.log('✅ Google GenAI services initialized');
       }
 
       // Only create collection if Qdrant is available
@@ -61,6 +93,7 @@ class RAGService {
       console.log('📊 Final state:', {
         qdrant: !!this.qdrant,
         gemini: !!this.gemini,
+        embeddingClient: !!this.embeddingClient,
         initialized: this.isInitialized
       });
     } catch (error) {
@@ -83,7 +116,7 @@ class RAGService {
       if (!collectionExists) {
         await this.qdrant.createCollection(this.collectionName, {
           vectors: {
-            size: 768, // Gemini embedding dimension
+            size: 768, // text-embedding-004 dimension
             distance: 'Cosine'
           },
           optimizers_config: {
@@ -214,34 +247,50 @@ class RAGService {
     return chunks;
   }
 
-  // Generate embeddings using Gemini
-  async generateEmbedding(text) {
+  // Generate task-specific embeddings using Google GenAI
+  async generateEmbedding(text, taskType = 'document', title = null) {
     try {
-      if (!this.embeddingModel) {
-        // Cache the model once instead of recreating every call
-        this.embeddingModel = this.gemini.getGenerativeModel({ model: 'embedding-001' });
+      if (!this.embeddingClient) {
+        throw new Error("Embedding client not initialized");
       }
 
-      const result = await this.embeddingModel.embedContent(text);
+      const config = this.embeddingConfigs[taskType];
+      if (!config) {
+        console.warn(`⚠️ Unknown task type: ${taskType}, using document config`);
+        config = this.embeddingConfigs.document;
+      }
+
+      console.log(`🔧 Generating ${taskType} embedding with task type: ${config.taskType}`);
+
+      const request = {
+        model: config.model,
+        content: {
+          parts: [{ text: text }]
+        },
+        taskType: config.taskType,
+        title: title || config.title
+      };
+
+      const result = await this.embeddingClient.embedContent(request);
 
       if (!result?.embedding?.values) {
         throw new Error("No embedding values returned");
       }
 
+      console.log(`✅ Generated ${taskType} embedding (dimension: ${result.embedding.values.length})`);
       return result.embedding.values;
     } catch (error) {
-      console.error("❌ Embedding generation failed:", error.message || error);
+      console.error(`❌ ${taskType} embedding generation failed:`, error.message || error);
       throw error;
     }
   }
 
-
-  // Index a document
+  // Index a document with optimized document embeddings
   async indexDocument(fileId, filePath, fileName, workspaceId = null, cloudinaryData = null) {
     try {
       console.log(`🔄 Indexing document: ${fileName}`);
 
-      if (!this.isInitialized || !this.qdrant) {
+      if (!this.isInitialized || !this.qdrant || !this.embeddingClient) {
         console.warn('⚠️ RAG service not properly initialized, skipping indexing');
         return { chunksCount: 0, success: false, message: 'RAG service not available' };
       }
@@ -264,11 +313,17 @@ class RAGService {
 
       console.log(`📄 Created ${chunks.length} chunks for ${fileName}`);
 
-      // Generate embeddings and store
+      // Generate document-optimized embeddings and store
       const points = [];
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
-        const embedding = await this.generateEmbedding(chunk.text);
+        
+        // Use RETRIEVAL_DOCUMENT task type for indexing documents
+        const embedding = await this.generateEmbedding(
+          chunk.text, 
+          'document', 
+          `${fileName} - Chunk ${i + 1}`
+        );
         
         // Calculate which page this chunk likely belongs to
         const estimatedPage = Math.ceil((chunk.metadata.chunkIndex + 1) / 2); // Rough estimate
@@ -288,6 +343,7 @@ class RAGService {
             pageUrl: pageUrl,
             cloudinaryUrl: cloudinaryData?.secureUrl,
             thumbnailUrl: cloudinaryData?.thumbnailUrl,
+            embeddingType: 'RETRIEVAL_DOCUMENT',
             ...chunk.metadata
           }
         });
@@ -328,13 +384,17 @@ class RAGService {
     }
   }
 
-  // Search for relevant chunks
+  // Search for relevant chunks with optimized query embeddings
   async searchRelevantChunks(query, fileIds = null, workspaceId = null, limit = 5) {
     try {
       console.log(`🔍 Searching for: "${query}"`);
 
-      // Generate query embedding
-      const queryEmbedding = await this.generateEmbedding(query);
+      // Generate query-optimized embedding using QUESTION_ANSWERING task type
+      const queryEmbedding = await this.generateEmbedding(
+        query, 
+        'query', 
+        'User Question for Document Search'
+      );
 
       // Build filter
       const filter = { must: [] };
@@ -397,7 +457,7 @@ class RAGService {
         }
       }
 
-      console.log(`🎯 Found ${searchResult.length} relevant chunks`);
+      console.log(`🎯 Found ${searchResult.length} relevant chunks using QUESTION_ANSWERING embeddings`);
 
       return searchResult.map(result => ({
         text: result.payload.text,
@@ -410,7 +470,8 @@ class RAGService {
           estimatedPage: result.payload.estimatedPage,
           pageUrl: result.payload.pageUrl,
           cloudinaryUrl: result.payload.cloudinaryUrl,
-          thumbnailUrl: result.payload.thumbnailUrl
+          thumbnailUrl: result.payload.thumbnailUrl,
+          embeddingType: result.payload.embeddingType
         }
       }));
 
@@ -420,12 +481,12 @@ class RAGService {
     }
   }
 
-  // Generate answer using RAG
+  // Generate answer using RAG with enhanced context understanding
   async generateAnswer(query, fileIds = null, workspaceId = null) {
     try {
       console.log(`🤖 Generating answer for: "${query}"`);
 
-      // Search for relevant chunks
+      // Search for relevant chunks using optimized query embeddings
       const relevantChunks = await this.searchRelevantChunks(
         query, 
         fileIds, 
@@ -441,36 +502,47 @@ class RAGService {
         };
       }
 
-      // Prepare context from chunks
+      // Prepare context from chunks with enhanced formatting
       const context = relevantChunks
-        .map((chunk, index) => `[Source ${index + 1}]: ${chunk.text}`)
+        .map((chunk, index) => {
+          const confidence = (chunk.score * 100).toFixed(1);
+          return `[Source ${index + 1} - ${chunk.metadata.fileName} - Page ${chunk.metadata.estimatedPage} - Relevance: ${confidence}%]: ${chunk.text}`;
+        })
         .join('\n\n');
 
-      // Generate answer with Gemini
-      const model = this.gemini.getGenerativeModel({ model: 'gemini-1.5-pro' });
+      // Generate answer with Gemini using advanced prompting
+      const model = this.gemini.getGenerativeModel({ 
+        model: 'gemini-1.5-pro',
+        generationConfig: {
+          temperature: 0.3, // Lower temperature for more precise answers
+          topP: 0.8,
+          maxOutputTokens: 2048,
+        }
+      });
       
-      const prompt = `
-You are an AI assistant that answers questions based on provided document content.
+      const prompt = `You are an expert AI assistant that provides accurate, detailed answers based on document content.
 
-Context from uploaded documents:
+CONTEXT FROM DOCUMENTS:
 ${context}
 
-User Question: ${query}
+USER QUESTION: ${query}
 
-Instructions:
+INSTRUCTIONS:
 1. Answer the question using ONLY the information provided in the context above
-2. Be precise and accurate
-3. If the context doesn't contain enough information, say so
-4. Include specific details and quotes when relevant
-5. Maintain a helpful and professional tone
-6. Do not make up information not present in the context
+2. Be precise, comprehensive, and well-structured
+3. Include specific details, quotes, and examples when relevant
+4. If multiple sources provide different perspectives, present them clearly
+5. If the context doesn't contain sufficient information, state this clearly
+6. Reference source numbers when citing specific information
+7. Maintain a professional, helpful tone
+8. Structure your answer with clear sections if appropriate
 
-Answer:`;
+ANSWER:`;
 
       const result = await model.generateContent(prompt);
       const answer = result.response.text();
 
-      // Prepare sources with original text and page references
+      // Prepare enhanced sources with additional metadata
       const sources = relevantChunks.map((chunk, index) => ({
         id: `source_${index + 1}`,
         fileName: chunk.metadata.fileName,
@@ -481,15 +553,18 @@ Answer:`;
         estimatedPage: chunk.metadata.estimatedPage || 1,
         pageUrl: chunk.metadata.pageUrl,
         cloudinaryUrl: chunk.metadata.cloudinaryUrl,
-        thumbnailUrl: chunk.metadata.thumbnailUrl
+        thumbnailUrl: chunk.metadata.thumbnailUrl,
+        embeddingType: chunk.metadata.embeddingType,
+        confidencePercentage: (chunk.score * 100).toFixed(1)
       }));
 
-      console.log(`✅ Generated answer with ${sources.length} sources`);
+      console.log(`✅ Generated answer with ${sources.length} sources using optimized embeddings`);
 
       return {
         answer: answer,
         sources: sources,
-        confidence: relevantChunks[0]?.score || 0
+        confidence: relevantChunks[0]?.score || 0,
+        embeddingStrategy: 'QUESTION_ANSWERING for queries, RETRIEVAL_DOCUMENT for indexed content'
       };
 
     } catch (error) {
@@ -498,7 +573,7 @@ Answer:`;
     }
   }
 
-  // Health check
+  // Health check with embedding client status
   async healthCheck() {
     try {
       if (!this.isInitialized) {
@@ -506,6 +581,7 @@ Answer:`;
           status: 'degraded', 
           qdrant: false, 
           gemini: false,
+          embeddingClient: false,
           initialized: false,
           message: 'RAG service not configured (missing environment variables)'
         };
@@ -519,13 +595,16 @@ Answer:`;
         status: this.qdrant ? 'healthy' : 'degraded', 
         qdrant: !!this.qdrant, 
         gemini: !!this.gemini,
-        initialized: this.isInitialized 
+        embeddingClient: !!this.embeddingClient,
+        initialized: this.isInitialized,
+        embeddingConfigs: Object.keys(this.embeddingConfigs)
       };
     } catch (error) {
       return { 
         status: 'unhealthy', 
         qdrant: false, 
         gemini: !!this.gemini,
+        embeddingClient: !!this.embeddingClient,
         initialized: this.isInitialized,
         error: error.message 
       };
