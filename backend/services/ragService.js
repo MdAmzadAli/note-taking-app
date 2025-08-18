@@ -349,7 +349,7 @@ class RAGService {
   async indexDocument(fileId, filePath, fileName, workspaceId = null, cloudinaryData = null) {
     try {
       console.log(`📄 Starting document indexing for: ${fileName} (${fileId})`);
-
+console.log("laude lag gaye!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
       if (!this.qdrant) {
         throw new Error("Qdrant client not initialized");
       }
@@ -597,7 +597,7 @@ class RAGService {
         query,
         fileIds,
         workspaceId,
-        4 // Get more chunks for better context
+        6 // Get more chunks for better context
       );
 
       if (relevantChunks.length === 0) {
@@ -622,7 +622,7 @@ class RAGService {
       }
 
       const model = await this.genaiChat.models.generateContent({
-        model: 'gemini-1.5-pro',
+        model: 'gemini-2.5-flash-lite',
         config: {
           temperature: 0.3,
           topP: 0.8,
