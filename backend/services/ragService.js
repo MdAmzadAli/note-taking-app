@@ -10,7 +10,8 @@ const POINT_NS = '2d3c0d3e-1e1a-4f6a-9e84-1b8de377e9c9';
 class RAGService {
   constructor() {
     this.qdrant = null;
-    this.genai = null;
+    this.genaiEmbedding = null; // For embeddings
+    this.genaiChat = null;      // For chatting
     this.collectionName = 'documents';
     this.chunkSize = 800;
     this.chunkOverlap = 100;
@@ -61,11 +62,12 @@ class RAGService {
     console.log('🔧 Environment check:');
     console.log('   QDRANT_URL:', process.env.QDRANT_URL ? '✅ Set' : '❌ Not set');
     console.log('   QDRANT_API_KEY:', process.env.QDRANT_API_KEY ? '✅ Set' : '⚠️ Not set (optional)');
-    console.log('   GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? '✅ Set' : '❌ Not set');
+    console.log('   GEMINI_EMBEDDING_API_KEY:', process.env.GEMINI_EMBEDDING_API_KEY ? '✅ Set' : '❌ Not set');
+    console.log('   GEMINI_CHAT_API_KEY:', process.env.GEMINI_CHAT_API_KEY ? '✅ Set' : '❌ Not set');
     
     try {
       // Check if required environment variables are available
-      if (!process.env.QDRANT_URL && !process.env.GEMINI_API_KEY) {
+      if (!process.env.QDRANT_URL && !process.env.GEMINI_EMBEDDING_API_KEY && !process.env.GEMINI_CHAT_API_KEY) {
         console.warn('⚠️ RAG environment variables not configured, running in mock mode');
         this.isInitialized = false;
         return;
@@ -81,15 +83,26 @@ class RAGService {
         console.log('✅ Qdrant client initialized');
       }
 
-      // Initialize Google GenAI with correct SDK usage
-      if (process.env.GEMINI_API_KEY) {
-        console.log('🔄 Initializing Google GenAI...');
+      // Initialize Google GenAI for embeddings
+      if (process.env.GEMINI_EMBEDDING_API_KEY) {
+        console.log('🔄 Initializing Google GenAI for embeddings...');
         
-        this.genai = new GoogleGenAI({
-          apiKey: process.env.GEMINI_API_KEY
+        this.genaiEmbedding = new GoogleGenAI({
+          apiKey: process.env.GEMINI_EMBEDDING_API_KEY
         });
         
-        console.log('✅ Google GenAI initialized');
+        console.log('✅ Google GenAI Embedding client initialized');
+      }
+
+      // Initialize Google GenAI for chat
+      if (process.env.GEMINI_CHAT_API_KEY) {
+        console.log('🔄 Initializing Google GenAI for chat...');
+        
+        this.genaiChat = new GoogleGenAI({
+          apiKey: process.env.GEMINI_CHAT_API_KEY
+        });
+        
+        console.log('✅ Google GenAI Chat client initialized');
       }
 
       // Only create collection if Qdrant is available
@@ -103,7 +116,8 @@ class RAGService {
       console.log('✅ RAG Service initialized successfully');
       console.log('📊 Final state:', {
         qdrant: !!this.qdrant,
-        genai: !!this.genai,
+        genaiEmbedding: !!this.genaiEmbedding,
+        genaiChat: !!this.genaiChat,
         initialized: this.isInitialized
       });
     } catch (error) {
@@ -243,8 +257,8 @@ class RAGService {
   // Generate task-specific embeddings using Google GenAI
   async generateEmbedding(text, taskType = 'document') {
     try {
-      if (!this.genai) {
-        throw new Error("Google GenAI not initialized");
+      if (!this.genaiEmbedding) {
+        throw new Error("Google GenAI Embedding client not initialized");
       }
 
       const config = this.embeddingConfigs[taskType];
@@ -256,7 +270,7 @@ class RAGService {
       console.log(`🔧 Generating ${taskType} embedding with task type: ${config.taskType}`);
 
       // Use correct Google GenAI SDK format
-      const response = await this.genai.models.embedContent({
+      const response = await this.genaiEmbedding.models.embedContent({
         model: config.model,
         contents: [text],
         taskType: config.taskType
@@ -278,8 +292,8 @@ class RAGService {
   // Generate batch embeddings for multiple texts (up to 168 per call)
   async generateBatchEmbeddings(texts, taskType = 'document') {
     try {
-      if (!this.genai) {
-        throw new Error("Google GenAI not initialized");
+      if (!this.genaiEmbedding) {
+        throw new Error("Google GenAI Embedding client not initialized");
       }
 
       if (!Array.isArray(texts) || texts.length === 0) {
@@ -299,7 +313,7 @@ class RAGService {
       console.log(`🔧 Generating batch ${taskType} embeddings for ${texts.length} texts with task type: ${config.taskType}`);
 
       // Use correct Google GenAI SDK format for batch processing
-      const response = await this.genai.models.embedContent({
+      const response = await this.genaiEmbedding.models.embedContent({
         model: config.model,
         contents: texts,
         taskType: config.taskType
@@ -333,7 +347,7 @@ class RAGService {
     try {
       console.log(`🔄 Indexing document: ${fileName}`);
 
-      if (!this.isInitialized || !this.qdrant || !this.genai) {
+      if (!this.isInitialized || !this.qdrant || !this.genaiEmbedding) {
         console.warn('⚠️ RAG service not properly initialized, skipping indexing');
         return { chunksCount: 0, success: false, message: 'RAG service not available' };
       }
@@ -560,8 +574,12 @@ class RAGService {
         })
         .join('\n\n');
 
-      // Generate answer using correct Google GenAI SDK
-      const model = await this.genai.models.generateContent({
+      // Generate answer using chat client
+      if (!this.genaiChat) {
+        throw new Error("Google GenAI Chat client not initialized");
+      }
+
+      const model = await this.genaiChat.models.generateContent({
         model: 'gemini-1.5-pro',
         config: {
           temperature: 0.3,
@@ -632,7 +650,8 @@ ANSWER:`
         return { 
           status: 'degraded', 
           qdrant: false, 
-          genai: false,
+          genaiEmbedding: false,
+          genaiChat: false,
           initialized: false,
           message: 'RAG service not configured (missing environment variables)'
         };
@@ -645,7 +664,8 @@ ANSWER:`
       return { 
         status: this.qdrant ? 'healthy' : 'degraded', 
         qdrant: !!this.qdrant, 
-        genai: !!this.genai,
+        genaiEmbedding: !!this.genaiEmbedding,
+        genaiChat: !!this.genaiChat,
         initialized: this.isInitialized,
         embeddingConfigs: Object.keys(this.embeddingConfigs)
       };
@@ -653,7 +673,8 @@ ANSWER:`
       return { 
         status: 'unhealthy', 
         qdrant: false, 
-        genai: !!this.genai,
+        genaiEmbedding: !!this.genaiEmbedding,
+        genaiChat: !!this.genaiChat,
         initialized: this.isInitialized,
         error: error.message 
       };
