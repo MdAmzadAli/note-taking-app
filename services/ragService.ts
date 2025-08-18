@@ -147,7 +147,11 @@ class RAGService {
         body: JSON.stringify(requestData)
       });
 
-      console.log(`✅ Document indexed successfully: ${fileId}`);
+      if (response.alreadyIndexed) {
+        console.log(`ℹ️ Document already indexed: ${fileId} (${response.chunksCount} chunks)`);
+      } else {
+        console.log(`✅ Document indexed successfully: ${fileId}`);
+      }
       console.log(`📊 Index response:`, JSON.stringify(response, null, 2));
       return response;
     } catch (error) {

@@ -307,6 +307,9 @@ export default function ExpertTab() {
   };
 
   const openFileChat = (file: SingleFile) => {
+    console.log(`💬 Opening chat for file: ${file.id} (${file.name})`);
+    console.log(`📤 File upload status: ${file.isUploaded ? 'Already uploaded' : 'Not uploaded'}`);
+    
     setSelectedFile(file);
     setSelectedWorkspace(null);
     setChatMessages([]);
@@ -314,6 +317,13 @@ export default function ExpertTab() {
   };
 
   const openWorkspaceChat = (workspace: Workspace) => {
+    console.log(`💬 Opening chat for workspace: ${workspace.id} (${workspace.name})`);
+    console.log(`📤 Workspace files status:`, workspace.files.map(f => ({
+      id: f.id,
+      name: f.name,
+      uploaded: f.isUploaded
+    })));
+    
     setSelectedWorkspace(workspace);
     setSelectedFile(null);
     setChatMessages([]);

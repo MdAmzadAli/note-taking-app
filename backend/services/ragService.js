@@ -1,4 +1,3 @@
-
 const { QdrantClient } = require('@qdrant/js-client-rest');
 const { GoogleGenAI } = require('@google/genai');
 const pdfParse = require('pdf-parse');
@@ -6,6 +5,10 @@ const fs = require('fs').promises;
 const path = require('path');
 const { v5: uuidv5 } = require('uuid');
 const POINT_NS = '2d3c0d3e-1e1a-4f6a-9e84-1b8de377e9c9';
+
+// Define COLLECTION_NAME at the module level if it's used in multiple places, otherwise pass it as argument or define it within the function.
+// For now, assuming it's intended to be used within the function or globally accessible.
+const COLLECTION_NAME = 'documents'; // Assuming this is the intended collection name
 
 class RAGService {
   constructor() {
@@ -16,7 +19,7 @@ class RAGService {
     this.chunkSize = 800;
     this.chunkOverlap = 100;
     this.isInitialized = false;
-    
+
     // Task-specific embedding configurations
     this.embeddingConfigs = {
       // For indexing documents - optimized for storage and retrieval
@@ -26,7 +29,7 @@ class RAGService {
       },
       // For processing user queries - optimized for Q&A
       query: {
-        model: 'text-embedding-004', 
+        model: 'text-embedding-004',
         taskType: 'QUESTION_ANSWERING'
       },
       // For semantic similarity during search
@@ -64,7 +67,7 @@ class RAGService {
     console.log('   QDRANT_API_KEY:', process.env.QDRANT_API_KEY ? '✅ Set' : '⚠️ Not set (optional)');
     console.log('   GEMINI_EMBEDDING_API_KEY:', process.env.GEMINI_EMBEDDING_API_KEY ? '✅ Set' : '❌ Not set');
     console.log('   GEMINI_CHAT_API_KEY:', process.env.GEMINI_CHAT_API_KEY ? '✅ Set' : '❌ Not set');
-    
+
     try {
       // Check if required environment variables are available
       if (!process.env.QDRANT_URL && !process.env.GEMINI_EMBEDDING_API_KEY && !process.env.GEMINI_CHAT_API_KEY) {
@@ -86,22 +89,22 @@ class RAGService {
       // Initialize Google GenAI for embeddings
       if (process.env.GEMINI_EMBEDDING_API_KEY) {
         console.log('🔄 Initializing Google GenAI for embeddings...');
-        
+
         this.genaiEmbedding = new GoogleGenAI({
           apiKey: process.env.GEMINI_EMBEDDING_API_KEY
         });
-        
+
         console.log('✅ Google GenAI Embedding client initialized');
       }
 
       // Initialize Google GenAI for chat
       if (process.env.GEMINI_CHAT_API_KEY) {
         console.log('🔄 Initializing Google GenAI for chat...');
-        
+
         this.genaiChat = new GoogleGenAI({
           apiKey: process.env.GEMINI_CHAT_API_KEY
         });
-        
+
         console.log('✅ Google GenAI Chat client initialized');
       }
 
@@ -111,7 +114,7 @@ class RAGService {
         await this.ensureCollection();
         console.log('✅ Qdrant collection ready');
       }
-      
+
       this.isInitialized = true;
       console.log('✅ RAG Service initialized successfully');
       console.log('📊 Final state:', {
@@ -153,7 +156,7 @@ class RAGService {
 
       // Always ensure payload indexes exist
       console.log('🔄 Ensuring payload indexes...');
-      
+
       try {
         // Create fileId index
         await this.qdrant.createPayloadIndex(this.collectionName, {
@@ -227,7 +230,7 @@ class RAGService {
 
         // Start new chunk with overlap
         const overlapSentences = sentences.slice(
-          Math.max(0, i - 2), 
+          Math.max(0, i - 2),
           i
         ).join('. ');
         currentChunk = overlapSentences + '. ' + sentence;
@@ -345,16 +348,55 @@ class RAGService {
   // Index a document with optimized document embeddings
   async indexDocument(fileId, filePath, fileName, workspaceId = null, cloudinaryData = null) {
     try {
-      console.log(`🔄 Indexing document: ${fileName}`);
+      console.log(`📄 Starting document indexing for: ${fileName} (${fileId})`);
 
-      if (!this.isInitialized || !this.qdrant || !this.genaiEmbedding) {
-        console.warn('⚠️ RAG service not properly initialized, skipping indexing');
-        return { chunksCount: 0, success: false, message: 'RAG service not available' };
+      if (!this.qdrant) {
+        throw new Error("Qdrant client not initialized");
+      }
+
+      // Check if document is already indexed first
+      try {
+        const existingPoints = await this.qdrant.scroll(this.collectionName, { // Use this.collectionName
+          filter: {
+            must: [
+              { key: 'fileId', match: { value: fileId } }
+            ]
+          },
+          limit: 1
+        });
+
+        if (existingPoints.points && existingPoints.points.length > 0) {
+          console.log(`📄 Document already indexed: ${fileId} (found existing chunks)`);
+          // Get total count of existing chunks
+          const allPoints = await this.qdrant.scroll(this.collectionName, { // Use this.collectionName
+            filter: {
+              must: [
+                { key: 'fileId', match: { value: fileId } }
+              ]
+            },
+            limit: 10000 // Get all chunks to count them
+          });
+
+          return {
+            success: true,
+            message: 'Document already indexed',
+            chunksCount: allPoints.points ? allPoints.points.length : 0,
+            alreadyIndexed: true
+          };
+        }
+      } catch (error) {
+        console.warn(`⚠️ Could not check for existing documents: ${error.message}`);
+        // Continue with indexing if check fails
+      }
+
+      // Validate file path
+      if (!filePath || !fs.existsSync(filePath)) {
+        throw new Error(`File not found: ${filePath}`);
       }
 
       // Extract text from PDF
       const text = await this.extractTextFromPDF(filePath);
-      
+
       if (!text || text.trim().length === 0) {
         throw new Error('No text content found in PDF');
       }
@@ -373,29 +415,29 @@ class RAGService {
       // Generate document-optimized embeddings in batches and store
       const points = [];
       const batchSize = 168; // Maximum chunks per API call
-      
+
       for (let batchStart = 0; batchStart < chunks.length; batchStart += batchSize) {
         const batchEnd = Math.min(batchStart + batchSize, chunks.length);
         const batchChunks = chunks.slice(batchStart, batchEnd);
-        
+
         console.log(`🔄 Processing batch ${Math.floor(batchStart / batchSize) + 1}/${Math.ceil(chunks.length / batchSize)} (${batchChunks.length} chunks)`);
-        
+
         // Extract texts for batch embedding
         const batchTexts = batchChunks.map(chunk => chunk.text);
-        
+
         // Generate embeddings for the entire batch
         const batchEmbeddings = await this.generateBatchEmbeddings(batchTexts, 'document');
-        
+
         // Create points for this batch
         for (let i = 0; i < batchChunks.length; i++) {
           const chunk = batchChunks[i];
           const globalIndex = batchStart + i;
           const embedding = batchEmbeddings[i];
-          
+
           // Calculate which page this chunk likely belongs to
           const estimatedPage = Math.ceil((globalIndex + 1) / 2); // Rough estimate
           const pageUrl = cloudinaryData?.pageUrls?.[estimatedPage - 1] || cloudinaryData?.secureUrl;
-          
+
           points.push({
             id: uuidv5(`${fileId}:${globalIndex}`, POINT_NS),
             vector: embedding,
@@ -418,7 +460,7 @@ class RAGService {
       }
 
       // Batch insert to Qdrant
-      await this.qdrant.upsert(this.collectionName, {
+      await this.qdrant.upsert(this.collectionName, { // Use this.collectionName
         wait: true,
         points: points
       });
@@ -435,7 +477,7 @@ class RAGService {
   // Remove document from index
   async removeDocument(fileId) {
     try {
-      await this.qdrant.delete(this.collectionName, {
+      await this.qdrant.delete(this.collectionName, { // Use this.collectionName
         filter: {
           must: [
             {
@@ -462,7 +504,7 @@ class RAGService {
 
       // Build filter
       const filter = { must: [] };
-      
+
       if (fileIds && fileIds.length > 0) {
         filter.must.push({
           key: 'fileId',
@@ -478,10 +520,10 @@ class RAGService {
       }
 
       let searchResult;
-      
+
       try {
         // Search in Qdrant with filters
-        searchResult = await this.qdrant.search(this.collectionName, {
+        searchResult = await this.qdrant.search(this.collectionName, { // Use this.collectionName
           vector: queryEmbedding,
           filter: filter.must.length > 0 ? filter : undefined,
           limit: limit,
@@ -489,32 +531,32 @@ class RAGService {
         });
       } catch (filterError) {
         console.warn('⚠️ Search with filter failed, trying without filters:', filterError.message);
-        
+
         // If filtering fails due to missing index, try search without filters
         if (filterError.message && filterError.message.includes('Index required')) {
           console.log('🔄 Retrying search without filters...');
-          searchResult = await this.qdrant.search(this.collectionName, {
+          searchResult = await this.qdrant.search(this.collectionName, { // Use this.collectionName
             vector: queryEmbedding,
             limit: limit * 2, // Get more results to filter manually
             with_payload: true
           });
-          
+
           // Manually filter results if we have fileIds or workspaceId
           if (fileIds && fileIds.length > 0) {
-            searchResult = searchResult.filter(result => 
+            searchResult = searchResult.filter(result =>
               fileIds.includes(result.payload.fileId)
             );
           }
-          
+
           if (workspaceId) {
-            searchResult = searchResult.filter(result => 
+            searchResult = searchResult.filter(result =>
               result.payload.workspaceId === workspaceId
             );
           }
-          
+
           // Limit results
           searchResult = searchResult.slice(0, limit);
-          
+
           console.log('✅ Manual filtering applied successfully');
         } else {
           throw filterError;
@@ -552,9 +594,9 @@ class RAGService {
 
       // Search for relevant chunks using optimized query embeddings
       const relevantChunks = await this.searchRelevantChunks(
-        query, 
-        fileIds, 
-        workspaceId, 
+        query,
+        fileIds,
+        workspaceId,
         4 // Get more chunks for better context
       );
 
@@ -609,7 +651,7 @@ ANSWER:`
           }]
         }]
       });
-      
+
       const answer = model.candidates[0].content.parts[0].text;
 
       // Prepare enhanced sources with additional metadata
@@ -647,9 +689,9 @@ ANSWER:`
   async healthCheck() {
     try {
       if (!this.isInitialized) {
-        return { 
-          status: 'degraded', 
-          qdrant: false, 
+        return {
+          status: 'degraded',
+          qdrant: false,
           genaiEmbedding: false,
           genaiChat: false,
           initialized: false,
@@ -661,22 +703,22 @@ ANSWER:`
         await this.qdrant.getCollections();
       }
 
-      return { 
-        status: this.qdrant ? 'healthy' : 'degraded', 
-        qdrant: !!this.qdrant, 
+      return {
+        status: this.qdrant ? 'healthy' : 'degraded',
+        qdrant: !!this.qdrant,
         genaiEmbedding: !!this.genaiEmbedding,
         genaiChat: !!this.genaiChat,
         initialized: this.isInitialized,
         embeddingConfigs: Object.keys(this.embeddingConfigs)
       };
     } catch (error) {
-      return { 
-        status: 'unhealthy', 
-        qdrant: false, 
+      return {
+        status: 'unhealthy',
+        qdrant: false,
         genaiEmbedding: !!this.genaiEmbedding,
         genaiChat: !!this.genaiChat,
         initialized: this.isInitialized,
-        error: error.message 
+        error: error.message
       };
     }
   }
