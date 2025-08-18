@@ -275,6 +275,59 @@ class RAGService {
     }
   }
 
+  // Generate batch embeddings for multiple texts (up to 168 per call)
+  async generateBatchEmbeddings(texts, taskType = 'document') {
+    try {
+      if (!this.genai) {
+        throw new Error("Google GenAI not initialized");
+      }
+
+      if (!Array.isArray(texts) || texts.length === 0) {
+        throw new Error("Texts must be a non-empty array");
+      }
+
+      if (texts.length > 168) {
+        throw new Error("Batch size cannot exceed 168 texts per API call");
+      }
+
+      const config = this.embeddingConfigs[taskType];
+      if (!config) {
+        console.warn(`⚠️ Unknown task type: ${taskType}, using document config`);
+        config = this.embeddingConfigs.document;
+      }
+
+      console.log(`🔧 Generating batch ${taskType} embeddings for ${texts.length} texts with task type: ${config.taskType}`);
+
+      // Use correct Google GenAI SDK format for batch processing
+      const response = await this.genai.models.embedContent({
+        model: config.model,
+        contents: texts,
+        taskType: config.taskType
+      });
+
+      if (!response?.embeddings || !Array.isArray(response.embeddings)) {
+        throw new Error("No embeddings array returned");
+      }
+
+      if (response.embeddings.length !== texts.length) {
+        throw new Error(`Expected ${texts.length} embeddings, got ${response.embeddings.length}`);
+      }
+
+      const embeddings = response.embeddings.map(emb => {
+        if (!emb?.values) {
+          throw new Error("Invalid embedding format - no values property");
+        }
+        return emb.values;
+      });
+
+      console.log(`✅ Generated batch ${taskType} embeddings (${embeddings.length} embeddings, dimension: ${embeddings[0]?.length})`);
+      return embeddings;
+    } catch (error) {
+      console.error(`❌ Batch ${taskType} embedding generation failed:`, error.message || error);
+      throw error;
+    }
+  }
+
   // Index a document with optimized document embeddings
   async indexDocument(fileId, filePath, fileName, workspaceId = null, cloudinaryData = null) {
     try {
@@ -303,36 +356,51 @@ class RAGService {
 
       console.log(`📄 Created ${chunks.length} chunks for ${fileName}`);
 
-      // Generate document-optimized embeddings and store
+      // Generate document-optimized embeddings in batches and store
       const points = [];
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
+      const batchSize = 168; // Maximum chunks per API call
+      
+      for (let batchStart = 0; batchStart < chunks.length; batchStart += batchSize) {
+        const batchEnd = Math.min(batchStart + batchSize, chunks.length);
+        const batchChunks = chunks.slice(batchStart, batchEnd);
         
-        // Use RETRIEVAL_DOCUMENT task type for indexing documents
-        const embedding = await this.generateEmbedding(chunk.text, 'document');
+        console.log(`🔄 Processing batch ${Math.floor(batchStart / batchSize) + 1}/${Math.ceil(chunks.length / batchSize)} (${batchChunks.length} chunks)`);
         
-        // Calculate which page this chunk likely belongs to
-        const estimatedPage = Math.ceil((chunk.metadata.chunkIndex + 1) / 2); // Rough estimate
-        const pageUrl = cloudinaryData?.pageUrls?.[estimatedPage - 1] || cloudinaryData?.secureUrl;
+        // Extract texts for batch embedding
+        const batchTexts = batchChunks.map(chunk => chunk.text);
         
-        points.push({
-          id: uuidv5(`${fileId}:${i}`, POINT_NS),
-          vector: embedding,
-          payload: {
-            text: chunk.text,
-            fileId: fileId,
-            fileName: fileName,
-            chunkIndex: i,
-            workspaceId: workspaceId,
-            totalChunks: chunks.length,
-            estimatedPage: estimatedPage,
-            pageUrl: pageUrl,
-            cloudinaryUrl: cloudinaryData?.secureUrl,
-            thumbnailUrl: cloudinaryData?.thumbnailUrl,
-            embeddingType: 'RETRIEVAL_DOCUMENT',
-            ...chunk.metadata
-          }
-        });
+        // Generate embeddings for the entire batch
+        const batchEmbeddings = await this.generateBatchEmbeddings(batchTexts, 'document');
+        
+        // Create points for this batch
+        for (let i = 0; i < batchChunks.length; i++) {
+          const chunk = batchChunks[i];
+          const globalIndex = batchStart + i;
+          const embedding = batchEmbeddings[i];
+          
+          // Calculate which page this chunk likely belongs to
+          const estimatedPage = Math.ceil((globalIndex + 1) / 2); // Rough estimate
+          const pageUrl = cloudinaryData?.pageUrls?.[estimatedPage - 1] || cloudinaryData?.secureUrl;
+          
+          points.push({
+            id: uuidv5(`${fileId}:${globalIndex}`, POINT_NS),
+            vector: embedding,
+            payload: {
+              text: chunk.text,
+              fileId: fileId,
+              fileName: fileName,
+              chunkIndex: globalIndex,
+              workspaceId: workspaceId,
+              totalChunks: chunks.length,
+              estimatedPage: estimatedPage,
+              pageUrl: pageUrl,
+              cloudinaryUrl: cloudinaryData?.secureUrl,
+              thumbnailUrl: cloudinaryData?.thumbnailUrl,
+              embeddingType: 'RETRIEVAL_DOCUMENT',
+              ...chunk.metadata
+            }
+          });
+        }
       }
 
       // Batch insert to Qdrant
