@@ -640,13 +640,28 @@ USER QUESTION: ${query}
 
 INSTRUCTIONS:
 1. Answer the question using ONLY the information provided in the context above
-2. Be precise, comprehensive, and well-structured
-3. Include specific details, quotes, and examples when relevant
-4. If multiple sources provide different perspectives, present them clearly
-5. If the context doesn't contain sufficient information, state this clearly
-6. Reference source numbers when citing specific information
-7. Maintain a professional, helpful tone
-8. Structure your answer with clear sections if appropriate
+2. Be precise, comprehensive, and well-structured with proper formatting
+3. Use **bold text** for important headings and key terms
+4. Use bullet points (•) or numbered lists (1.) for multiple items or steps
+5. Structure complex answers with clear sections using **Section Headings**
+6. Include specific details, quotes, and examples when relevant
+7. If multiple sources provide different perspectives, present them clearly
+8. Reference source numbers when citing specific information (e.g., [Source 1])
+9. Maintain a professional, helpful tone
+10. If the context doesn't contain sufficient information, state this clearly
+
+FORMATTING GUIDELINES:
+- Use **headings** for main sections
+- Use bullet points for lists:
+  • First point
+  • Second point
+  • Third point
+- Use numbered lists for sequential steps:
+  1. First step
+  2. Second step
+  3. Third step
+- Use **bold** for emphasis on key terms
+- Keep paragraphs concise and well-spaced
 
 ANSWER:`
           }]

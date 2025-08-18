@@ -173,6 +173,87 @@ export default function ChatInterface({
     setIsFilePreviewVisible(true);
   };
 
+  // Helper function to render formatted text with markdown-like styling
+  const renderFormattedText = (text: string) => {
+    const lines = text.split('\n');
+    const elements: React.ReactNode[] = [];
+    let keyCounter = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      // Skip empty lines but add spacing
+      if (line.trim() === '') {
+        elements.push(<View key={keyCounter++} style={styles.lineSpacing} />);
+        continue;
+      }
+
+      // Check for headings (lines with **text** or ### text)
+      if (line.match(/^#{1,3}\s+/) || line.match(/^\*\*.*\*\*$/)) {
+        const headingText = line.replace(/^#{1,3}\s+/, '').replace(/^\*\*(.*)\*\*$/, '$1');
+        elements.push(
+          <Text key={keyCounter++} style={styles.headingText}>
+            {headingText}
+          </Text>
+        );
+        continue;
+      }
+
+      // Check for bullet points
+      if (line.match(/^[\s]*[-•*]\s+/) || line.match(/^\d+\.\s+/)) {
+        const bulletText = line.replace(/^[\s]*[-•*]\s+/, '').replace(/^\d+\.\s+/, '');
+        elements.push(
+          <View key={keyCounter++} style={styles.bulletContainer}>
+            <Text style={styles.bulletPoint}>•</Text>
+            <Text style={styles.bulletText}>{formatInlineText(bulletText)}</Text>
+          </View>
+        );
+        continue;
+      }
+
+      // Regular paragraph text
+      elements.push(
+        <Text key={keyCounter++} style={styles.pdfAiMessageText}>
+          {formatInlineText(line)}
+        </Text>
+      );
+    }
+
+    return <View>{elements}</View>;
+  };
+
+  // Helper function to format inline text (bold, italic, etc.)
+  const formatInlineText = (text: string) => {
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/);
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        // Bold text
+        return (
+          <Text key={index} style={styles.boldText}>
+            {part.slice(2, -2)}
+          </Text>
+        );
+      } else if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
+        // Italic text
+        return (
+          <Text key={index} style={styles.italicText}>
+            {part.slice(1, -1)}
+          </Text>
+        );
+      } else if (part.startsWith('`') && part.endsWith('`')) {
+        // Code text
+        return (
+          <Text key={index} style={styles.codeText}>
+            {part.slice(1, -1)}
+          </Text>
+        );
+      } else {
+        // Regular text
+        return part;
+      }
+    });
+  };
+
   return (
     <SafeAreaView style={styles.pdfChatContainer}>
       <KeyboardAvoidingView 
@@ -349,7 +430,7 @@ export default function ChatInterface({
                     </View>
                   ) : (
                     <>
-                      <Text style={styles.pdfAiMessageText}>{msg.ai}</Text>
+                      {renderFormattedText(msg.ai)}
                       {msg.sources && msg.sources.length > 0 && (
                         <TouchableOpacity 
                           style={styles.pdfSourceButton}
@@ -938,5 +1019,50 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '500',
+  },
+  // New styles for formatted text
+  headingText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginVertical: 8,
+    lineHeight: 24,
+  },
+  bulletContainer: {
+    flexDirection: 'row',
+    marginVertical: 2,
+    paddingLeft: 8,
+  },
+  bulletPoint: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    marginRight: 8,
+    lineHeight: 22,
+  },
+  bulletText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    lineHeight: 22,
+    flex: 1,
+  },
+  boldText: {
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  italicText: {
+    fontStyle: 'italic',
+    color: '#FFFFFF',
+  },
+  codeText: {
+    fontFamily: 'monospace',
+    backgroundColor: '#333333',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+    color: '#00FF88',
+    fontSize: 14,
+  },
+  lineSpacing: {
+    height: 8,
   },
 });
