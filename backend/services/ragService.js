@@ -495,7 +495,7 @@ class RAGService {
       // Generate answer using correct Google GenAI SDK
       const model = await this.genai.models.generateContent({
         model: 'gemini-1.5-pro',
-        generationConfig: {
+        config: {
           temperature: 0.3,
           topP: 0.8,
           maxOutputTokens: 2048,
