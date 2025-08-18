@@ -7,7 +7,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 interface UploadModalProps {
   isVisible: boolean;
   onClose: () => void;
-  onUpload: () => void;
+  onUpload: (file?: any) => void;
   onUploadFromUrl?: (url: string) => void;
   isBackendConnected: boolean;
   isLoading: boolean;
@@ -45,8 +45,8 @@ export default function UploadModal({
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
-        // Call the existing onUpload function with the file
-        await onUpload(file);
+        // Call the existing onUpload function with the selected file
+        onUpload(file);
       }
     } catch (error) {
       console.error('Error picking document:', error);

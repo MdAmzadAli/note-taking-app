@@ -147,7 +147,7 @@ export default function ExpertTab() {
     });
   };
 
-  const handleUploadSingleFile = async () => {
+  const handleUploadSingleFile = async (selectedFile?: any) => {
     if (!isBackendConnected) {
       Alert.alert('Backend Not Available', 'Backend server is not connected. Please check the connection.');
       return;
@@ -155,54 +155,66 @@ export default function ExpertTab() {
 
     try {
       setIsLoading(true);
-      console.log('🎯 Starting file selection process...');
+      console.log('🎯 Starting file upload process...');
 
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/pdf',
-        copyToCacheDirectory: true,
-      });
-
-      console.log('📄 Document picker result:', JSON.stringify(result, null, 2));
-
-      if (!result.canceled && result.assets[0]) {
-        const file = result.assets[0];
-        console.log('📄 Selected file details:', JSON.stringify(file, null, 2));
-
-        const fileToUpload = {
-          uri: file.uri,
-          name: file.name,
-          type: file.mimeType || 'application/octet-stream'
-        };
-
-        console.log('📤 Preparing file for upload:', JSON.stringify(fileToUpload, null, 2));
-
-        const uploadedFile = await fileService.uploadFile(fileToUpload);
-
-        console.log('✅ File uploaded successfully:', JSON.stringify(uploadedFile, null, 2));
-
-        const newFile: SingleFile = {
-          id: uploadedFile.id,
-          name: uploadedFile.originalName,
-          uploadDate: new Date(uploadedFile.uploadDate).toLocaleDateString(),
-          mimetype: uploadedFile.mimetype,
-          size: uploadedFile.size,
-          isUploaded: true,
-          cloudinary: uploadedFile.cloudinary,
-        };
-
-        const successMessage = uploadedFile.cloudinary
-          ? 'File uploaded and processed successfully! PDF preview available.'
-          : 'File uploaded successfully! (Cloudinary not configured - using basic preview)';
-
-        Alert.alert('Success', successMessage);
-
-        const updatedFiles = [...singleFiles, newFile];
-        setSingleFiles(updatedFiles);
-        await saveData(updatedFiles, workspaces);
-        setIsUploadModalVisible(false);
+      let file;
+      
+      if (selectedFile) {
+        // File was already selected from the modal
+        file = selectedFile;
+        console.log('📄 Using pre-selected file:', JSON.stringify(file, null, 2));
       } else {
-        console.log('📄 File selection was canceled or no file selected');
+        // Fallback: select file if none provided
+        console.log('🎯 No file provided, starting file selection...');
+        const result = await DocumentPicker.getDocumentAsync({
+          type: 'application/pdf',
+          copyToCacheDirectory: true,
+        });
+
+        console.log('📄 Document picker result:', JSON.stringify(result, null, 2));
+
+        if (!result.canceled && result.assets[0]) {
+          file = result.assets[0];
+        } else {
+          console.log('📄 File selection was canceled or no file selected');
+          return;
+        }
       }
+
+      console.log('📄 Selected file details:', JSON.stringify(file, null, 2));
+
+      const fileToUpload = {
+        uri: file.uri,
+        name: file.name,
+        type: file.mimeType || 'application/octet-stream'
+      };
+
+      console.log('📤 Preparing file for upload:', JSON.stringify(fileToUpload, null, 2));
+
+      const uploadedFile = await fileService.uploadFile(fileToUpload);
+
+      console.log('✅ File uploaded successfully:', JSON.stringify(uploadedFile, null, 2));
+
+      const newFile: SingleFile = {
+        id: uploadedFile.id,
+        name: uploadedFile.originalName,
+        uploadDate: new Date(uploadedFile.uploadDate).toLocaleDateString(),
+        mimetype: uploadedFile.mimetype,
+        size: uploadedFile.size,
+        isUploaded: true,
+        cloudinary: uploadedFile.cloudinary,
+      };
+
+      const successMessage = uploadedFile.cloudinary
+        ? 'File uploaded and processed successfully! PDF preview available.'
+        : 'File uploaded successfully! (Cloudinary not configured - using basic preview)';
+
+      Alert.alert('Success', successMessage);
+
+      const updatedFiles = [...singleFiles, newFile];
+      setSingleFiles(updatedFiles);
+      await saveData(updatedFiles, workspaces);
+      setIsUploadModalVisible(false);
     } catch (error) {
       console.error('❌ File upload process failed');
       console.error('❌ Error type:', error.constructor.name);
