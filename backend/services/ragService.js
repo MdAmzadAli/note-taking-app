@@ -194,67 +194,145 @@ class RAGService {
     }
   }
 
-  // Extract text from PDF
+  // Extract text from PDF with page and line information
   async extractTextFromPDF(filePath) {
     try {
       const dataBuffer = await fs.readFile(filePath);
-      const data = await pdfParse(dataBuffer);
-      return data.text;
+      const data = await pdfParse(dataBuffer, {
+        // Enable page-by-page processing to preserve page information
+        pagerender: async (pageData) => {
+          const textContent = pageData.getTextContent();
+          const page = await textContent;
+          const pageText = page.items.map(item => item.str).join(' ');
+          return pageText;
+        }
+      });
+
+      // Extract page-by-page text if available
+      if (data.numpages > 1) {
+        const pageTexts = [];
+        for (let pageNum = 1; pageNum <= data.numpages; pageNum++) {
+          try {
+            const pageData = await pdfParse(dataBuffer, {
+              first: pageNum,
+              last: pageNum
+            });
+            pageTexts.push({
+              pageNumber: pageNum,
+              text: pageData.text.trim(),
+              lines: pageData.text.split('\n').filter(line => line.trim().length > 0)
+            });
+          } catch (pageError) {
+            console.warn(`⚠️ Failed to extract page ${pageNum}, using fallback`);
+            // Fallback: estimate page content from total text
+            const totalLines = data.text.split('\n');
+            const linesPerPage = Math.ceil(totalLines.length / data.numpages);
+            const startLine = (pageNum - 1) * linesPerPage;
+            const endLine = Math.min(startLine + linesPerPage, totalLines.length);
+            const pageLines = totalLines.slice(startLine, endLine);
+            
+            pageTexts.push({
+              pageNumber: pageNum,
+              text: pageLines.join('\n').trim(),
+              lines: pageLines.filter(line => line.trim().length > 0)
+            });
+          }
+        }
+        return { fullText: data.text, pages: pageTexts, totalPages: data.numpages };
+      } else {
+        // Single page document
+        const lines = data.text.split('\n').filter(line => line.trim().length > 0);
+        return {
+          fullText: data.text,
+          pages: [{
+            pageNumber: 1,
+            text: data.text,
+            lines: lines
+          }],
+          totalPages: 1
+        };
+      }
     } catch (error) {
       console.error('❌ PDF text extraction failed:', error);
       throw error;
     }
   }
 
-  // Split text into semantic chunks
-  splitIntoChunks(text, metadata = {}) {
-    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  // Split text into semantic chunks with page and line preservation
+  splitIntoChunks(pdfData, metadata = {}) {
     const chunks = [];
-    let currentChunk = '';
-    let currentLength = 0;
+    let globalChunkIndex = 0;
 
-    for (let i = 0; i < sentences.length; i++) {
-      const sentence = sentences[i].trim() + '.';
-      const sentenceLength = sentence.length;
+    // Process each page separately to preserve page information
+    for (const pageData of pdfData.pages) {
+      const pageNumber = pageData.pageNumber;
+      const pageLines = pageData.lines;
+      
+      // Group lines into sentences for better chunking
+      let currentChunk = '';
+      let currentLength = 0;
+      let startLineIndex = 0;
+      let currentLineIndex = 0;
 
-      if (currentLength + sentenceLength > this.chunkSize && currentChunk) {
-        // Add chunk with metadata
+      for (let lineIndex = 0; lineIndex < pageLines.length; lineIndex++) {
+        const line = pageLines[lineIndex].trim();
+        if (!line) continue;
+
+        // Check if adding this line would exceed chunk size
+        if (currentLength + line.length > this.chunkSize && currentChunk.trim()) {
+          // Create chunk with current content
+          chunks.push({
+            text: currentChunk.trim(),
+            metadata: {
+              ...metadata,
+              chunkIndex: globalChunkIndex++,
+              pageNumber: pageNumber,
+              startLine: startLineIndex + 1, // 1-indexed for user display
+              endLine: lineIndex, // 1-indexed for user display
+              linesUsed: pageLines.slice(startLineIndex, lineIndex).map(l => l.trim()).filter(l => l),
+              originalLines: pageLines.slice(startLineIndex, lineIndex),
+              totalLinesOnPage: pageLines.length
+            }
+          });
+
+          // Start new chunk with some overlap
+          const overlapLines = Math.min(2, lineIndex - startLineIndex);
+          if (overlapLines > 0) {
+            const overlapText = pageLines.slice(Math.max(0, lineIndex - overlapLines), lineIndex).join(' ');
+            currentChunk = overlapText + ' ' + line;
+            startLineIndex = Math.max(0, lineIndex - overlapLines);
+          } else {
+            currentChunk = line;
+            startLineIndex = lineIndex;
+          }
+          currentLength = currentChunk.length;
+        } else {
+          // Add line to current chunk
+          currentChunk += (currentChunk ? ' ' : '') + line;
+          currentLength += line.length;
+        }
+        currentLineIndex = lineIndex;
+      }
+
+      // Add final chunk for this page if it has content
+      if (currentChunk.trim()) {
         chunks.push({
           text: currentChunk.trim(),
           metadata: {
             ...metadata,
-            chunkIndex: chunks.length,
-            startSentence: i - Math.floor(currentChunk.split('.').length),
-            endSentence: i
+            chunkIndex: globalChunkIndex++,
+            pageNumber: pageNumber,
+            startLine: startLineIndex + 1, // 1-indexed for user display
+            endLine: currentLineIndex + 1, // 1-indexed for user display
+            linesUsed: pageLines.slice(startLineIndex, currentLineIndex + 1).map(l => l.trim()).filter(l => l),
+            originalLines: pageLines.slice(startLineIndex, currentLineIndex + 1),
+            totalLinesOnPage: pageLines.length
           }
         });
-
-        // Start new chunk with overlap
-        const overlapSentences = sentences.slice(
-          Math.max(0, i - 2),
-          i
-        ).join('. ');
-        currentChunk = overlapSentences + '. ' + sentence;
-        currentLength = currentChunk.length;
-      } else {
-        currentChunk += (currentChunk ? ' ' : '') + sentence;
-        currentLength += sentenceLength;
       }
     }
 
-    // Add final chunk
-    if (currentChunk.trim()) {
-      chunks.push({
-        text: currentChunk.trim(),
-        metadata: {
-          ...metadata,
-          chunkIndex: chunks.length,
-          startSentence: sentences.length - Math.floor(currentChunk.split('.').length),
-          endSentence: sentences.length
-        }
-      });
-    }
-
+    console.log(`📄 Created ${chunks.length} chunks across ${pdfData.pages.length} pages`);
     return chunks;
   }
 
@@ -395,20 +473,21 @@ class RAGService {
         throw new Error(`File not found: ${filePath}`);
       }
 
-      // Extract text from PDF
-      const text = await this.extractTextFromPDF(filePath);
+      // Extract text from PDF with page and line information
+      const pdfData = await this.extractTextFromPDF(filePath);
 
-      if (!text || text.trim().length === 0) {
+      if (!pdfData.fullText || pdfData.fullText.trim().length === 0) {
         throw new Error('No text content found in PDF');
       }
 
-      // Split into chunks
-      const chunks = this.splitIntoChunks(text, {
+      // Split into chunks with page and line preservation
+      const chunks = this.splitIntoChunks(pdfData, {
         fileId,
         fileName,
         workspaceId,
         filePath,
-        cloudinaryData
+        cloudinaryData,
+        totalPages: pdfData.totalPages
       });
 
       console.log(`📄 Created ${chunks.length} chunks for ${fileName}`);
@@ -435,9 +514,9 @@ class RAGService {
           const globalIndex = batchStart + i;
           const embedding = batchEmbeddings[i];
 
-          // Calculate which page this chunk likely belongs to
-          const estimatedPage = Math.ceil((globalIndex + 1) / 2); // Rough estimate
-          const pageUrl = cloudinaryData?.pageUrls?.[estimatedPage - 1] || cloudinaryData?.secureUrl;
+          // Get actual page information from chunk metadata
+          const pageNumber = chunk.metadata.pageNumber || 1;
+          const pageUrl = cloudinaryData?.pageUrls?.[pageNumber - 1] || cloudinaryData?.secureUrl;
 
           points.push({
             id: uuidv5(`${fileId}:${globalIndex}`, POINT_NS),
@@ -449,11 +528,20 @@ class RAGService {
               chunkIndex: globalIndex,
               workspaceId: workspaceId,
               totalChunks: chunks.length,
-              estimatedPage: estimatedPage,
+              // Accurate page and line information
+              pageNumber: pageNumber,
+              startLine: chunk.metadata.startLine,
+              endLine: chunk.metadata.endLine,
+              linesUsed: chunk.metadata.linesUsed,
+              originalLines: chunk.metadata.originalLines,
+              totalLinesOnPage: chunk.metadata.totalLinesOnPage,
+              totalPages: chunk.metadata.totalPages,
+              // URLs and cloudinary data
               pageUrl: pageUrl,
               cloudinaryUrl: cloudinaryData?.secureUrl,
               thumbnailUrl: cloudinaryData?.thumbnailUrl,
               embeddingType: 'RETRIEVAL_DOCUMENT',
+              // Preserve all chunk metadata
               ...chunk.metadata
             }
           });
@@ -574,7 +662,15 @@ class RAGService {
           fileName: result.payload.fileName,
           chunkIndex: result.payload.chunkIndex,
           workspaceId: result.payload.workspaceId,
-          estimatedPage: result.payload.estimatedPage,
+          // Accurate page and line information
+          pageNumber: result.payload.pageNumber,
+          startLine: result.payload.startLine,
+          endLine: result.payload.endLine,
+          linesUsed: result.payload.linesUsed || [],
+          originalLines: result.payload.originalLines || [],
+          totalLinesOnPage: result.payload.totalLinesOnPage,
+          totalPages: result.payload.totalPages,
+          // URLs
           pageUrl: result.payload.pageUrl,
           cloudinaryUrl: result.payload.cloudinaryUrl,
           thumbnailUrl: result.payload.thumbnailUrl,
@@ -609,11 +705,16 @@ class RAGService {
         };
       }
 
-      // Prepare context from chunks with enhanced formatting
+      // Prepare context from chunks with enhanced formatting including line information
       const context = relevantChunks
         .map((chunk, index) => {
           const confidence = (chunk.score * 100).toFixed(1);
-          return `[Source ${index + 1} - ${chunk.metadata.fileName} - Page ${chunk.metadata.estimatedPage} - Relevance: ${confidence}%]: ${chunk.text}`;
+          const pageInfo = `Page ${chunk.metadata.pageNumber || 1}`;
+          const lineInfo = chunk.metadata.startLine && chunk.metadata.endLine 
+            ? `Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`
+            : '';
+          const locationInfo = lineInfo ? `${pageInfo}, ${lineInfo}` : pageInfo;
+          return `[Source ${index + 1} - ${chunk.metadata.fileName} - ${locationInfo} - Relevance: ${confidence}%]: ${chunk.text}`;
         })
         .join('\n\n');
 
@@ -670,7 +771,7 @@ ANSWER:`
 
       const answer = model.candidates[0].content.parts[0].text;
 
-      // Prepare enhanced sources with additional metadata
+      // Prepare enhanced sources with detailed page and line information
       const sources = relevantChunks.map((chunk, index) => ({
         id: `source_${index + 1}`,
         fileName: chunk.metadata.fileName,
@@ -678,7 +779,19 @@ ANSWER:`
         chunkIndex: chunk.metadata.chunkIndex,
         originalText: chunk.text,
         relevanceScore: chunk.score,
-        estimatedPage: chunk.metadata.estimatedPage || 1,
+        // Accurate page and line information
+        pageNumber: chunk.metadata.pageNumber || 1,
+        startLine: chunk.metadata.startLine,
+        endLine: chunk.metadata.endLine,
+        linesUsed: chunk.metadata.linesUsed || [],
+        originalLines: chunk.metadata.originalLines || [],
+        totalLinesOnPage: chunk.metadata.totalLinesOnPage,
+        totalPages: chunk.metadata.totalPages,
+        // Line range for display
+        lineRange: chunk.metadata.startLine && chunk.metadata.endLine 
+          ? `Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`
+          : 'Full page content',
+        // URLs
         pageUrl: chunk.metadata.pageUrl,
         cloudinaryUrl: chunk.metadata.cloudinaryUrl,
         thumbnailUrl: chunk.metadata.thumbnailUrl,

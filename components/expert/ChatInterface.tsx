@@ -542,12 +542,20 @@ export default function ChatInterface({
                 <View key={source.id} style={styles.sourceItem}>
                   <View style={styles.sourceHeader}>
                     <Text style={styles.sourceFileName}>
-                      📄 {source.fileName} {source.estimatedPage ? `(Page ${source.estimatedPage})` : ''}
+                      📄 {source.fileName} (Page {source.pageNumber || 1}
+                      {source.lineRange ? `, ${source.lineRange}` : ''})
                     </Text>
                     <Text style={styles.sourceScore}>
                       {Math.round(source.relevanceScore * 100)}% match
                     </Text>
                   </View>
+                  {(source.startLine && source.endLine) && (
+                    <View style={styles.sourceLineInfo}>
+                      <Text style={styles.sourceLineText}>
+                        📍 Lines {source.startLine}-{source.endLine} of {source.totalLinesOnPage || 'unknown'} total lines on page
+                      </Text>
+                    </View>
+                  )}
                   <View style={styles.sourceTextContainer}>
                     <Text style={styles.sourceText}>
                       {source.originalText}
@@ -1006,6 +1014,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#CCCCCC',
     lineHeight: 20,
+  },
+  sourceLineInfo: {
+    backgroundColor: '#333333',
+    borderRadius: 6,
+    padding: 8,
+    marginVertical: 8,
+  },
+  sourceLineText: {
+    fontSize: 12,
+    color: '#10B981',
+    fontWeight: '500',
   },
   viewPageButton: {
     marginTop: 12,
