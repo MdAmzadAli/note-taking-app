@@ -1,0 +1,61 @@
+🔄 Starting RAG query process...
+🤖 Generating answer for: "Give me summary of this pdf"
+🔍 Searching for: "Give me summary of this pdf"
+❌ Search failed: ApiError: Bad Request
+    at Object.fun [as searchPoints] (/home/runner/workspace/backend/node_modules/@qdrant/openapi-typescript-fetch/dist/cjs/fetcher.js:172:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async QdrantClient.search (/home/runner/workspace/backend/node_modules/@qdrant/js-client-rest/dist/cjs/qdrant-client.js:169:26)
+    at async RAGService.searchRelevantChunks (/home/runner/workspace/backend/services/ragService.js:306:28)
+    at async RAGService.generateAnswer (/home/runner/workspace/backend/services/ragService.js:342:30)
+    at async /home/runner/workspace/backend/server.js:608:20 {
+  headers: Headers {
+    'content-encoding': 'br',
+    'content-type': 'application/json',
+    date: 'Mon, 18 Aug 2025 07:23:13 GMT',
+    vary: 'accept-encoding, Origin, Access-Control-Request-Method, Access-Control-Request-Headers',
+    'transfer-encoding': 'chunked'
+  },
+  url: 'https://88400bcb-09a0-4ddb-a90d-78abcb266b4c.us-west-1-0.aws.cloud.qdrant.io:6333/collections/documents/points/search',
+  status: 400,
+  statusText: 'Bad Request',
+  data: {
+    status: {
+      error: 'Bad request: Index required but not found for "fileId" of one of the following types: [keyword, uuid]. Help: Create an index for this key or use a different filter.'
+    },
+    time: 0.000002372
+  }
+}
+❌ Answer generation failed: ApiError: Bad Request
+    at Object.fun [as searchPoints] (/home/runner/workspace/backend/node_modules/@qdrant/openapi-typescript-fetch/dist/cjs/fetcher.js:172:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async QdrantClient.search (/home/runner/workspace/backend/node_modules/@qdrant/js-client-rest/dist/cjs/qdrant-client.js:169:26)
+    at async RAGService.searchRelevantChunks (/home/runner/workspace/backend/services/ragService.js:306:28)
+    at async RAGService.generateAnswer (/home/runner/workspace/backend/services/ragService.js:342:30)
+    at async /home/runner/workspace/backend/server.js:608:20 {
+  headers: Headers {
+    'content-encoding': 'br',
+    'content-type': 'application/json',
+    date: 'Mon, 18 Aug 2025 07:23:13 GMT',
+    vary: 'accept-encoding, Origin, Access-Control-Request-Method, Access-Control-Request-Headers',
+    'transfer-encoding': 'chunked'
+  },
+  url: 'https://88400bcb-09a0-4ddb-a90d-78abcb266b4c.us-west-1-0.aws.cloud.qdrant.io:6333/collections/documents/points/search',
+  status: 400,
+  statusText: 'Bad Request',
+  data: {
+    status: {
+      error: 'Bad request: Index required but not found for "fileId" of one of the following types: [keyword, uuid]. Help: Create an index for this key or use a different filter.'
+    },
+    time: 0.000002372
+  }
+}
+❌ RAG query error after 2403ms
+❌ Error type: 
+❌ Error message: Bad Request
+❌ Error stack: Error: Bad Request
+    at Object.fun [as searchPoints] (/home/runner/workspace/backend/node_modules/@qdrant/openapi-typescript-fetch/dist/cjs/fetcher.js:172:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async QdrantClient.search (/home/runner/workspace/backend/node_modules/@qdrant/js-client-rest/dist/cjs/qdrant-client.js:169:26)
+    at async RAGService.searchRelevantChunks (/home/runner/workspace/backend/services/ragService.js:306:28)
+    at async RAGService.generateAnswer (/home/runner/workspace/backend/services/ragService.js:342:30)
+    at async /home/runner/workspace/backend/server.js:608:20
