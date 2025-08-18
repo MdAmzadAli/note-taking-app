@@ -278,7 +278,7 @@ class RAGService {
         const line = pageLines[lineIndex].trim();
         if (!line) continue;
 
-        // Check if adding this line would exceed chunk size
+        // Check if adding this line would exceed chunk sizesdsdsdn
         if (currentLength + line.length > this.chunkSize && currentChunk.trim()) {
           // Create chunk with current content
           chunks.push({
