@@ -2,6 +2,7 @@ const { QdrantClient } = require('@qdrant/js-client-rest');
 const { GoogleGenAI } = require('@google/genai');
 const pdfParse = require('pdf-parse');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const { v5: uuidv5 } = require('uuid');
 const POINT_NS = '2d3c0d3e-1e1a-4f6a-9e84-1b8de377e9c9';
@@ -390,7 +391,7 @@ class RAGService {
       }
 
       // Validate file path
-      if (!filePath || !fs.existsSync(filePath)) {
+      if (!filePath || !fsSync.existsSync(filePath)) {
         throw new Error(`File not found: ${filePath}`);
       }
 
