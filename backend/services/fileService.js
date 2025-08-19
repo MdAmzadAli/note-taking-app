@@ -129,6 +129,7 @@ class FileService {
         mimetype: fileInfo.mimetype,
         size: fileInfo.size,
         uploadDate: fileInfo.uploadDate,
+        workspaceId: fileInfo.workspaceId || null,
         cloudinary: cloudinaryResult
       };
 

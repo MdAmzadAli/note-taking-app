@@ -15,7 +15,7 @@ export interface FileUploadResponse {
 }
 
 class FileService {
-  async uploadFile(file: File | { uri: string; name: string; type?: string }, filename?: string): Promise<FileUploadResponse> {
+  async uploadFile(file: File | { uri: string; name: string; type?: string; workspaceId?: string }, filename?: string): Promise<FileUploadResponse> {
     try {
       console.log('📤 Starting file upload...');
       console.log('🔍 File input type:', typeof file);
@@ -23,6 +23,12 @@ class FileService {
       console.log('🔍 Filename parameter:', filename);
 
       const formData = new FormData();
+
+      // Add workspace ID if provided
+      if (file && typeof file === 'object' && 'workspaceId' in file && file.workspaceId) {
+        formData.append('workspaceId', file.workspaceId);
+        console.log('🏢 Adding workspace ID to upload:', file.workspaceId);
+      }
 
       // Handle web File object vs mobile file object
       if (file instanceof File) {

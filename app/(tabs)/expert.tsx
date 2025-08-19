@@ -158,7 +158,7 @@ export default function ExpertTab() {
       console.log('🎯 Starting file upload process...');
 
       let file;
-      
+
       if (selectedFile) {
         // File was already selected from the modal
         file = selectedFile;
@@ -246,23 +246,43 @@ export default function ExpertTab() {
       });
 
       if (!results.canceled) {
-        const files: SingleFile[] = [];
+        // Step 1: Create workspace locally first with generated ID
+        const workspaceId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+        console.log(`🏢 Creating workspace locally with ID: ${workspaceId}`);
+
+        const newWorkspace: Workspace = {
+          id: workspaceId,
+          name: workspaceName,
+          files: [], // Empty initially
+          createdDate: new Date().toLocaleDateString(),
+        };
+
+        // Step 2: Save workspace immediately to local storage
+        const updatedWorkspaces = [...workspaces, newWorkspace];
+        setWorkspaces(updatedWorkspaces);
+        await saveData(singleFiles, updatedWorkspaces);
+        console.log(`💾 Workspace saved locally: ${workspaceName}`);
+
+        // Step 3: Upload files with workspace ID
+        const uploadedFiles: SingleFile[] = [];
 
         for (let i = 0; i < Math.min(results.assets.length, 5); i++) {
           const file = results.assets[i];
 
           try {
-            console.log(`📤 Uploading workspace file ${i + 1}:`, JSON.stringify(file, null, 2));
+            console.log(`📤 Uploading workspace file ${i + 1}: ${file.name} for workspace: ${workspaceId}`);
+            console.log(`📄 File details:`, JSON.stringify(file, null, 2));
 
             const fileToUpload = {
               uri: file.uri,
               name: file.name,
-              type: file.mimeType || 'application/octet-stream'
+              type: file.mimeType || 'application/octet-stream',
+              workspaceId: workspaceId // Include workspace ID in upload
             };
 
-            const uploadedFile = await fileService.uploadFile(fileToUpload);
+            const uploadedFile = await fileService.uploadFile(fileToUpload, file.name);
 
-            files.push({
+            uploadedFiles.push({
               id: uploadedFile.id,
               name: uploadedFile.originalName,
               uploadDate: new Date(uploadedFile.uploadDate).toLocaleDateString(),
@@ -279,46 +299,37 @@ export default function ExpertTab() {
           }
         }
 
-        if (files.length > 0) {
-          const newWorkspace: Workspace = {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-            name: workspaceName,
-            files,
-            createdDate: new Date().toLocaleDateString(),
+        // Step 4: Update workspace with uploaded files
+        if (uploadedFiles.length > 0) {
+          const updatedWorkspace = {
+            ...newWorkspace,
+            files: uploadedFiles
           };
 
-          console.log(`🏢 Created workspace with ID: ${newWorkspace.id}`);
-          console.log(`📄 Files in workspace: ${files.length}`);
+          const finalWorkspaces = updatedWorkspaces.map(w => 
+            w.id === workspaceId ? updatedWorkspace : w
+          );
 
-          // Index all uploaded files for RAG with the workspace ID
-          for (const file of files) {
-            try {
-              console.log(`🔄 Starting RAG indexing for workspace file: ${file.name}`);
-              console.log(`🏢 Using workspaceId: ${newWorkspace.id}`);
-              console.log(`📄 Indexing fileId: ${file.id}`);
-              const indexResult = await ragService.indexDocument(file.id, newWorkspace.id);
-              console.log(`✅ RAG indexing completed for workspace file: ${file.name}`, indexResult);
-            } catch (ragError) {
-              console.warn(`⚠️ RAG indexing failed for workspace file ${file.name} (continuing anyway):`, ragError.message);
-              // Don't fail the workspace creation if RAG indexing fails
-            }
-          }
+          setWorkspaces(finalWorkspaces);
+          await saveData(singleFiles, finalWorkspaces);
 
-          const updatedWorkspaces = [...workspaces, newWorkspace];
-          setWorkspaces(updatedWorkspaces);
-          await saveData(singleFiles, updatedWorkspaces);
-          setWorkspaceName('');
+          console.log(`🏢 Updated workspace ${workspaceId} with ${uploadedFiles.length} files`);
+
+          Alert.alert('Success', `Workspace "${workspaceName}" created with ${uploadedFiles.length} file(s)!`);
           setIsWorkspaceModalVisible(false);
-
-          // Navigate directly to the created workspace
-          openWorkspaceChat(newWorkspace);
+          setWorkspaceName('');
         } else {
-          Alert.alert('Error', 'No files were successfully uploaded.');
+          // Remove workspace if no files were uploaded
+          const revertedWorkspaces = workspaces; // Original workspaces without the failed one
+          setWorkspaces(revertedWorkspaces);
+          await saveData(singleFiles, revertedWorkspaces);
+
+          Alert.alert('Error', 'No files were successfully uploaded. Workspace was not created.');
         }
       }
     } catch (error) {
-      console.error('Error creating workspace:', error);
-      Alert.alert('Error', 'Failed to create workspace');
+      console.error('❌ Workspace creation failed:', error);
+      Alert.alert('Error', `Failed to create workspace: ${error.message}`);
     } finally {
       setIsLoading(false);
     }

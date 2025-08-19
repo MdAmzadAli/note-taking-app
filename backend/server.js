@@ -209,45 +209,35 @@ app.delete('/file/:id', async (req, res) => {
 // File upload endpoint
 app.post('/upload', upload.single('file'), async (req, res) => {
   try {
-    console.log('📤 Upload request received');
-    console.log('🔍 Request headers:', JSON.stringify(req.headers, null, 2));
-    console.log('🔍 Request file:', req.file ? 'Present' : 'Missing');
-    console.log('🔍 Request body keys:', Object.keys(req.body || {}));
-    console.log('🔍 Request body:', JSON.stringify(req.body, null, 2));
-
-    if (req.file) {
-      console.log('📄 Multer parsed file:', JSON.stringify(req.file, null, 2));
-    } else {
-      console.error('❌ No file in request - multer did not parse any file');
-      console.error('❌ This could be due to:');
-      console.error('   - Incorrect field name (should be "file")');
-      console.error('   - Unsupported content type');
-      console.error('   - File size too large');
-      console.error('   - Malformed multipart data');
-    }
-
     if (!req.file) {
-      console.error('❌ No file in request');
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    console.log('📄 File details:', {
-      originalName: req.file.originalname,
-      filename: req.file.filename,
+    console.log('📤 File upload request received');
+    console.log('📄 File info:', {
+      originalname: req.file.originalname,
       mimetype: req.file.mimetype,
       size: req.file.size,
       path: req.file.path
     });
 
+    // Extract workspace ID if provided
+    const workspaceId = req.body.workspaceId;
+    if (workspaceId) {
+      console.log('🏢 File uploaded for workspace:', workspaceId);
+    }
+
     const fileInfo = {
-      id: path.parse(req.file.filename).name,
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
       originalName: req.file.originalname,
-      filename: req.file.filename,
       mimetype: req.file.mimetype,
       size: req.file.size,
+      path: req.file.path,
       uploadDate: new Date().toISOString(),
-      path: req.file.path
+      workspaceId: workspaceId || null, // Store workspace ID in file metadata
     };
+
+    console.log('🏷️ Generated file info:', fileInfo);
 
     console.log('💾 Saving file metadata...');
     // Save file metadata
@@ -741,4 +731,4 @@ async function startServer() {
 
 startServer().catch(console.error);
 
-module.exports = app;
+module.module.exports = app;
