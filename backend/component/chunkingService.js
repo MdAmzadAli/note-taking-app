@@ -1045,12 +1045,13 @@ class ChunkingService {
     return chunks;
   }
 
-  // Create chunks based on structured units with proper overlap
+  // Create chunks based on structured units with controlled overlap (70-110 characters)
   _createUnitsBasedChunks(units, pageNumber, metadata, startIndex) {
     const chunks = [];
     let chunkIndex = startIndex;
     let currentChunk = '';
     let currentUnits = [];
+    let lastChunkText = '';
 
     for (let i = 0; i < units.length; i++) {
       const unit = units[i];
@@ -1059,18 +1060,22 @@ class ChunkingService {
       // Check if adding this unit would exceed chunk size
       if (currentChunk.length + unitText.length > this.chunkSize && currentChunk.trim()) {
         // Create chunk with current content
+        const chunkText = currentChunk.trim();
         chunks.push(this._createSemanticChunk(
-          currentChunk.trim(),
+          chunkText,
           metadata,
           chunkIndex++,
           pageNumber,
           currentUnits
         ));
 
-        // Unit-based overlap: carry last 1-2 units forward
-        const overlapUnits = this._getOverlapUnits(currentUnits);
-        currentChunk = overlapUnits.map(u => u.text).join('\n') + '\n' + unitText;
-        currentUnits = [...overlapUnits, unit];
+        // Calculate controlled overlap (70-110 characters)
+        const overlapText = this._getControlledOverlap(chunkText, 70, 110);
+        
+        // Start new chunk with overlap + current unit
+        currentChunk = overlapText ? (overlapText + '\n' + unitText) : unitText;
+        currentUnits = [unit];
+        lastChunkText = chunkText;
       } else {
         // Add unit to current chunk
         if (currentChunk) {
@@ -1096,7 +1101,49 @@ class ChunkingService {
     return chunks;
   }
 
-  // Get overlap units (last 1-2 units depending on type)
+  // Get controlled overlap text with specified character range
+  _getControlledOverlap(chunkText, minOverlap = 70, maxOverlap = 110) {
+    if (!chunkText || chunkText.length < minOverlap) {
+      return chunkText; // Return full text if shorter than minimum
+    }
+
+    // Try to find good break points within the overlap range
+    const startPos = Math.max(0, chunkText.length - maxOverlap);
+    const endPos = chunkText.length - minOverlap;
+
+    if (startPos >= endPos) {
+      // Fallback: take last maxOverlap characters
+      return chunkText.slice(-maxOverlap);
+    }
+
+    // Look for good break points in descending order of preference
+    const searchText = chunkText.slice(startPos, chunkText.length);
+    const breakPoints = [
+      searchText.lastIndexOf('. '),
+      searchText.lastIndexOf('! '),
+      searchText.lastIndexOf('? '),
+      searchText.lastIndexOf('\n'),
+      searchText.lastIndexOf('; '),
+      searchText.lastIndexOf(', '),
+      searchText.lastIndexOf(' ')
+    ];
+
+    // Find the best break point within our target range
+    for (const breakPoint of breakPoints) {
+      if (breakPoint > 0) {
+        const overlapText = chunkText.slice(startPos + breakPoint + 1);
+        if (overlapText.length >= minOverlap && overlapText.length <= maxOverlap) {
+          return overlapText;
+        }
+      }
+    }
+
+    // Fallback: ensure we stay within range
+    const fallbackOverlap = chunkText.slice(-Math.min(maxOverlap, chunkText.length));
+    return fallbackOverlap.length >= minOverlap ? fallbackOverlap : chunkText.slice(-minOverlap);
+  }
+
+  // Get overlap units (last 1-2 units depending on type) - kept for compatibility
   _getOverlapUnits(units) {
     if (units.length === 0) return [];
 

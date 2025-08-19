@@ -139,7 +139,7 @@ Return ONLY the JSON array, no explanations.`;
       console.warn(`⚠️ Step A: JSON parsing failed:`, parseError.message);
     }
 
-    // Step B: Generate final answer with analysis
+    // Step B: Generate final answer with analysis and source identification
     console.log(`📤 Step B: Generating final answer...`);
 
     const analysisPrompt = `You are a financial analysis expert. Answer the user's question using the extracted financial data and original context.
@@ -162,10 +162,16 @@ INSTRUCTIONS:
 7. If extraction missed important data visible in context, include it
 8. Be precise with numbers and show calculations clearly
 
+CRITICAL: After your answer, provide a separate section identifying which sources you actually used:
+
+---
+SOURCES_USED: [list only the source numbers (e.g., "1,3,5") that you referenced in your answer]
+
 Format your response with:
 - **Summary** of findings
 - **Detailed breakdown** with calculations if needed
 - **Sources** referenced
+- SOURCES_USED: [comma-separated source numbers]
 
 ANSWER:`;
 
@@ -179,10 +185,32 @@ ANSWER:`;
       contents: [{ parts: [{ text: analysisPrompt }] }]
     });
 
-    const finalAnswer = finalResponse.candidates[0].content.parts[0].text;
+    const fullResponse = finalResponse.candidates[0].content.parts[0].text;
 
-    // Prepare enhanced sources
-    const sources = relevantChunks.map((chunk, index) => ({
+    // Extract used sources and clean answer
+    let finalAnswer = fullResponse;
+    let usedSourceIndices = [];
+
+    const sourcesUsedMatch = fullResponse.match(/SOURCES_USED:\s*\[(.*?)\]/);
+    if (sourcesUsedMatch) {
+      const sourcesUsedStr = sourcesUsedMatch[1];
+      usedSourceIndices = sourcesUsedStr
+        .split(',')
+        .map(s => parseInt(s.trim()) - 1) // Convert to 0-based indexing
+        .filter(idx => !isNaN(idx) && idx >= 0 && idx < relevantChunks.length);
+      
+      // Remove the SOURCES_USED section from the answer
+      finalAnswer = fullResponse.replace(/---\s*SOURCES_USED:.*$/s, '').trim();
+      
+      console.log(`🎯 Gemini identified ${usedSourceIndices.length} actually used sources: [${usedSourceIndices.map(i => i + 1).join(', ')}]`);
+    } else {
+      console.log(`⚠️ Could not extract SOURCES_USED from response, using all sources`);
+      usedSourceIndices = relevantChunks.map((_, idx) => idx);
+    }
+
+    // Prepare enhanced sources - only include actually used sources
+    const filteredChunks = usedSourceIndices.map(idx => relevantChunks[idx]);
+    const sources = filteredChunks.map((chunk, index) => ({
       id: `source_${index + 1}`,
       fileName: chunk.metadata.fileName,
       fileId: chunk.metadata.fileId,
@@ -201,7 +229,7 @@ ANSWER:`;
       confidencePercentage: (chunk.score * 100).toFixed(1)
     }));
 
-    console.log(`✅ 2-step analysis complete with ${sources.length} sources`);
+    console.log(`✅ 2-step analysis complete with ${sources.length} filtered sources (${relevantChunks.length} total retrieved)`);
 
     return {
       answer: finalAnswer,
@@ -261,15 +289,42 @@ INSTRUCTIONS:
 9. Maintain a professional, helpful tone
 10. If the context doesn't contain sufficient information, state this clearly
 
+CRITICAL: After your answer, provide a separate section identifying which sources you actually used:
+
+---
+SOURCES_USED: [list only the source numbers (e.g., "1,3,5") that you referenced in your answer]
+
 ANSWER:`
         }]
       }]
     });
 
-    const answer = response.candidates[0].content.parts[0].text;
+    const fullResponse = response.candidates[0].content.parts[0].text;
 
-    // Prepare sources
-    const sources = relevantChunks.map((chunk, index) => ({
+    // Extract used sources and clean answer
+    let answer = fullResponse;
+    let usedSourceIndices = [];
+
+    const sourcesUsedMatch = fullResponse.match(/SOURCES_USED:\s*\[(.*?)\]/);
+    if (sourcesUsedMatch) {
+      const sourcesUsedStr = sourcesUsedMatch[1];
+      usedSourceIndices = sourcesUsedStr
+        .split(',')
+        .map(s => parseInt(s.trim()) - 1) // Convert to 0-based indexing
+        .filter(idx => !isNaN(idx) && idx >= 0 && idx < relevantChunks.length);
+      
+      // Remove the SOURCES_USED section from the answer
+      answer = fullResponse.replace(/---\s*SOURCES_USED:.*$/s, '').trim();
+      
+      console.log(`🎯 Gemini identified ${usedSourceIndices.length} actually used sources: [${usedSourceIndices.map(i => i + 1).join(', ')}]`);
+    } else {
+      console.log(`⚠️ Could not extract SOURCES_USED from response, using all sources`);
+      usedSourceIndices = relevantChunks.map((_, idx) => idx);
+    }
+
+    // Prepare sources - only include actually used sources
+    const filteredChunks = usedSourceIndices.map(idx => relevantChunks[idx]);
+    const sources = filteredChunks.map((chunk, index) => ({
       id: `source_${index + 1}`,
       fileName: chunk.metadata.fileName,
       fileId: chunk.metadata.fileId,
@@ -288,7 +343,7 @@ ANSWER:`
       confidencePercentage: (chunk.score * 100).toFixed(1)
     }));
 
-    console.log(`✅ Standard answer generated with ${sources.length} sources`);
+    console.log(`✅ Standard answer generated with ${sources.length} filtered sources (${relevantChunks.length} total retrieved)`);
 
     return {
       answer: answer,
