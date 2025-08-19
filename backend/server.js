@@ -504,8 +504,9 @@ app.post('/rag/index/:id', async (req, res) => {
     const metadata = JSON.parse(fsSync.readFileSync(metadataPath, 'utf8'));
     console.log(`📊 File metadata:`, JSON.stringify(metadata, null, 2));
 
-    const filePath = path.join(__dirname, 'uploads', `${id}.${metadata.originalName.split('.').pop()}`);
-    console.log(`📁 File path: ${filePath}`);
+    // Use the actual file path from metadata instead of reconstructing it
+    const filePath = metadata.path;
+    console.log(`📁 File path from metadata: ${filePath}`);
     console.log(`📁 File exists: ${fsSync.existsSync(filePath)}`);
 
     if (!fsSync.existsSync(filePath)) {
