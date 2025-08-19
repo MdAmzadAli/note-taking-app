@@ -333,6 +333,7 @@ class ChunkingService {
   _buildUnitsFromLines(lines, lineOffset = 0) {
     const units = [];
     let currentParagraph = [];
+    let paragraphStartIndex = null; // Track when paragraph starts (1-based)
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -347,10 +348,11 @@ class ChunkingService {
             type: 'paragraph',
             text: currentParagraph.map(l => l.text).join(' '),
             lines: currentParagraph.map(l => l.text),
-            startLine: globalLineIndex - currentParagraph.length + 1,
+            startLine: paragraphStartIndex,
             endLine: globalLineIndex
           });
           currentParagraph = [];
+          paragraphStartIndex = null;
         }
         
         // Add table row unit with enhanced metadata
@@ -387,10 +389,11 @@ class ChunkingService {
             type: 'paragraph',
             text: currentParagraph.map(l => l.text).join(' '),
             lines: currentParagraph.map(l => l.text),
-            startLine: globalLineIndex - currentParagraph.length + 1,
+            startLine: paragraphStartIndex,
             endLine: globalLineIndex
           });
           currentParagraph = [];
+          paragraphStartIndex = null;
         }
         
         // Add header unit
@@ -408,10 +411,11 @@ class ChunkingService {
             type: 'paragraph',
             text: currentParagraph.map(l => l.text).join(' '),
             lines: currentParagraph.map(l => l.text),
-            startLine: globalLineIndex - currentParagraph.length + 1,
+            startLine: paragraphStartIndex,
             endLine: globalLineIndex
           });
           currentParagraph = [];
+          paragraphStartIndex = null;
         }
         
         // Add bullet unit
@@ -424,6 +428,10 @@ class ChunkingService {
         });
       } else {
         // Regular text - add to current paragraph
+        if (currentParagraph.length === 0) {
+          // Starting new paragraph - track start index (1-based)
+          paragraphStartIndex = globalLineIndex + 1;
+        }
         currentParagraph.push(line);
         
         // Check if paragraph should end (modified to handle column context)
@@ -432,10 +440,11 @@ class ChunkingService {
             type: 'paragraph',
             text: currentParagraph.map(l => l.text).join(' '),
             lines: currentParagraph.map(l => l.text),
-            startLine: globalLineIndex - currentParagraph.length + 2,
+            startLine: paragraphStartIndex,
             endLine: globalLineIndex + 1
           });
           currentParagraph = [];
+          paragraphStartIndex = null;
         }
       }
     }
@@ -447,7 +456,7 @@ class ChunkingService {
         type: 'paragraph',
         text: currentParagraph.map(l => l.text).join(' '),
         lines: currentParagraph.map(l => l.text),
-        startLine: globalLineIndex - currentParagraph.length + 1,
+        startLine: paragraphStartIndex,
         endLine: globalLineIndex + 1
       });
     }
