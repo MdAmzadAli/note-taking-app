@@ -495,118 +495,303 @@ class RAGService {
     }
   }
 
-  // Search for relevant chunks with optimized query embeddings
+  // Enhanced search with workspace-aware retrieval, MMR, and document bucketing
   async searchRelevantChunks(query, fileIds = null, workspaceId = null, limit = 5) {
     try {
-      console.log(`🔍 Searching for: "${query}"`);
+      console.log(`🔍 Enhanced search for: "${query}"`);
+      console.log(`📄 FileIds: ${fileIds ? fileIds.length : 0}, WorkspaceId: ${workspaceId || 'none'}`);
 
-      // Generate query-optimized embedding using QUESTION_ANSWERING task type
-      const queryEmbedding = await this.generateEmbedding(query, 'query');
-
-      // Build filter
-      const filter = { must: [] };
-
-      if (fileIds && fileIds.length > 0) {
-        filter.must.push({
-          key: 'fileId',
-          match: { any: fileIds }
-        });
+      // For workspace mode (multiple files), use enhanced retrieval
+      if (workspaceId && fileIds && fileIds.length > 1) {
+        return await this.searchWorkspaceRelevantChunks(query, fileIds, workspaceId, limit);
       }
 
-      if (workspaceId) {
-        filter.must.push({
-          key: 'workspaceId',
-          match: { value: workspaceId }
-        });
-      }
-
-      let searchResult;
-
-      try {
-        // Search in Qdrant with filters
-        searchResult = await this.qdrant.search(this.collectionName, { // Use this.collectionName
-          vector: queryEmbedding,
-          filter: filter.must.length > 0 ? filter : undefined,
-          limit: limit,
-          with_payload: true
-        });
-      } catch (filterError) {
-        console.warn('⚠️ Search with filter failed, trying without filters:', filterError.message);
-
-        // If filtering fails due to missing index, try search without filters
-        if (filterError.message && filterError.message.includes('Index required')) {
-          console.log('🔄 Retrying search without filters...');
-          searchResult = await this.qdrant.search(this.collectionName, { // Use this.collectionName
-            vector: queryEmbedding,
-            limit: limit * 2, // Get more results to filter manually
-            with_payload: true
-          });
-
-          // Manually filter results if we have fileIds or workspaceId
-          if (fileIds && fileIds.length > 0) {
-            searchResult = searchResult.filter(result =>
-              fileIds.includes(result.payload.fileId)
-            );
-          }
-
-          if (workspaceId) {
-            searchResult = searchResult.filter(result =>
-              result.payload.workspaceId === workspaceId
-            );
-          }
-
-          // Limit results
-          searchResult = searchResult.slice(0, limit);
-
-          console.log('✅ Manual filtering applied successfully');
-        } else {
-          throw filterError;
-        }
-      }
-
-      console.log(`🎯 Found ${searchResult.length} relevant chunks using QUESTION_ANSWERING embeddings`);
-
-      return searchResult.map(result => ({
-        text: result.payload.text,
-        score: result.score,
-        metadata: {
-          fileId: result.payload.fileId,
-          fileName: result.payload.fileName,
-          chunkIndex: result.payload.chunkIndex,
-          workspaceId: result.payload.workspaceId,
-          // Accurate page and line information
-          pageNumber: result.payload.pageNumber,
-          startLine: result.payload.startLine,
-          endLine: result.payload.endLine,
-          linesUsed: result.payload.linesUsed || [],
-          originalLines: result.payload.originalLines || [],
-          totalLinesOnPage: result.payload.totalLinesOnPage,
-          totalPages: result.payload.totalPages,
-          // URLs
-          pageUrl: result.payload.pageUrl,
-          cloudinaryUrl: result.payload.cloudinaryUrl,
-          thumbnailUrl: result.payload.thumbnailUrl,
-          embeddingType: result.payload.embeddingType
-        }
-      }));
+      // For single file, use standard search
+      return await this.searchSingleFileChunks(query, fileIds, workspaceId, limit);
 
     } catch (error) {
-      console.error('❌ Search failed:', error);
+      console.error('❌ Enhanced search failed:', error);
       throw error;
     }
   }
 
-  // Generate answer using RAG with enhanced context understanding
+  // Workspace-aware search with document bucketing and MMR
+  async searchWorkspaceRelevantChunks(query, fileIds, workspaceId, totalLimit) {
+    console.log(`🏢 Workspace search: ${fileIds.length} files, limit: ${totalLimit}`);
+    
+    const queryEmbedding = await this.generateEmbedding(query, 'query');
+    const chunksPerDoc = Math.max(2, Math.ceil(totalLimit / fileIds.length)); // Ensure each doc contributes
+    const retrievalLimit = chunksPerDoc * 3; // Get more candidates for MMR
+
+    let allCandidates = [];
+
+    // Step 1: Retrieve top candidates from each document
+    for (const fileId of fileIds) {
+      try {
+        console.log(`📄 Searching in document: ${fileId}`);
+        
+        const filter = { 
+          must: [
+            { key: 'fileId', match: { value: fileId } },
+            { key: 'workspaceId', match: { value: workspaceId } }
+          ]
+        };
+
+        let docResults = await this.qdrant.search(this.collectionName, {
+          vector: queryEmbedding,
+          filter: filter,
+          limit: retrievalLimit,
+          with_payload: true
+        });
+
+        if (docResults.length > 0) {
+          console.log(`✅ Found ${docResults.length} candidates from ${fileId}`);
+          
+          // Add document-specific context
+          const processedResults = docResults.map(result => ({
+            text: result.payload.text,
+            score: result.score,
+            fileId: result.payload.fileId,
+            vector: result.vector || null, // Store for MMR if available
+            metadata: {
+              fileId: result.payload.fileId,
+              fileName: result.payload.fileName,
+              chunkIndex: result.payload.chunkIndex,
+              workspaceId: result.payload.workspaceId,
+              pageNumber: result.payload.pageNumber,
+              startLine: result.payload.startLine,
+              endLine: result.payload.endLine,
+              linesUsed: result.payload.linesUsed || [],
+              originalLines: result.payload.originalLines || [],
+              totalLinesOnPage: result.payload.totalLinesOnPage,
+              totalPages: result.payload.totalPages,
+              pageUrl: result.payload.pageUrl,
+              cloudinaryUrl: result.payload.cloudinaryUrl,
+              thumbnailUrl: result.payload.thumbnailUrl,
+              embeddingType: result.payload.embeddingType
+            }
+          }));
+
+          allCandidates.push(...processedResults);
+        }
+      } catch (docError) {
+        console.warn(`⚠️ Failed to search document ${fileId}:`, docError.message);
+      }
+    }
+
+    if (allCandidates.length === 0) {
+      console.log(`❌ No candidates found across ${fileIds.length} documents`);
+      return [];
+    }
+
+    console.log(`📊 Total candidates collected: ${allCandidates.length}`);
+
+    // Step 2: Apply MMR for diversity and document representation
+    const selectedChunks = this.applyMMR(allCandidates, queryEmbedding, totalLimit, chunksPerDoc);
+    
+    console.log(`🎯 Final selection: ${selectedChunks.length} chunks from workspace`);
+    return selectedChunks;
+  }
+
+  // Standard single-file search
+  async searchSingleFileChunks(query, fileIds, workspaceId, limit) {
+    const queryEmbedding = await this.generateEmbedding(query, 'query');
+
+    // Build filter
+    const filter = { must: [] };
+
+    if (fileIds && fileIds.length > 0) {
+      filter.must.push({
+        key: 'fileId',
+        match: { any: fileIds }
+      });
+    }
+
+    if (workspaceId) {
+      filter.must.push({
+        key: 'workspaceId',
+        match: { value: workspaceId }
+      });
+    }
+
+    let searchResult;
+
+    try {
+      searchResult = await this.qdrant.search(this.collectionName, {
+        vector: queryEmbedding,
+        filter: filter.must.length > 0 ? filter : undefined,
+        limit: limit,
+        with_payload: true
+      });
+    } catch (filterError) {
+      console.warn('⚠️ Search with filter failed, trying without filters:', filterError.message);
+      
+      if (filterError.message && filterError.message.includes('Index required')) {
+        console.log('🔄 Retrying search without filters...');
+        searchResult = await this.qdrant.search(this.collectionName, {
+          vector: queryEmbedding,
+          limit: limit * 2,
+          with_payload: true
+        });
+
+        // Manual filtering
+        if (fileIds && fileIds.length > 0) {
+          searchResult = searchResult.filter(result =>
+            fileIds.includes(result.payload.fileId)
+          );
+        }
+
+        if (workspaceId) {
+          searchResult = searchResult.filter(result =>
+            result.payload.workspaceId === workspaceId
+          );
+        }
+
+        searchResult = searchResult.slice(0, limit);
+      } else {
+        throw filterError;
+      }
+    }
+
+    console.log(`🎯 Found ${searchResult.length} relevant chunks using standard search`);
+
+    return searchResult.map(result => ({
+      text: result.payload.text,
+      score: result.score,
+      metadata: {
+        fileId: result.payload.fileId,
+        fileName: result.payload.fileName,
+        chunkIndex: result.payload.chunkIndex,
+        workspaceId: result.payload.workspaceId,
+        pageNumber: result.payload.pageNumber,
+        startLine: result.payload.startLine,
+        endLine: result.payload.endLine,
+        linesUsed: result.payload.linesUsed || [],
+        originalLines: result.payload.originalLines || [],
+        totalLinesOnPage: result.payload.totalLinesOnPage,
+        totalPages: result.payload.totalPages,
+        pageUrl: result.payload.pageUrl,
+        cloudinaryUrl: result.payload.cloudinaryUrl,
+        thumbnailUrl: result.payload.thumbnailUrl,
+        embeddingType: result.payload.embeddingType
+      }
+    }));
+  }
+
+  // MMR implementation for diversity and document representation
+  applyMMR(candidates, queryEmbedding, totalLimit, minPerDoc) {
+    if (candidates.length <= totalLimit) {
+      return candidates;
+    }
+
+    console.log(`🔄 Applying MMR to ${candidates.length} candidates`);
+
+    // Sort by score initially
+    candidates.sort((a, b) => b.score - a.score);
+
+    const selected = [];
+    const remaining = [...candidates];
+    const docCounts = new Map();
+
+    // MMR parameters
+    const lambda = 0.7; // Balance between relevance and diversity
+
+    // First, ensure minimum representation per document
+    const uniqueFileIds = [...new Set(candidates.map(c => c.fileId))];
+    
+    for (const fileId of uniqueFileIds) {
+      const docCandidates = candidates.filter(c => c.fileId === fileId);
+      const needed = Math.min(minPerDoc, docCandidates.length);
+      
+      for (let i = 0; i < needed && selected.length < totalLimit; i++) {
+        selected.push(docCandidates[i]);
+        docCounts.set(fileId, (docCounts.get(fileId) || 0) + 1);
+        
+        // Remove from remaining
+        const idx = remaining.findIndex(r => 
+          r.fileId === docCandidates[i].fileId && 
+          r.metadata.chunkIndex === docCandidates[i].metadata.chunkIndex
+        );
+        if (idx !== -1) remaining.splice(idx, 1);
+      }
+    }
+
+    console.log(`📋 Ensured minimum representation: ${selected.length} chunks`);
+
+    // Fill remaining slots with MMR
+    while (selected.length < totalLimit && remaining.length > 0) {
+      let bestCandidate = null;
+      let bestScore = -Infinity;
+
+      for (const candidate of remaining) {
+        // Relevance score (similarity to query)
+        const relevanceScore = candidate.score;
+
+        // Diversity score (dissimilarity to already selected)
+        let maxSimilarity = 0;
+        for (const selectedChunk of selected) {
+          // Simple text-based similarity as fallback
+          const similarity = this.computeTextSimilarity(candidate.text, selectedChunk.text);
+          maxSimilarity = Math.max(maxSimilarity, similarity);
+        }
+
+        // MMR score: λ * relevance - (1-λ) * max_similarity
+        const mmrScore = lambda * relevanceScore - (1 - lambda) * maxSimilarity;
+
+        if (mmrScore > bestScore) {
+          bestScore = mmrScore;
+          bestCandidate = candidate;
+        }
+      }
+
+      if (bestCandidate) {
+        selected.push(bestCandidate);
+        docCounts.set(bestCandidate.fileId, (docCounts.get(bestCandidate.fileId) || 0) + 1);
+        
+        const idx = remaining.findIndex(r => 
+          r.fileId === bestCandidate.fileId && 
+          r.metadata.chunkIndex === bestCandidate.metadata.chunkIndex
+        );
+        if (idx !== -1) remaining.splice(idx, 1);
+      } else {
+        break;
+      }
+    }
+
+    console.log(`✅ MMR selection complete: ${selected.length} chunks`);
+    console.log(`📊 Document distribution:`, Object.fromEntries(docCounts));
+
+    return selected;
+  }
+
+  // Simple text similarity for MMR
+  computeTextSimilarity(text1, text2) {
+    const words1 = new Set(text1.toLowerCase().split(/\s+/));
+    const words2 = new Set(text2.toLowerCase().split(/\s+/));
+    
+    const intersection = new Set([...words1].filter(word => words2.has(word)));
+    const union = new Set([...words1, ...words2]);
+    
+    return union.size > 0 ? intersection.size / union.size : 0;
+  }
+
+  // Generate answer using 2-step LLM flow for enhanced financial data handling
   async generateAnswer(query, fileIds = null, workspaceId = null) {
     try {
       console.log(`🤖 Generating answer for: "${query}"`);
 
-      // Search for relevant chunks using optimized query embeddings
+      // Determine if this is a workspace query with multiple files
+      const isWorkspaceQuery = workspaceId && fileIds && fileIds.length > 1;
+      const isFinancialQuery = this.isFinancialQuery(query);
+
+      console.log(`📊 Query type: ${isWorkspaceQuery ? 'Workspace' : 'Single'}, Financial: ${isFinancialQuery}`);
+
+      // Search for relevant chunks using enhanced retrieval
       const relevantChunks = await this.searchRelevantChunks(
         query,
         fileIds,
         workspaceId,
-        6 // Get more chunks for better context
+        isWorkspaceQuery ? 12 : 6 // More chunks for workspace queries
       );
 
       if (relevantChunks.length === 0) {
@@ -617,34 +802,217 @@ class RAGService {
         };
       }
 
-      // Prepare context from chunks with enhanced formatting including line information
-      const context = relevantChunks
-        .map((chunk, index) => {
-          const confidence = (chunk.score * 100).toFixed(1);
-          const pageInfo = `Page ${chunk.metadata.pageNumber || 1}`;
-          const lineInfo = chunk.metadata.startLine && chunk.metadata.endLine 
-            ? `Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`
-            : '';
-          const locationInfo = lineInfo ? `${pageInfo}, ${lineInfo}` : pageInfo;
-          return `[Source ${index + 1} - ${chunk.metadata.fileName} - ${locationInfo} - Relevance: ${confidence}%]: ${chunk.text}`;
-        })
-        .join('\n\n');
-
-      // Generate answer using chat client
-      if (!this.genaiChat) {
-        throw new Error("Google GenAI Chat client not initialized");
+      // Use 2-step flow for financial queries in workspace mode
+      if (isWorkspaceQuery && isFinancialQuery) {
+        return await this.generateTwoStepAnswer(query, relevantChunks);
       }
 
-      const model = await this.genaiChat.models.generateContent({
-        model: 'gemini-2.5-flash-lite',
-        config: {
-          temperature: 0.3,
-          topP: 0.8,
-          maxOutputTokens: 2048,
-        },
-        contents: [{
-          parts: [{
-            text: `You are an expert AI assistant that provides accurate, detailed answers based on document content.
+      // Use standard flow for other queries
+      return await this.generateStandardAnswer(query, relevantChunks);
+
+    } catch (error) {
+      console.error('❌ Answer generation failed:', error);
+      throw error;
+    }
+  }
+
+  // Check if query involves financial/cost analysis
+  isFinancialQuery(query) {
+    const financialKeywords = [
+      'cost', 'costs', 'price', 'prices', 'amount', 'amounts', 'budget', 'budgets',
+      'expense', 'expenses', 'fee', 'fees', 'payment', 'payments', 'total', 'sum',
+      'revenue', 'profit', 'loss', 'financial', 'money', 'currency', 'dollar',
+      'rupee', 'euro', 'pound', '$', '₹', '€', '£', 'calculate', 'calculation'
+    ];
+    
+    const queryLower = query.toLowerCase();
+    return financialKeywords.some(keyword => queryLower.includes(keyword));
+  }
+
+  // 2-step LLM flow: Extract → Analyze
+  async generateTwoStepAnswer(query, relevantChunks) {
+    console.log(`🔄 Using 2-step LLM flow for financial analysis`);
+
+    if (!this.genaiChat) {
+      throw new Error("Google GenAI Chat client not initialized");
+    }
+
+    // Prepare context for extraction
+    const context = relevantChunks
+      .map((chunk, index) => {
+        const pageInfo = `Page ${chunk.metadata.pageNumber || 1}`;
+        const lineInfo = chunk.metadata.startLine && chunk.metadata.endLine 
+          ? `Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`
+          : '';
+        const locationInfo = lineInfo ? `${pageInfo}, ${lineInfo}` : pageInfo;
+        return `[Doc: ${chunk.metadata.fileName} | ${locationInfo}]: ${chunk.text}`;
+      })
+      .join('\n\n');
+
+    // Step A: Extract structured financial data
+    console.log(`📤 Step A: Extracting financial data...`);
+    
+    const extractionPrompt = `You are a financial data extraction expert. Extract ALL cost items, amounts, and currencies from the provided documents.
+
+CONTEXT FROM DOCUMENTS:
+${context}
+
+EXTRACTION TASK:
+Identify and extract every cost, price, amount, or financial figure mentioned in the documents.
+
+Return ONLY a valid JSON array with this structure:
+[
+  {
+    "item": "description of cost item",
+    "amount": numeric_value,
+    "currency": "USD/INR/EUR/etc",
+    "document": "document_name",
+    "page": page_number,
+    "context": "brief surrounding context"
+  }
+]
+
+Rules:
+- Extract ALL financial figures, no matter how small
+- Convert text numbers to numeric values (e.g., "five thousand" → 5000)
+- Identify currency from symbols ($, ₹, €) or text (USD, INR, EUR)
+- If currency is unclear, use "UNKNOWN"
+- Include the specific document name and page number
+- Provide brief context for each item
+
+Return ONLY the JSON array, no explanations.`;
+
+    const extractionResponse = await this.genaiChat.models.generateContent({
+      model: 'gemini-2.5-flash-lite',
+      config: {
+        temperature: 0.1, // Low temperature for structured extraction
+        topP: 0.8,
+        maxOutputTokens: 2048,
+      },
+      contents: [{ parts: [{ text: extractionPrompt }] }]
+    });
+
+    let extractedData = [];
+    try {
+      const extractionText = extractionResponse.candidates[0].content.parts[0].text;
+      console.log(`📄 Raw extraction response:`, extractionText.substring(0, 500));
+      
+      // Clean the response to extract JSON
+      const jsonMatch = extractionText.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        extractedData = JSON.parse(jsonMatch[0]);
+        console.log(`✅ Step A: Extracted ${extractedData.length} financial items`);
+      } else {
+        console.warn(`⚠️ Step A: No valid JSON found in extraction response`);
+      }
+    } catch (parseError) {
+      console.warn(`⚠️ Step A: JSON parsing failed:`, parseError.message);
+    }
+
+    // Step B: Generate final answer with analysis
+    console.log(`📤 Step B: Generating final answer...`);
+
+    const analysisPrompt = `You are a financial analysis expert. Answer the user's question using the extracted financial data and original context.
+
+USER QUESTION: ${query}
+
+EXTRACTED FINANCIAL DATA:
+${JSON.stringify(extractedData, null, 2)}
+
+ORIGINAL CONTEXT:
+${context}
+
+INSTRUCTIONS:
+1. Answer the user's question comprehensively using both the extracted data and original context
+2. If asked for totals or calculations, perform them using the extracted data
+3. Group by currency and show subtotals if multiple currencies exist
+4. Always cite sources with document names and page numbers
+5. Use **bold text** for important headings and totals
+6. Use bullet points for itemized lists
+7. If extraction missed important data visible in context, include it
+8. Be precise with numbers and show calculations clearly
+
+Format your response with:
+- **Summary** of findings
+- **Detailed breakdown** with calculations if needed
+- **Sources** referenced
+
+ANSWER:`;
+
+    const finalResponse = await this.genaiChat.models.generateContent({
+      model: 'gemini-2.5-flash-lite',
+      config: {
+        temperature: 0.3,
+        topP: 0.8,
+        maxOutputTokens: 2048,
+      },
+      contents: [{ parts: [{ text: analysisPrompt }] }]
+    });
+
+    const finalAnswer = finalResponse.candidates[0].content.parts[0].text;
+
+    // Prepare enhanced sources
+    const sources = relevantChunks.map((chunk, index) => ({
+      id: `source_${index + 1}`,
+      fileName: chunk.metadata.fileName,
+      fileId: chunk.metadata.fileId,
+      chunkIndex: chunk.metadata.chunkIndex,
+      originalText: chunk.text,
+      relevanceScore: chunk.score,
+      pageNumber: chunk.metadata.pageNumber || 1,
+      startLine: chunk.metadata.startLine,
+      endLine: chunk.metadata.endLine,
+      lineRange: chunk.metadata.startLine && chunk.metadata.endLine 
+        ? `Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`
+        : 'Full page content',
+      pageUrl: chunk.metadata.pageUrl,
+      cloudinaryUrl: chunk.metadata.cloudinaryUrl,
+      thumbnailUrl: chunk.metadata.thumbnailUrl,
+      confidencePercentage: (chunk.score * 100).toFixed(1)
+    }));
+
+    console.log(`✅ 2-step analysis complete with ${sources.length} sources`);
+
+    return {
+      answer: finalAnswer,
+      sources: sources,
+      confidence: relevantChunks[0]?.score || 0,
+      analysisType: '2-step-financial',
+      extractedData: extractedData.length > 0 ? extractedData : null
+    };
+  }
+
+  // Standard single-step answer generation
+  async generateStandardAnswer(query, relevantChunks) {
+    console.log(`📝 Using standard answer generation`);
+
+    // Prepare context from chunks
+    const context = relevantChunks
+      .map((chunk, index) => {
+        const confidence = (chunk.score * 100).toFixed(1);
+        const pageInfo = `Page ${chunk.metadata.pageNumber || 1}`;
+        const lineInfo = chunk.metadata.startLine && chunk.metadata.endLine 
+          ? `Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`
+          : '';
+        const locationInfo = lineInfo ? `${pageInfo}, ${lineInfo}` : pageInfo;
+        return `[Source ${index + 1} - ${chunk.metadata.fileName} - ${locationInfo} - Relevance: ${confidence}%]: ${chunk.text}`;
+      })
+      .join('\n\n');
+
+    if (!this.genaiChat) {
+      throw new Error("Google GenAI Chat client not initialized");
+    }
+
+    const response = await this.genaiChat.models.generateContent({
+      model: 'gemini-2.5-flash-lite',
+      config: {
+        temperature: 0.3,
+        topP: 0.8,
+        maxOutputTokens: 2048,
+      },
+      contents: [{
+        parts: [{
+          text: `You are an expert AI assistant that provides accurate, detailed answers based on document content.
 
 CONTEXT FROM DOCUMENTS:
 ${context}
@@ -663,67 +1031,41 @@ INSTRUCTIONS:
 9. Maintain a professional, helpful tone
 10. If the context doesn't contain sufficient information, state this clearly
 
-FORMATTING GUIDELINES:
-- Use **headings** for main sections
-- Use bullet points for lists:
-  • First point
-  • Second point
-  • Third point
-- Use numbered lists for sequential steps:
-  1. First step
-  2. Second step
-  3. Third step
-- Use **bold** for emphasis on key terms
-- Keep paragraphs concise and well-spaced
-
 ANSWER:`
-          }]
         }]
-      });
+      }]
+    });
 
-      const answer = model.candidates[0].content.parts[0].text;
+    const answer = response.candidates[0].content.parts[0].text;
 
-      // Prepare enhanced sources with detailed page and line information
-      const sources = relevantChunks.map((chunk, index) => ({
-        id: `source_${index + 1}`,
-        fileName: chunk.metadata.fileName,
-        fileId: chunk.metadata.fileId,
-        chunkIndex: chunk.metadata.chunkIndex,
-        originalText: chunk.text,
-        relevanceScore: chunk.score,
-        // Accurate page and line information
-        pageNumber: chunk.metadata.pageNumber || 1,
-        startLine: chunk.metadata.startLine,
-        endLine: chunk.metadata.endLine,
-        linesUsed: chunk.metadata.linesUsed || [],
-        originalLines: chunk.metadata.originalLines || [],
-        totalLinesOnPage: chunk.metadata.totalLinesOnPage,
-        totalPages: chunk.metadata.totalPages,
-        // Line range for display
-        lineRange: chunk.metadata.startLine && chunk.metadata.endLine 
-          ? `Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`
-          : 'Full page content',
-        // URLs
-        pageUrl: chunk.metadata.pageUrl,
-        cloudinaryUrl: chunk.metadata.cloudinaryUrl,
-        thumbnailUrl: chunk.metadata.thumbnailUrl,
-        embeddingType: chunk.metadata.embeddingType,
-        confidencePercentage: (chunk.score * 100).toFixed(1)
-      }));
+    // Prepare sources
+    const sources = relevantChunks.map((chunk, index) => ({
+      id: `source_${index + 1}`,
+      fileName: chunk.metadata.fileName,
+      fileId: chunk.metadata.fileId,
+      chunkIndex: chunk.metadata.chunkIndex,
+      originalText: chunk.text,
+      relevanceScore: chunk.score,
+      pageNumber: chunk.metadata.pageNumber || 1,
+      startLine: chunk.metadata.startLine,
+      endLine: chunk.metadata.endLine,
+      lineRange: chunk.metadata.startLine && chunk.metadata.endLine 
+        ? `Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`
+        : 'Full page content',
+      pageUrl: chunk.metadata.pageUrl,
+      cloudinaryUrl: chunk.metadata.cloudinaryUrl,
+      thumbnailUrl: chunk.metadata.thumbnailUrl,
+      confidencePercentage: (chunk.score * 100).toFixed(1)
+    }));
 
-      console.log(`✅ Generated answer with ${sources.length} sources using optimized embeddings`);
+    console.log(`✅ Standard answer generated with ${sources.length} sources`);
 
-      return {
-        answer: answer,
-        sources: sources,
-        confidence: relevantChunks[0]?.score || 0,
-        embeddingStrategy: 'QUESTION_ANSWERING for queries, RETRIEVAL_DOCUMENT for indexed content'
-      };
-
-    } catch (error) {
-      console.error('❌ Answer generation failed:', error);
-      throw error;
-    }
+    return {
+      answer: answer,
+      sources: sources,
+      confidence: relevantChunks[0]?.score || 0,
+      analysisType: 'standard'
+    };
   }
 
   // Health check with embedding client status
