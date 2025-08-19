@@ -94,6 +94,7 @@ class VectorDatabaseService {
         throw new Error("Qdrant client not initialized");
       }
 
+      console.log(`🏢 VectorDB: Storing chunks for ${fileName} with workspaceId: ${workspaceId || 'null'}`);
       const points = [];
 
       for (let i = 0; i < chunks.length; i++) {
@@ -102,29 +103,36 @@ class VectorDatabaseService {
         const pageNumber = chunk.metadata.pageNumber || 1;
         const pageUrl = cloudinaryData?.pageUrls?.[pageNumber - 1] || cloudinaryData?.secureUrl;
 
+        const pointPayload = {
+          text: chunk.text,
+          fileId: fileId,
+          fileName: fileName,
+          chunkIndex: i,
+          workspaceId: workspaceId,
+          totalChunks: chunks.length,
+            pageNumber: pageNumber,
+          startLine: chunk.metadata.startLine,
+          endLine: chunk.metadata.endLine,
+          linesUsed: chunk.metadata.linesUsed,
+          // originalLines: chunk.metadata.originalLines,
+          totalLinesOnPage: chunk.metadata.totalLinesOnPage,
+          totalPages: chunk.metadata.totalPages,
+          pageUrl: pageUrl,
+          cloudinaryUrl: cloudinaryData?.secureUrl,
+          // thumbnailUrl: cloudinaryData?.thumbnailUrl,
+          embeddingType: 'RETRIEVAL_DOCUMENT',
+          ...chunk.metadata
+        };
+
+        // Log workspaceId for first few chunks for debugging
+        if (i < 3) {
+          console.log(`🔍 VectorDB: Chunk ${i} payload workspaceId: ${pointPayload.workspaceId || 'null'}`);
+        }
+
         points.push({
           id: uuidv5(`${fileId}:${i}`, POINT_NS),
           vector: embedding,
-          payload: {
-            text: chunk.text,
-            fileId: fileId,
-            fileName: fileName,
-            chunkIndex: i,
-            workspaceId: workspaceId,
-            totalChunks: chunks.length,
-            pageNumber: pageNumber,
-            startLine: chunk.metadata.startLine,
-            endLine: chunk.metadata.endLine,
-            linesUsed: chunk.metadata.linesUsed,
-            // originalLines: chunk.metadata.originalLines,
-            totalLinesOnPage: chunk.metadata.totalLinesOnPage,
-            totalPages: chunk.metadata.totalPages,
-            pageUrl: pageUrl,
-            cloudinaryUrl: cloudinaryData?.secureUrl,
-            // thumbnailUrl: cloudinaryData?.thumbnailUrl,
-            embeddingType: 'RETRIEVAL_DOCUMENT',
-            ...chunk.metadata
-          }
+          payload: pointPayload
         });
       }
 

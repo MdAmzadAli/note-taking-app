@@ -5,7 +5,7 @@ const express = require('express');
 const multer = require('multer');
 const sharp = require('sharp');
 const fs = require('fs').promises;
-const fsSync = require('fs'); 
+const fsSync = require('fs');
 const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -32,7 +32,7 @@ app.use(helmet());
 const corsOptions = {
   origin: function (origin, callback) {
     console.log('🌐 CORS check for origin:', origin);
-    
+
     // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) {
       console.log('✅ No origin - allowing');
@@ -489,7 +489,7 @@ app.get('/metadata/:id', async (req, res) => {
 
 // RAG endpoints
 app.post('/rag/index/:id', async (req, res) => {
-  
+
   console.log(`🔄 RAG: Received indexing request`);
   console.log(`📄 File ID: ${req.params.id}`);
   console.log(`🏢 Request body:`, JSON.stringify(req.body, null, 2));
@@ -532,12 +532,12 @@ app.post('/rag/index/:id', async (req, res) => {
       cloudinaryData: metadata.cloudinary
     });
 
-    // Index the document
+    // Index the document using RAG service
     const result = await ragService.indexDocument(
       id,
       filePath,
       metadata.originalName,
-      workspaceId,
+      workspaceId, // Pass workspaceId from request body
       metadata.cloudinary
     );
 

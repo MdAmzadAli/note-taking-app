@@ -13,6 +13,7 @@ class DocumentIndexingService {
   async indexDocument(fileId, filePath, fileName, workspaceId = null, cloudinaryData = null) {
     try {
       console.log(`📄 Starting document indexing for: ${fileName} (${fileId})`);
+      console.log(`🏢 Indexing with workspaceId: ${workspaceId || 'null'}`);
       
       if (!this.vectorDatabaseService.isInitialized()) {
         throw new Error("Vector database not initialized");
@@ -72,6 +73,7 @@ class DocumentIndexingService {
       const embeddings = await this.generateEmbeddingsForChunks(chunks);
 
       // Store in vector database
+      console.log(`🔄 Storing ${chunks.length} chunks with workspaceId: ${workspaceId || 'null'}`);
       const result = await this.vectorDatabaseService.storeDocumentChunks(
         fileId,
         fileName,
@@ -81,7 +83,7 @@ class DocumentIndexingService {
         cloudinaryData
       );
 
-      console.log(`✅ Successfully indexed ${result.chunksCount} chunks for ${fileName}`);
+      console.log(`✅ Successfully indexed ${result.chunksCount} chunks for ${fileName} in workspace: ${workspaceId || 'null'}`);
       return result;
 
     } catch (error) {

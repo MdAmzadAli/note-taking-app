@@ -287,6 +287,23 @@ export default function ExpertTab() {
             createdDate: new Date().toLocaleDateString(),
           };
 
+          console.log(`🏢 Created workspace with ID: ${newWorkspace.id}`);
+          console.log(`📄 Files in workspace: ${files.length}`);
+
+          // Index all uploaded files for RAG with the workspace ID
+          for (const file of files) {
+            try {
+              console.log(`🔄 Starting RAG indexing for workspace file: ${file.name}`);
+              console.log(`🏢 Using workspaceId: ${newWorkspace.id}`);
+              console.log(`📄 Indexing fileId: ${file.id}`);
+              const indexResult = await ragService.indexDocument(file.id, newWorkspace.id);
+              console.log(`✅ RAG indexing completed for workspace file: ${file.name}`, indexResult);
+            } catch (ragError) {
+              console.warn(`⚠️ RAG indexing failed for workspace file ${file.name} (continuing anyway):`, ragError.message);
+              // Don't fail the workspace creation if RAG indexing fails
+            }
+          }
+
           const updatedWorkspaces = [...workspaces, newWorkspace];
           setWorkspaces(updatedWorkspaces);
           await saveData(singleFiles, updatedWorkspaces);
@@ -472,7 +489,9 @@ export default function ExpertTab() {
 
         // Index the document for RAG after successful upload
         try {
-          console.log('🔄 Starting RAG indexing for added workspace file...');
+          console.log(`🔄 Starting RAG indexing for added workspace file...`);
+          console.log(`🏢 Using workspaceId: ${workspaceId}`);
+          console.log(`📄 Indexing fileId: ${uploadedFile.id}`);
           const indexResult = await ragService.indexDocument(uploadedFile.id, workspaceId);
           console.log('✅ RAG indexing completed for added workspace file:', indexResult);
         } catch (ragError) {
