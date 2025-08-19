@@ -1,4 +1,3 @@
-
 const fs = require('fs').promises;
 
 // Import PDF.js for layout-aware extraction (single source of truth)
@@ -8,7 +7,7 @@ class ChunkingService {
   constructor(chunkSize = 800, chunkOverlap = 75) {
     this.chunkSize = chunkSize;
     this.chunkOverlap = chunkOverlap;
-    
+
     // Configure PDF.js for Node.js environment
     pdfjsLib.GlobalWorkerOptions.workerSrc = null;
   }
@@ -20,34 +19,34 @@ class ChunkingService {
       if (!filePath || typeof filePath !== 'string') {
         throw new Error('Invalid file path provided');
       }
-      
+
       const dataBuffer = await fs.readFile(filePath);
-      
+
       // Validate file size (prevent memory issues)
       const maxSize = 50 * 1024 * 1024; // 50MB limit
       if (dataBuffer.length > maxSize) {
         console.warn(`⚠️ Large PDF file: ${(dataBuffer.length / 1024 / 1024).toFixed(1)}MB`);
       }
-      
+
       const pdfData = new Uint8Array(dataBuffer);
-      
+
       console.log('📄 Starting layout-aware PDF extraction...');
-      
+
       // Load PDF document with pdfjs-dist
       const loadingTask = pdfjsLib.getDocument({
         data: pdfData,
         useSystemFonts: true,
         disableFontFace: false
       });
-      
+
       const pdfDocument = await loadingTask.promise;
       const totalPages = pdfDocument.numPages;
-      
+
       console.log(`📄 PDF loaded: ${totalPages} pages`);
-      
+
       const pages = [];
       let fullText = '';
-      
+
       // Process each page with layout awareness
       for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
         const page = await pdfDocument.getPage(pageNum);
@@ -55,20 +54,23 @@ class ChunkingService {
         pages.push(pageData);
         fullText += pageData.text + '\n\n';
       }
-      
+
       await pdfDocument.destroy();
-      
+
       console.log(`📄 Layout-aware extraction completed: ${pages.length} pages processed`);
-      
+
+      // Apply soft hyphen merging to the full text as well
+      const cleanFullText = this._mergeSoftHyphens(fullText.trim());
+
       return {
-        fullText: fullText.trim(),
+        fullText: cleanFullText,
         pages: pages,
         totalPages: totalPages
       };
-      
+
     } catch (error) {
       console.error('❌ Layout-aware PDF extraction failed:', error);
-      
+
       // Fallback to basic extraction if layout-aware fails
       console.log('📄 Falling back to basic PDF extraction...');
       return await this._fallbackExtraction(filePath);
@@ -80,7 +82,7 @@ class ChunkingService {
     try {
       const textContent = await page.getTextContent();
       const viewport = page.getViewport({ scale: 1.0 });
-      
+
       // Collect text items with coordinates
       const textItems = textContent.items.map(item => ({
         text: item.str,
@@ -91,21 +93,24 @@ class ChunkingService {
         fontName: item.fontName,
         fontSize: item.transform[0]
       })).filter(item => item.text.trim().length > 0);
-      
+
       console.log(`📄 Page ${pageNumber}: Extracted ${textItems.length} text items`);
-      
+
       // Group text items into lines by Y proximity
       const lines = this._groupIntoLines(textItems);
-      
+
       // Detect columns by clustering X ranges
       const columns = this._detectColumns(lines);
-      
+
       // Build structured units (paragraphs, table rows, etc.)
       const structuredUnits = this._buildStructuredUnits(lines, columns);
-      
+
       // Generate clean text from structured units
-      const pageText = structuredUnits.map(unit => unit.text).join('\n');
-      
+      let pageText = structuredUnits.map(unit => unit.text).join('\n');
+
+      // Merge soft hyphens at line ends to prevent embedding similarity and number parsing issues
+      pageText = this._mergeSoftHyphens(pageText);
+
       return {
         pageNumber: pageNumber,
         text: pageText,
@@ -114,7 +119,7 @@ class ChunkingService {
         columns: Math.max(1, columns.length),
         hasTable: structuredUnits.some(unit => unit.type === 'table_row')
       };
-      
+
     } catch (error) {
       console.error(`❌ Layout extraction failed for page ${pageNumber}:`, error);
       throw error;
@@ -124,20 +129,20 @@ class ChunkingService {
   // Group text items into lines by Y coordinate proximity
   _groupIntoLines(textItems) {
     if (textItems.length === 0) return [];
-    
+
     // Sort strictly by Y coordinate first, then by X coordinate (transitive comparator)
     textItems.sort((a, b) => (a.y - b.y) || (a.x - b.x));
-    
+
     const lines = [];
     let currentLine = { items: [textItems[0]], y: textItems[0].y, minX: textItems[0].x, maxX: textItems[0].x + textItems[0].width };
-    
+
     // Use configurable Y tolerance for better handling of low-DPI scans
     const yTolerance = 5; // Increased from 3px to 5px for better robustness
-    
+
     for (let i = 1; i < textItems.length; i++) {
       const item = textItems[i];
       const yDiff = Math.abs(item.y - currentLine.y);
-      
+
       if (yDiff <= yTolerance) { // Same line (5px tolerance)
         currentLine.items.push(item);
         currentLine.minX = Math.min(currentLine.minX, item.x);
@@ -145,7 +150,7 @@ class ChunkingService {
       } else {
         // Finalize current line
         lines.push(this._finalizeLine(currentLine));
-        
+
         // Start new line
         currentLine = { 
           items: [item], 
@@ -155,12 +160,12 @@ class ChunkingService {
         };
       }
     }
-    
+
     // Add final line
     if (currentLine.items.length > 0) {
       lines.push(this._finalizeLine(currentLine));
     }
-    
+
     return lines;
   }
 
@@ -168,15 +173,15 @@ class ChunkingService {
   _finalizeLine(lineData) {
     // Sort items by X coordinate
     lineData.items.sort((a, b) => a.x - b.x);
-    
+
     // Build text with proper spacing
     let text = '';
     for (let i = 0; i < lineData.items.length; i++) {
       const item = lineData.items[i];
       const nextItem = lineData.items[i + 1];
-      
+
       text += item.text;
-      
+
       // Add space if there's a gap to next item
       if (nextItem) {
         const gap = nextItem.x - (item.x + item.width);
@@ -185,7 +190,7 @@ class ChunkingService {
         }
       }
     }
-    
+
     return {
       text: text.trim(),
       y: lineData.y,
@@ -198,19 +203,19 @@ class ChunkingService {
   // Detect columns by clustering X ranges
   _detectColumns(lines) {
     if (lines.length === 0) return [{ minX: 0, maxX: 1000 }];
-    
+
     // Collect all X ranges
     const xRanges = lines.map(line => ({ minX: line.minX, maxX: line.maxX }));
-    
+
     // Simple column detection: group by similar minX values
     const columns = [];
     const tolerance = 20; // 20px tolerance for column alignment
-    
+
     xRanges.forEach(range => {
       const existingColumn = columns.find(col => 
         Math.abs(col.minX - range.minX) < tolerance
       );
-      
+
       if (existingColumn) {
         existingColumn.minX = Math.min(existingColumn.minX, range.minX);
         existingColumn.maxX = Math.max(existingColumn.maxX, range.maxX);
@@ -223,12 +228,12 @@ class ChunkingService {
         });
       }
     });
-    
+
     // Sort columns by X position and filter out single occurrences
     const detectedColumns = columns
       .filter(col => col.count > 1)
       .sort((a, b) => a.minX - b.minX);
-    
+
     // Default to single column if no columns detected
     if (detectedColumns.length === 0) {
       return [{
@@ -237,51 +242,51 @@ class ChunkingService {
         count: lines.length
       }];
     }
-    
+
     return detectedColumns;
   }
 
   // Build structured units from lines and columns
   _buildStructuredUnits(lines, columns) {
     if (lines.length === 0) return [];
-    
+
     // If only one column detected, use original logic
     if (columns.length === 1) {
       return this._buildUnitsFromLines(lines);
     }
-    
+
     // Partition lines into column buckets based on detected column ranges
     const columnBuckets = this._partitionLinesByColumns(lines, columns);
-    
+
     // Build units within each column independently (left-to-right order)
     const allUnits = [];
     let globalLineOffset = 0;
-    
+
     // Sort columns by X position (left to right)
     const sortedColumns = columns.sort((a, b) => a.minX - b.minX);
-    
+
     for (let colIndex = 0; colIndex < sortedColumns.length; colIndex++) {
       const column = sortedColumns[colIndex];
       const columnLines = columnBuckets[colIndex] || [];
-      
+
       if (columnLines.length === 0) continue;
-      
+
       // Build units for this column
       const columnUnits = this._buildUnitsFromLines(columnLines, globalLineOffset);
-      
+
       // Add column metadata to each unit
       columnUnits.forEach(unit => {
         unit.columnIndex = colIndex;
         unit.columnRange = { minX: column.minX, maxX: column.maxX };
       });
-      
+
       allUnits.push(...columnUnits);
       globalLineOffset += columnLines.length;
     }
-    
+
     // Sort all units by line number to maintain reading order
     allUnits.sort((a, b) => a.startLine - b.startLine);
-    
+
     return allUnits;
   }
 
@@ -289,22 +294,22 @@ class ChunkingService {
   _partitionLinesByColumns(lines, columns) {
     const sortedColumns = columns.sort((a, b) => a.minX - b.minX);
     const columnBuckets = Array(sortedColumns.length).fill(null).map(() => []);
-    
+
     for (const line of lines) {
       // Find which column this line belongs to based on its X position
       let assignedColumn = -1;
-      
+
       for (let i = 0; i < sortedColumns.length; i++) {
         const column = sortedColumns[i];
-        
+
         // Check if line's X range overlaps with column range
         const lineOverlap = Math.min(line.maxX, column.maxX) - Math.max(line.minX, column.minX);
-        
+
         if (lineOverlap > 0) {
           // Calculate overlap percentage
           const lineWidth = line.maxX - line.minX;
           const overlapPercentage = lineWidth > 0 ? lineOverlap / lineWidth : 1;
-          
+
           // Assign to column if significant overlap (>50%)
           if (overlapPercentage > 0.5) {
             assignedColumn = i;
@@ -312,7 +317,7 @@ class ChunkingService {
           }
         }
       }
-      
+
       // If no column assignment found, assign to closest column by X position
       if (assignedColumn === -1) {
         let minDistance = Infinity;
@@ -325,18 +330,18 @@ class ChunkingService {
           }
         }
       }
-      
+
       // Add line to assigned column bucket
       if (assignedColumn >= 0 && assignedColumn < columnBuckets.length) {
         columnBuckets[assignedColumn].push(line);
       }
     }
-    
+
     // Sort lines within each column by Y position (top to bottom)
     columnBuckets.forEach(bucket => {
       bucket.sort((a, b) => a.y - b.y);
     });
-    
+
     return columnBuckets;
   }
 
@@ -345,12 +350,12 @@ class ChunkingService {
     const units = [];
     let currentParagraph = [];
     let paragraphStartIndex = null; // Track when paragraph starts (1-based)
-    
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const nextLine = lines[i + 1];
       const globalLineIndex = lineOffset + i;
-      
+
       // Detect table rows by checking for regular vertical alignment
       if (this._isTableRow(line, lines)) {
         // End current paragraph
@@ -365,11 +370,11 @@ class ChunkingService {
           currentParagraph = [];
           paragraphStartIndex = null;
         }
-        
+
         // Add table row unit with enhanced metadata
         const tableColumns = this._extractTableColumns(line);
         const rowNormalized = this._normalizeCurrencyAndNumbers(line.text);
-        
+
         units.push({
           type: 'table_row',
           text: line.text,
@@ -406,7 +411,7 @@ class ChunkingService {
           currentParagraph = [];
           paragraphStartIndex = null;
         }
-        
+
         // Add header unit
         units.push({
           type: 'header',
@@ -428,7 +433,7 @@ class ChunkingService {
           currentParagraph = [];
           paragraphStartIndex = null;
         }
-        
+
         // Add bullet unit
         units.push({
           type: 'bullet',
@@ -444,7 +449,7 @@ class ChunkingService {
           paragraphStartIndex = globalLineIndex + 1;
         }
         currentParagraph.push(line);
-        
+
         // Check if paragraph should end (modified to handle column context)
         if (!nextLine || this._shouldEndParagraph(line, nextLine)) {
           units.push({
@@ -459,7 +464,7 @@ class ChunkingService {
         }
       }
     }
-    
+
     // Add final paragraph if exists
     if (currentParagraph.length > 0) {
       const globalLineIndex = lineOffset + lines.length - 1;
@@ -471,48 +476,48 @@ class ChunkingService {
         endLine: globalLineIndex + 1
       });
     }
-    
+
     return units;
   }
 
   // Enhanced table row detection with robust numeric analysis
   _isTableRow(line, allLines) {
     const text = line.text;
-    
+
     // Use enhanced normalization to detect numbers/currencies
     const normalized = this._normalizeCurrencyAndNumbers(text);
-    
+
     // Require at least 2 numeric values for table row classification
     if (normalized.numbers.length < 2) return false;
-    
+
     // Test column extraction to ensure proper structure
     const columns = this._extractTableColumns(line);
     if (columns.length < 3) return false;
-    
+
     // Count numeric columns
     const numericColumns = columns.filter(col => col.isNumeric).length;
     if (numericColumns < 2) return false;
-    
+
     // Check for similar structure in nearby lines (enhanced analysis)
     const nearbyLines = allLines.slice(
       Math.max(0, allLines.indexOf(line) - 2),
       Math.min(allLines.length, allLines.indexOf(line) + 3)
     );
-    
+
     const similarStructure = nearbyLines.filter(l => {
       if (l === line) return false;
-      
+
       const lNormalized = this._normalizeCurrencyAndNumbers(l.text);
       const lColumns = this._extractTableColumns(l);
       const lNumericColumns = lColumns.filter(col => col.isNumeric).length;
-      
+
       // Check for similar structure: similar number of columns and numeric content
       return lNormalized.numbers.length >= 2 && 
              lColumns.length >= 3 && 
              lNumericColumns >= 2 &&
              Math.abs(lColumns.length - columns.length) <= 1; // Allow slight variation
     });
-    
+
     return similarStructure.length > 0;
   }
 
@@ -567,10 +572,10 @@ class ChunkingService {
 
     while ((match = numberPattern.exec(text)) !== null) {
       const [fullMatch, currencySymbol, currencyCodeBefore, numberPart, multiplier, percentage, currencyCodeAfter] = match;
-      
+
       // Skip if numberPart is too short or doesn't contain digits
       if (!numberPart || !/\d/.test(numberPart)) continue;
-      
+
       // Determine currency
       let currency = null;
       if (currencySymbol && currencyMap[currencySymbol]) {
@@ -589,10 +594,10 @@ class ChunkingService {
 
       // Parse number with locale detection
       const parsedValue = this._parseNumberWithLocaleDetection(numberPart.trim());
-      
+
       if (!isNaN(parsedValue) && parsedValue !== null) {
         let finalValue = isNegative ? -Math.abs(parsedValue) : parsedValue;
-        
+
         // Apply multiplier
         let multiplierValue = 1;
         let rawValue = finalValue;
@@ -600,7 +605,7 @@ class ChunkingService {
           multiplierValue = multiplierMap[multiplier];
           finalValue = finalValue * multiplierValue;
         }
-        
+
         const numberData = {
           originalText: fullMatch.trim(),
           value: finalValue,
@@ -615,7 +620,7 @@ class ChunkingService {
         };
 
         normalizedData.numbers.push(numberData);
-        
+
         if (currency && !normalizedData.currencies.includes(currency)) {
           normalizedData.currencies.push(currency);
         }
@@ -623,7 +628,7 @@ class ChunkingService {
         // Create normalized representation
         let normalizedNum = currency ? `${currency} ${finalValue}` : finalValue.toString();
         if (percentage) normalizedNum += '%';
-        
+
         // Replace in processed text for better parsing
         processedText = processedText.replace(fullMatch, normalizedNum);
       }
@@ -637,19 +642,19 @@ class ChunkingService {
   _parseNumberWithLocaleDetection(numberStr) {
     // Clean the input
     const cleaned = numberStr.replace(/[-\s()]/g, '').trim();
-    
+
     // Detect EU format: \d{1,3}(\.\d{3})+,\d{2} (e.g., 1.234.567,89)
     const euFormatPattern = /^\d{1,3}(?:\.\d{3})+,\d{1,2}$/;
-    
+
     // Detect US format with comma thousands: \d{1,3}(,\d{3})+\.?\d* (e.g., 1,234,567.89)
     const usFormatPattern = /^\d{1,3}(?:,\d{3})+(?:\.\d+)?$/;
-    
+
     // Simple decimal with comma: \d+,\d+ (e.g., 123,45)
     const simpleCommaDecimal = /^\d+,\d+$/;
-    
+
     // Simple decimal with dot: \d+\.\d+ (e.g., 123.45)
     const simpleDotDecimal = /^\d+\.\d+$/;
-    
+
     if (euFormatPattern.test(cleaned)) {
       // EU format: dots are thousands, comma is decimal
       return parseFloat(cleaned.replace(/\./g, '').replace(',', '.'));
@@ -669,10 +674,10 @@ class ChunkingService {
       // Try to parse as-is, replacing common separators
       const attempt1 = parseFloat(cleaned.replace(/,/g, ''));
       if (!isNaN(attempt1)) return attempt1;
-      
+
       const attempt2 = parseFloat(cleaned.replace(/\./g, '').replace(',', '.'));
       if (!isNaN(attempt2)) return attempt2;
-      
+
       return null;
     }
   }
@@ -680,7 +685,7 @@ class ChunkingService {
   // Enhanced table column extraction with robust number/currency parsing
   _extractTableColumns(line) {
     const text = line.text;
-    
+
     // Try multiple delimiter strategies
     const delimiters = [
       /\s{3,}|\t/, // 3+ spaces or tabs (most common)
@@ -696,17 +701,17 @@ class ChunkingService {
     // Test each delimiter strategy
     for (const delimiter of delimiters) {
       const columns = text.split(delimiter).filter(col => col.trim().length > 0);
-      
+
       if (columns.length >= 2) {
         // Score based on number of numeric columns and reasonable distribution
         const numericColumns = columns.filter(col => {
           const normalized = this._normalizeCurrencyAndNumbers(col.trim());
           return normalized.numbers.length > 0;
         }).length;
-        
+
         // Prefer delimiters that create more numeric columns
         const score = numericColumns + (columns.length >= 3 ? 2 : 0);
-        
+
         if (score > bestScore) {
           bestScore = score;
           bestColumns = columns;
@@ -723,7 +728,7 @@ class ChunkingService {
     return bestColumns.map((col, index) => {
       const trimmedCol = col.trim();
       const normalized = this._normalizeCurrencyAndNumbers(trimmedCol);
-      
+
       const columnData = {
         index: index,
         text: trimmedCol,
@@ -753,11 +758,11 @@ class ChunkingService {
     // Large Y gap indicates paragraph break
     const yGap = Math.abs(nextLine.y - currentLine.y);
     if (yGap > 15) return true;
-    
+
     // Significant X position change (new column or indentation)
     const xDiff = Math.abs(nextLine.minX - currentLine.minX);
     if (xDiff > 30) return true;
-    
+
     return false;
   }
 
@@ -766,22 +771,22 @@ class ChunkingService {
     try {
       const dataBuffer = await fs.readFile(filePath);
       const pdfData = new Uint8Array(dataBuffer);
-      
+
       console.log('📄 Using basic pdfjs-dist fallback extraction...');
-      
+
       // Use pdfjs-dist for consistency with main extraction
       const loadingTask = pdfjsLib.getDocument({
         data: pdfData,
         useSystemFonts: false, // Simplified for fallback
         disableFontFace: true
       });
-      
+
       const pdfDocument = await loadingTask.promise;
       const totalPages = pdfDocument.numPages;
-      
+
       let fullText = '';
       const pages = [];
-      
+
       // Extract text from each page using consistent method
       for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
         const page = await pdfDocument.getPage(pageNum);
@@ -789,20 +794,20 @@ class ChunkingService {
         pages.push(pageData);
         fullText += pageData.text + '\n\n';
       }
-      
+
       await pdfDocument.destroy();
-      
+
       console.log(`📄 Fallback extraction completed: ${totalPages} pages processed`);
-      
+
       return {
         fullText: fullText.trim(),
         pages: pages,
         totalPages: totalPages
       };
-      
+
     } catch (error) {
       console.error('❌ Fallback extraction failed:', error);
-      
+
       // Final fallback - return minimal structure
       return {
         fullText: 'Text extraction failed',
@@ -830,7 +835,7 @@ class ChunkingService {
     try {
       const textContent = await page.getTextContent();
       const viewport = page.getViewport({ scale: 1.0 });
-      
+
       // Collect text items with coordinates (same as main extraction)
       const textItems = textContent.items.map(item => ({
         text: item.str,
@@ -841,16 +846,19 @@ class ChunkingService {
         fontName: item.fontName,
         fontSize: item.transform[0]
       })).filter(item => item.text.trim().length > 0);
-      
+
       // Group text items into lines by Y proximity (same logic as main)
       const lines = this._groupIntoLines(textItems);
-      
+
       // Build simple structured units without column/table detection
       const structuredUnits = this._buildSimpleUnitsFromLines(lines);
-      
+
       // Generate clean text from structured units
-      const pageText = structuredUnits.map(unit => unit.text).join('\n');
-      
+      let pageText = structuredUnits.map(unit => unit.text).join('\n');
+
+      // Merge soft hyphens at line ends to prevent embedding similarity and number parsing issues
+      pageText = this._mergeSoftHyphens(pageText);
+
       return {
         pageNumber: pageNumber,
         text: pageText,
@@ -859,10 +867,10 @@ class ChunkingService {
         columns: 1,
         hasTable: false
       };
-      
+
     } catch (error) {
       console.error(`❌ Fallback layout extraction failed for page ${pageNumber}:`, error);
-      
+
       // Ultimate fallback: simple text extraction
       const textContent = await page.getTextContent();
       const pageText = textContent.items
@@ -870,9 +878,9 @@ class ChunkingService {
         .join(' ')
         .replace(/\s+/g, ' ')
         .trim();
-      
+
       const lines = pageText.split('\n').filter(line => line.trim().length > 0);
-      
+
       return {
         pageNumber: pageNumber,
         text: pageText,
@@ -895,11 +903,11 @@ class ChunkingService {
     const units = [];
     let currentParagraph = [];
     let paragraphStartIndex = null;
-    
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const nextLine = lines[i + 1];
-      
+
       // Detect headers and bullets (simplified)
       if (this._isHeader(line.text)) {
         // End current paragraph
@@ -914,7 +922,7 @@ class ChunkingService {
           currentParagraph = [];
           paragraphStartIndex = null;
         }
-        
+
         // Add header unit
         units.push({
           type: 'header',
@@ -936,7 +944,7 @@ class ChunkingService {
           currentParagraph = [];
           paragraphStartIndex = null;
         }
-        
+
         // Add bullet unit
         units.push({
           type: 'bullet',
@@ -951,7 +959,7 @@ class ChunkingService {
           paragraphStartIndex = i + 1;
         }
         currentParagraph.push(line);
-        
+
         // Check if paragraph should end
         if (!nextLine || this._shouldEndParagraph(line, nextLine)) {
           units.push({
@@ -966,7 +974,7 @@ class ChunkingService {
         }
       }
     }
-    
+
     // Add final paragraph if exists
     if (currentParagraph.length > 0) {
       units.push({
@@ -977,7 +985,7 @@ class ChunkingService {
         endLine: lines.length
       });
     }
-    
+
     return units;
   }
 
@@ -985,7 +993,7 @@ class ChunkingService {
   async processPDF(filePath, metadata = {}) {
     try {
       console.log(`📄 Processing PDF with layout awareness: ${filePath}`);
-      
+
       // Extract text with layout information
       const pdfData = await this.extractTextFromPDF(filePath);
 
@@ -1026,7 +1034,7 @@ class ChunkingService {
     for (const pageData of pdfData.pages) {
       const pageNumber = pageData.pageNumber;
       const structuredUnits = pageData.structuredUnits || [];
-      
+
       // Create chunks using unit-based approach
       const pageChunks = this._createUnitsBasedChunks(structuredUnits, pageNumber, metadata, globalChunkIndex);
       chunks.push(...pageChunks);
@@ -1043,11 +1051,11 @@ class ChunkingService {
     let chunkIndex = startIndex;
     let currentChunk = '';
     let currentUnits = [];
-    
+
     for (let i = 0; i < units.length; i++) {
       const unit = units[i];
       const unitText = unit.text;
-      
+
       // Check if adding this unit would exceed chunk size
       if (currentChunk.length + unitText.length > this.chunkSize && currentChunk.trim()) {
         // Create chunk with current content
@@ -1091,18 +1099,18 @@ class ChunkingService {
   // Get overlap units (last 1-2 units depending on type)
   _getOverlapUnits(units) {
     if (units.length === 0) return [];
-    
+
     // For table rows, carry forward last row
     if (units[units.length - 1].type === 'table_row') {
       return units.slice(-1);
     }
-    
+
     // For paragraphs, carry forward last 1-2 units based on size
     const lastUnit = units[units.length - 1];
     if (lastUnit.text.length < this.chunkOverlap) {
       return units.slice(-Math.min(2, units.length));
     }
-    
+
     return units.slice(-1);
   }
 
@@ -1111,14 +1119,14 @@ class ChunkingService {
     const chunks = [];
     let currentPosition = 0;
     let chunkIndex = 0;
-    
+
     // Preserve significant line breaks as structure signals
     const preservedText = text.replace(/\n\s*\n/g, '\n\n__PARAGRAPH_BREAK__\n\n');
-    
+
     while (currentPosition < preservedText.length) {
       // Calculate safe chunk end position
       let chunkEnd = Math.min(currentPosition + this.chunkSize, preservedText.length);
-      
+
       // If not at document end, try to break at word/sentence boundary
       if (chunkEnd < preservedText.length) {
         // Look for good break points in descending order of preference
@@ -1130,7 +1138,7 @@ class ChunkingService {
           preservedText.lastIndexOf('\n', chunkEnd),
           preservedText.lastIndexOf(' ', chunkEnd)
         ];
-        
+
         for (const breakPoint of breakPoints) {
           if (breakPoint > currentPosition + (this.chunkSize * 0.3)) { // At least 30% of target size
             chunkEnd = breakPoint + 1;
@@ -1138,19 +1146,19 @@ class ChunkingService {
           }
         }
       }
-      
+
       // Extract chunk text
       let chunkText = preservedText.substring(currentPosition, chunkEnd).trim();
-      
+
       // Restore paragraph breaks
       chunkText = chunkText.replace(/__PARAGRAPH_BREAK__/g, '');
-      
+
       // Skip empty chunks
       if (chunkText.length === 0) {
         currentPosition = chunkEnd;
         continue;
       }
-      
+
       // Create chunk object
       chunks.push({
         text: chunkText,
@@ -1164,22 +1172,22 @@ class ChunkingService {
           preservedStructure: chunkText.includes('\n\n')
         }
       });
-      
+
       // Calculate next position with safe step
       const effectiveChunkLength = chunkEnd - currentPosition;
       const step = Math.max(
         effectiveChunkLength - this.chunkOverlap,
         Math.min(50, effectiveChunkLength * 0.1) // Minimum step: 50 chars or 10% of chunk
       );
-      
+
       currentPosition += Math.floor(step);
-      
+
       // Safety check to prevent infinite loops
       if (step <= 0 || currentPosition >= preservedText.length) {
         break;
       }
     }
-    
+
     console.log(`📄 Fixed-size advanced chunking created ${chunks.length} chunks`);
     return chunks;
   }
@@ -1206,44 +1214,44 @@ class ChunkingService {
 
   _isHeader(line) {
     const text = line.text || line; // Handle both line objects and strings
-    
+
     // Basic length and content checks
     if (text.length > 80 || text.length < 3) return false;
-    
+
     // Pattern 1: All caps with colon (strong header indicator)
     const allCapsWithColon = /^[A-Z\s]+:\s*$/.test(text) && text.length < 60;
     if (allCapsWithColon) return true;
-    
+
     // Pattern 2: Numbered headers (1. Title, Section 1, etc.)
     const numberedHeader = /^(\d+\.|\d+\s+|Section\s+\d+|Chapter\s+\d+)\s*[A-Z]/.test(text);
     if (numberedHeader) return true;
-    
+
     // Pattern 3: Title case with colon and reasonable length
     const titleCaseWithColon = /^[A-Z][a-z]+(\s+[A-Z][a-z]+)*:\s*$/.test(text) && text.length < 60;
     if (titleCaseWithColon) return true;
-    
+
     // Pattern 4: All caps but require additional context checks
     const allCaps = /^[A-Z\s]+$/.test(text) && text.length < 50;
     if (allCaps) {
       // Additional checks to reduce false positives
-      
+
       // Reject if it looks like an acronym (too short, no spaces)
       if (text.length < 8 && !/\s/.test(text)) return false;
-      
+
       // Reject common false positives
       const falsePositives = /^(USD|EUR|GBP|INR|CAD|AUD|CHF|CNY|JPY|YES|NO|TRUE|FALSE|NULL|TOTAL|SUM|AVG|MAX|MIN|COUNT|ID|NAME|DATE|TIME|TYPE|STATUS)$/;
       if (falsePositives.test(text.trim())) return false;
-      
+
       // If we have line object with position info, check for Y-gap context
       if (typeof line === 'object' && line.y !== undefined) {
         // This would require context from surrounding lines, which we can check in the calling method
         return this._hasHeaderContext(line);
       }
-      
+
       // For plain text, be more restrictive - require at least one space (multi-word)
       return /\s/.test(text) && text.split(/\s+/).length >= 2;
     }
-    
+
     return false;
   }
 
@@ -1259,26 +1267,26 @@ class ChunkingService {
   _isHeaderWithContext(line, allLines, currentIndex) {
     // First check basic header patterns
     if (!this._isHeader(line)) return false;
-    
+
     const text = line.text;
     const isAllCaps = /^[A-Z\s]+:?\s*$/.test(text);
-    
+
     // If it's not all caps, trust the basic header detection
     if (!isAllCaps) return true;
-    
+
     // For all-caps lines, require additional context validation
-    
+
     // Check for Y-gap context (spacing above/below)
     const prevLine = currentIndex > 0 ? allLines[currentIndex - 1] : null;
     const nextLine = currentIndex < allLines.length - 1 ? allLines[currentIndex + 1] : null;
-    
+
     let hasYGapContext = false;
-    
+
     if (prevLine && nextLine) {
       // Check for significant Y gaps (indicating spacing around header)
       const gapAbove = Math.abs(line.y - prevLine.y);
       const gapBelow = Math.abs(nextLine.y - line.y);
-      
+
       // Header should have larger gaps than normal line spacing
       const normalLineSpacing = 15; // Based on yTolerance used elsewhere
       hasYGapContext = gapAbove > normalLineSpacing * 1.5 || gapBelow > normalLineSpacing * 1.5;
@@ -1286,10 +1294,10 @@ class ChunkingService {
       // At document boundaries, be more lenient
       hasYGapContext = true;
     }
-    
+
     // Check for title case pattern (more likely to be headers)
     const isTitleCase = /^[A-Z][a-z]+(\s+[A-Z][a-z]+)*/.test(text);
-    
+
     // Additional validation for all-caps headers
     if (isAllCaps) {
       // Require either:
@@ -1302,7 +1310,7 @@ class ChunkingService {
              isTitleCase || 
              (text.split(/\s+/).length >= 3 && text.length >= 15);
     }
-    
+
     return true;
   }
 
@@ -1310,10 +1318,10 @@ class ChunkingService {
   _createSemanticChunk(text, metadata, chunkIndex, pageNumber, semanticUnits) {
     const unitTypes = semanticUnits.map(u => u.type);
     const lineNumbers = semanticUnits.map(u => u.startLine).filter(n => n);
-    
+
     // Analyze numeric content across the entire chunk
     const chunkNormalized = this._normalizeCurrencyAndNumbers(text);
-    
+
     // Collect numeric metadata from table rows
     const tableRows = semanticUnits.filter(u => u.type === 'table_row');
     const numericMetadata = {
@@ -1424,7 +1432,7 @@ class ChunkingService {
     ];
 
     const tests = testCases.length > 0 ? testCases : defaultTests;
-    
+
     console.log('🧪 Testing Currency/Number Normalization:');
     tests.forEach((test, index) => {
       try {
@@ -1492,7 +1500,7 @@ class ChunkingService {
 
     stats.averageChunkSize = Math.round(stats.averageChunkSize / chunks.length);
     stats.pagesSpanned = stats.pagesSpanned.size;
-    
+
     if (stats.minChunkSize === Infinity) stats.minChunkSize = 0;
 
     console.log(`📈 Layout-Aware Chunking Statistics:`, stats);
@@ -1515,16 +1523,16 @@ class ChunkingService {
     pdfData.pages.forEach(page => {
       if (page.structuredUnits) {
         analysis.totalStructuredUnits += page.structuredUnits.length;
-        
+
         page.structuredUnits.forEach(unit => {
           analysis.structureTypes[unit.type] = (analysis.structureTypes[unit.type] || 0) + 1;
         });
       }
-      
+
       if (page.hasTable) {
         analysis.hasTabularData = true;
       }
-      
+
       analysis.averageColumnsPerPage += (page.columns || 1);
     });
 
@@ -1542,6 +1550,14 @@ class ChunkingService {
 
     console.log(`📊 Layout-Aware PDF Structure Analysis:`, analysis);
     return analysis;
+  }
+
+  // Merges soft hyphens at line ends
+  _mergeSoftHyphens(text) {
+    // Regex to find hyphen followed by whitespace and newline, and then a word character.
+    // It replaces this pattern with an empty string, effectively merging the hyphenated word.
+    // Example: "construc-\n tion" becomes "construction"
+    return text.replace(/-\s*\n(?=\w)/g, '');
   }
 }
 
