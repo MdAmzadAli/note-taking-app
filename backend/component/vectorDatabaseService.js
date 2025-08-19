@@ -116,12 +116,12 @@ class VectorDatabaseService {
             startLine: chunk.metadata.startLine,
             endLine: chunk.metadata.endLine,
             linesUsed: chunk.metadata.linesUsed,
-            originalLines: chunk.metadata.originalLines,
+            // originalLines: chunk.metadata.originalLines,
             totalLinesOnPage: chunk.metadata.totalLinesOnPage,
             totalPages: chunk.metadata.totalPages,
             pageUrl: pageUrl,
             cloudinaryUrl: cloudinaryData?.secureUrl,
-            thumbnailUrl: cloudinaryData?.thumbnailUrl,
+            // thumbnailUrl: cloudinaryData?.thumbnailUrl,
             embeddingType: 'RETRIEVAL_DOCUMENT',
             ...chunk.metadata
           }
