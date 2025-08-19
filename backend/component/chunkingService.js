@@ -125,23 +125,20 @@ class ChunkingService {
   _groupIntoLines(textItems) {
     if (textItems.length === 0) return [];
     
-    // Sort by Y coordinate first, then by X coordinate
-    textItems.sort((a, b) => {
-      const yDiff = Math.abs(a.y - b.y);
-      if (yDiff < 3) { // Same line threshold
-        return a.x - b.x; // Sort by X within same line
-      }
-      return a.y - b.y; // Sort by Y across lines
-    });
+    // Sort strictly by Y coordinate first, then by X coordinate (transitive comparator)
+    textItems.sort((a, b) => (a.y - b.y) || (a.x - b.x));
     
     const lines = [];
     let currentLine = { items: [textItems[0]], y: textItems[0].y, minX: textItems[0].x, maxX: textItems[0].x + textItems[0].width };
+    
+    // Use configurable Y tolerance for better handling of low-DPI scans
+    const yTolerance = 5; // Increased from 3px to 5px for better robustness
     
     for (let i = 1; i < textItems.length; i++) {
       const item = textItems[i];
       const yDiff = Math.abs(item.y - currentLine.y);
       
-      if (yDiff < 3) { // Same line (3px tolerance)
+      if (yDiff <= yTolerance) { // Same line (5px tolerance)
         currentLine.items.push(item);
         currentLine.minX = Math.min(currentLine.minX, item.x);
         currentLine.maxX = Math.max(currentLine.maxX, item.x + item.width);
