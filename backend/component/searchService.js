@@ -35,14 +35,15 @@ class SearchService {
 
     let allCandidates = [];
 
-    // Step 1: Retrieve top candidates from each document
+    // Step 1: Retrieve top candidates from each document individually
     for (const fileId of fileIds) {
       try {
         console.log(`📄 Searching in document: ${fileId}`);
         
+        // Search each document individually to avoid filter conflicts
         const filter = { 
           must: [
-            { key: 'fileId', match: { any: fileIds } },
+            { key: 'fileId', match: { value: fileId } }, // Single file ID per search
             { key: 'workspaceId', match: { value: workspaceId } }
           ]
         };
@@ -55,7 +56,38 @@ class SearchService {
 
         if (docResults.length > 0) {
           console.log(`✅ Found ${docResults.length} candidates from ${fileId}`);
+        } else {
+          console.log(`⚠️ No results found for ${fileId}, trying fallback search...`);
           
+          // Fallback: Search without workspace filter
+          try {
+            const fallbackFilter = { 
+              must: [{ key: 'fileId', match: { value: fileId } }]
+            };
+            
+            docResults = await this.vectorDatabaseService.searchSimilarChunks(
+              queryEmbedding, 
+              fallbackFilter, 
+              retrievalLimit
+            );
+            
+            if (docResults.length > 0) {
+              console.log(`✅ Fallback search found ${docResults.length} candidates from ${fileId}`);
+              
+              // Filter by workspaceId manually if needed
+              if (workspaceId) {
+                docResults = docResults.filter(result => 
+                  result.payload.workspaceId === workspaceId
+                );
+                console.log(`📄 After workspace filtering: ${docResults.length} candidates`);
+              }
+            }
+          } catch (fallbackError) {
+            console.warn(`⚠️ Fallback search also failed for ${fileId}:`, fallbackError.message);
+          }
+        }
+
+        if (docResults.length > 0) {
           // Add document-specific context
           const processedResults = docResults.map(result => ({
             text: result.payload.text,
@@ -82,6 +114,8 @@ class SearchService {
           }));
 
           allCandidates.push(...processedResults);
+        } else {
+          console.warn(`❌ No candidates found for document ${fileId}`);
         }
       } catch (docError) {
         console.warn(`⚠️ Failed to search document ${fileId}:`, docError.message);
