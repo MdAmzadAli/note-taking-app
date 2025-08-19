@@ -245,14 +245,32 @@ class ChunkingService {
           currentParagraph = [];
         }
         
-        // Add table row unit
+        // Add table row unit with enhanced metadata
+        const tableColumns = this._extractTableColumns(line);
+        const rowNormalized = this._normalizeCurrencyAndNumbers(line.text);
+        
         units.push({
           type: 'table_row',
           text: line.text,
           lines: [line.text],
           startLine: i + 1,
           endLine: i + 1,
-          columns: this._extractTableColumns(line)
+          columns: tableColumns,
+          // Enhanced numeric metadata
+          numericMetadata: {
+            totalNumbers: rowNormalized.numbers.length,
+            totalCurrencies: rowNormalized.currencies,
+            hasNegativeValues: rowNormalized.hasNegative,
+            numericColumns: tableColumns.filter(col => col.isNumeric).length,
+            primaryValues: tableColumns
+              .filter(col => col.primaryValue !== undefined)
+              .map(col => ({
+                columnIndex: col.index,
+                value: col.primaryValue,
+                currency: col.primaryCurrency,
+                isPercentage: col.isPercentage
+              }))
+          }
         });
       } else if (this._isHeader(line.text)) {
         // End current paragraph
@@ -328,21 +346,25 @@ class ChunkingService {
     return units;
   }
 
-  // Detect table rows by checking for regular vertical alignment and numeric content
+  // Enhanced table row detection with robust numeric analysis
   _isTableRow(line, allLines) {
     const text = line.text;
     
-    // Check for multiple numeric values or currency
-    const numericPattern = /\$?[\d,]+\.?\d*%?/g;
-    const numericMatches = text.match(numericPattern);
+    // Use enhanced normalization to detect numbers/currencies
+    const normalized = this._normalizeCurrencyAndNumbers(text);
     
-    if (!numericMatches || numericMatches.length < 2) return false;
+    // Require at least 2 numeric values for table row classification
+    if (normalized.numbers.length < 2) return false;
     
-    // Check for regular spacing or tab-like separation
-    const parts = text.split(/\s{2,}|\t/);
-    if (parts.length < 3) return false;
+    // Test column extraction to ensure proper structure
+    const columns = this._extractTableColumns(line);
+    if (columns.length < 3) return false;
     
-    // Check if similar structure exists in nearby lines
+    // Count numeric columns
+    const numericColumns = columns.filter(col => col.isNumeric).length;
+    if (numericColumns < 2) return false;
+    
+    // Check for similar structure in nearby lines (enhanced analysis)
     const nearbyLines = allLines.slice(
       Math.max(0, allLines.indexOf(line) - 2),
       Math.min(allLines.length, allLines.indexOf(line) + 3)
@@ -350,26 +372,190 @@ class ChunkingService {
     
     const similarStructure = nearbyLines.filter(l => {
       if (l === line) return false;
-      const lNumeric = l.text.match(numericPattern);
-      const lParts = l.text.split(/\s{2,}|\t/);
-      return lNumeric && lNumeric.length >= 2 && lParts.length >= 3;
+      
+      const lNormalized = this._normalizeCurrencyAndNumbers(l.text);
+      const lColumns = this._extractTableColumns(l);
+      const lNumericColumns = lColumns.filter(col => col.isNumeric).length;
+      
+      // Check for similar structure: similar number of columns and numeric content
+      return lNormalized.numbers.length >= 2 && 
+             lColumns.length >= 3 && 
+             lNumericColumns >= 2 &&
+             Math.abs(lColumns.length - columns.length) <= 1; // Allow slight variation
     });
     
     return similarStructure.length > 0;
   }
 
-  // Extract table columns from a table row
+  // Enhanced currency/number normalizer
+  _normalizeCurrencyAndNumbers(text) {
+    const normalizedData = {
+      originalText: text,
+      normalizedText: text,
+      currencies: [],
+      numbers: [],
+      hasNegative: false
+    };
+
+    // Currency symbols and codes mapping
+    const currencyMap = {
+      '₹': 'INR',
+      '$': 'USD', 
+      '€': 'EUR',
+      '£': 'GBP',
+      '¥': 'JPY',
+      '₦': 'NGN',
+      '₽': 'RUB',
+      'USD': 'USD',
+      'INR': 'INR',
+      'EUR': 'EUR',
+      'GBP': 'GBP',
+      'JPY': 'JPY',
+      'CAD': 'CAD',
+      'AUD': 'AUD',
+      'CHF': 'CHF',
+      'CNY': 'CNY'
+    };
+
+    // Enhanced number pattern that handles:
+    // - Currency symbols (₹, $, €, £, etc.)
+    // - Currency codes (USD, INR, etc.)
+    // - Commas and thin spaces as thousands separators
+    // - Parentheses for negatives: (1,234.56)
+    // - Percentages
+    // - Scientific notation
+    const numberPattern = /(?:([₹$€£¥₦₽])\s*)?(?:(USD|INR|EUR|GBP|JPY|CAD|AUD|CHF|CNY)\s*)?(?:\()?(-?\s*[\d,\s]+(?:\.[\d]+)?(?:[eE][+-]?\d+)?)\s*(?:\))?\s*(%)?(?:\s*(USD|INR|EUR|GBP|JPY|CAD|AUD|CHF|CNY))?/gi;
+
+    let match;
+    let processedText = text;
+
+    while ((match = numberPattern.exec(text)) !== null) {
+      const [fullMatch, currencySymbol, currencyCodeBefore, numberPart, percentage, currencyCodeAfter] = match;
+      
+      // Determine currency
+      let currency = null;
+      if (currencySymbol && currencyMap[currencySymbol]) {
+        currency = currencyMap[currencySymbol];
+      } else if (currencyCodeBefore && currencyMap[currencyCodeBefore]) {
+        currency = currencyMap[currencyCodeBefore];
+      } else if (currencyCodeAfter && currencyMap[currencyCodeAfter]) {
+        currency = currencyMap[currencyCodeAfter];
+      }
+
+      // Check for negatives (parentheses or minus sign)
+      const isNegative = fullMatch.includes('(') && fullMatch.includes(')') || numberPart.includes('-');
+      if (isNegative) {
+        normalizedData.hasNegative = true;
+      }
+
+      // Clean and parse number
+      const cleanNumber = numberPart
+        .replace(/[-\s,()]/g, '') // Remove spaces, commas, parentheses, minus
+        .replace(/\s+/g, ''); // Remove any remaining spaces
+
+      const numericValue = parseFloat(cleanNumber);
+      
+      if (!isNaN(numericValue)) {
+        const finalValue = isNegative ? -Math.abs(numericValue) : numericValue;
+        
+        const numberData = {
+          originalText: fullMatch.trim(),
+          value: finalValue,
+          currency: currency,
+          isPercentage: !!percentage,
+          isNegative: isNegative,
+          position: match.index,
+          length: fullMatch.length
+        };
+
+        normalizedData.numbers.push(numberData);
+        
+        if (currency && !normalizedData.currencies.includes(currency)) {
+          normalizedData.currencies.push(currency);
+        }
+
+        // Create normalized representation
+        let normalizedNum = currency ? `${currency} ${finalValue}` : finalValue.toString();
+        if (percentage) normalizedNum += '%';
+        
+        // Replace in processed text for better parsing
+        processedText = processedText.replace(fullMatch, normalizedNum);
+      }
+    }
+
+    normalizedData.normalizedText = processedText;
+    return normalizedData;
+  }
+
+  // Enhanced table column extraction with robust number/currency parsing
   _extractTableColumns(line) {
     const text = line.text;
     
-    // Split by multiple spaces or tabs
-    const columns = text.split(/\s{2,}|\t/).filter(col => col.trim().length > 0);
-    
-    return columns.map((col, index) => ({
-      index: index,
-      text: col.trim(),
-      isNumeric: /^\$?[\d,]+\.?\d*%?$/.test(col.trim())
-    }));
+    // Try multiple delimiter strategies
+    const delimiters = [
+      /\s{3,}|\t/, // 3+ spaces or tabs (most common)
+      /\s{2,}/, // 2+ spaces
+      /\|/, // Pipe delimiter
+      /;/, // Semicolon
+      /,(?=\s)/, // Comma followed by space (not within numbers)
+    ];
+
+    let bestColumns = [];
+    let bestScore = 0;
+
+    // Test each delimiter strategy
+    for (const delimiter of delimiters) {
+      const columns = text.split(delimiter).filter(col => col.trim().length > 0);
+      
+      if (columns.length >= 2) {
+        // Score based on number of numeric columns and reasonable distribution
+        const numericColumns = columns.filter(col => {
+          const normalized = this._normalizeCurrencyAndNumbers(col.trim());
+          return normalized.numbers.length > 0;
+        }).length;
+        
+        // Prefer delimiters that create more numeric columns
+        const score = numericColumns + (columns.length >= 3 ? 2 : 0);
+        
+        if (score > bestScore) {
+          bestScore = score;
+          bestColumns = columns;
+        }
+      }
+    }
+
+    // Fallback to space-based splitting if no good delimiter found
+    if (bestColumns.length === 0) {
+      bestColumns = text.split(/\s{2,}|\t/).filter(col => col.trim().length > 0);
+    }
+
+    // Process each column with enhanced normalization
+    return bestColumns.map((col, index) => {
+      const trimmedCol = col.trim();
+      const normalized = this._normalizeCurrencyAndNumbers(trimmedCol);
+      
+      const columnData = {
+        index: index,
+        text: trimmedCol,
+        normalizedText: normalized.normalizedText,
+        isNumeric: normalized.numbers.length > 0,
+        numbers: normalized.numbers,
+        currencies: normalized.currencies,
+        hasNegative: normalized.hasNegative,
+        // Legacy compatibility
+        isLegacyNumeric: /^\$?[\d,]+\.?\d*%?$/.test(trimmedCol)
+      };
+
+      // Add primary numeric value for easy access
+      if (normalized.numbers.length > 0) {
+        const primaryNumber = normalized.numbers[0];
+        columnData.primaryValue = primaryNumber.value;
+        columnData.primaryCurrency = primaryNumber.currency;
+        columnData.isPercentage = primaryNumber.isPercentage;
+      }
+
+      return columnData;
+    });
   }
 
   // Check if paragraph should end
@@ -551,11 +737,39 @@ class ChunkingService {
            line.endsWith(':') && line.length < 80;
   }
 
-  // Create a semantic chunk object with enhanced metadata
+  // Create a semantic chunk object with enhanced metadata including numeric analysis
   _createSemanticChunk(text, metadata, chunkIndex, pageNumber, semanticUnits) {
     const unitTypes = semanticUnits.map(u => u.type);
     const lineNumbers = semanticUnits.map(u => u.startLine).filter(n => n);
     
+    // Analyze numeric content across the entire chunk
+    const chunkNormalized = this._normalizeCurrencyAndNumbers(text);
+    
+    // Collect numeric metadata from table rows
+    const tableRows = semanticUnits.filter(u => u.type === 'table_row');
+    const numericMetadata = {
+      totalNumbers: chunkNormalized.numbers.length,
+      currencies: [...new Set(chunkNormalized.currencies)],
+      hasNegativeValues: chunkNormalized.hasNegative,
+      tableRowsCount: tableRows.length,
+      totalNumericColumns: tableRows.reduce((sum, row) => 
+        sum + (row.numericMetadata?.numericColumns || 0), 0),
+      primaryValues: []
+    };
+
+    // Collect all primary values from table rows
+    tableRows.forEach((row, rowIndex) => {
+      if (row.numericMetadata?.primaryValues) {
+        row.numericMetadata.primaryValues.forEach(val => {
+          numericMetadata.primaryValues.push({
+            ...val,
+            rowIndex: rowIndex,
+            unitType: 'table_row'
+          });
+        });
+      }
+    });
+
     return {
       text: text,
       metadata: {
@@ -572,7 +786,11 @@ class ChunkingService {
         hasTableContent: unitTypes.includes('table_row'),
         tableColumns: semanticUnits
           .filter(u => u.type === 'table_row' && u.columns)
-          .map(u => u.columns.length)
+          .map(u => u.columns.length),
+        // Enhanced numeric metadata
+        numericMetadata: numericMetadata,
+        hasFinancialData: numericMetadata.currencies.length > 0,
+        hasNegativeValues: numericMetadata.hasNegativeValues
       }
     };
   }
@@ -595,6 +813,40 @@ class ChunkingService {
       chunkSize: this.chunkSize,
       chunkOverlap: this.chunkOverlap
     };
+  }
+
+  // Utility method to analyze numeric content in text
+  analyzeNumericContent(text) {
+    return this._normalizeCurrencyAndNumbers(text);
+  }
+
+  // Utility method to test currency/number normalization
+  testNormalization(testCases = []) {
+    const defaultTests = [
+      '₹1,23,456.78',
+      '$1,234.56',
+      '(1,234.56)',
+      '€ 1.234,56',
+      'USD 1,000.00',
+      '12.5%',
+      '₹(50,000)',
+      '$1.2M',
+      '£1 234.56',
+      'INR 1,00,000.00'
+    ];
+
+    const tests = testCases.length > 0 ? testCases : defaultTests;
+    
+    console.log('🧪 Testing Currency/Number Normalization:');
+    tests.forEach(test => {
+      const result = this._normalizeCurrencyAndNumbers(test);
+      console.log(`Input: "${test}" → Numbers: ${result.numbers.length}, Currencies: [${result.currencies.join(', ')}]`);
+      result.numbers.forEach((num, i) => {
+        console.log(`  Number ${i + 1}: ${num.value} ${num.currency || ''} ${num.isPercentage ? '%' : ''} ${num.isNegative ? '(negative)' : ''}`);
+      });
+    });
+
+    return tests.map(test => this._normalizeCurrencyAndNumbers(test));
   }
 
   // Get chunking statistics with layout information
