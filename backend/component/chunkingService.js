@@ -3,9 +3,9 @@ const pdfParse = require('pdf-parse');
 const fs = require('fs').promises;
 
 class ChunkingService {
-  constructor(chunkSize = 800, chunkOverlap = 100) {
+  constructor(chunkSize = 800, chunkOverlap = 75) {
     this.chunkSize = chunkSize;
-    this.chunkOverlap = chunkOverlap;
+    this.chunkOverlap = chunkOverlap; // 50-100 character overlap as specified
   }
 
   // Extract text from PDF with page and line information
@@ -114,66 +114,187 @@ class ChunkingService {
     // Process each page separately to preserve page information
     for (const pageData of pdfData.pages) {
       const pageNumber = pageData.pageNumber;
-      const pageLines = pageData.lines;
+      const pageText = pageData.text;
       
-      // Group lines into sentences for better chunking
-      let currentChunk = '';
-      let currentLength = 0;
-      let startLineIndex = 0;
-      let currentLineIndex = 0;
-
-      for (let lineIndex = 0; lineIndex < pageLines.length; lineIndex++) {
-        const line = pageLines[lineIndex].trim();
-        if (!line) continue;
-
-        // Check if adding this line would exceed chunk size
-        if (currentLength + line.length > this.chunkSize && currentChunk.trim()) {
-          // Create chunk with current content
-          chunks.push(this._createChunk(
-            currentChunk.trim(),
-            metadata,
-            globalChunkIndex++,
-            pageNumber,
-            startLineIndex,
-            lineIndex,
-            pageLines
-          ));
-
-          // Start new chunk with some overlap
-          const overlapLines = Math.min(2, lineIndex - startLineIndex);
-          if (overlapLines > 0) {
-            const overlapText = pageLines.slice(Math.max(0, lineIndex - overlapLines), lineIndex).join(' ');
-            currentChunk = overlapText + ' ' + line;
-            startLineIndex = Math.max(0, lineIndex - overlapLines);
-          } else {
-            currentChunk = line;
-            startLineIndex = lineIndex;
-          }
-          currentLength = currentChunk.length;
-        } else {
-          // Add line to current chunk
-          currentChunk += (currentChunk ? ' ' : '') + line;
-          currentLength += line.length;
-        }
-        currentLineIndex = lineIndex;
-      }
-
-      // Add final chunk for this page if it has content
-      if (currentChunk.trim()) {
-        chunks.push(this._createChunk(
-          currentChunk.trim(),
-          metadata,
-          globalChunkIndex++,
-          pageNumber,
-          startLineIndex,
-          currentLineIndex,
-          pageLines
-        ));
-      }
+      // Use semantic chunking with proper boundaries
+      const pageChunks = this._semanticChunkText(pageText, pageNumber, metadata, globalChunkIndex);
+      chunks.push(...pageChunks);
+      globalChunkIndex += pageChunks.length;
     }
 
     console.log(`📄 Created ${chunks.length} chunks across ${pdfData.pages.length} pages`);
     return chunks;
+  }
+
+  // Semantic chunking implementation
+  _semanticChunkText(text, pageNumber, metadata, startIndex) {
+    const chunks = [];
+    let chunkIndex = startIndex;
+    
+    // Split by semantic boundaries (paragraphs, bullet points, table rows)
+    const semanticUnits = this._identifySemanticUnits(text);
+    
+    let currentChunk = '';
+    let currentUnits = [];
+    
+    for (let i = 0; i < semanticUnits.length; i++) {
+      const unit = semanticUnits[i];
+      const unitText = unit.text;
+      
+      // Check if adding this unit would exceed chunk size
+      if (currentChunk.length + unitText.length > this.chunkSize && currentChunk.trim()) {
+        // Create chunk with current content
+        chunks.push(this._createSemanticChunk(
+          currentChunk.trim(),
+          metadata,
+          chunkIndex++,
+          pageNumber,
+          currentUnits
+        ));
+
+        // Start new chunk with overlap if needed
+        if (this.chunkOverlap > 0 && currentChunk.length > this.chunkOverlap) {
+          const overlapText = currentChunk.slice(-this.chunkOverlap);
+          currentChunk = overlapText + ' ' + unitText;
+          currentUnits = [unit];
+        } else {
+          currentChunk = unitText;
+          currentUnits = [unit];
+        }
+      } else {
+        // Add unit to current chunk
+        if (currentChunk) {
+          currentChunk += (unit.type === 'paragraph' ? '\n\n' : '\n') + unitText;
+        } else {
+          currentChunk = unitText;
+        }
+        currentUnits.push(unit);
+      }
+    }
+
+    // Add final chunk if it has content
+    if (currentChunk.trim()) {
+      chunks.push(this._createSemanticChunk(
+        currentChunk.trim(),
+        metadata,
+        chunkIndex++,
+        pageNumber,
+        currentUnits
+      ));
+    }
+
+    return chunks;
+  }
+
+  // Identify semantic units (paragraphs, bullet points, table rows)
+  _identifySemanticUnits(text) {
+    const units = [];
+    const lines = text.split('\n');
+    let currentParagraph = '';
+    let lineNumber = 0;
+
+    for (const line of lines) {
+      lineNumber++;
+      const trimmedLine = line.trim();
+      
+      if (!trimmedLine) {
+        // Empty line - end current paragraph
+        if (currentParagraph.trim()) {
+          units.push({
+            type: 'paragraph',
+            text: currentParagraph.trim(),
+            lineNumber: lineNumber - 1
+          });
+          currentParagraph = '';
+        }
+        continue;
+      }
+
+      // Check for bullet points, table rows, or other structured content
+      if (this._isBulletPoint(trimmedLine)) {
+        // End current paragraph and add bullet as separate unit
+        if (currentParagraph.trim()) {
+          units.push({
+            type: 'paragraph',
+            text: currentParagraph.trim(),
+            lineNumber: lineNumber - 1
+          });
+          currentParagraph = '';
+        }
+        units.push({
+          type: 'bullet',
+          text: trimmedLine,
+          lineNumber: lineNumber
+        });
+      } else if (this._isTableRow(trimmedLine)) {
+        // End current paragraph and add table row as separate unit
+        if (currentParagraph.trim()) {
+          units.push({
+            type: 'paragraph',
+            text: currentParagraph.trim(),
+            lineNumber: lineNumber - 1
+          });
+          currentParagraph = '';
+        }
+        units.push({
+          type: 'table_row',
+          text: trimmedLine,
+          lineNumber: lineNumber
+        });
+      } else if (this._isHeader(trimmedLine)) {
+        // End current paragraph and add header as separate unit
+        if (currentParagraph.trim()) {
+          units.push({
+            type: 'paragraph',
+            text: currentParagraph.trim(),
+            lineNumber: lineNumber - 1
+          });
+          currentParagraph = '';
+        }
+        units.push({
+          type: 'header',
+          text: trimmedLine,
+          lineNumber: lineNumber
+        });
+      } else {
+        // Regular text - add to current paragraph
+        currentParagraph += (currentParagraph ? ' ' : '') + trimmedLine;
+      }
+    }
+
+    // Add final paragraph if exists
+    if (currentParagraph.trim()) {
+      units.push({
+        type: 'paragraph',
+        text: currentParagraph.trim(),
+        lineNumber: lineNumber
+      });
+    }
+
+    return units;
+  }
+
+  // Helper methods for semantic unit detection
+  _isBulletPoint(line) {
+    return /^[\u2022\u2023\u25E6\u2043\u2219•·‣⁃▪▫‧∙∘‰◦⦾⦿]/.test(line) || // Unicode bullets
+           /^[-*+]\s/.test(line) || // ASCII bullets
+           /^\d+[\.\)]\s/.test(line) || // Numbered lists
+           /^[a-zA-Z][\.\)]\s/.test(line); // Lettered lists
+  }
+
+  _isTableRow(line) {
+    // Detect potential table rows (contains multiple tabs or specific separators)
+    return line.includes('\t') || 
+           (line.split(/\s{2,}/).length > 2) || // Multiple spaces
+           /\|.*\|/.test(line) || // Pipe-separated
+           /^\s*\d+\s+[\w\s]+\s+[\d,.$]+/.test(line); // Number-text-number pattern
+  }
+
+  _isHeader(line) {
+    // Detect headers (all caps, ends with colon, or short lines in all caps)
+    return /^[A-Z\s]+:?\s*$/.test(line) && line.length < 60 ||
+           /^\d+\.\s*[A-Z]/.test(line) || // Numbered headers
+           line.endsWith(':') && line.length < 80;
   }
 
   // Create a chunk object with proper metadata
@@ -189,6 +310,28 @@ class ChunkingService {
         linesUsed: pageLines.slice(startLineIndex, endLineIndex + 1).map(l => l.trim()).filter(l => l),
         originalLines: pageLines.slice(startLineIndex, endLineIndex + 1),
         totalLinesOnPage: pageLines.length
+      }
+    };
+  }
+
+  // Create a semantic chunk object with enhanced metadata
+  _createSemanticChunk(text, metadata, chunkIndex, pageNumber, semanticUnits) {
+    const unitTypes = semanticUnits.map(u => u.type);
+    const lineNumbers = semanticUnits.map(u => u.lineNumber);
+    
+    return {
+      text: text,
+      metadata: {
+        ...metadata,
+        chunkIndex: chunkIndex,
+        pageNumber: pageNumber,
+        chunkSize: text.length,
+        semanticTypes: [...new Set(unitTypes)], // Unique unit types in this chunk
+        startLine: Math.min(...lineNumbers),
+        endLine: Math.max(...lineNumbers),
+        unitCount: semanticUnits.length,
+        strategy: 'semantic',
+        hasStructuredContent: unitTypes.some(t => ['bullet', 'table_row', 'header'].includes(t))
       }
     };
   }
@@ -216,6 +359,7 @@ class ChunkingService {
   // Split text into chunks with different strategies
   splitWithStrategy(pdfData, metadata = {}, strategy = 'semantic') {
     console.log(`📋 Using chunking strategy: ${strategy}`);
+    console.log(`📏 Chunk size: ${this.chunkSize} chars, Overlap: ${this.chunkOverlap} chars`);
     
     switch (strategy) {
       case 'semantic':
