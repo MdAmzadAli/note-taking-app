@@ -1,8 +1,7 @@
 
-const pdfParse = require('pdf-parse');
 const fs = require('fs').promises;
 
-// Import PDF.js for layout-aware extraction
+// Import PDF.js for layout-aware extraction (single source of truth)
 const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
 
 class ChunkingService {
@@ -17,7 +16,19 @@ class ChunkingService {
   // Layout-aware PDF text extraction using pdfjs-dist
   async extractTextFromPDF(filePath) {
     try {
+      // Validate input
+      if (!filePath || typeof filePath !== 'string') {
+        throw new Error('Invalid file path provided');
+      }
+      
       const dataBuffer = await fs.readFile(filePath);
+      
+      // Validate file size (prevent memory issues)
+      const maxSize = 50 * 1024 * 1024; // 50MB limit
+      if (dataBuffer.length > maxSize) {
+        console.warn(`⚠️ Large PDF file: ${(dataBuffer.length / 1024 / 1024).toFixed(1)}MB`);
+      }
+      
       const pdfData = new Uint8Array(dataBuffer);
       
       console.log('📄 Starting layout-aware PDF extraction...');
@@ -571,31 +582,92 @@ class ChunkingService {
     return false;
   }
 
-  // Fallback extraction using pdf-parse
+  // Improved fallback extraction using only pdfjs-dist (no redundant parsing)
   async _fallbackExtraction(filePath) {
-    const dataBuffer = await fs.readFile(filePath);
-    const data = await pdfParse(dataBuffer);
-    
-    const lines = data.text.split('\n').filter(line => line.trim().length > 0);
-    
-    return {
-      fullText: data.text,
-      pages: [{
-        pageNumber: 1,
-        text: data.text,
-        lines: lines,
-        structuredUnits: lines.map((line, index) => ({
-          type: 'paragraph',
-          text: line,
-          lines: [line],
-          startLine: index + 1,
-          endLine: index + 1
-        })),
-        columns: 1,
-        hasTable: false
-      }],
-      totalPages: data.numpages || 1
-    };
+    try {
+      const dataBuffer = await fs.readFile(filePath);
+      const pdfData = new Uint8Array(dataBuffer);
+      
+      console.log('📄 Using basic pdfjs-dist fallback extraction...');
+      
+      // Use pdfjs-dist for consistency with main extraction
+      const loadingTask = pdfjsLib.getDocument({
+        data: pdfData,
+        useSystemFonts: false, // Simplified for fallback
+        disableFontFace: true
+      });
+      
+      const pdfDocument = await loadingTask.promise;
+      const totalPages = pdfDocument.numPages;
+      
+      let fullText = '';
+      const pages = [];
+      
+      // Extract text from each page using consistent method
+      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        const page = await pdfDocument.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        
+        // Simple text extraction preserving line breaks
+        const pageText = textContent.items
+          .map(item => item.str)
+          .join(' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        
+        const lines = pageText.split(/[.!?]+/).filter(line => line.trim().length > 0);
+        
+        pages.push({
+          pageNumber: pageNum,
+          text: pageText,
+          lines: lines,
+          structuredUnits: lines.map((line, index) => ({
+            type: 'paragraph',
+            text: line.trim(),
+            lines: [line.trim()],
+            startLine: index + 1,
+            endLine: index + 1
+          })),
+          columns: 1,
+          hasTable: false
+        });
+        
+        fullText += pageText + '\n\n';
+      }
+      
+      await pdfDocument.destroy();
+      
+      console.log(`📄 Fallback extraction completed: ${totalPages} pages processed`);
+      
+      return {
+        fullText: fullText.trim(),
+        pages: pages,
+        totalPages: totalPages
+      };
+      
+    } catch (error) {
+      console.error('❌ Fallback extraction failed:', error);
+      
+      // Final fallback - return minimal structure
+      return {
+        fullText: 'Text extraction failed',
+        pages: [{
+          pageNumber: 1,
+          text: 'Text extraction failed',
+          lines: ['Text extraction failed'],
+          structuredUnits: [{
+            type: 'paragraph',
+            text: 'Text extraction failed',
+            lines: ['Text extraction failed'],
+            startLine: 1,
+            endLine: 1
+          }],
+          columns: 1,
+          hasTable: false
+        }],
+        totalPages: 1
+      };
+    }
   }
 
   // Complete PDF processing with layout-aware extraction
@@ -723,6 +795,96 @@ class ChunkingService {
     return units.slice(-1);
   }
 
+  // Safe fixed-size chunking with proper step calculation and blank line preservation
+  _splitByFixedSizeAdvanced(text, metadata = {}) {
+    const chunks = [];
+    let currentPosition = 0;
+    let chunkIndex = 0;
+    
+    // Preserve significant line breaks as structure signals
+    const preservedText = text.replace(/\n\s*\n/g, '\n\n__PARAGRAPH_BREAK__\n\n');
+    
+    while (currentPosition < preservedText.length) {
+      // Calculate safe chunk end position
+      let chunkEnd = Math.min(currentPosition + this.chunkSize, preservedText.length);
+      
+      // If not at document end, try to break at word/sentence boundary
+      if (chunkEnd < preservedText.length) {
+        // Look for good break points in descending order of preference
+        const breakPoints = [
+          preservedText.lastIndexOf('\n\n__PARAGRAPH_BREAK__\n\n', chunkEnd),
+          preservedText.lastIndexOf('. ', chunkEnd),
+          preservedText.lastIndexOf('! ', chunkEnd),
+          preservedText.lastIndexOf('? ', chunkEnd),
+          preservedText.lastIndexOf('\n', chunkEnd),
+          preservedText.lastIndexOf(' ', chunkEnd)
+        ];
+        
+        for (const breakPoint of breakPoints) {
+          if (breakPoint > currentPosition + (this.chunkSize * 0.3)) { // At least 30% of target size
+            chunkEnd = breakPoint + 1;
+            break;
+          }
+        }
+      }
+      
+      // Extract chunk text
+      let chunkText = preservedText.substring(currentPosition, chunkEnd).trim();
+      
+      // Restore paragraph breaks
+      chunkText = chunkText.replace(/__PARAGRAPH_BREAK__/g, '');
+      
+      // Skip empty chunks
+      if (chunkText.length === 0) {
+        currentPosition = chunkEnd;
+        continue;
+      }
+      
+      // Create chunk object
+      chunks.push({
+        text: chunkText,
+        metadata: {
+          ...metadata,
+          chunkIndex: chunkIndex++,
+          chunkSize: chunkText.length,
+          startPosition: currentPosition,
+          endPosition: chunkEnd,
+          strategy: 'fixed_size_advanced',
+          preservedStructure: chunkText.includes('\n\n')
+        }
+      });
+      
+      // Calculate next position with safe step
+      const effectiveChunkLength = chunkEnd - currentPosition;
+      const step = Math.max(
+        effectiveChunkLength - this.chunkOverlap,
+        Math.min(50, effectiveChunkLength * 0.1) // Minimum step: 50 chars or 10% of chunk
+      );
+      
+      currentPosition += Math.floor(step);
+      
+      // Safety check to prevent infinite loops
+      if (step <= 0 || currentPosition >= preservedText.length) {
+        break;
+      }
+    }
+    
+    console.log(`📄 Fixed-size advanced chunking created ${chunks.length} chunks`);
+    return chunks;
+  }
+
+  // Alternative chunking strategy selector
+  splitWithStrategy(pdfData, metadata = {}, strategy = 'semantic') {
+    switch (strategy) {
+      case 'fixed_size':
+        return this._splitByFixedSizeAdvanced(pdfData.fullText, metadata);
+      case 'semantic':
+      case 'layout_aware_semantic':
+      default:
+        return this.splitIntoChunks(pdfData, metadata);
+    }
+  }
+
   // Helper methods (keep existing ones)
   _isBulletPoint(line) {
     return /^[\u2022\u2023\u25E6\u2043\u2219•·‣⁃▪▫‧∙∘‰◦⦾⦿]/.test(line) ||
@@ -838,15 +1000,26 @@ class ChunkingService {
     const tests = testCases.length > 0 ? testCases : defaultTests;
     
     console.log('🧪 Testing Currency/Number Normalization:');
-    tests.forEach(test => {
-      const result = this._normalizeCurrencyAndNumbers(test);
-      console.log(`Input: "${test}" → Numbers: ${result.numbers.length}, Currencies: [${result.currencies.join(', ')}]`);
-      result.numbers.forEach((num, i) => {
-        console.log(`  Number ${i + 1}: ${num.value} ${num.currency || ''} ${num.isPercentage ? '%' : ''} ${num.isNegative ? '(negative)' : ''}`);
-      });
+    tests.forEach((test, index) => {
+      try {
+        const result = this._normalizeCurrencyAndNumbers(test);
+        console.log(`Input: "${test}" → Numbers: ${result.numbers.length}, Currencies: [${result.currencies.join(', ')}]`);
+        result.numbers.forEach((num, i) => {
+          console.log(`  Number ${i + 1}: ${num.value} ${num.currency || ''} ${num.isPercentage ? '%' : ''} ${num.isNegative ? '(negative)' : ''}`);
+        });
+      } catch (error) {
+        console.error(`❌ Test ${index + 1} failed for "${test}":`, error.message);
+      }
     });
 
-    return tests.map(test => this._normalizeCurrencyAndNumbers(test));
+    return tests.map(test => {
+      try {
+        return this._normalizeCurrencyAndNumbers(test);
+      } catch (error) {
+        console.error(`Error processing test case "${test}":`, error);
+        return { originalText: test, normalizedText: test, currencies: [], numbers: [], hasNegative: false };
+      }
+    });
   }
 
   // Get chunking statistics with layout information
