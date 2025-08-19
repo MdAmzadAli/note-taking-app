@@ -42,7 +42,7 @@ class SearchService {
         
         const filter = { 
           must: [
-            { key: 'fileId', match: { value: fileId } },
+            { key: 'fileId', match: { any: fileIds } },
             { key: 'workspaceId', match: { value: workspaceId } }
           ]
         };
