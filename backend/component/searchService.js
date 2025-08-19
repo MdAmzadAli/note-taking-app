@@ -87,12 +87,26 @@ class SearchService {
             if (docResults.length > 0) {
               console.log(`✅ Fallback 1 found ${docResults.length} candidates from ${fileId}`);
               
+              // Log detailed info about fallback 1 results
+              console.log(`🔍 Fallback 1 results analysis for ${fileId}:`);
+              docResults.forEach((result, index) => {
+                console.log(`   [${index}] fileId: ${result.payload.fileId}, workspaceId: ${result.payload.workspaceId}, score: ${result.score}`);
+              });
+              
               // Manual workspace filtering
               if (workspaceId) {
                 const beforeFilter = docResults.length;
-                docResults = docResults.filter(result => 
-                  result.payload.workspaceId === workspaceId
-                );
+                console.log(`🔍 Manual workspace filtering: looking for workspaceId="${workspaceId}"`);
+                
+                docResults = docResults.filter(result => {
+                  const hasWorkspace = result.payload.workspaceId === workspaceId;
+                  if (!hasWorkspace) {
+                    console.log(`   ❌ Filtering out: fileId=${result.payload.fileId}, workspaceId="${result.payload.workspaceId}" (doesn't match "${workspaceId}")`);
+                  } else {
+                    console.log(`   ✅ Keeping: fileId=${result.payload.fileId}, workspaceId="${result.payload.workspaceId}" (matches "${workspaceId}")`);
+                  }
+                  return hasWorkspace;
+                });
                 console.log(`📄 Manual workspace filter: ${beforeFilter} → ${docResults.length} candidates`);
               }
               
@@ -111,17 +125,43 @@ class SearchService {
               console.log(`📊 Fallback 2 results (no filter): ${docResults.length} chunks`);
               
               if (docResults.length > 0) {
+                // Log detailed info about fallback 2 results before filtering
+                console.log(`🔍 Fallback 2 results analysis (before filtering):`);
+                const sampleResults = docResults.slice(0, 5); // Show first 5 for brevity
+                sampleResults.forEach((result, index) => {
+                  console.log(`   [${index}] fileId: ${result.payload.fileId}, workspaceId: ${result.payload.workspaceId}, score: ${result.score}`);
+                });
+                if (docResults.length > 5) {
+                  console.log(`   ... and ${docResults.length - 5} more results`);
+                }
+                
                 // Manual filtering for both fileId and workspaceId
                 const beforeFilter = docResults.length;
-                docResults = docResults.filter(result => 
-                  result.payload.fileId === fileId && 
-                  (!workspaceId || result.payload.workspaceId === workspaceId)
-                );
+                console.log(`🔍 Manual filtering: looking for fileId="${fileId}" and workspaceId="${workspaceId}"`);
+                
+                docResults = docResults.filter(result => {
+                  const fileMatch = result.payload.fileId === fileId;
+                  const workspaceMatch = !workspaceId || result.payload.workspaceId === workspaceId;
+                  const shouldKeep = fileMatch && workspaceMatch;
+                  
+                  if (!shouldKeep) {
+                    console.log(`   ❌ Filtering out: fileId=${result.payload.fileId} (match:${fileMatch}), workspaceId="${result.payload.workspaceId}" (match:${workspaceMatch})`);
+                  }
+                  
+                  return shouldKeep;
+                });
+                
                 console.log(`📄 Manual filtering: ${beforeFilter} → ${docResults.length} candidates for ${fileId}`);
                 
                 if (docResults.length > 0) {
                   documentsWithResults++;
                   console.log(`✅ Fallback 2 found ${docResults.length} candidates from ${fileId}`);
+                  
+                  // Log the final filtered results
+                  console.log(`🔍 Final fallback 2 results for ${fileId}:`);
+                  docResults.forEach((result, index) => {
+                    console.log(`   [${index}] fileId: ${result.payload.fileId}, workspaceId: ${result.payload.workspaceId}, score: ${result.score}`);
+                  });
                 }
               }
             }
@@ -186,13 +226,14 @@ class SearchService {
     if (allCandidates.length === 0) {
       console.log(`❌ No candidates found across ${fileIds.length} documents`);
       
-      // Additional debugging - check if documents exist in vector DB
+      // Additional debugging - check if documents exist in vector DB and their workspace info
       console.log(`🔍 Debugging: Checking if documents exist in vector database...`);
       for (const fileId of fileIds) {
         try {
           const exists = await this.vectorDatabaseService.checkDocumentExists(fileId);
           const chunkCount = await this.vectorDatabaseService.getDocumentChunkCount(fileId);
-          console.log(`📄 Document ${fileId}: exists=${exists}, chunks=${chunkCount}`);
+          const workspaceInfo = await this.vectorDatabaseService.getDocumentWorkspaceInfo(fileId);
+          console.log(`📄 Document ${fileId}: exists=${exists}, chunks=${chunkCount}, workspaceInfo:`, workspaceInfo);
         } catch (checkError) {
           console.warn(`⚠️ Could not check document ${fileId}:`, checkError.message);
         }

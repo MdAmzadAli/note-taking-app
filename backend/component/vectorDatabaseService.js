@@ -252,6 +252,43 @@ class VectorDatabaseService {
     }
   }
 
+  async getDocumentWorkspaceInfo(fileId) {
+    try {
+      if (!this.qdrant) {
+        return { workspaceIds: [], totalChunks: 0 };
+      }
+
+      const allPoints = await this.qdrant.scroll(this.collectionName, {
+        filter: {
+          must: [
+            { key: 'fileId', match: { value: fileId } }
+          ]
+        },
+        limit: 100 // Get a sample to check workspace info
+      });
+
+      if (!allPoints.points || allPoints.points.length === 0) {
+        return { workspaceIds: [], totalChunks: 0 };
+      }
+
+      const workspaceIds = [...new Set(allPoints.points.map(point => point.payload.workspaceId))];
+      const sampleChunks = allPoints.points.slice(0, 3).map(point => ({
+        chunkIndex: point.payload.chunkIndex,
+        workspaceId: point.payload.workspaceId,
+        fileName: point.payload.fileName
+      }));
+
+      return {
+        workspaceIds,
+        totalChunks: allPoints.points.length,
+        sampleChunks
+      };
+    } catch (error) {
+      console.warn(`⚠️ Could not get document workspace info: ${error.message}`);
+      return { workspaceIds: [], totalChunks: 0, error: error.message };
+    }
+  }
+
   isInitialized() {
     return !!this.qdrant;
   }
