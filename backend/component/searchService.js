@@ -28,66 +28,121 @@ class SearchService {
   // Workspace-aware search with document bucketing and MMR
   async searchWorkspaceRelevantChunks(query, fileIds, workspaceId, totalLimit) {
     console.log(`🏢 Workspace search: ${fileIds.length} files, limit: ${totalLimit}`);
+    console.log(`📄 File IDs: [${fileIds.join(', ')}]`);
+    console.log(`🏢 Workspace ID: ${workspaceId}`);
     
     const queryEmbedding = await this.embeddingService.generateEmbedding(query, 'query');
+    console.log(`🔍 Query embedding generated (length: ${queryEmbedding.length})`);
+    
     const chunksPerDoc = Math.max(2, Math.ceil(totalLimit / fileIds.length)); // Ensure each doc contributes
     const retrievalLimit = chunksPerDoc * 3; // Get more candidates for MMR
+    console.log(`📊 Per-doc limit: ${chunksPerDoc}, retrieval limit: ${retrievalLimit}`);
 
     let allCandidates = [];
+    let documentsSearched = 0;
+    let documentsWithResults = 0;
 
     // Step 1: Retrieve top candidates from each document individually
     for (const fileId of fileIds) {
+      documentsSearched++;
       try {
-        console.log(`📄 Searching in document: ${fileId}`);
+        console.log(`📄 [${documentsSearched}/${fileIds.length}] Searching in document: ${fileId}`);
         
-        // Search each document individually to avoid filter conflicts
-        const filter = { 
+        // Primary search: with both fileId and workspaceId filters
+        const primaryFilter = { 
           must: [
-            { key: 'fileId', match: { value: fileId } }, // Single file ID per search
+            { key: 'fileId', match: { value: fileId } },
             { key: 'workspaceId', match: { value: workspaceId } }
           ]
         };
+        console.log(`🔍 Primary filter:`, JSON.stringify(primaryFilter));
 
         let docResults = await this.vectorDatabaseService.searchSimilarChunks(
           queryEmbedding, 
-          filter, 
+          primaryFilter, 
           retrievalLimit
         );
+        console.log(`📊 Primary search results for ${fileId}: ${docResults.length} chunks`);
 
         if (docResults.length > 0) {
-          console.log(`✅ Found ${docResults.length} candidates from ${fileId}`);
+          console.log(`✅ Primary search found ${docResults.length} candidates from ${fileId}`);
+          documentsWithResults++;
         } else {
-          console.log(`⚠️ No results found for ${fileId}, trying fallback search...`);
+          console.log(`⚠️ No results from primary search for ${fileId}, trying fallbacks...`);
           
-          // Fallback: Search without workspace filter
+          // Fallback 1: Search without workspace filter
           try {
-            const fallbackFilter = { 
+            const fallbackFilter1 = { 
               must: [{ key: 'fileId', match: { value: fileId } }]
             };
+            console.log(`🔍 Fallback 1 filter:`, JSON.stringify(fallbackFilter1));
             
             docResults = await this.vectorDatabaseService.searchSimilarChunks(
               queryEmbedding, 
-              fallbackFilter, 
+              fallbackFilter1, 
               retrievalLimit
             );
+            console.log(`📊 Fallback 1 results for ${fileId}: ${docResults.length} chunks`);
             
             if (docResults.length > 0) {
-              console.log(`✅ Fallback search found ${docResults.length} candidates from ${fileId}`);
+              console.log(`✅ Fallback 1 found ${docResults.length} candidates from ${fileId}`);
               
-              // Filter by workspaceId manually if needed
+              // Manual workspace filtering
               if (workspaceId) {
+                const beforeFilter = docResults.length;
                 docResults = docResults.filter(result => 
                   result.payload.workspaceId === workspaceId
                 );
-                console.log(`📄 After workspace filtering: ${docResults.length} candidates`);
+                console.log(`📄 Manual workspace filter: ${beforeFilter} → ${docResults.length} candidates`);
+              }
+              
+              if (docResults.length > 0) {
+                documentsWithResults++;
+              }
+            } else {
+              // Fallback 2: Search without any filters
+              console.log(`⚠️ Fallback 1 failed, trying fallback 2 (no filters)...`);
+              
+              docResults = await this.vectorDatabaseService.searchSimilarChunks(
+                queryEmbedding, 
+                undefined, 
+                retrievalLimit * 2 // Get more results to filter manually
+              );
+              console.log(`📊 Fallback 2 results (no filter): ${docResults.length} chunks`);
+              
+              if (docResults.length > 0) {
+                // Manual filtering for both fileId and workspaceId
+                const beforeFilter = docResults.length;
+                docResults = docResults.filter(result => 
+                  result.payload.fileId === fileId && 
+                  (!workspaceId || result.payload.workspaceId === workspaceId)
+                );
+                console.log(`📄 Manual filtering: ${beforeFilter} → ${docResults.length} candidates for ${fileId}`);
+                
+                if (docResults.length > 0) {
+                  documentsWithResults++;
+                  console.log(`✅ Fallback 2 found ${docResults.length} candidates from ${fileId}`);
+                }
               }
             }
           } catch (fallbackError) {
-            console.warn(`⚠️ Fallback search also failed for ${fileId}:`, fallbackError.message);
+            console.warn(`⚠️ All fallback searches failed for ${fileId}:`, fallbackError.message);
           }
         }
 
         if (docResults.length > 0) {
+          // Log sample results for debugging
+          if (docResults.length > 0) {
+            const firstResult = docResults[0];
+            console.log(`📝 Sample result from ${fileId}:`, {
+              score: firstResult.score,
+              textPreview: firstResult.payload.text.substring(0, 100) + '...',
+              fileName: firstResult.payload.fileName,
+              workspaceId: firstResult.payload.workspaceId,
+              chunkIndex: firstResult.payload.chunkIndex
+            });
+          }
+          
           // Add document-specific context
           const processedResults = docResults.map(result => ({
             text: result.payload.text,
@@ -114,25 +169,53 @@ class SearchService {
           }));
 
           allCandidates.push(...processedResults);
+          console.log(`📊 Added ${processedResults.length} candidates from ${fileId}, total: ${allCandidates.length}`);
         } else {
-          console.warn(`❌ No candidates found for document ${fileId}`);
+          console.warn(`❌ No candidates found for document ${fileId} after all search attempts`);
         }
       } catch (docError) {
         console.warn(`⚠️ Failed to search document ${fileId}:`, docError.message);
       }
     }
 
+    console.log(`📊 Workspace search summary:`);
+    console.log(`   - Documents searched: ${documentsSearched}`);
+    console.log(`   - Documents with results: ${documentsWithResults}`);
+    console.log(`   - Total candidates: ${allCandidates.length}`);
+
     if (allCandidates.length === 0) {
       console.log(`❌ No candidates found across ${fileIds.length} documents`);
+      
+      // Additional debugging - check if documents exist in vector DB
+      console.log(`🔍 Debugging: Checking if documents exist in vector database...`);
+      for (const fileId of fileIds) {
+        try {
+          const exists = await this.vectorDatabaseService.checkDocumentExists(fileId);
+          const chunkCount = await this.vectorDatabaseService.getDocumentChunkCount(fileId);
+          console.log(`📄 Document ${fileId}: exists=${exists}, chunks=${chunkCount}`);
+        } catch (checkError) {
+          console.warn(`⚠️ Could not check document ${fileId}:`, checkError.message);
+        }
+      }
+      
       return [];
     }
 
-    console.log(`📊 Total candidates collected: ${allCandidates.length}`);
+    console.log(`📊 Candidate score distribution:`, 
+      allCandidates.map(c => c.score).sort((a, b) => b - a).slice(0, 5)
+    );
 
     // Step 2: Apply MMR for diversity and document representation
     const selectedChunks = this.applyMMR(allCandidates, queryEmbedding, totalLimit, chunksPerDoc);
     
     console.log(`🎯 Final selection: ${selectedChunks.length} chunks from workspace`);
+    console.log(`📊 Final chunks distribution:`, 
+      selectedChunks.reduce((acc, chunk) => {
+        acc[chunk.metadata.fileName] = (acc[chunk.metadata.fileName] || 0) + 1;
+        return acc;
+      }, {})
+    );
+    
     return selectedChunks;
   }
 

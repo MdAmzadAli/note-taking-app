@@ -156,13 +156,31 @@ class VectorDatabaseService {
 
       if (filter) {
         searchParams.filter = filter;
+        console.log(`🔍 VectorDB: Searching with filter:`, JSON.stringify(filter, null, 2));
+      } else {
+        console.log(`🔍 VectorDB: Searching without filter, limit: ${limit}`);
       }
 
+      console.log(`🔍 VectorDB: Query embedding length: ${queryEmbedding.length}`);
+
       const searchResult = await this.qdrant.search(this.collectionName, searchParams);
+      
+      console.log(`📊 VectorDB: Search returned ${searchResult.length} results`);
+      
+      if (searchResult.length > 0) {
+        const topResult = searchResult[0];
+        console.log(`📝 VectorDB: Top result score: ${topResult.score}, fileId: ${topResult.payload.fileId}, workspaceId: ${topResult.payload.workspaceId}`);
+      }
+      
       return searchResult;
 
     } catch (error) {
       console.error('❌ Vector search failed:', error);
+      console.error('❌ Search params were:', JSON.stringify({
+        vector_length: queryEmbedding?.length,
+        limit,
+        filter
+      }, null, 2));
       throw error;
     }
   }
