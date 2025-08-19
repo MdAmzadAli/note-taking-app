@@ -5,16 +5,16 @@ class AnswerGenerationService {
     this.searchService = searchService;
   }
 
-  // Generate answer using 2-step LLM flow for enhanced financial data handling
+  // Generate answer using intelligent flow selection
   async generateAnswer(query, fileIds = null, workspaceId = null) {
     try {
       console.log(`🤖 Generating answer for: "${query}"`);
 
       // Determine if this is a workspace query with multiple files
       const isWorkspaceQuery = workspaceId && fileIds && fileIds.length > 1;
-      const isFinancialQuery = this.isFinancialQuery(query);
+      const isComplexQuery = this.isComplexQuery(query);
 
-      console.log(`📊 Query type: ${isWorkspaceQuery ? 'Workspace' : 'Single'}, Financial: ${isFinancialQuery}`);
+      console.log(`📊 Query type: ${isWorkspaceQuery ? 'Workspace' : 'Single'}, Complex: ${isComplexQuery}`);
 
       // Search for relevant chunks using enhanced retrieval
       const relevantChunks = await this.searchService.searchRelevantChunks(
@@ -32,12 +32,12 @@ class AnswerGenerationService {
         };
       }
 
-      // Use 2-step flow for financial queries in workspace mode
-      if (isWorkspaceQuery && isFinancialQuery) {
+      // Use 2-step flow for complex queries with multiple chunks
+      if (relevantChunks.length > 4 || isComplexQuery) {
         return await this.generateTwoStepAnswer(query, relevantChunks);
       }
 
-      // Use standard flow for other queries
+      // Use standard flow for simple queries with few chunks
       return await this.generateStandardAnswer(query, relevantChunks);
 
     } catch (error) {
@@ -59,124 +59,183 @@ class AnswerGenerationService {
     return financialKeywords.some(keyword => queryLower.includes(keyword));
   }
 
-  // 2-step LLM flow: Extract → Analyze
+  // Check if query is complex and would benefit from 2-step processing
+  isComplexQuery(query) {
+    const complexIndicators = [
+      // Financial keywords
+      'cost', 'costs', 'price', 'prices', 'total', 'sum', 'calculate', 'calculation',
+      'budget', 'expense', 'revenue', 'profit', 'financial',
+      // Analytical keywords
+      'compare', 'comparison', 'analyze', 'analysis', 'evaluate', 'assessment',
+      'summary', 'summarize', 'overview', 'breakdown', 'detailed', 'comprehensive',
+      // Aggregation keywords
+      'all', 'entire', 'complete', 'overall', 'across', 'throughout',
+      'multiple', 'various', 'different', 'each', 'every',
+      // Question types requiring filtering
+      'what are', 'list all', 'show me', 'find all', 'identify',
+      'how many', 'which ones', 'what kind'
+    ];
+    
+    const queryLower = query.toLowerCase();
+    const complexKeywordCount = complexIndicators.filter(keyword => 
+      queryLower.includes(keyword)
+    ).length;
+    
+    // Consider complex if:
+    // 1. Contains multiple complex keywords
+    // 2. Query is long (suggests detailed request)
+    // 3. Contains financial keywords
+    return complexKeywordCount >= 2 || 
+           query.length > 100 || 
+           this.isFinancialQuery(query);
+  }
+
+  // 2-step LLM flow: Filter & Summarize → Generate Answer
   async generateTwoStepAnswer(query, relevantChunks) {
-    console.log(`🔄 Using 2-step LLM flow for financial analysis`);
+    console.log(`🔄 Using 2-step LLM flow with context filtering and summarization`);
 
     if (!this.embeddingService.genaiChat) {
       throw new Error("Google GenAI Chat client not initialized");
     }
 
-    // Prepare context for extraction
-    const context = relevantChunks
-      .map((chunk, index) => {
-        const pageInfo = `Page ${chunk.metadata.pageNumber || 1}`;
-        const lineInfo = chunk.metadata.startLine && chunk.metadata.endLine 
-          ? `Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`
-          : '';
-        const locationInfo = lineInfo ? `${pageInfo}, ${lineInfo}` : pageInfo;
-        return `[Doc: ${chunk.metadata.fileName} | ${locationInfo}]: ${chunk.text}`;
-      })
-      .join('\n\n');
-
-    // Step A: Extract structured financial data
-    console.log(`📤 Step A: Extracting financial data...`);
-    
-    const extractionPrompt = `You are a financial data extraction expert. Extract ALL cost items, amounts, and currencies from the provided documents.
-
-CONTEXT FROM DOCUMENTS:
-${context}
-
-EXTRACTION TASK:
-Identify and extract every cost, price, amount, or financial figure mentioned in the documents.
-
-Return ONLY a valid JSON array with this structure:
-[
-  {
-    "item": "description of cost item",
-    "amount": numeric_value,
-    "currency": "USD/INR/EUR/etc",
-    "document": "document_name",
-    "page": page_number,
-    "context": "brief surrounding context"
-  }
-]
-
-Rules:
-- Extract ALL financial figures, no matter how small
-- Convert text numbers to numeric values (e.g., "five thousand" → 5000)
-- Identify currency from symbols ($, ₹, €) or text (USD, INR, EUR)
-- If currency is unclear, use "UNKNOWN"
-- Include the specific document name and page number
-- Provide brief context for each item
-
-Return ONLY the JSON array, no explanations.`;
-
-    const extractionResponse = await this.embeddingService.genaiChat.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
-      config: {
-        temperature: 0.1, // Low temperature for structured extraction
-        topP: 0.8,
-        maxOutputTokens: 2048,
-      },
-      contents: [{ parts: [{ text: extractionPrompt }] }]
+    // Prepare numbered context for step 1 filtering
+    const numberedContexts = relevantChunks.map((chunk, index) => {
+      const pageInfo = `Page ${chunk.metadata.pageNumber || 1}`;
+      const lineInfo = chunk.metadata.startLine && chunk.metadata.endLine 
+        ? `Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`
+        : '';
+      const locationInfo = lineInfo ? `${pageInfo}, ${lineInfo}` : pageInfo;
+      return `[Context ${index + 1} - Doc: ${chunk.metadata.fileName} | ${locationInfo}]: ${chunk.text}`;
     });
 
-    let extractedData = [];
+    // Step 1: Filter relevant contexts and create summaries using cheaper model
+    console.log(`📤 Step 1: Filtering and summarizing relevant contexts using cheaper model...`);
+    
+    const filterPrompt = `You are an expert context analyzer. Your task is to filter and summarize only the most relevant contexts for the user's query.
+
+USER QUERY: ${query}
+
+CONTEXTS TO ANALYZE:
+${numberedContexts.join('\n\n')}
+
+INSTRUCTIONS:
+1. Analyze each context against the user query
+2. DISCARD contexts that are completely irrelevant or off-topic from the query
+3. For RELEVANT contexts, create detailed summaries that preserve ALL valuable information related to the query
+4. Store every important detail, fact, figure, or data point that could help answer the query
+5. Maintain the original context numbers for tracking
+
+Return your response in this exact JSON format:
+{
+  "relevant_contexts": [
+    {
+      "context_number": 1,
+      "relevance_score": 0.85,
+      "summary": "Detailed summary preserving all valuable points related to query...",
+      "key_points": ["Point 1", "Point 2", "Point 3"]
+    }
+  ],
+  "discarded_contexts": [2, 4, 7],
+  "total_relevant": 5
+}
+
+CRITICAL: Include ALL contexts that have even moderate relevance. Only discard completely unrelated ones.`;
+
+    const filterResponse = await this.embeddingService.genaiChat.models.generateContent({
+      model: 'gemini-1.5-flash-8b', // Using cheaper model for filtering
+      config: {
+        temperature: 0.1,
+        topP: 0.8,
+        maxOutputTokens: 3072,
+      },
+      contents: [{ parts: [{ text: filterPrompt }] }]
+    });
+
+    let filteredData = null;
+    let relevantSummaries = [];
+    let relevantMetadata = [];
+
     try {
-      const extractionText = extractionResponse.candidates[0].content.parts[0].text;
-      console.log(`📄 Raw extraction response:`, extractionText.substring(0, 500));
+      const filterText = filterResponse.candidates[0].content.parts[0].text;
+      console.log(`📄 Raw filter response (first 300 chars):`, filterText.substring(0, 300));
       
-      // Clean the response to extract JSON
-      const jsonMatch = extractionText.match(/\[[\s\S]*\]/);
+      // Extract JSON from response
+      const jsonMatch = filterText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        extractedData = JSON.parse(jsonMatch[0]);
-        console.log(`✅ Step A: Extracted ${extractedData.length} financial items`);
+        filteredData = JSON.parse(jsonMatch[0]);
+        console.log(`✅ Step 1: Filtered ${filteredData.total_relevant} relevant contexts from ${relevantChunks.length} total`);
+        console.log(`🗑️ Step 1: Discarded contexts: [${filteredData.discarded_contexts.join(', ')}]`);
+        
+        // Prepare summaries and store metadata separately
+        relevantSummaries = filteredData.relevant_contexts.map(ctx => ({
+          context_number: ctx.context_number,
+          summary: ctx.summary,
+          key_points: ctx.key_points,
+          relevance_score: ctx.relevance_score
+        }));
+
+        // Store metadata for final response
+        relevantMetadata = filteredData.relevant_contexts.map(ctx => {
+          const originalIndex = ctx.context_number - 1;
+          return relevantChunks[originalIndex];
+        });
+
       } else {
-        console.warn(`⚠️ Step A: No valid JSON found in extraction response`);
+        console.warn(`⚠️ Step 1: No valid JSON found in filter response, using all contexts`);
+        // Fallback: use all contexts
+        relevantSummaries = relevantChunks.map((chunk, index) => ({
+          context_number: index + 1,
+          summary: chunk.text,
+          key_points: ["Original context preserved"],
+          relevance_score: chunk.score
+        }));
+        relevantMetadata = relevantChunks;
       }
     } catch (parseError) {
-      console.warn(`⚠️ Step A: JSON parsing failed:`, parseError.message);
+      console.warn(`⚠️ Step 1: JSON parsing failed:`, parseError.message);
+      // Fallback: use all contexts
+      relevantSummaries = relevantChunks.map((chunk, index) => ({
+        context_number: index + 1,
+        summary: chunk.text,
+        key_points: ["Original context preserved"],
+        relevance_score: chunk.score
+      }));
+      relevantMetadata = relevantChunks;
     }
 
-    // Step B: Generate final answer with analysis and source identification
-    console.log(`📤 Step B: Generating final answer...`);
+    // Step 2: Generate final answer using current model with filtered summaries
+    console.log(`📤 Step 2: Generating final answer using current model...`);
 
-    const analysisPrompt = `You are a financial analysis expert. Answer the user's question using the extracted financial data and original context.
+    const summariesText = relevantSummaries
+      .map(ctx => `[Summary ${ctx.context_number} - Relevance: ${(ctx.relevance_score * 100).toFixed(1)}%]:\n${ctx.summary}\nKey Points: ${ctx.key_points.join(', ')}`)
+      .join('\n\n');
+
+    const analysisPrompt = `You are an expert AI assistant. Answer the user's question using the filtered and summarized context information.
 
 USER QUESTION: ${query}
 
-EXTRACTED FINANCIAL DATA:
-${JSON.stringify(extractedData, null, 2)}
-
-ORIGINAL CONTEXT:
-${context}
+FILTERED CONTEXT SUMMARIES:
+${summariesText}
 
 INSTRUCTIONS:
-1. Answer the user's question comprehensively using both the extracted data and original context
-2. If asked for totals or calculations, perform them using the extracted data
-3. Group by currency and show subtotals if multiple currencies exist
-4. Always cite sources with document names and page numbers
-5. Use **bold text** for important headings and totals
-6. Use bullet points for itemized lists
-7. If extraction missed important data visible in context, include it
-8. Be precise with numbers and show calculations clearly
+1. Answer the user's question comprehensively using the provided summaries
+2. Use **bold text** for important headings and key terms
+3. Use bullet points (•) or numbered lists for multiple items
+4. Structure complex answers with clear sections using **Section Headings**
+5. Include specific details and examples when relevant
+6. Reference summary numbers when citing information (e.g., [Summary 1])
+7. Maintain a professional, helpful tone
+8. If summaries don't contain sufficient information, state this clearly
 
-CRITICAL: After your answer, provide a separate section identifying which sources you actually used:
+CRITICAL: After your answer, provide a separate section identifying which summaries you actually used:
 
 ---
-SOURCES_USED: [list only the source numbers (e.g., "1,3,5") that you referenced in your answer]
-
-Format your response with:
-- **Summary** of findings
-- **Detailed breakdown** with calculations if needed
-- **Sources** referenced
-- SOURCES_USED: [comma-separated source numbers]
+SUMMARIES_USED: [list only the summary numbers (e.g., "1,3,5") that you referenced in your answer]
 
 ANSWER:`;
 
     const finalResponse = await this.embeddingService.genaiChat.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
+      model: 'gemini-2.5-flash-lite', // Using current model for final answer
       config: {
         temperature: 0.3,
         topP: 0.8,
@@ -187,56 +246,74 @@ ANSWER:`;
 
     const fullResponse = finalResponse.candidates[0].content.parts[0].text;
 
-    // Extract used sources and clean answer
+    // Extract used summaries and clean answer
     let finalAnswer = fullResponse;
-    let usedSourceIndices = [];
+    let usedSummaryNumbers = [];
 
-    const sourcesUsedMatch = fullResponse.match(/SOURCES_USED:\s*\[(.*?)\]/);
-    if (sourcesUsedMatch) {
-      const sourcesUsedStr = sourcesUsedMatch[1];
-      usedSourceIndices = sourcesUsedStr
+    const summariesUsedMatch = fullResponse.match(/SUMMARIES_USED:\s*\[(.*?)\]/);
+    if (summariesUsedMatch) {
+      const summariesUsedStr = summariesUsedMatch[1];
+      usedSummaryNumbers = summariesUsedStr
         .split(',')
-        .map(s => parseInt(s.trim()) - 1) // Convert to 0-based indexing
-        .filter(idx => !isNaN(idx) && idx >= 0 && idx < relevantChunks.length);
+        .map(s => parseInt(s.trim()))
+        .filter(num => !isNaN(num) && num >= 1 && num <= relevantSummaries.length);
       
-      // Remove the SOURCES_USED section from the answer
-      finalAnswer = fullResponse.replace(/---\s*SOURCES_USED:.*$/s, '').trim();
+      // Remove the SUMMARIES_USED section from the answer
+      finalAnswer = fullResponse.replace(/---\s*SUMMARIES_USED:.*$/s, '').trim();
       
-      console.log(`🎯 Gemini identified ${usedSourceIndices.length} actually used sources: [${usedSourceIndices.map(i => i + 1).join(', ')}]`);
+      console.log(`🎯 Step 2: Used ${usedSummaryNumbers.length} summaries: [${usedSummaryNumbers.join(', ')}]`);
     } else {
-      console.log(`⚠️ Could not extract SOURCES_USED from response, using all sources`);
-      usedSourceIndices = relevantChunks.map((_, idx) => idx);
+      console.log(`⚠️ Could not extract SUMMARIES_USED from response, using all filtered summaries`);
+      usedSummaryNumbers = relevantSummaries.map(ctx => ctx.context_number);
     }
 
-    // Prepare enhanced sources - only include actually used sources
-    const filteredChunks = usedSourceIndices.map(idx => relevantChunks[idx]);
-    const sources = filteredChunks.map((chunk, index) => ({
-      id: `source_${index + 1}`,
-      fileName: chunk.metadata.fileName,
-      fileId: chunk.metadata.fileId,
-      chunkIndex: chunk.metadata.chunkIndex,
-      originalText: chunk.text,
-      relevanceScore: chunk.score,
-      pageNumber: chunk.metadata.pageNumber || 1,
-      startLine: chunk.metadata.startLine,
-      endLine: chunk.metadata.endLine,
-      lineRange: chunk.metadata.startLine && chunk.metadata.endLine 
-        ? `Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`
-        : 'Full page content',
-      pageUrl: chunk.metadata.pageUrl,
-      cloudinaryUrl: chunk.metadata.cloudinaryUrl,
-      thumbnailUrl: chunk.metadata.thumbnailUrl,
-      confidencePercentage: (chunk.score * 100).toFixed(1)
-    }));
+    // Prepare final sources based on used summaries
+    const finalSources = usedSummaryNumbers
+      .map(summaryNum => {
+        const summaryIndex = relevantSummaries.findIndex(ctx => ctx.context_number === summaryNum);
+        if (summaryIndex === -1) return null;
+        
+        const originalIndex = summaryNum - 1;
+        const chunk = relevantMetadata[summaryIndex];
+        if (!chunk) return null;
 
-    console.log(`✅ 2-step analysis complete with ${sources.length} filtered sources (${relevantChunks.length} total retrieved)`);
+        return {
+          id: `source_${summaryNum}`,
+          fileName: chunk.metadata.fileName,
+          fileId: chunk.metadata.fileId,
+          chunkIndex: chunk.metadata.chunkIndex,
+          originalText: chunk.text,
+          relevanceScore: relevantSummaries[summaryIndex].relevance_score,
+          pageNumber: chunk.metadata.pageNumber || 1,
+          startLine: chunk.metadata.startLine,
+          endLine: chunk.metadata.endLine,
+          lineRange: chunk.metadata.startLine && chunk.metadata.endLine 
+            ? `Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`
+            : 'Full page content',
+          pageUrl: chunk.metadata.pageUrl,
+          cloudinaryUrl: chunk.metadata.cloudinaryUrl,
+          thumbnailUrl: chunk.metadata.thumbnailUrl,
+          confidencePercentage: (relevantSummaries[summaryIndex].relevance_score * 100).toFixed(1)
+        };
+      })
+      .filter(source => source !== null);
+
+    console.log(`✅ 2-step analysis complete:`);
+    console.log(`   📊 Original contexts: ${relevantChunks.length}`);
+    console.log(`   ✅ Filtered contexts: ${relevantSummaries.length}`);
+    console.log(`   🎯 Used in answer: ${finalSources.length}`);
 
     return {
       answer: finalAnswer,
-      sources: sources,
-      confidence: relevantChunks[0]?.score || 0,
-      analysisType: '2-step-financial',
-      extractedData: extractedData.length > 0 ? extractedData : null
+      sources: finalSources,
+      confidence: relevantSummaries[0]?.relevance_score || 0,
+      analysisType: '2-step-filtered',
+      processingStats: {
+        originalContexts: relevantChunks.length,
+        filteredContexts: relevantSummaries.length,
+        usedInAnswer: finalSources.length,
+        discardedContexts: filteredData?.discarded_contexts || []
+      }
     };
   }
 
