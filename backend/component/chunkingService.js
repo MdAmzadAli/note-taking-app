@@ -496,7 +496,7 @@ class ChunkingService {
     return similarStructure.length > 0;
   }
 
-  // Enhanced currency/number normalizer
+  // Enhanced currency/number normalizer with EU/IN format support and multipliers
   _normalizeCurrencyAndNumbers(text) {
     const normalizedData = {
       originalText: text,
@@ -526,20 +526,30 @@ class ChunkingService {
       'CNY': 'CNY'
     };
 
+    // Multiplier mappings
+    const multiplierMap = {
+      'k': 1000, 'K': 1000,
+      'm': 1000000, 'M': 1000000,
+      'b': 1000000000, 'B': 1000000000,
+      'billion': 1000000000, 'million': 1000000, 'thousand': 1000
+    };
+
     // Enhanced number pattern that handles:
-    // - Currency symbols (₹, $, €, £, etc.)
-    // - Currency codes (USD, INR, etc.)
-    // - Commas and thin spaces as thousands separators
-    // - Parentheses for negatives: (1,234.56)
+    // - Currency symbols and codes
+    // - EU/IN formats with dots/commas
+    // - Multipliers (k, M, B, etc.)
+    // - Parentheses for negatives
     // - Percentages
-    // - Scientific notation
-    const numberPattern = /(?:([₹$€£¥₦₽])\s*)?(?:(USD|INR|EUR|GBP|JPY|CAD|AUD|CHF|CNY)\s*)?(?:\()?(-?\s*[\d,\s]+(?:\.[\d]+)?(?:[eE][+-]?\d+)?)\s*(?:\))?\s*(%)?(?:\s*(USD|INR|EUR|GBP|JPY|CAD|AUD|CHF|CNY))?/gi;
+    const numberPattern = /(?:([₹$€£¥₦₽])\s*)?(?:(USD|INR|EUR|GBP|JPY|CAD|AUD|CHF|CNY)\s*)?(?:\()?(-?\s*[\d,.\s]+)\s*(?:\))?\s*([kKmMbB]|billion|million|thousand)?\s*(%)?(?:\s*(USD|INR|EUR|GBP|JPY|CAD|AUD|CHF|CNY))?/gi;
 
     let match;
     let processedText = text;
 
     while ((match = numberPattern.exec(text)) !== null) {
-      const [fullMatch, currencySymbol, currencyCodeBefore, numberPart, percentage, currencyCodeAfter] = match;
+      const [fullMatch, currencySymbol, currencyCodeBefore, numberPart, multiplier, percentage, currencyCodeAfter] = match;
+      
+      // Skip if numberPart is too short or doesn't contain digits
+      if (!numberPart || !/\d/.test(numberPart)) continue;
       
       // Determine currency
       let currency = null;
@@ -557,19 +567,26 @@ class ChunkingService {
         normalizedData.hasNegative = true;
       }
 
-      // Clean and parse number
-      const cleanNumber = numberPart
-        .replace(/[-\s,()]/g, '') // Remove spaces, commas, parentheses, minus
-        .replace(/\s+/g, ''); // Remove any remaining spaces
-
-      const numericValue = parseFloat(cleanNumber);
+      // Parse number with locale detection
+      const parsedValue = this._parseNumberWithLocaleDetection(numberPart.trim());
       
-      if (!isNaN(numericValue)) {
-        const finalValue = isNegative ? -Math.abs(numericValue) : numericValue;
+      if (!isNaN(parsedValue) && parsedValue !== null) {
+        let finalValue = isNegative ? -Math.abs(parsedValue) : parsedValue;
+        
+        // Apply multiplier
+        let multiplierValue = 1;
+        let rawValue = finalValue;
+        if (multiplier && multiplierMap[multiplier]) {
+          multiplierValue = multiplierMap[multiplier];
+          finalValue = finalValue * multiplierValue;
+        }
         
         const numberData = {
           originalText: fullMatch.trim(),
           value: finalValue,
+          rawValue: rawValue, // Value before multiplier
+          multiplier: multiplier || null,
+          multiplierValue: multiplierValue,
           currency: currency,
           isPercentage: !!percentage,
           isNegative: isNegative,
@@ -594,6 +611,50 @@ class ChunkingService {
 
     normalizedData.normalizedText = processedText;
     return normalizedData;
+  }
+
+  // Parse number with automatic locale detection (EU vs US format)
+  _parseNumberWithLocaleDetection(numberStr) {
+    // Clean the input
+    const cleaned = numberStr.replace(/[-\s()]/g, '').trim();
+    
+    // Detect EU format: \d{1,3}(\.\d{3})+,\d{2} (e.g., 1.234.567,89)
+    const euFormatPattern = /^\d{1,3}(?:\.\d{3})+,\d{1,2}$/;
+    
+    // Detect US format with comma thousands: \d{1,3}(,\d{3})+\.?\d* (e.g., 1,234,567.89)
+    const usFormatPattern = /^\d{1,3}(?:,\d{3})+(?:\.\d+)?$/;
+    
+    // Simple decimal with comma: \d+,\d+ (e.g., 123,45)
+    const simpleCommaDecimal = /^\d+,\d+$/;
+    
+    // Simple decimal with dot: \d+\.\d+ (e.g., 123.45)
+    const simpleDotDecimal = /^\d+\.\d+$/;
+    
+    if (euFormatPattern.test(cleaned)) {
+      // EU format: dots are thousands, comma is decimal
+      return parseFloat(cleaned.replace(/\./g, '').replace(',', '.'));
+    } else if (usFormatPattern.test(cleaned)) {
+      // US format: commas are thousands, dot is decimal
+      return parseFloat(cleaned.replace(/,/g, ''));
+    } else if (simpleCommaDecimal.test(cleaned) && !simpleDotDecimal.test(cleaned)) {
+      // Simple comma decimal (likely EU): 123,45
+      return parseFloat(cleaned.replace(',', '.'));
+    } else if (simpleDotDecimal.test(cleaned) && !simpleCommaDecimal.test(cleaned)) {
+      // Simple dot decimal (likely US): 123.45
+      return parseFloat(cleaned);
+    } else if (/^\d+$/.test(cleaned)) {
+      // Just digits: integer
+      return parseInt(cleaned, 10);
+    } else {
+      // Try to parse as-is, replacing common separators
+      const attempt1 = parseFloat(cleaned.replace(/,/g, ''));
+      if (!isNaN(attempt1)) return attempt1;
+      
+      const attempt2 = parseFloat(cleaned.replace(/\./g, '').replace(',', '.'));
+      if (!isNaN(attempt2)) return attempt2;
+      
+      return null;
+    }
   }
 
   // Enhanced table column extraction with robust number/currency parsing
@@ -1097,13 +1158,21 @@ class ChunkingService {
       '₹1,23,456.78',
       '$1,234.56',
       '(1,234.56)',
-      '€ 1.234,56',
+      '€ 1.234,56',        // EU format: should parse as 1234.56
+      '€1.234.567,89',     // EU format: should parse as 1234567.89
       'USD 1,000.00',
       '12.5%',
       '₹(50,000)',
-      '$1.2M',
-      '£1 234.56',
-      'INR 1,00,000.00'
+      '$1.2M',             // Should parse as 1,200,000
+      '£250k',             // Should parse as 250,000
+      '€2.5B',             // Should parse as 2,500,000,000
+      '₹1 234.56',
+      'INR 1,00,000.00',
+      '15,67',             // Simple EU decimal
+      '1.500,25',          // EU thousands + decimal
+      '$500K',             // US format with multiplier
+      '(€1.200,50)',       // Negative EU format
+      '75.5%'              // Percentage
     ];
 
     const tests = testCases.length > 0 ? testCases : defaultTests;
