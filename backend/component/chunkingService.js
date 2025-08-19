@@ -2,94 +2,434 @@
 const pdfParse = require('pdf-parse');
 const fs = require('fs').promises;
 
+// Import PDF.js for layout-aware extraction
+const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+
 class ChunkingService {
   constructor(chunkSize = 800, chunkOverlap = 75) {
     this.chunkSize = chunkSize;
-    this.chunkOverlap = chunkOverlap; // 50-100 character overlap as specified
+    this.chunkOverlap = chunkOverlap;
+    
+    // Configure PDF.js for Node.js environment
+    pdfjsLib.GlobalWorkerOptions.workerSrc = null;
   }
 
-  // Extract text from PDF with page and line information
+  // Layout-aware PDF text extraction using pdfjs-dist
   async extractTextFromPDF(filePath) {
     try {
       const dataBuffer = await fs.readFile(filePath);
-      const data = await pdfParse(dataBuffer, {
-        // Enable page-by-page processing to preserve page information
-        pagerender: async (pageData) => {
-          const textContent = pageData.getTextContent();
-          const page = await textContent;
-          const pageText = page.items.map(item => item.str).join(' ');
-          return pageText;
-        }
+      const pdfData = new Uint8Array(dataBuffer);
+      
+      console.log('📄 Starting layout-aware PDF extraction...');
+      
+      // Load PDF document with pdfjs-dist
+      const loadingTask = pdfjsLib.getDocument({
+        data: pdfData,
+        useSystemFonts: true,
+        disableFontFace: false
       });
-
-      // Extract page-by-page text if available
-      if (data.numpages > 1) {
-        const pageTexts = [];
-        for (let pageNum = 1; pageNum <= data.numpages; pageNum++) {
-          try {
-            const pageData = await pdfParse(dataBuffer, {
-              first: pageNum,
-              last: pageNum
-            });
-            pageTexts.push({
-              pageNumber: pageNum,
-              text: pageData.text.trim(),
-              lines: pageData.text.split('\n').filter(line => line.trim().length > 0)
-            });
-          } catch (pageError) {
-            console.warn(`⚠️ Failed to extract page ${pageNum}, using fallback`);
-            // Fallback: estimate page content from total text
-            const totalLines = data.text.split('\n');
-            const linesPerPage = Math.ceil(totalLines.length / data.numpages);
-            const startLine = (pageNum - 1) * linesPerPage;
-            const endLine = Math.min(startLine + linesPerPage, totalLines.length);
-            const pageLines = totalLines.slice(startLine, endLine);
-            
-            pageTexts.push({
-              pageNumber: pageNum,
-              text: pageLines.join('\n').trim(),
-              lines: pageLines.filter(line => line.trim().length > 0)
-            });
-          }
-        }
-        return { fullText: data.text, pages: pageTexts, totalPages: data.numpages };
-      } else {
-        // Single page document
-        const lines = data.text.split('\n').filter(line => line.trim().length > 0);
-        return {
-          fullText: data.text,
-          pages: [{
-            pageNumber: 1,
-            text: data.text,
-            lines: lines
-          }],
-          totalPages: 1
-        };
+      
+      const pdfDocument = await loadingTask.promise;
+      const totalPages = pdfDocument.numPages;
+      
+      console.log(`📄 PDF loaded: ${totalPages} pages`);
+      
+      const pages = [];
+      let fullText = '';
+      
+      // Process each page with layout awareness
+      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        const page = await pdfDocument.getPage(pageNum);
+        const pageData = await this._extractPageWithLayout(page, pageNum);
+        pages.push(pageData);
+        fullText += pageData.text + '\n\n';
       }
+      
+      await pdfDocument.destroy();
+      
+      console.log(`📄 Layout-aware extraction completed: ${pages.length} pages processed`);
+      
+      return {
+        fullText: fullText.trim(),
+        pages: pages,
+        totalPages: totalPages
+      };
+      
     } catch (error) {
-      console.error('❌ PDF text extraction failed:', error);
+      console.error('❌ Layout-aware PDF extraction failed:', error);
+      
+      // Fallback to basic extraction if layout-aware fails
+      console.log('📄 Falling back to basic PDF extraction...');
+      return await this._fallbackExtraction(filePath);
+    }
+  }
+
+  // Extract page content with layout information (x, y coordinates)
+  async _extractPageWithLayout(page, pageNumber) {
+    try {
+      const textContent = await page.getTextContent();
+      const viewport = page.getViewport({ scale: 1.0 });
+      
+      // Collect text items with coordinates
+      const textItems = textContent.items.map(item => ({
+        text: item.str,
+        x: item.transform[4],
+        y: viewport.height - item.transform[5], // Flip Y coordinate
+        width: item.width,
+        height: item.height,
+        fontName: item.fontName,
+        fontSize: item.transform[0]
+      })).filter(item => item.text.trim().length > 0);
+      
+      console.log(`📄 Page ${pageNumber}: Extracted ${textItems.length} text items`);
+      
+      // Group text items into lines by Y proximity
+      const lines = this._groupIntoLines(textItems);
+      
+      // Detect columns by clustering X ranges
+      const columns = this._detectColumns(lines);
+      
+      // Build structured units (paragraphs, table rows, etc.)
+      const structuredUnits = this._buildStructuredUnits(lines, columns);
+      
+      // Generate clean text from structured units
+      const pageText = structuredUnits.map(unit => unit.text).join('\n');
+      
+      return {
+        pageNumber: pageNumber,
+        text: pageText,
+        lines: lines.map(line => line.text),
+        structuredUnits: structuredUnits,
+        columns: columns.length,
+        hasTable: structuredUnits.some(unit => unit.type === 'table_row')
+      };
+      
+    } catch (error) {
+      console.error(`❌ Layout extraction failed for page ${pageNumber}:`, error);
       throw error;
     }
   }
 
-  // Complete PDF processing: extract and chunk in one method
+  // Group text items into lines by Y coordinate proximity
+  _groupIntoLines(textItems) {
+    if (textItems.length === 0) return [];
+    
+    // Sort by Y coordinate first, then by X coordinate
+    textItems.sort((a, b) => {
+      const yDiff = Math.abs(a.y - b.y);
+      if (yDiff < 3) { // Same line threshold
+        return a.x - b.x; // Sort by X within same line
+      }
+      return a.y - b.y; // Sort by Y across lines
+    });
+    
+    const lines = [];
+    let currentLine = { items: [textItems[0]], y: textItems[0].y, minX: textItems[0].x, maxX: textItems[0].x + textItems[0].width };
+    
+    for (let i = 1; i < textItems.length; i++) {
+      const item = textItems[i];
+      const yDiff = Math.abs(item.y - currentLine.y);
+      
+      if (yDiff < 3) { // Same line (3px tolerance)
+        currentLine.items.push(item);
+        currentLine.minX = Math.min(currentLine.minX, item.x);
+        currentLine.maxX = Math.max(currentLine.maxX, item.x + item.width);
+      } else {
+        // Finalize current line
+        lines.push(this._finalizeLine(currentLine));
+        
+        // Start new line
+        currentLine = { 
+          items: [item], 
+          y: item.y, 
+          minX: item.x, 
+          maxX: item.x + item.width 
+        };
+      }
+    }
+    
+    // Add final line
+    if (currentLine.items.length > 0) {
+      lines.push(this._finalizeLine(currentLine));
+    }
+    
+    return lines;
+  }
+
+  // Finalize line by sorting items and building text
+  _finalizeLine(lineData) {
+    // Sort items by X coordinate
+    lineData.items.sort((a, b) => a.x - b.x);
+    
+    // Build text with proper spacing
+    let text = '';
+    for (let i = 0; i < lineData.items.length; i++) {
+      const item = lineData.items[i];
+      const nextItem = lineData.items[i + 1];
+      
+      text += item.text;
+      
+      // Add space if there's a gap to next item
+      if (nextItem) {
+        const gap = nextItem.x - (item.x + item.width);
+        if (gap > 5) { // Significant gap
+          text += ' ';
+        }
+      }
+    }
+    
+    return {
+      text: text.trim(),
+      y: lineData.y,
+      minX: lineData.minX,
+      maxX: lineData.maxX,
+      items: lineData.items
+    };
+  }
+
+  // Detect columns by clustering X ranges
+  _detectColumns(lines) {
+    if (lines.length === 0) return [{ minX: 0, maxX: 1000 }];
+    
+    // Collect all X ranges
+    const xRanges = lines.map(line => ({ minX: line.minX, maxX: line.maxX }));
+    
+    // Simple column detection: group by similar minX values
+    const columns = [];
+    const tolerance = 20; // 20px tolerance for column alignment
+    
+    xRanges.forEach(range => {
+      const existingColumn = columns.find(col => 
+        Math.abs(col.minX - range.minX) < tolerance
+      );
+      
+      if (existingColumn) {
+        existingColumn.minX = Math.min(existingColumn.minX, range.minX);
+        existingColumn.maxX = Math.max(existingColumn.maxX, range.maxX);
+        existingColumn.count++;
+      } else {
+        columns.push({
+          minX: range.minX,
+          maxX: range.maxX,
+          count: 1
+        });
+      }
+    });
+    
+    // Sort columns by X position and filter out single occurrences
+    return columns
+      .filter(col => col.count > 1)
+      .sort((a, b) => a.minX - b.minX);
+  }
+
+  // Build structured units from lines and columns
+  _buildStructuredUnits(lines, columns) {
+    const units = [];
+    let currentParagraph = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const nextLine = lines[i + 1];
+      
+      // Detect table rows by checking for regular vertical alignment
+      if (this._isTableRow(line, lines)) {
+        // End current paragraph
+        if (currentParagraph.length > 0) {
+          units.push({
+            type: 'paragraph',
+            text: currentParagraph.map(l => l.text).join(' '),
+            lines: currentParagraph.map(l => l.text),
+            startLine: i - currentParagraph.length + 1,
+            endLine: i
+          });
+          currentParagraph = [];
+        }
+        
+        // Add table row unit
+        units.push({
+          type: 'table_row',
+          text: line.text,
+          lines: [line.text],
+          startLine: i + 1,
+          endLine: i + 1,
+          columns: this._extractTableColumns(line)
+        });
+      } else if (this._isHeader(line.text)) {
+        // End current paragraph
+        if (currentParagraph.length > 0) {
+          units.push({
+            type: 'paragraph',
+            text: currentParagraph.map(l => l.text).join(' '),
+            lines: currentParagraph.map(l => l.text),
+            startLine: i - currentParagraph.length + 1,
+            endLine: i
+          });
+          currentParagraph = [];
+        }
+        
+        // Add header unit
+        units.push({
+          type: 'header',
+          text: line.text,
+          lines: [line.text],
+          startLine: i + 1,
+          endLine: i + 1
+        });
+      } else if (this._isBulletPoint(line.text)) {
+        // End current paragraph
+        if (currentParagraph.length > 0) {
+          units.push({
+            type: 'paragraph',
+            text: currentParagraph.map(l => l.text).join(' '),
+            lines: currentParagraph.map(l => l.text),
+            startLine: i - currentParagraph.length + 1,
+            endLine: i
+          });
+          currentParagraph = [];
+        }
+        
+        // Add bullet unit
+        units.push({
+          type: 'bullet',
+          text: line.text,
+          lines: [line.text],
+          startLine: i + 1,
+          endLine: i + 1
+        });
+      } else {
+        // Regular text - add to current paragraph
+        currentParagraph.push(line);
+        
+        // Check if paragraph should end
+        if (!nextLine || this._shouldEndParagraph(line, nextLine)) {
+          units.push({
+            type: 'paragraph',
+            text: currentParagraph.map(l => l.text).join(' '),
+            lines: currentParagraph.map(l => l.text),
+            startLine: i - currentParagraph.length + 2,
+            endLine: i + 1
+          });
+          currentParagraph = [];
+        }
+      }
+    }
+    
+    // Add final paragraph if exists
+    if (currentParagraph.length > 0) {
+      units.push({
+        type: 'paragraph',
+        text: currentParagraph.map(l => l.text).join(' '),
+        lines: currentParagraph.map(l => l.text),
+        startLine: lines.length - currentParagraph.length + 1,
+        endLine: lines.length
+      });
+    }
+    
+    return units;
+  }
+
+  // Detect table rows by checking for regular vertical alignment and numeric content
+  _isTableRow(line, allLines) {
+    const text = line.text;
+    
+    // Check for multiple numeric values or currency
+    const numericPattern = /\$?[\d,]+\.?\d*%?/g;
+    const numericMatches = text.match(numericPattern);
+    
+    if (!numericMatches || numericMatches.length < 2) return false;
+    
+    // Check for regular spacing or tab-like separation
+    const parts = text.split(/\s{2,}|\t/);
+    if (parts.length < 3) return false;
+    
+    // Check if similar structure exists in nearby lines
+    const nearbyLines = allLines.slice(
+      Math.max(0, allLines.indexOf(line) - 2),
+      Math.min(allLines.length, allLines.indexOf(line) + 3)
+    );
+    
+    const similarStructure = nearbyLines.filter(l => {
+      if (l === line) return false;
+      const lNumeric = l.text.match(numericPattern);
+      const lParts = l.text.split(/\s{2,}|\t/);
+      return lNumeric && lNumeric.length >= 2 && lParts.length >= 3;
+    });
+    
+    return similarStructure.length > 0;
+  }
+
+  // Extract table columns from a table row
+  _extractTableColumns(line) {
+    const text = line.text;
+    
+    // Split by multiple spaces or tabs
+    const columns = text.split(/\s{2,}|\t/).filter(col => col.trim().length > 0);
+    
+    return columns.map((col, index) => ({
+      index: index,
+      text: col.trim(),
+      isNumeric: /^\$?[\d,]+\.?\d*%?$/.test(col.trim())
+    }));
+  }
+
+  // Check if paragraph should end
+  _shouldEndParagraph(currentLine, nextLine) {
+    // Large Y gap indicates paragraph break
+    const yGap = Math.abs(nextLine.y - currentLine.y);
+    if (yGap > 15) return true;
+    
+    // Significant X position change (new column or indentation)
+    const xDiff = Math.abs(nextLine.minX - currentLine.minX);
+    if (xDiff > 30) return true;
+    
+    return false;
+  }
+
+  // Fallback extraction using pdf-parse
+  async _fallbackExtraction(filePath) {
+    const dataBuffer = await fs.readFile(filePath);
+    const data = await pdfParse(dataBuffer);
+    
+    const lines = data.text.split('\n').filter(line => line.trim().length > 0);
+    
+    return {
+      fullText: data.text,
+      pages: [{
+        pageNumber: 1,
+        text: data.text,
+        lines: lines,
+        structuredUnits: lines.map((line, index) => ({
+          type: 'paragraph',
+          text: line,
+          lines: [line],
+          startLine: index + 1,
+          endLine: index + 1
+        })),
+        columns: 1,
+        hasTable: false
+      }],
+      totalPages: data.numpages || 1
+    };
+  }
+
+  // Complete PDF processing with layout-aware extraction
   async processPDF(filePath, metadata = {}) {
     try {
-      console.log(`📄 Processing PDF: ${filePath}`);
+      console.log(`📄 Processing PDF with layout awareness: ${filePath}`);
       
-      // Extract text from PDF with page and line information
+      // Extract text with layout information
       const pdfData = await this.extractTextFromPDF(filePath);
 
       if (!pdfData.fullText || pdfData.fullText.trim().length === 0) {
         throw new Error('No text content found in PDF');
       }
 
-      console.log(`📄 Extracted text from ${pdfData.totalPages} pages`);
+      console.log(`📄 Extracted ${pdfData.totalPages} pages with layout info`);
 
-      // Split into chunks with page and line preservation
+      // Split into semantic chunks with unit-based overlap
       const chunks = this.splitIntoChunks(pdfData, metadata);
 
-      console.log(`📄 Created ${chunks.length} chunks from PDF`);
+      console.log(`📄 Created ${chunks.length} semantic chunks`);
 
       return {
         pdfData: pdfData,
@@ -97,7 +437,9 @@ class ChunkingService {
         summary: {
           totalPages: pdfData.totalPages,
           totalChunks: chunks.length,
-          fullTextLength: pdfData.fullText.length
+          fullTextLength: pdfData.fullText.length,
+          hasStructuredContent: pdfData.pages.some(p => p.hasTable),
+          averageColumnsPerPage: pdfData.pages.reduce((sum, p) => sum + p.columns, 0) / pdfData.pages.length
         }
       };
     } catch (error) {
@@ -106,39 +448,35 @@ class ChunkingService {
     }
   }
 
-  // Split text into semantic chunks with page and line preservation
+  // Split text into semantic chunks with unit-based overlap
   splitIntoChunks(pdfData, metadata = {}) {
     const chunks = [];
     let globalChunkIndex = 0;
 
-    // Process each page separately to preserve page information
+    // Process each page using structured units
     for (const pageData of pdfData.pages) {
       const pageNumber = pageData.pageNumber;
-      const pageText = pageData.text;
+      const structuredUnits = pageData.structuredUnits || [];
       
-      // Use semantic chunking with proper boundaries
-      const pageChunks = this._semanticChunkText(pageText, pageNumber, metadata, globalChunkIndex);
+      // Create chunks using unit-based approach
+      const pageChunks = this._createUnitsBasedChunks(structuredUnits, pageNumber, metadata, globalChunkIndex);
       chunks.push(...pageChunks);
       globalChunkIndex += pageChunks.length;
     }
 
-    console.log(`📄 Created ${chunks.length} chunks across ${pdfData.pages.length} pages`);
+    console.log(`📄 Created ${chunks.length} chunks using unit-based approach`);
     return chunks;
   }
 
-  // Semantic chunking implementation
-  _semanticChunkText(text, pageNumber, metadata, startIndex) {
+  // Create chunks based on structured units with proper overlap
+  _createUnitsBasedChunks(units, pageNumber, metadata, startIndex) {
     const chunks = [];
     let chunkIndex = startIndex;
-    
-    // Split by semantic boundaries (paragraphs, bullet points, table rows)
-    const semanticUnits = this._identifySemanticUnits(text);
-    
     let currentChunk = '';
     let currentUnits = [];
     
-    for (let i = 0; i < semanticUnits.length; i++) {
-      const unit = semanticUnits[i];
+    for (let i = 0; i < units.length; i++) {
+      const unit = units[i];
       const unitText = unit.text;
       
       // Check if adding this unit would exceed chunk size
@@ -152,19 +490,14 @@ class ChunkingService {
           currentUnits
         ));
 
-        // Start new chunk with overlap if needed
-        if (this.chunkOverlap > 0 && currentChunk.length > this.chunkOverlap) {
-          const overlapText = currentChunk.slice(-this.chunkOverlap);
-          currentChunk = overlapText + ' ' + unitText;
-          currentUnits = [unit];
-        } else {
-          currentChunk = unitText;
-          currentUnits = [unit];
-        }
+        // Unit-based overlap: carry last 1-2 units forward
+        const overlapUnits = this._getOverlapUnits(currentUnits);
+        currentChunk = overlapUnits.map(u => u.text).join('\n') + '\n' + unitText;
+        currentUnits = [...overlapUnits, unit];
       } else {
         // Add unit to current chunk
         if (currentChunk) {
-          currentChunk += (unit.type === 'paragraph' ? '\n\n' : '\n') + unitText;
+          currentChunk += '\n' + unitText;
         } else {
           currentChunk = unitText;
         }
@@ -186,138 +519,42 @@ class ChunkingService {
     return chunks;
   }
 
-  // Identify semantic units (paragraphs, bullet points, table rows)
-  _identifySemanticUnits(text) {
-    const units = [];
-    const lines = text.split('\n');
-    let currentParagraph = '';
-    let lineNumber = 0;
-
-    for (const line of lines) {
-      lineNumber++;
-      const trimmedLine = line.trim();
-      
-      if (!trimmedLine) {
-        // Empty line - end current paragraph
-        if (currentParagraph.trim()) {
-          units.push({
-            type: 'paragraph',
-            text: currentParagraph.trim(),
-            lineNumber: lineNumber - 1
-          });
-          currentParagraph = '';
-        }
-        continue;
-      }
-
-      // Check for bullet points, table rows, or other structured content
-      if (this._isBulletPoint(trimmedLine)) {
-        // End current paragraph and add bullet as separate unit
-        if (currentParagraph.trim()) {
-          units.push({
-            type: 'paragraph',
-            text: currentParagraph.trim(),
-            lineNumber: lineNumber - 1
-          });
-          currentParagraph = '';
-        }
-        units.push({
-          type: 'bullet',
-          text: trimmedLine,
-          lineNumber: lineNumber
-        });
-      } else if (this._isTableRow(trimmedLine)) {
-        // End current paragraph and add table row as separate unit
-        if (currentParagraph.trim()) {
-          units.push({
-            type: 'paragraph',
-            text: currentParagraph.trim(),
-            lineNumber: lineNumber - 1
-          });
-          currentParagraph = '';
-        }
-        units.push({
-          type: 'table_row',
-          text: trimmedLine,
-          lineNumber: lineNumber
-        });
-      } else if (this._isHeader(trimmedLine)) {
-        // End current paragraph and add header as separate unit
-        if (currentParagraph.trim()) {
-          units.push({
-            type: 'paragraph',
-            text: currentParagraph.trim(),
-            lineNumber: lineNumber - 1
-          });
-          currentParagraph = '';
-        }
-        units.push({
-          type: 'header',
-          text: trimmedLine,
-          lineNumber: lineNumber
-        });
-      } else {
-        // Regular text - add to current paragraph
-        currentParagraph += (currentParagraph ? ' ' : '') + trimmedLine;
-      }
+  // Get overlap units (last 1-2 units depending on type)
+  _getOverlapUnits(units) {
+    if (units.length === 0) return [];
+    
+    // For table rows, carry forward last row
+    if (units[units.length - 1].type === 'table_row') {
+      return units.slice(-1);
     }
-
-    // Add final paragraph if exists
-    if (currentParagraph.trim()) {
-      units.push({
-        type: 'paragraph',
-        text: currentParagraph.trim(),
-        lineNumber: lineNumber
-      });
+    
+    // For paragraphs, carry forward last 1-2 units based on size
+    const lastUnit = units[units.length - 1];
+    if (lastUnit.text.length < this.chunkOverlap) {
+      return units.slice(-Math.min(2, units.length));
     }
-
-    return units;
+    
+    return units.slice(-1);
   }
 
-  // Helper methods for semantic unit detection
+  // Helper methods (keep existing ones)
   _isBulletPoint(line) {
-    return /^[\u2022\u2023\u25E6\u2043\u2219•·‣⁃▪▫‧∙∘‰◦⦾⦿]/.test(line) || // Unicode bullets
-           /^[-*+]\s/.test(line) || // ASCII bullets
-           /^\d+[\.\)]\s/.test(line) || // Numbered lists
-           /^[a-zA-Z][\.\)]\s/.test(line); // Lettered lists
-  }
-
-  _isTableRow(line) {
-    // Detect potential table rows (contains multiple tabs or specific separators)
-    return line.includes('\t') || 
-           (line.split(/\s{2,}/).length > 2) || // Multiple spaces
-           /\|.*\|/.test(line) || // Pipe-separated
-           /^\s*\d+\s+[\w\s]+\s+[\d,.$]+/.test(line); // Number-text-number pattern
+    return /^[\u2022\u2023\u25E6\u2043\u2219•·‣⁃▪▫‧∙∘‰◦⦾⦿]/.test(line) ||
+           /^[-*+]\s/.test(line) ||
+           /^\d+[\.\)]\s/.test(line) ||
+           /^[a-zA-Z][\.\)]\s/.test(line);
   }
 
   _isHeader(line) {
-    // Detect headers (all caps, ends with colon, or short lines in all caps)
     return /^[A-Z\s]+:?\s*$/.test(line) && line.length < 60 ||
-           /^\d+\.\s*[A-Z]/.test(line) || // Numbered headers
+           /^\d+\.\s*[A-Z]/.test(line) ||
            line.endsWith(':') && line.length < 80;
-  }
-
-  // Create a chunk object with proper metadata
-  _createChunk(text, metadata, chunkIndex, pageNumber, startLineIndex, endLineIndex, pageLines) {
-    return {
-      text: text,
-      metadata: {
-        ...metadata,
-        chunkIndex: chunkIndex,
-        pageNumber: pageNumber,
-        startLine: startLineIndex + 1, // 1-indexed for user display
-        endLine: endLineIndex + 1, // 1-indexed for user display
-        linesUsed: pageLines.slice(startLineIndex, endLineIndex + 1).map(l => l.trim()).filter(l => l),
-        originalLines: pageLines.slice(startLineIndex, endLineIndex + 1),
-        totalLinesOnPage: pageLines.length
-      }
-    };
   }
 
   // Create a semantic chunk object with enhanced metadata
   _createSemanticChunk(text, metadata, chunkIndex, pageNumber, semanticUnits) {
     const unitTypes = semanticUnits.map(u => u.type);
-    const lineNumbers = semanticUnits.map(u => u.lineNumber);
+    const lineNumbers = semanticUnits.map(u => u.startLine).filter(n => n);
     
     return {
       text: text,
@@ -326,12 +563,16 @@ class ChunkingService {
         chunkIndex: chunkIndex,
         pageNumber: pageNumber,
         chunkSize: text.length,
-        semanticTypes: [...new Set(unitTypes)], // Unique unit types in this chunk
-        startLine: Math.min(...lineNumbers),
-        endLine: Math.max(...lineNumbers),
+        semanticTypes: [...new Set(unitTypes)],
+        startLine: lineNumbers.length > 0 ? Math.min(...lineNumbers) : 1,
+        endLine: lineNumbers.length > 0 ? Math.max(...lineNumbers) : 1,
         unitCount: semanticUnits.length,
-        strategy: 'semantic',
-        hasStructuredContent: unitTypes.some(t => ['bullet', 'table_row', 'header'].includes(t))
+        strategy: 'layout_aware_semantic',
+        hasStructuredContent: unitTypes.some(t => ['bullet', 'table_row', 'header'].includes(t)),
+        hasTableContent: unitTypes.includes('table_row'),
+        tableColumns: semanticUnits
+          .filter(u => u.type === 'table_row' && u.columns)
+          .map(u => u.columns.length)
       }
     };
   }
@@ -356,209 +597,7 @@ class ChunkingService {
     };
   }
 
-  // Split text into chunks with different strategies
-  splitWithStrategy(pdfData, metadata = {}, strategy = 'semantic') {
-    console.log(`📋 Using chunking strategy: ${strategy}`);
-    console.log(`📏 Chunk size: ${this.chunkSize} chars, Overlap: ${this.chunkOverlap} chars`);
-    
-    switch (strategy) {
-      case 'semantic':
-        return this.splitIntoChunks(pdfData, metadata);
-      case 'sentence':
-        return this._splitBySentences(pdfData, metadata);
-      case 'paragraph':
-        return this._splitByParagraphs(pdfData, metadata);
-      case 'fixed':
-        return this._splitByFixedSize(pdfData, metadata);
-      default:
-        console.warn(`⚠️ Unknown strategy: ${strategy}, using semantic`);
-        return this.splitIntoChunks(pdfData, metadata);
-    }
-  }
-
-  // Split by sentences (alternative strategy)
-  _splitBySentences(pdfData, metadata = {}) {
-    const chunks = [];
-    let globalChunkIndex = 0;
-
-    for (const pageData of pdfData.pages) {
-      const pageNumber = pageData.pageNumber;
-      const pageText = pageData.text;
-      
-      // Split by sentences using regex
-      const sentences = pageText.split(/[.!?]+/).filter(s => s.trim().length > 0);
-      
-      let currentChunk = '';
-      let sentenceIndex = 0;
-
-      for (const sentence of sentences) {
-        if (currentChunk.length + sentence.length > this.chunkSize && currentChunk.trim()) {
-          chunks.push({
-            text: currentChunk.trim(),
-            metadata: {
-              ...metadata,
-              chunkIndex: globalChunkIndex++,
-              pageNumber: pageNumber,
-              strategy: 'sentence',
-              sentenceRange: `${sentenceIndex - currentChunk.split(/[.!?]+/).length + 1}-${sentenceIndex}`
-            }
-          });
-          
-          // Start new chunk with overlap
-          const overlapSentences = currentChunk.split(/[.!?]+/).slice(-1);
-          currentChunk = overlapSentences.join('. ') + '. ' + sentence;
-        } else {
-          currentChunk += (currentChunk ? '. ' : '') + sentence;
-        }
-        sentenceIndex++;
-      }
-
-      if (currentChunk.trim()) {
-        chunks.push({
-          text: currentChunk.trim(),
-          metadata: {
-            ...metadata,
-            chunkIndex: globalChunkIndex++,
-            pageNumber: pageNumber,
-            strategy: 'sentence'
-          }
-        });
-      }
-    }
-
-    return chunks;
-  }
-
-  // Split by paragraphs (alternative strategy)
-  _splitByParagraphs(pdfData, metadata = {}) {
-    const chunks = [];
-    let globalChunkIndex = 0;
-
-    for (const pageData of pdfData.pages) {
-      const pageNumber = pageData.pageNumber;
-      const pageText = pageData.text;
-      
-      // Split by double line breaks (paragraphs)
-      const paragraphs = pageText.split(/\n\s*\n/).filter(p => p.trim().length > 0);
-      
-      let currentChunk = '';
-      let paragraphIndex = 0;
-
-      for (const paragraph of paragraphs) {
-        if (currentChunk.length + paragraph.length > this.chunkSize && currentChunk.trim()) {
-          chunks.push({
-            text: currentChunk.trim(),
-            metadata: {
-              ...metadata,
-              chunkIndex: globalChunkIndex++,
-              pageNumber: pageNumber,
-              strategy: 'paragraph',
-              paragraphRange: `${paragraphIndex - currentChunk.split(/\n\s*\n/).length + 1}-${paragraphIndex}`
-            }
-          });
-          
-          currentChunk = paragraph;
-        } else {
-          currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
-        }
-        paragraphIndex++;
-      }
-
-      if (currentChunk.trim()) {
-        chunks.push({
-          text: currentChunk.trim(),
-          metadata: {
-            ...metadata,
-            chunkIndex: globalChunkIndex++,
-            pageNumber: pageNumber,
-            strategy: 'paragraph'
-          }
-        });
-      }
-    }
-
-    return chunks;
-  }
-
-  // Split by fixed size (alternative strategy)
-  _splitByFixedSize(pdfData, metadata = {}) {
-    const chunks = [];
-    let globalChunkIndex = 0;
-
-    for (const pageData of pdfData.pages) {
-      const pageNumber = pageData.pageNumber;
-      const pageText = pageData.text;
-      
-      let currentPosition = 0;
-      
-      while (currentPosition < pageText.length) {
-        const endPosition = Math.min(currentPosition + this.chunkSize, pageText.length);
-        let chunkText = pageText.substring(currentPosition, endPosition);
-        
-        // Try to break at word boundary if not at end
-        if (endPosition < pageText.length) {
-          const lastSpaceIndex = chunkText.lastIndexOf(' ');
-          if (lastSpaceIndex > this.chunkSize * 0.8) { // Only break if we don't lose too much text
-            chunkText = chunkText.substring(0, lastSpaceIndex);
-          }
-        }
-
-        chunks.push({
-          text: chunkText.trim(),
-          metadata: {
-            ...metadata,
-            chunkIndex: globalChunkIndex++,
-            pageNumber: pageNumber,
-            strategy: 'fixed',
-            characterRange: `${currentPosition}-${currentPosition + chunkText.length}`
-          }
-        });
-
-        currentPosition += chunkText.length - this.chunkOverlap;
-      }
-    }
-
-    return chunks;
-  }
-
-  // Analyze PDF structure and recommend chunking strategy
-  analyzePDFStructure(pdfData) {
-    const analysis = {
-      totalPages: pdfData.totalPages,
-      totalLines: pdfData.pages.reduce((sum, page) => sum + page.lines.length, 0),
-      averageLinesPerPage: 0,
-      averageLineLength: 0,
-      hasShortLines: false,
-      hasLongParagraphs: false,
-      recommendedStrategy: 'semantic'
-    };
-
-    // Calculate averages
-    analysis.averageLinesPerPage = analysis.totalLines / analysis.totalPages;
-    
-    const allLines = pdfData.pages.flatMap(page => page.lines);
-    const totalCharacters = allLines.reduce((sum, line) => sum + line.length, 0);
-    analysis.averageLineLength = totalCharacters / allLines.length;
-
-    // Analyze structure patterns
-    analysis.hasShortLines = analysis.averageLineLength < 50;
-    analysis.hasLongParagraphs = pdfData.fullText.includes('\n\n') && 
-                                 pdfData.fullText.split('\n\n').some(para => para.length > 1000);
-
-    // Recommend strategy based on analysis
-    if (analysis.hasShortLines && analysis.averageLinesPerPage > 30) {
-      analysis.recommendedStrategy = 'paragraph';
-    } else if (analysis.averageLineLength > 100 && !analysis.hasLongParagraphs) {
-      analysis.recommendedStrategy = 'sentence';
-    } else if (analysis.totalPages > 50 || analysis.averageLinesPerPage < 10) {
-      analysis.recommendedStrategy = 'fixed';
-    }
-
-    console.log(`📊 PDF Structure Analysis:`, analysis);
-    return analysis;
-  }
-
-  // Get chunking statistics
+  // Get chunking statistics with layout information
   getChunkingStats(chunks) {
     const stats = {
       totalChunks: chunks.length,
@@ -567,7 +606,10 @@ class ChunkingService {
       maxChunkSize: 0,
       pagesSpanned: new Set(),
       chunkSizeDistribution: {},
-      strategy: chunks[0]?.metadata?.strategy || 'semantic'
+      strategy: chunks[0]?.metadata?.strategy || 'layout_aware_semantic',
+      structuredContentChunks: 0,
+      tableContentChunks: 0,
+      unitTypesDistribution: {}
     };
 
     chunks.forEach(chunk => {
@@ -576,6 +618,21 @@ class ChunkingService {
       stats.minChunkSize = Math.min(stats.minChunkSize, size);
       stats.maxChunkSize = Math.max(stats.maxChunkSize, size);
       stats.pagesSpanned.add(chunk.metadata.pageNumber);
+
+      // Count structured content
+      if (chunk.metadata.hasStructuredContent) {
+        stats.structuredContentChunks++;
+      }
+      if (chunk.metadata.hasTableContent) {
+        stats.tableContentChunks++;
+      }
+
+      // Track unit types
+      if (chunk.metadata.semanticTypes) {
+        chunk.metadata.semanticTypes.forEach(type => {
+          stats.unitTypesDistribution[type] = (stats.unitTypesDistribution[type] || 0) + 1;
+        });
+      }
 
       // Distribution in 100-char buckets
       const bucket = Math.floor(size / 100) * 100;
@@ -587,8 +644,53 @@ class ChunkingService {
     
     if (stats.minChunkSize === Infinity) stats.minChunkSize = 0;
 
-    console.log(`📈 Chunking Statistics:`, stats);
+    console.log(`📈 Layout-Aware Chunking Statistics:`, stats);
     return stats;
+  }
+
+  // Analyze PDF structure with layout information
+  analyzePDFStructure(pdfData) {
+    const analysis = {
+      totalPages: pdfData.totalPages,
+      totalStructuredUnits: 0,
+      averageUnitsPerPage: 0,
+      structureTypes: {},
+      hasTabularData: false,
+      averageColumnsPerPage: 0,
+      recommendedStrategy: 'layout_aware_semantic'
+    };
+
+    // Analyze structure across all pages
+    pdfData.pages.forEach(page => {
+      if (page.structuredUnits) {
+        analysis.totalStructuredUnits += page.structuredUnits.length;
+        
+        page.structuredUnits.forEach(unit => {
+          analysis.structureTypes[unit.type] = (analysis.structureTypes[unit.type] || 0) + 1;
+        });
+      }
+      
+      if (page.hasTable) {
+        analysis.hasTabularData = true;
+      }
+      
+      analysis.averageColumnsPerPage += (page.columns || 1);
+    });
+
+    analysis.averageUnitsPerPage = analysis.totalStructuredUnits / analysis.totalPages;
+    analysis.averageColumnsPerPage = analysis.averageColumnsPerPage / analysis.totalPages;
+
+    // Recommend strategy based on structure
+    if (analysis.hasTabularData) {
+      analysis.recommendedStrategy = 'layout_aware_semantic';
+    } else if (analysis.averageColumnsPerPage > 1.5) {
+      analysis.recommendedStrategy = 'column_aware';
+    } else if (analysis.structureTypes.paragraph > analysis.totalStructuredUnits * 0.8) {
+      analysis.recommendedStrategy = 'paragraph_based';
+    }
+
+    console.log(`📊 Layout-Aware PDF Structure Analysis:`, analysis);
+    return analysis;
   }
 }
 
