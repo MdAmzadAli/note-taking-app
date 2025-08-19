@@ -785,33 +785,9 @@ class ChunkingService {
       // Extract text from each page using consistent method
       for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
         const page = await pdfDocument.getPage(pageNum);
-        const textContent = await page.getTextContent();
-        
-        // Simple text extraction preserving line breaks
-        const pageText = textContent.items
-          .map(item => item.str)
-          .join(' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-        
-        const lines = pageText.split(/[.!?]+/).filter(line => line.trim().length > 0);
-        
-        pages.push({
-          pageNumber: pageNum,
-          text: pageText,
-          lines: lines,
-          structuredUnits: lines.map((line, index) => ({
-            type: 'paragraph',
-            text: line.trim(),
-            lines: [line.trim()],
-            startLine: index + 1,
-            endLine: index + 1
-          })),
-          columns: 1,
-          hasTable: false
-        });
-        
-        fullText += pageText + '\n\n';
+        const pageData = await this._extractPageWithLayoutFallback(page, pageNum);
+        pages.push(pageData);
+        fullText += pageData.text + '\n\n';
       }
       
       await pdfDocument.destroy();
@@ -847,6 +823,162 @@ class ChunkingService {
         totalPages: 1
       };
     }
+  }
+
+  // Fallback page extraction with simplified layout line detection
+  async _extractPageWithLayoutFallback(page, pageNumber) {
+    try {
+      const textContent = await page.getTextContent();
+      const viewport = page.getViewport({ scale: 1.0 });
+      
+      // Collect text items with coordinates (same as main extraction)
+      const textItems = textContent.items.map(item => ({
+        text: item.str,
+        x: item.transform[4],
+        y: viewport.height - item.transform[5], // Flip Y coordinate
+        width: item.width,
+        height: item.height,
+        fontName: item.fontName,
+        fontSize: item.transform[0]
+      })).filter(item => item.text.trim().length > 0);
+      
+      // Group text items into lines by Y proximity (same logic as main)
+      const lines = this._groupIntoLines(textItems);
+      
+      // Build simple structured units without column/table detection
+      const structuredUnits = this._buildSimpleUnitsFromLines(lines);
+      
+      // Generate clean text from structured units
+      const pageText = structuredUnits.map(unit => unit.text).join('\n');
+      
+      return {
+        pageNumber: pageNumber,
+        text: pageText,
+        lines: lines.map(line => line.text),
+        structuredUnits: structuredUnits,
+        columns: 1,
+        hasTable: false
+      };
+      
+    } catch (error) {
+      console.error(`❌ Fallback layout extraction failed for page ${pageNumber}:`, error);
+      
+      // Ultimate fallback: simple text extraction
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map(item => item.str)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      const lines = pageText.split('\n').filter(line => line.trim().length > 0);
+      
+      return {
+        pageNumber: pageNumber,
+        text: pageText,
+        lines: lines,
+        structuredUnits: lines.map((line, index) => ({
+          type: 'paragraph',
+          text: line.trim(),
+          lines: [line.trim()],
+          startLine: index + 1,
+          endLine: index + 1
+        })),
+        columns: 1,
+        hasTable: false
+      };
+    }
+  }
+
+  // Simplified unit building for fallback (no table/column detection)
+  _buildSimpleUnitsFromLines(lines) {
+    const units = [];
+    let currentParagraph = [];
+    let paragraphStartIndex = null;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const nextLine = lines[i + 1];
+      
+      // Detect headers and bullets (simplified)
+      if (this._isHeader(line.text)) {
+        // End current paragraph
+        if (currentParagraph.length > 0) {
+          units.push({
+            type: 'paragraph',
+            text: currentParagraph.map(l => l.text).join(' '),
+            lines: currentParagraph.map(l => l.text),
+            startLine: paragraphStartIndex,
+            endLine: i
+          });
+          currentParagraph = [];
+          paragraphStartIndex = null;
+        }
+        
+        // Add header unit
+        units.push({
+          type: 'header',
+          text: line.text,
+          lines: [line.text],
+          startLine: i + 1,
+          endLine: i + 1
+        });
+      } else if (this._isBulletPoint(line.text)) {
+        // End current paragraph
+        if (currentParagraph.length > 0) {
+          units.push({
+            type: 'paragraph',
+            text: currentParagraph.map(l => l.text).join(' '),
+            lines: currentParagraph.map(l => l.text),
+            startLine: paragraphStartIndex,
+            endLine: i
+          });
+          currentParagraph = [];
+          paragraphStartIndex = null;
+        }
+        
+        // Add bullet unit
+        units.push({
+          type: 'bullet',
+          text: line.text,
+          lines: [line.text],
+          startLine: i + 1,
+          endLine: i + 1
+        });
+      } else {
+        // Regular text - add to current paragraph
+        if (currentParagraph.length === 0) {
+          paragraphStartIndex = i + 1;
+        }
+        currentParagraph.push(line);
+        
+        // Check if paragraph should end
+        if (!nextLine || this._shouldEndParagraph(line, nextLine)) {
+          units.push({
+            type: 'paragraph',
+            text: currentParagraph.map(l => l.text).join(' '),
+            lines: currentParagraph.map(l => l.text),
+            startLine: paragraphStartIndex,
+            endLine: i + 1
+          });
+          currentParagraph = [];
+          paragraphStartIndex = null;
+        }
+      }
+    }
+    
+    // Add final paragraph if exists
+    if (currentParagraph.length > 0) {
+      units.push({
+        type: 'paragraph',
+        text: currentParagraph.map(l => l.text).join(' '),
+        lines: currentParagraph.map(l => l.text),
+        startLine: paragraphStartIndex,
+        endLine: lines.length
+      });
+    }
+    
+    return units;
   }
 
   // Complete PDF processing with layout-aware extraction
