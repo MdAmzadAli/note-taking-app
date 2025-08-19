@@ -198,73 +198,19 @@ class RAGService {
     }
   }
 
-  // Extract text from PDF with page and line information
+  // Extract text from PDF with page and line information (delegated to ChunkingService)
   async extractTextFromPDF(filePath) {
-    try {
-      const dataBuffer = await fs.readFile(filePath);
-      const data = await pdfParse(dataBuffer, {
-        // Enable page-by-page processing to preserve page information
-        pagerender: async (pageData) => {
-          const textContent = pageData.getTextContent();
-          const page = await textContent;
-          const pageText = page.items.map(item => item.str).join(' ');
-          return pageText;
-        }
-      });
-
-      // Extract page-by-page text if available
-      if (data.numpages > 1) {
-        const pageTexts = [];
-        for (let pageNum = 1; pageNum <= data.numpages; pageNum++) {
-          try {
-            const pageData = await pdfParse(dataBuffer, {
-              first: pageNum,
-              last: pageNum
-            });
-            pageTexts.push({
-              pageNumber: pageNum,
-              text: pageData.text.trim(),
-              lines: pageData.text.split('\n').filter(line => line.trim().length > 0)
-            });
-          } catch (pageError) {
-            console.warn(`⚠️ Failed to extract page ${pageNum}, using fallback`);
-            // Fallback: estimate page content from total text
-            const totalLines = data.text.split('\n');
-            const linesPerPage = Math.ceil(totalLines.length / data.numpages);
-            const startLine = (pageNum - 1) * linesPerPage;
-            const endLine = Math.min(startLine + linesPerPage, totalLines.length);
-            const pageLines = totalLines.slice(startLine, endLine);
-            
-            pageTexts.push({
-              pageNumber: pageNum,
-              text: pageLines.join('\n').trim(),
-              lines: pageLines.filter(line => line.trim().length > 0)
-            });
-          }
-        }
-        return { fullText: data.text, pages: pageTexts, totalPages: data.numpages };
-      } else {
-        // Single page document
-        const lines = data.text.split('\n').filter(line => line.trim().length > 0);
-        return {
-          fullText: data.text,
-          pages: [{
-            pageNumber: 1,
-            text: data.text,
-            lines: lines
-          }],
-          totalPages: 1
-        };
-      }
-    } catch (error) {
-      console.error('❌ PDF text extraction failed:', error);
-      throw error;
-    }
+    return this.chunkingService.extractTextFromPDF(filePath);
   }
 
-  // Split text into semantic chunks with page and line preservation
+  // Split text into semantic chunks with page and line preservation (delegated to ChunkingService)
   splitIntoChunks(pdfData, metadata = {}) {
     return this.chunkingService.splitIntoChunks(pdfData, metadata);
+  }
+
+  // Process PDF completely: extract and chunk in one call (delegated to ChunkingService)
+  async processPDF(filePath, metadata = {}) {
+    return this.chunkingService.processPDF(filePath, metadata);
   }
 
   // Update chunking configuration
@@ -275,9 +221,19 @@ class RAGService {
     this.chunkingService.setChunkOverlap(chunkOverlap);
   }
 
-  // Split with different strategies
+  // Split with different strategies (delegated to ChunkingService)
   splitWithStrategy(pdfData, metadata = {}, strategy = 'semantic') {
     return this.chunkingService.splitWithStrategy(pdfData, metadata, strategy);
+  }
+
+  // Analyze PDF structure and get recommendations (delegated to ChunkingService)
+  analyzePDFStructure(pdfData) {
+    return this.chunkingService.analyzePDFStructure(pdfData);
+  }
+
+  // Get chunking statistics (delegated to ChunkingService)
+  getChunkingStats(chunks) {
+    return this.chunkingService.getChunkingStats(chunks);
   }
 
   // Generate task-specific embeddings using Google GenAI
@@ -417,21 +373,33 @@ class RAGService {
         throw new Error(`File not found: ${filePath}`);
       }
 
-      // Extract text from PDF with page and line information
-      const pdfData = await this.extractTextFromPDF(filePath);
+      // Process PDF: extract and chunk in one call using enhanced ChunkingService
+      const pdfResult = await this.processPDF(filePath, {
+        fileId,
+        fileName,
+        workspaceId,
+        filePath,
+        cloudinaryData
+      });
+
+      const pdfData = pdfResult.pdfData;
+      const chunks = pdfResult.chunks;
 
       if (!pdfData.fullText || pdfData.fullText.trim().length === 0) {
         throw new Error('No text content found in PDF');
       }
 
-      // Split into chunks with page and line preservation
-      const chunks = this.splitIntoChunks(pdfData, {
-        fileId,
-        fileName,
-        workspaceId,
-        filePath,
-        cloudinaryData,
-        totalPages: pdfData.totalPages
+      // Log PDF analysis
+      const structureAnalysis = this.analyzePDFStructure(pdfData);
+      const chunkingStats = this.getChunkingStats(chunks);
+      
+      console.log(`📊 PDF Processing Summary:`, {
+        ...pdfResult.summary,
+        structureAnalysis: structureAnalysis.recommendedStrategy,
+        chunkingStats: {
+          avgSize: chunkingStats.averageChunkSize,
+          range: `${chunkingStats.minChunkSize}-${chunkingStats.maxChunkSize}`
+        }
       });
 
       console.log(`📄 Created ${chunks.length} chunks for ${fileName}`);

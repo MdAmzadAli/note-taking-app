@@ -1,8 +1,109 @@
 
+const pdfParse = require('pdf-parse');
+const fs = require('fs').promises;
+
 class ChunkingService {
   constructor(chunkSize = 800, chunkOverlap = 100) {
     this.chunkSize = chunkSize;
     this.chunkOverlap = chunkOverlap;
+  }
+
+  // Extract text from PDF with page and line information
+  async extractTextFromPDF(filePath) {
+    try {
+      const dataBuffer = await fs.readFile(filePath);
+      const data = await pdfParse(dataBuffer, {
+        // Enable page-by-page processing to preserve page information
+        pagerender: async (pageData) => {
+          const textContent = pageData.getTextContent();
+          const page = await textContent;
+          const pageText = page.items.map(item => item.str).join(' ');
+          return pageText;
+        }
+      });
+
+      // Extract page-by-page text if available
+      if (data.numpages > 1) {
+        const pageTexts = [];
+        for (let pageNum = 1; pageNum <= data.numpages; pageNum++) {
+          try {
+            const pageData = await pdfParse(dataBuffer, {
+              first: pageNum,
+              last: pageNum
+            });
+            pageTexts.push({
+              pageNumber: pageNum,
+              text: pageData.text.trim(),
+              lines: pageData.text.split('\n').filter(line => line.trim().length > 0)
+            });
+          } catch (pageError) {
+            console.warn(`⚠️ Failed to extract page ${pageNum}, using fallback`);
+            // Fallback: estimate page content from total text
+            const totalLines = data.text.split('\n');
+            const linesPerPage = Math.ceil(totalLines.length / data.numpages);
+            const startLine = (pageNum - 1) * linesPerPage;
+            const endLine = Math.min(startLine + linesPerPage, totalLines.length);
+            const pageLines = totalLines.slice(startLine, endLine);
+            
+            pageTexts.push({
+              pageNumber: pageNum,
+              text: pageLines.join('\n').trim(),
+              lines: pageLines.filter(line => line.trim().length > 0)
+            });
+          }
+        }
+        return { fullText: data.text, pages: pageTexts, totalPages: data.numpages };
+      } else {
+        // Single page document
+        const lines = data.text.split('\n').filter(line => line.trim().length > 0);
+        return {
+          fullText: data.text,
+          pages: [{
+            pageNumber: 1,
+            text: data.text,
+            lines: lines
+          }],
+          totalPages: 1
+        };
+      }
+    } catch (error) {
+      console.error('❌ PDF text extraction failed:', error);
+      throw error;
+    }
+  }
+
+  // Complete PDF processing: extract and chunk in one method
+  async processPDF(filePath, metadata = {}) {
+    try {
+      console.log(`📄 Processing PDF: ${filePath}`);
+      
+      // Extract text from PDF with page and line information
+      const pdfData = await this.extractTextFromPDF(filePath);
+
+      if (!pdfData.fullText || pdfData.fullText.trim().length === 0) {
+        throw new Error('No text content found in PDF');
+      }
+
+      console.log(`📄 Extracted text from ${pdfData.totalPages} pages`);
+
+      // Split into chunks with page and line preservation
+      const chunks = this.splitIntoChunks(pdfData, metadata);
+
+      console.log(`📄 Created ${chunks.length} chunks from PDF`);
+
+      return {
+        pdfData: pdfData,
+        chunks: chunks,
+        summary: {
+          totalPages: pdfData.totalPages,
+          totalChunks: chunks.length,
+          fullTextLength: pdfData.fullText.length
+        }
+      };
+    } catch (error) {
+      console.error('❌ PDF processing failed:', error);
+      throw error;
+    }
   }
 
   // Split text into semantic chunks with page and line preservation
@@ -95,11 +196,13 @@ class ChunkingService {
   // Update chunk size configuration
   setChunkSize(size) {
     this.chunkSize = size;
+    console.log(`📏 Chunk size updated to: ${size}`);
   }
 
   // Update chunk overlap configuration
   setChunkOverlap(overlap) {
     this.chunkOverlap = overlap;
+    console.log(`🔄 Chunk overlap updated to: ${overlap}`);
   }
 
   // Get current configuration
@@ -112,6 +215,8 @@ class ChunkingService {
 
   // Split text into chunks with different strategies
   splitWithStrategy(pdfData, metadata = {}, strategy = 'semantic') {
+    console.log(`📋 Using chunking strategy: ${strategy}`);
+    
     switch (strategy) {
       case 'semantic':
         return this.splitIntoChunks(pdfData, metadata);
@@ -122,6 +227,7 @@ class ChunkingService {
       case 'fixed':
         return this._splitByFixedSize(pdfData, metadata);
       default:
+        console.warn(`⚠️ Unknown strategy: ${strategy}, using semantic`);
         return this.splitIntoChunks(pdfData, metadata);
     }
   }
@@ -269,6 +375,76 @@ class ChunkingService {
     }
 
     return chunks;
+  }
+
+  // Analyze PDF structure and recommend chunking strategy
+  analyzePDFStructure(pdfData) {
+    const analysis = {
+      totalPages: pdfData.totalPages,
+      totalLines: pdfData.pages.reduce((sum, page) => sum + page.lines.length, 0),
+      averageLinesPerPage: 0,
+      averageLineLength: 0,
+      hasShortLines: false,
+      hasLongParagraphs: false,
+      recommendedStrategy: 'semantic'
+    };
+
+    // Calculate averages
+    analysis.averageLinesPerPage = analysis.totalLines / analysis.totalPages;
+    
+    const allLines = pdfData.pages.flatMap(page => page.lines);
+    const totalCharacters = allLines.reduce((sum, line) => sum + line.length, 0);
+    analysis.averageLineLength = totalCharacters / allLines.length;
+
+    // Analyze structure patterns
+    analysis.hasShortLines = analysis.averageLineLength < 50;
+    analysis.hasLongParagraphs = pdfData.fullText.includes('\n\n') && 
+                                 pdfData.fullText.split('\n\n').some(para => para.length > 1000);
+
+    // Recommend strategy based on analysis
+    if (analysis.hasShortLines && analysis.averageLinesPerPage > 30) {
+      analysis.recommendedStrategy = 'paragraph';
+    } else if (analysis.averageLineLength > 100 && !analysis.hasLongParagraphs) {
+      analysis.recommendedStrategy = 'sentence';
+    } else if (analysis.totalPages > 50 || analysis.averageLinesPerPage < 10) {
+      analysis.recommendedStrategy = 'fixed';
+    }
+
+    console.log(`📊 PDF Structure Analysis:`, analysis);
+    return analysis;
+  }
+
+  // Get chunking statistics
+  getChunkingStats(chunks) {
+    const stats = {
+      totalChunks: chunks.length,
+      averageChunkSize: 0,
+      minChunkSize: Infinity,
+      maxChunkSize: 0,
+      pagesSpanned: new Set(),
+      chunkSizeDistribution: {},
+      strategy: chunks[0]?.metadata?.strategy || 'semantic'
+    };
+
+    chunks.forEach(chunk => {
+      const size = chunk.text.length;
+      stats.averageChunkSize += size;
+      stats.minChunkSize = Math.min(stats.minChunkSize, size);
+      stats.maxChunkSize = Math.max(stats.maxChunkSize, size);
+      stats.pagesSpanned.add(chunk.metadata.pageNumber);
+
+      // Distribution in 100-char buckets
+      const bucket = Math.floor(size / 100) * 100;
+      stats.chunkSizeDistribution[bucket] = (stats.chunkSizeDistribution[bucket] || 0) + 1;
+    });
+
+    stats.averageChunkSize = Math.round(stats.averageChunkSize / chunks.length);
+    stats.pagesSpanned = stats.pagesSpanned.size;
+    
+    if (stats.minChunkSize === Infinity) stats.minChunkSize = 0;
+
+    console.log(`📈 Chunking Statistics:`, stats);
+    return stats;
   }
 }
 
