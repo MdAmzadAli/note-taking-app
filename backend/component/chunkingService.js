@@ -111,7 +111,7 @@ class ChunkingService {
         text: pageText,
         lines: lines.map(line => line.text),
         structuredUnits: structuredUnits,
-        columns: columns.length,
+        columns: Math.max(1, columns.length),
         hasTable: structuredUnits.some(unit => unit.type === 'table_row')
       };
       
@@ -225,17 +225,28 @@ class ChunkingService {
     });
     
     // Sort columns by X position and filter out single occurrences
-    return columns
+    const detectedColumns = columns
       .filter(col => col.count > 1)
       .sort((a, b) => a.minX - b.minX);
+    
+    // Default to single column if no columns detected
+    if (detectedColumns.length === 0) {
+      return [{
+        minX: 0,
+        maxX: Math.max(...lines.map(line => line.maxX || 1000)),
+        count: lines.length
+      }];
+    }
+    
+    return detectedColumns;
   }
 
   // Build structured units from lines and columns
   _buildStructuredUnits(lines, columns) {
     if (lines.length === 0) return [];
     
-    // If no columns detected or single column, use original logic
-    if (columns.length <= 1) {
+    // If only one column detected, use original logic
+    if (columns.length === 1) {
       return this._buildUnitsFromLines(lines);
     }
     
