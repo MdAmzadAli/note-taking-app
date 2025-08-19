@@ -5,6 +5,7 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { v5: uuidv5 } = require('uuid');
+const ChunkingService = require('../component/chunkingService');
 const POINT_NS = '2d3c0d3e-1e1a-4f6a-9e84-1b8de377e9c9';
 
 // Define COLLECTION_NAME at the module level if it's used in multiple places, otherwise pass it as argument or define it within the function.
@@ -20,6 +21,9 @@ class RAGService {
     this.chunkSize = 800;
     this.chunkOverlap = 100;
     this.isInitialized = false;
+    
+    // Initialize chunking service
+    this.chunkingService = new ChunkingService(this.chunkSize, this.chunkOverlap);
 
     // Task-specific embedding configurations
     this.embeddingConfigs = {
@@ -260,80 +264,20 @@ class RAGService {
 
   // Split text into semantic chunks with page and line preservation
   splitIntoChunks(pdfData, metadata = {}) {
-    const chunks = [];
-    let globalChunkIndex = 0;
+    return this.chunkingService.splitIntoChunks(pdfData, metadata);
+  }
 
-    // Process each page separately to preserve page information
-    for (const pageData of pdfData.pages) {
-      const pageNumber = pageData.pageNumber;
-      const pageLines = pageData.lines;
-      
-      // Group lines into sentences for better chunking
-      let currentChunk = '';
-      let currentLength = 0;
-      let startLineIndex = 0;
-      let currentLineIndex = 0;
+  // Update chunking configuration
+  updateChunkingConfig(chunkSize, chunkOverlap) {
+    this.chunkSize = chunkSize;
+    this.chunkOverlap = chunkOverlap;
+    this.chunkingService.setChunkSize(chunkSize);
+    this.chunkingService.setChunkOverlap(chunkOverlap);
+  }
 
-      for (let lineIndex = 0; lineIndex < pageLines.length; lineIndex++) {
-        const line = pageLines[lineIndex].trim();
-        if (!line) continue;
-
-        // Check if adding this line would exceed chunk sizesdsdsdn
-        if (currentLength + line.length > this.chunkSize && currentChunk.trim()) {
-          // Create chunk with current content
-          chunks.push({
-            text: currentChunk.trim(),
-            metadata: {
-              ...metadata,
-              chunkIndex: globalChunkIndex++,
-              pageNumber: pageNumber,
-              startLine: startLineIndex + 1, // 1-indexed for user display
-              endLine: lineIndex, // 1-indexed for user display
-              linesUsed: pageLines.slice(startLineIndex, lineIndex).map(l => l.trim()).filter(l => l),
-              originalLines: pageLines.slice(startLineIndex, lineIndex),
-              totalLinesOnPage: pageLines.length
-            }
-          });
-
-          // Start new chunk with some overlap
-          const overlapLines = Math.min(2, lineIndex - startLineIndex);
-          if (overlapLines > 0) {
-            const overlapText = pageLines.slice(Math.max(0, lineIndex - overlapLines), lineIndex).join(' ');
-            currentChunk = overlapText + ' ' + line;
-            startLineIndex = Math.max(0, lineIndex - overlapLines);
-          } else {
-            currentChunk = line;
-            startLineIndex = lineIndex;
-          }
-          currentLength = currentChunk.length;
-        } else {
-          // Add line to current chunk
-          currentChunk += (currentChunk ? ' ' : '') + line;
-          currentLength += line.length;
-        }
-        currentLineIndex = lineIndex;
-      }
-
-      // Add final chunk for this page if it has content
-      if (currentChunk.trim()) {
-        chunks.push({
-          text: currentChunk.trim(),
-          metadata: {
-            ...metadata,
-            chunkIndex: globalChunkIndex++,
-            pageNumber: pageNumber,
-            startLine: startLineIndex + 1, // 1-indexed for user display
-            endLine: currentLineIndex + 1, // 1-indexed for user display
-            linesUsed: pageLines.slice(startLineIndex, currentLineIndex + 1).map(l => l.trim()).filter(l => l),
-            originalLines: pageLines.slice(startLineIndex, currentLineIndex + 1),
-            totalLinesOnPage: pageLines.length
-          }
-        });
-      }
-    }
-
-    console.log(`📄 Created ${chunks.length} chunks across ${pdfData.pages.length} pages`);
-    return chunks;
+  // Split with different strategies
+  splitWithStrategy(pdfData, metadata = {}, strategy = 'semantic') {
+    return this.chunkingService.splitWithStrategy(pdfData, metadata, strategy);
   }
 
   // Generate task-specific embeddings using Google GenAI
