@@ -380,7 +380,7 @@ class ChunkingService {
               }))
           }
         });
-      } else if (this._isHeader(line.text)) {
+      } else if (this._isHeaderWithContext(line, lines, i)) {
         // End current paragraph
         if (currentParagraph.length > 0) {
           units.push({
@@ -1053,9 +1053,105 @@ class ChunkingService {
   }
 
   _isHeader(line) {
-    return /^[A-Z\s]+:?\s*$/.test(line) && line.length < 60 ||
-           /^\d+\.\s*[A-Z]/.test(line) ||
-           line.endsWith(':') && line.length < 80;
+    const text = line.text || line; // Handle both line objects and strings
+    
+    // Basic length and content checks
+    if (text.length > 80 || text.length < 3) return false;
+    
+    // Pattern 1: All caps with colon (strong header indicator)
+    const allCapsWithColon = /^[A-Z\s]+:\s*$/.test(text) && text.length < 60;
+    if (allCapsWithColon) return true;
+    
+    // Pattern 2: Numbered headers (1. Title, Section 1, etc.)
+    const numberedHeader = /^(\d+\.|\d+\s+|Section\s+\d+|Chapter\s+\d+)\s*[A-Z]/.test(text);
+    if (numberedHeader) return true;
+    
+    // Pattern 3: Title case with colon and reasonable length
+    const titleCaseWithColon = /^[A-Z][a-z]+(\s+[A-Z][a-z]+)*:\s*$/.test(text) && text.length < 60;
+    if (titleCaseWithColon) return true;
+    
+    // Pattern 4: All caps but require additional context checks
+    const allCaps = /^[A-Z\s]+$/.test(text) && text.length < 50;
+    if (allCaps) {
+      // Additional checks to reduce false positives
+      
+      // Reject if it looks like an acronym (too short, no spaces)
+      if (text.length < 8 && !/\s/.test(text)) return false;
+      
+      // Reject common false positives
+      const falsePositives = /^(USD|EUR|GBP|INR|CAD|AUD|CHF|CNY|JPY|YES|NO|TRUE|FALSE|NULL|TOTAL|SUM|AVG|MAX|MIN|COUNT|ID|NAME|DATE|TIME|TYPE|STATUS)$/;
+      if (falsePositives.test(text.trim())) return false;
+      
+      // If we have line object with position info, check for Y-gap context
+      if (typeof line === 'object' && line.y !== undefined) {
+        // This would require context from surrounding lines, which we can check in the calling method
+        return this._hasHeaderContext(line);
+      }
+      
+      // For plain text, be more restrictive - require at least one space (multi-word)
+      return /\s/.test(text) && text.split(/\s+/).length >= 2;
+    }
+    
+    return false;
+  }
+
+  // Helper method to check if a line has header-like context (Y-gaps, positioning)
+  _hasHeaderContext(line) {
+    // This method can be called from _buildUnitsFromLines where we have access to surrounding lines
+    // For now, return true to maintain existing behavior, but this can be enhanced
+    // when we have context of surrounding lines available
+    return true;
+  }
+
+  // Enhanced header detection with context from surrounding lines
+  _isHeaderWithContext(line, allLines, currentIndex) {
+    // First check basic header patterns
+    if (!this._isHeader(line)) return false;
+    
+    const text = line.text;
+    const isAllCaps = /^[A-Z\s]+:?\s*$/.test(text);
+    
+    // If it's not all caps, trust the basic header detection
+    if (!isAllCaps) return true;
+    
+    // For all-caps lines, require additional context validation
+    
+    // Check for Y-gap context (spacing above/below)
+    const prevLine = currentIndex > 0 ? allLines[currentIndex - 1] : null;
+    const nextLine = currentIndex < allLines.length - 1 ? allLines[currentIndex + 1] : null;
+    
+    let hasYGapContext = false;
+    
+    if (prevLine && nextLine) {
+      // Check for significant Y gaps (indicating spacing around header)
+      const gapAbove = Math.abs(line.y - prevLine.y);
+      const gapBelow = Math.abs(nextLine.y - line.y);
+      
+      // Header should have larger gaps than normal line spacing
+      const normalLineSpacing = 15; // Based on yTolerance used elsewhere
+      hasYGapContext = gapAbove > normalLineSpacing * 1.5 || gapBelow > normalLineSpacing * 1.5;
+    } else if (!prevLine || !nextLine) {
+      // At document boundaries, be more lenient
+      hasYGapContext = true;
+    }
+    
+    // Check for title case pattern (more likely to be headers)
+    const isTitleCase = /^[A-Z][a-z]+(\s+[A-Z][a-z]+)*/.test(text);
+    
+    // Additional validation for all-caps headers
+    if (isAllCaps) {
+      // Require either:
+      // 1. Y-gap context, OR
+      // 2. Colon at end, OR  
+      // 3. Title case pattern, OR
+      // 4. Multiple words (reduces acronym false positives)
+      return hasYGapContext || 
+             text.endsWith(':') || 
+             isTitleCase || 
+             (text.split(/\s+/).length >= 3 && text.length >= 15);
+    }
+    
+    return true;
   }
 
   // Create a semantic chunk object with enhanced metadata including numeric analysis
