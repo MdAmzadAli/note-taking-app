@@ -15,6 +15,56 @@ export interface FileUploadResponse {
 }
 
 class FileService {
+  async uploadWorkspaceFiles(files: Array<{ uri: string; name: string; type?: string }>, workspaceId: string): Promise<FileUploadResponse[]> {
+    try {
+      console.log('📤 Starting batch workspace file upload...');
+      console.log('🏢 Workspace ID:', workspaceId);
+      console.log('📄 Number of files:', files.length);
+
+      const formData = new FormData();
+      formData.append('workspaceId', workspaceId);
+
+      // Add all files to the same FormData
+      files.forEach((file, index) => {
+        console.log(`📱 Adding file ${index + 1}: ${file.name}`);
+        const mobileFile = {
+          uri: file.uri,
+          name: file.name,
+          type: file.type || 'application/pdf'
+        };
+        formData.append('files', mobileFile as any);
+      });
+
+      console.log('🔄 Sending batch upload request to:', API_ENDPOINTS.uploadWorkspace);
+      const response = await fetch(API_ENDPOINTS.uploadWorkspace, {
+        method: 'POST',
+        body: formData,
+      });
+
+      console.log('📨 Batch upload response received');
+      console.log('📨 Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Batch upload failed with status:', response.status);
+        console.error('❌ Error response:', errorText);
+        throw new Error(`Batch upload failed: ${response.status} - ${errorText}`);
+      }
+
+      const result: ApiResponse<{ files: FileUploadResponse[] }> = await response.json();
+      const uploadedFiles = result.files!;
+      console.log('✅ Batch files uploaded successfully:', uploadedFiles.length, 'files');
+
+      return uploadedFiles;
+    } catch (error) {
+      console.error('❌ Batch file upload error occurred');
+      console.error('❌ Error type:', error.constructor.name);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error stack:', error.stack);
+      throw error;
+    }
+  }
+
   async uploadFile(file: File | { uri: string; name: string; type?: string; workspaceId?: string }, filename?: string): Promise<FileUploadResponse> {
     try {
       console.log('📤 Starting file upload...');

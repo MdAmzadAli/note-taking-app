@@ -263,40 +263,35 @@ export default function ExpertTab() {
         await saveData(singleFiles, updatedWorkspaces);
         console.log(`💾 Workspace saved locally: ${workspaceName}`);
 
-        // Step 3: Upload files with workspace ID
-        const uploadedFiles: SingleFile[] = [];
+        // Step 3: Batch upload all files for workspace
+        const filesToUpload = results.assets.slice(0, 5).map(file => ({
+          uri: file.uri,
+          name: file.name,
+          type: file.mimeType || 'application/pdf'
+        }));
 
-        for (let i = 0; i < Math.min(results.assets.length, 5); i++) {
-          const file = results.assets[i];
+        console.log(`📤 Starting batch upload for workspace: ${workspaceId}`);
+        console.log(`📄 Files to upload:`, filesToUpload.length);
 
-          try {
-            console.log(`📤 Uploading workspace file ${i + 1}: ${file.name} for workspace: ${workspaceId}`);
-            console.log(`📄 File details:`, JSON.stringify(file, null, 2));
+        let uploadedFiles: SingleFile[] = [];
 
-            const fileToUpload = {
-              uri: file.uri,
-              name: file.name,
-              type: file.mimeType || 'application/octet-stream',
-              workspaceId: workspaceId // Include workspace ID in upload
-            };
+        try {
+          const batchResult = await fileService.uploadWorkspaceFiles(filesToUpload, workspaceId);
+          
+          uploadedFiles = batchResult.map(uploadedFile => ({
+            id: uploadedFile.id,
+            name: uploadedFile.originalName,
+            uploadDate: new Date(uploadedFile.uploadDate).toLocaleDateString(),
+            mimetype: uploadedFile.mimetype,
+            size: uploadedFile.size,
+            isUploaded: true,
+            cloudinary: uploadedFile.cloudinary,
+          }));
 
-            const uploadedFile = await fileService.uploadFile(fileToUpload, file.name);
-
-            uploadedFiles.push({
-              id: uploadedFile.id,
-              name: uploadedFile.originalName,
-              uploadDate: new Date(uploadedFile.uploadDate).toLocaleDateString(),
-              mimetype: uploadedFile.mimetype,
-              size: uploadedFile.size,
-              isUploaded: true,
-              cloudinary: uploadedFile.cloudinary,
-            });
-
-            console.log(`✅ Successfully uploaded workspace file: ${file.name}`);
-          } catch (uploadError) {
-            console.error(`❌ Failed to upload workspace file ${file.name}:`, uploadError);
-            Alert.alert('Partial Upload', `Failed to upload ${file.name}, continuing with other files.`);
-          }
+          console.log(`✅ Batch upload completed: ${uploadedFiles.length} files uploaded`);
+        } catch (batchError) {
+          console.error(`❌ Batch upload failed:`, batchError);
+          Alert.alert('Upload Failed', `Failed to upload files: ${batchError.message}`);
         }
 
         // Step 4: Update workspace with uploaded files

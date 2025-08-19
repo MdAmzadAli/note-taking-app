@@ -1,11 +1,10 @@
-
 // For Replit environment, use the correct URL format
 const getApiBaseUrl = () => {
   if (typeof window !== 'undefined') {
     // In Replit web environment, use the backend port forwarding
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
-    
+
     // For Replit, the backend runs on port 5000
     if (hostname.includes('replit.dev')) {
       // Use the same domain with port 5000
@@ -22,15 +21,19 @@ const getApiBaseUrl = () => {
   return 'http://0.0.0.0:5000';
 };
 
+const API_BASE_URL = getApiBaseUrl();
+
 export const API_ENDPOINTS = {
-  upload: `${getApiBaseUrl()}/upload`,
-  preview: (id: string) => `${getApiBaseUrl()}/preview/${id}`,
-  file: (id: string) => `${getApiBaseUrl()}/file/${id}`,
-  metadata: (id: string) => `${getApiBaseUrl()}/metadata/${id}`,
-  pdfPage: (id: string, page: number) => `${getApiBaseUrl()}/pdf/${id}/page/${page}`,
-  csvPage: (id: string, page: number) => `${getApiBaseUrl()}/csv/${id}/page/${page}`,
-  download: (id: string) => `${getApiBaseUrl()}/download/${id}`,
-  health: `${getApiBaseUrl()}/health`
+  base: API_BASE_URL,
+  upload: `${API_BASE_URL}/upload`,
+  uploadWorkspace: `${API_BASE_URL}/upload/workspace`,
+  preview: (id: string) => `${API_BASE_URL}/preview/${id}`,
+  file: (id: string) => `${API_BASE_URL}/file/${id}`,
+  metadata: (id: string) => `${API_BASE_URL}/metadata/${id}`,
+  pdfPage: (id: string, page: number) => `${API_BASE_URL}/pdf/${id}/page/${page}`,
+  csvPage: (id: string, page: number) => `${API_BASE_URL}/csv/${id}/page/${page}`,
+  download: (id: string) => `${API_BASE_URL}/download/${id}`,
+  health: `${API_BASE_URL}/health`
 };
 
 export interface ApiResponse<T = any> {

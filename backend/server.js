@@ -206,6 +206,103 @@ app.delete('/file/:id', async (req, res) => {
   }
 });
 
+// Workspace batch file upload endpoint
+app.post('/upload/workspace', upload.array('files', 5), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' });
+    }
+
+    const workspaceId = req.body.workspaceId;
+    if (!workspaceId) {
+      return res.status(400).json({ error: 'Workspace ID is required' });
+    }
+
+    console.log('📤 Workspace batch file upload request received');
+    console.log('🏢 Workspace ID:', workspaceId);
+    console.log('📄 Number of files:', req.files.length);
+
+    const uploadedFiles = [];
+    const errors = [];
+
+    // Process each file sequentially
+    for (let i = 0; i < req.files.length; i++) {
+      const file = req.files[i];
+      
+      try {
+        console.log(`📤 Processing file ${i + 1}/${req.files.length}: ${file.originalname}`);
+
+        const fileInfo = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          originalName: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size,
+          path: file.path,
+          uploadDate: new Date().toISOString(),
+          workspaceId: workspaceId,
+        };
+
+        console.log(`💾 Saving metadata for file ${i + 1}: ${fileInfo.id}`);
+        await fileService.saveFileMetadata(fileInfo);
+
+        console.log(`🔄 Processing upload for file ${i + 1}...`);
+        const processedFile = await fileService.processFileUpload(fileInfo);
+
+        console.log(`🖼️ Generating preview for file ${i + 1}...`);
+        try {
+          await fileService.generatePreview(fileInfo);
+          console.log(`✅ Preview generated for file ${i + 1}`);
+        } catch (previewError) {
+          console.error(`❌ Preview generation failed for file ${i + 1}:`, previewError);
+        }
+
+        // Auto-index PDF files for RAG with workspace ID
+        if (fileInfo.mimetype === 'application/pdf') {
+          console.log(`🔄 Starting RAG indexing for file ${i + 1} (${fileInfo.originalName})...`);
+          try {
+            const indexResult = await ragService.indexDocument(
+              fileInfo.id,
+              fileInfo.path,
+              fileInfo.originalName,
+              workspaceId,
+              processedFile.cloudinary
+            );
+            console.log(`✅ RAG indexing completed for file ${i + 1}:`, indexResult.chunksCount, 'chunks');
+          } catch (ragError) {
+            console.warn(`⚠️ RAG indexing failed for file ${i + 1} (continuing anyway):`, ragError.message);
+          }
+        }
+
+        uploadedFiles.push(processedFile);
+        console.log(`✅ Successfully processed file ${i + 1}: ${file.originalname}`);
+
+      } catch (fileError) {
+        console.error(`❌ Failed to process file ${i + 1} (${file.originalname}):`, fileError);
+        errors.push({
+          filename: file.originalname,
+          error: fileError.message
+        });
+      }
+    }
+
+    const response = {
+      success: true,
+      files: uploadedFiles,
+      processedCount: uploadedFiles.length,
+      totalCount: req.files.length,
+      errors: errors.length > 0 ? errors : undefined
+    };
+
+    console.log(`📤 Workspace batch upload completed: ${uploadedFiles.length}/${req.files.length} files processed`);
+    res.status(201).json(response);
+
+  } catch (error) {
+    console.error('❌ Workspace batch upload error:', error);
+    console.error('❌ Stack trace:', error.stack);
+    res.status(500).json({ error: 'Workspace batch upload failed', details: error.message });
+  }
+});
+
 // File upload endpoint
 app.post('/upload', upload.single('file'), async (req, res) => {
   try {
