@@ -232,12 +232,112 @@ class ChunkingService {
 
   // Build structured units from lines and columns
   _buildStructuredUnits(lines, columns) {
+    if (lines.length === 0) return [];
+    
+    // If no columns detected or single column, use original logic
+    if (columns.length <= 1) {
+      return this._buildUnitsFromLines(lines);
+    }
+    
+    // Partition lines into column buckets based on detected column ranges
+    const columnBuckets = this._partitionLinesByColumns(lines, columns);
+    
+    // Build units within each column independently (left-to-right order)
+    const allUnits = [];
+    let globalLineOffset = 0;
+    
+    // Sort columns by X position (left to right)
+    const sortedColumns = columns.sort((a, b) => a.minX - b.minX);
+    
+    for (let colIndex = 0; colIndex < sortedColumns.length; colIndex++) {
+      const column = sortedColumns[colIndex];
+      const columnLines = columnBuckets[colIndex] || [];
+      
+      if (columnLines.length === 0) continue;
+      
+      // Build units for this column
+      const columnUnits = this._buildUnitsFromLines(columnLines, globalLineOffset);
+      
+      // Add column metadata to each unit
+      columnUnits.forEach(unit => {
+        unit.columnIndex = colIndex;
+        unit.columnRange = { minX: column.minX, maxX: column.maxX };
+      });
+      
+      allUnits.push(...columnUnits);
+      globalLineOffset += columnLines.length;
+    }
+    
+    // Sort all units by line number to maintain reading order
+    allUnits.sort((a, b) => a.startLine - b.startLine);
+    
+    return allUnits;
+  }
+
+  // Partition lines into column buckets based on detected column ranges
+  _partitionLinesByColumns(lines, columns) {
+    const sortedColumns = columns.sort((a, b) => a.minX - b.minX);
+    const columnBuckets = Array(sortedColumns.length).fill(null).map(() => []);
+    
+    for (const line of lines) {
+      // Find which column this line belongs to based on its X position
+      let assignedColumn = -1;
+      
+      for (let i = 0; i < sortedColumns.length; i++) {
+        const column = sortedColumns[i];
+        
+        // Check if line's X range overlaps with column range
+        const lineOverlap = Math.min(line.maxX, column.maxX) - Math.max(line.minX, column.minX);
+        
+        if (lineOverlap > 0) {
+          // Calculate overlap percentage
+          const lineWidth = line.maxX - line.minX;
+          const overlapPercentage = lineWidth > 0 ? lineOverlap / lineWidth : 1;
+          
+          // Assign to column if significant overlap (>50%)
+          if (overlapPercentage > 0.5) {
+            assignedColumn = i;
+            break;
+          }
+        }
+      }
+      
+      // If no column assignment found, assign to closest column by X position
+      if (assignedColumn === -1) {
+        let minDistance = Infinity;
+        for (let i = 0; i < sortedColumns.length; i++) {
+          const column = sortedColumns[i];
+          const distance = Math.abs(line.minX - column.minX);
+          if (distance < minDistance) {
+            minDistance = distance;
+            assignedColumn = i;
+          }
+        }
+      }
+      
+      // Add line to assigned column bucket
+      if (assignedColumn >= 0 && assignedColumn < columnBuckets.length) {
+        columnBuckets[assignedColumn].push(line);
+      }
+    }
+    
+    // Sort lines within each column by Y position (top to bottom)
+    columnBuckets.forEach(bucket => {
+      bucket.sort((a, b) => a.y - b.y);
+    });
+    
+    return columnBuckets;
+  }
+
+  // Build structured units from a set of lines (extracted from original logic)
+  _buildUnitsFromLines(lines, lineOffset = 0) {
     const units = [];
     let currentParagraph = [];
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const nextLine = lines[i + 1];
+      const globalLineIndex = lineOffset + i;
       
       // Detect table rows by checking for regular vertical alignment
       if (this._isTableRow(line, lines)) {
@@ -247,8 +347,8 @@ class ChunkingService {
             type: 'paragraph',
             text: currentParagraph.map(l => l.text).join(' '),
             lines: currentParagraph.map(l => l.text),
-            startLine: i - currentParagraph.length + 1,
-            endLine: i
+            startLine: globalLineIndex - currentParagraph.length + 1,
+            endLine: globalLineIndex
           });
           currentParagraph = [];
         }
@@ -261,8 +361,8 @@ class ChunkingService {
           type: 'table_row',
           text: line.text,
           lines: [line.text],
-          startLine: i + 1,
-          endLine: i + 1,
+          startLine: globalLineIndex + 1,
+          endLine: globalLineIndex + 1,
           columns: tableColumns,
           // Enhanced numeric metadata
           numericMetadata: {
@@ -287,8 +387,8 @@ class ChunkingService {
             type: 'paragraph',
             text: currentParagraph.map(l => l.text).join(' '),
             lines: currentParagraph.map(l => l.text),
-            startLine: i - currentParagraph.length + 1,
-            endLine: i
+            startLine: globalLineIndex - currentParagraph.length + 1,
+            endLine: globalLineIndex
           });
           currentParagraph = [];
         }
@@ -298,8 +398,8 @@ class ChunkingService {
           type: 'header',
           text: line.text,
           lines: [line.text],
-          startLine: i + 1,
-          endLine: i + 1
+          startLine: globalLineIndex + 1,
+          endLine: globalLineIndex + 1
         });
       } else if (this._isBulletPoint(line.text)) {
         // End current paragraph
@@ -308,8 +408,8 @@ class ChunkingService {
             type: 'paragraph',
             text: currentParagraph.map(l => l.text).join(' '),
             lines: currentParagraph.map(l => l.text),
-            startLine: i - currentParagraph.length + 1,
-            endLine: i
+            startLine: globalLineIndex - currentParagraph.length + 1,
+            endLine: globalLineIndex
           });
           currentParagraph = [];
         }
@@ -319,21 +419,21 @@ class ChunkingService {
           type: 'bullet',
           text: line.text,
           lines: [line.text],
-          startLine: i + 1,
-          endLine: i + 1
+          startLine: globalLineIndex + 1,
+          endLine: globalLineIndex + 1
         });
       } else {
         // Regular text - add to current paragraph
         currentParagraph.push(line);
         
-        // Check if paragraph should end
+        // Check if paragraph should end (modified to handle column context)
         if (!nextLine || this._shouldEndParagraph(line, nextLine)) {
           units.push({
             type: 'paragraph',
             text: currentParagraph.map(l => l.text).join(' '),
             lines: currentParagraph.map(l => l.text),
-            startLine: i - currentParagraph.length + 2,
-            endLine: i + 1
+            startLine: globalLineIndex - currentParagraph.length + 2,
+            endLine: globalLineIndex + 1
           });
           currentParagraph = [];
         }
@@ -342,12 +442,13 @@ class ChunkingService {
     
     // Add final paragraph if exists
     if (currentParagraph.length > 0) {
+      const globalLineIndex = lineOffset + lines.length - 1;
       units.push({
         type: 'paragraph',
         text: currentParagraph.map(l => l.text).join(' '),
         lines: currentParagraph.map(l => l.text),
-        startLine: lines.length - currentParagraph.length + 1,
-        endLine: lines.length
+        startLine: globalLineIndex - currentParagraph.length + 1,
+        endLine: globalLineIndex + 1
       });
     }
     
@@ -929,6 +1030,12 @@ class ChunkingService {
       }
     });
 
+    // Collect column information
+    const columnIndices = [...new Set(semanticUnits.map(u => u.columnIndex).filter(c => c !== undefined))];
+    const columnRanges = semanticUnits
+      .filter(u => u.columnRange)
+      .map(u => u.columnRange);
+
     return {
       text: text,
       metadata: {
@@ -949,7 +1056,12 @@ class ChunkingService {
         // Enhanced numeric metadata
         numericMetadata: numericMetadata,
         hasFinancialData: numericMetadata.currencies.length > 0,
-        hasNegativeValues: numericMetadata.hasNegativeValues
+        hasNegativeValues: numericMetadata.hasNegativeValues,
+        // Column layout metadata
+        columnIndices: columnIndices,
+        columnRanges: columnRanges,
+        spansMultipleColumns: columnIndices.length > 1,
+        isColumnAware: columnIndices.length > 0
       }
     };
   }
