@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
     padding: 24,
     width: '90%',
     maxWidth: 450,
-    height: '50%',
+    minHeight: '50%',
   },
   stepContainer: {
     flex: 1,
