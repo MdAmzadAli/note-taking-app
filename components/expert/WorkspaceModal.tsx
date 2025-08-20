@@ -92,7 +92,8 @@ export default function WorkspaceModal({
   };
 
   const handleAddFromDevice = async () => {
-    if (files.length >= 5) {
+    const remainingSlots = 5 - files.length;
+    if (remainingSlots <= 0) {
       Alert.alert('Limit Reached', 'Maximum 5 files can be uploaded.');
       return;
     }
@@ -101,19 +102,28 @@ export default function WorkspaceModal({
       const result = await DocumentPicker.getDocumentAsync({
         type: 'application/pdf',
         copyToCacheDirectory: true,
+        multiple: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const file = result.assets[0];
-        const newFile: FileItem = {
-          id: Date.now().toString(),
+        const filesToAdd = result.assets.slice(0, remainingSlots);
+        const newFiles: FileItem[] = filesToAdd.map((file, index) => ({
+          id: (Date.now() + index).toString(),
           name: file.name,
           type: 'device',
           source: file.name,
           file: file
-        };
-        setFiles([...files, newFile]);
+        }));
+        
+        setFiles([...files, ...newFiles]);
         setShowFileOptionsModal(false);
+
+        if (result.assets.length > remainingSlots) {
+          Alert.alert(
+            'Some files not added', 
+            `Only ${filesToAdd.length} files were added due to the 5-file limit. ${result.assets.length - remainingSlots} files were skipped.`
+          );
+        }
       }
     } catch (error) {
       console.error('Error picking document:', error);
