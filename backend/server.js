@@ -930,4 +930,4 @@ async function startServer() {
 
 startServer().catch(console.error);
 
-module.module.exports = app;
+module.exports = app;
