@@ -542,8 +542,11 @@ export default function ChatInterface({
                 <View key={source.id} style={styles.sourceItem}>
                   <View style={styles.sourceHeader}>
                     <Text style={styles.sourceFileName}>
-                      📄 {source.fileName} (Page {source.pageNumber || 1}
-                      {source.lineRange ? `, ${source.lineRange}` : ''})
+                      📄 {source.fileName}
+                      {source.pageNumber && ` (Page ${source.pageNumber}`}
+                      {source.lineRange && source.pageNumber && `, ${source.lineRange}`}
+                      {source.lineRange && !source.pageNumber && ` (${source.lineRange}`}
+                      {(source.pageNumber || source.lineRange) && ')'}
                     </Text>
                     <Text style={styles.sourceScore}>
                       {Math.round(source.relevanceScore * 100)}% match
@@ -552,7 +555,9 @@ export default function ChatInterface({
                   {(source.startLine && source.endLine) && (
                     <View style={styles.sourceLineInfo}>
                       <Text style={styles.sourceLineText}>
-                        📍 Lines {source.startLine}-{source.endLine} of {source.totalLinesOnPage || 'unknown'} total lines on page
+                        📍 Lines {source.startLine}-{source.endLine}
+                        {source.totalLinesOnPage && ` of ${source.totalLinesOnPage} total lines`}
+                        {source.pageNumber && ' on page'}
                       </Text>
                     </View>
                   )}
