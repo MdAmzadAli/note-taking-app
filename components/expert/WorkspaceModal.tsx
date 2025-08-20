@@ -155,7 +155,6 @@ export default function WorkspaceModal({
     setFiles([...files, newFile]);
     setUrlInput('');
     setActiveUrlInput(null);
-    setShowFileOptionsModal(false);
   };
 
   const handleRemoveFile = (fileId: string) => {
