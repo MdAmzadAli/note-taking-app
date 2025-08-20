@@ -42,6 +42,7 @@ export default function WorkspaceModal({
   const [urlInput, setUrlInput] = useState('');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [showFileOptionsModal, setShowFileOptionsModal] = useState(false);
 
   const modalContentRef = useRef<View>(null);
 
@@ -73,6 +74,7 @@ export default function WorkspaceModal({
     setUrlInput('');
     setKeyboardHeight(0);
     setIsKeyboardVisible(false);
+    setShowFileOptionsModal(false);
   };
 
   const handleNext = () => {
@@ -86,6 +88,7 @@ export default function WorkspaceModal({
     setShowFileOptions(false);
     setActiveUrlInput(null);
     setUrlInput('');
+    setShowFileOptionsModal(false);
   };
 
   const handleAddFromDevice = async () => {
@@ -110,7 +113,7 @@ export default function WorkspaceModal({
           file: file
         };
         setFiles([...files, newFile]);
-        setShowFileOptions(false);
+        setShowFileOptionsModal(false);
       }
     } catch (error) {
       console.error('Error picking document:', error);
@@ -142,7 +145,7 @@ export default function WorkspaceModal({
     setFiles([...files, newFile]);
     setUrlInput('');
     setActiveUrlInput(null);
-    setShowFileOptions(false);
+    setShowFileOptionsModal(false);
   };
 
   const handleRemoveFile = (fileId: string) => {
@@ -264,86 +267,11 @@ export default function WorkspaceModal({
           <View style={styles.addFileSection}>
             <TouchableOpacity 
               style={styles.addFileButton}
-              onPress={() => setShowFileOptions(!showFileOptions)}
+              onPress={() => setShowFileOptionsModal(true)}
             >
               <IconSymbol size={16} name="plus" color="#8B5CF6" />
               <Text style={styles.addFileText}>Add File</Text>
-              <IconSymbol size={12} name="chevron.down" color="#8B5CF6" />
             </TouchableOpacity>
-
-            {showFileOptions && (
-              <View style={styles.fileOptionsContainer}>
-                <TouchableOpacity 
-                  style={styles.fileOption}
-                  onPress={handleAddFromDevice}
-                >
-                  <IconSymbol size={16} name="phone" color="#4B5563" />
-                  <Text style={styles.fileOptionText}>From Device</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.fileOption}
-                  onPress={() => handleUrlOptionClick('url')}
-                >
-                  <IconSymbol size={16} name="link" color="#4B5563" />
-                  <Text style={styles.fileOptionText}>From Internet</Text>
-                </TouchableOpacity>
-
-                {activeUrlInput === 'url' && (
-                  <View style={styles.urlInputSection}>
-                    <View style={styles.urlInputContainer}>
-                      <TextInput
-                        style={styles.urlInput}
-                        value={urlInput}
-                        onChangeText={setUrlInput}
-                        placeholder="Enter URL..."
-                        placeholderTextColor="#999999"
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        keyboardType="url"
-                      />
-                      <TouchableOpacity 
-                        style={styles.sendButton}
-                        onPress={handleAddUrl}
-                      >
-                        <IconSymbol size={16} name="arrow.right" color="#8B5CF6" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
-                
-                <TouchableOpacity 
-                  style={styles.fileOption}
-                  onPress={() => handleUrlOptionClick('webpage')}
-                >
-                  <IconSymbol size={16} name="globe" color="#4B5563" />
-                  <Text style={styles.fileOptionText}>Add Webpage</Text>
-                </TouchableOpacity>
-
-                {activeUrlInput === 'webpage' && (
-                  <View style={styles.urlInputSection}>
-                    <View style={styles.urlInputContainer}>
-                      <TextInput
-                        style={styles.urlInput}
-                        value={urlInput}
-                        onChangeText={setUrlInput}
-                        placeholder="Enter webpage URL..."
-                        placeholderTextColor="#999999"
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        keyboardType="url"
-                      />
-                      <TouchableOpacity 
-                        style={styles.sendButton}
-                        onPress={handleAddUrl}
-                      >
-                        <IconSymbol size={16} name="arrow.right" color="#8B5CF6" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
-              </View>
-            )}
           </View>
         )}
       </View>
@@ -394,6 +322,101 @@ export default function WorkspaceModal({
           {currentStep === 1 ? renderStep1() : renderStep2()}
         </View>
       </View>
+
+      {/* File Options Modal */}
+      <Modal visible={showFileOptionsModal} transparent animationType="fade">
+        <View style={styles.fileOptionsModalOverlay}>
+          <View style={styles.fileOptionsModal}>
+            <View style={styles.fileOptionsHeader}>
+              <Text style={styles.fileOptionsTitle}>Add File</Text>
+              <TouchableOpacity 
+                style={styles.closeOptionsButton}
+                onPress={() => {
+                  setShowFileOptionsModal(false);
+                  setActiveUrlInput(null);
+                  setUrlInput('');
+                }}
+              >
+                <IconSymbol size={16} name="xmark" color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.fileOptionsContent}>
+              <TouchableOpacity 
+                style={styles.fileOptionModal}
+                onPress={handleAddFromDevice}
+              >
+                <IconSymbol size={20} name="phone" color="#4B5563" />
+                <Text style={styles.fileOptionModalText}>From Device</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.fileOptionModal}
+                onPress={() => handleUrlOptionClick('url')}
+              >
+                <IconSymbol size={20} name="link" color="#4B5563" />
+                <Text style={styles.fileOptionModalText}>From Internet</Text>
+              </TouchableOpacity>
+
+              {activeUrlInput === 'url' && (
+                <View style={styles.urlInputModalSection}>
+                  <View style={styles.urlInputModalContainer}>
+                    <TextInput
+                      style={styles.urlInputModal}
+                      value={urlInput}
+                      onChangeText={setUrlInput}
+                      placeholder="Enter URL..."
+                      placeholderTextColor="#999999"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="url"
+                      autoFocus
+                    />
+                    <TouchableOpacity 
+                      style={styles.sendButtonModal}
+                      onPress={handleAddUrl}
+                    >
+                      <IconSymbol size={16} name="arrow.right" color="#8B5CF6" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+              
+              <TouchableOpacity 
+                style={styles.fileOptionModal}
+                onPress={() => handleUrlOptionClick('webpage')}
+              >
+                <IconSymbol size={20} name="globe" color="#4B5563" />
+                <Text style={styles.fileOptionModalText}>Add Webpage</Text>
+              </TouchableOpacity>
+
+              {activeUrlInput === 'webpage' && (
+                <View style={styles.urlInputModalSection}>
+                  <View style={styles.urlInputModalContainer}>
+                    <TextInput
+                      style={styles.urlInputModal}
+                      value={urlInput}
+                      onChangeText={setUrlInput}
+                      placeholder="Enter webpage URL..."
+                      placeholderTextColor="#999999"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="url"
+                      autoFocus
+                    />
+                    <TouchableOpacity 
+                      style={styles.sendButtonModal}
+                      onPress={handleAddUrl}
+                    >
+                      <IconSymbol size={16} name="arrow.right" color="#8B5CF6" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 }
@@ -609,5 +632,92 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     fontFamily: 'Inter',
+  },
+  fileOptionsModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fileOptionsModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    width: '80%',
+    maxWidth: 300,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  fileOptionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  fileOptionsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    fontFamily: 'Inter',
+  },
+  closeOptionsButton: {
+    padding: 4,
+  },
+  fileOptionsContent: {
+    padding: 8,
+  },
+  fileOptionModal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 8,
+    marginVertical: 2,
+    gap: 12,
+  },
+  fileOptionModalText: {
+    fontSize: 15,
+    color: '#4B5563',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  urlInputModalSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    marginVertical: 4,
+  },
+  urlInputModalContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 6,
+    paddingRight: 8,
+  },
+  urlInputModal: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#1F2937',
+    fontFamily: 'Inter',
+  },
+  sendButtonModal: {
+    padding: 8,
+    backgroundColor: '#F3F0FF',
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
