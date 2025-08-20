@@ -298,49 +298,121 @@ export default function ExpertTab() {
     setIsLoading(true);
 
     try {
+      // Step 1: Create workspace locally first
       const newWorkspace: Workspace = {
         id: Date.now().toString(),
-        name: workspaceData.name,
-        description: workspaceData.description, // Assuming description is part of workspaceData
+        name: workspaceData.name.trim(),
+        description: workspaceData.description?.trim() || '',
         files: [],
         createdDate: new Date().toISOString(),
       };
 
-      // Process files from the workspace data
-      const processedFiles: SingleFile[] = [];
+      console.log('🏢 Creating workspace locally:', newWorkspace.name);
+      console.log('📄 Files to process:', workspaceData.files.length);
+
+      // Step 2: Process files for batch upload
+      const filesToUpload: Array<{ uri: string; name: string; type?: string }> = [];
+      const urlsToProcess: Array<{ url: string; type: 'url' | 'webpage' }> = [];
 
       for (const fileInfo of workspaceData.files) {
-        let processedFile: SingleFile | null = null;
         if (fileInfo.type === 'device' && fileInfo.file) {
-          processedFile = await handleFileUpload(fileInfo.file, newWorkspace.id);
+          // Prepare device files for batch upload
+          filesToUpload.push({
+            uri: fileInfo.file.uri,
+            name: fileInfo.file.name,
+            type: fileInfo.file.mimeType || 'application/pdf'
+          });
         } else if (fileInfo.type === 'url' || fileInfo.type === 'webpage') {
-          processedFile = await handleUrlUpload(fileInfo.source, newWorkspace.id);
-        }
-
-        if (processedFile) {
-          processedFiles.push(processedFile);
+          // URLs need separate handling as they can't be batched with device files
+          urlsToProcess.push({
+            url: fileInfo.source,
+            type: fileInfo.type
+          });
         }
       }
 
+      const processedFiles: SingleFile[] = [];
+
+      // Step 3: Single batch upload call for device files
+      if (filesToUpload.length > 0 && isBackendConnected) {
+        console.log('📤 Making single batch upload call for', filesToUpload.length, 'device files');
+        try {
+          const uploadedFiles = await fileService.uploadWorkspaceFiles(filesToUpload, newWorkspace.id);
+          
+          // Convert uploaded files to SingleFile format
+          for (const uploadedFile of uploadedFiles) {
+            const singleFile: SingleFile = {
+              id: uploadedFile.id,
+              name: uploadedFile.originalName,
+              uploadDate: new Date(uploadedFile.uploadDate).toLocaleDateString(),
+              mimetype: uploadedFile.mimetype,
+              size: uploadedFile.size,
+              isUploaded: true,
+              cloudinary: uploadedFile.cloudinary,
+            };
+            processedFiles.push(singleFile);
+          }
+          
+          console.log('✅ Batch upload completed:', uploadedFiles.length, 'files');
+        } catch (uploadError) {
+          console.error('❌ Batch upload failed:', uploadError);
+          Alert.alert('Upload Error', `Failed to upload files: ${uploadError.message}`);
+        }
+      }
+
+      // Step 4: Process URLs individually (as they require different handling)
+      for (const urlInfo of urlsToProcess) {
+        try {
+          const urlFile = await handleUrlUpload(urlInfo.url, newWorkspace.id);
+          if (urlFile) {
+            processedFiles.push(urlFile);
+          }
+        } catch (urlError) {
+          console.warn('⚠️ URL processing failed:', urlError.message);
+        }
+      }
+
+      // Step 5: Handle offline mode for device files
+      if (filesToUpload.length > 0 && !isBackendConnected) {
+        console.log('📱 Backend offline - storing files locally');
+        for (const fileInfo of filesToUpload) {
+          const localFile: SingleFile = {
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            name: fileInfo.name,
+            uploadDate: new Date().toLocaleDateString(),
+            mimetype: fileInfo.type || 'application/pdf',
+            size: 0,
+            isUploaded: false,
+          };
+          processedFiles.push(localFile);
+        }
+      }
+
+      // Step 6: Update workspace with processed files
       newWorkspace.files = processedFiles;
 
+      // Step 7: Save workspace locally
       const updatedWorkspaces = [...workspaces, newWorkspace];
       setWorkspaces(updatedWorkspaces);
-      await AsyncStorage.setItem('expert_workspaces', JSON.stringify(updatedWorkspaces)); // Corrected key
+      await AsyncStorage.setItem('expert_workspaces', JSON.stringify(updatedWorkspaces));
 
+      console.log('✅ Workspace created successfully:', newWorkspace.name);
+      console.log('📄 Files processed:', processedFiles.length);
+
+      // Step 8: Clean up and navigate
       setIsWorkspaceModalVisible(false);
-      setWorkspaceName(''); // Clear the input field
+      setWorkspaceName('');
       setSelectedWorkspace(newWorkspace);
 
       if (processedFiles.length > 0) {
         setIsChatVisible(true);
+        Alert.alert('Success', `Workspace "${newWorkspace.name}" created with ${processedFiles.length} files!`);
       } else {
-        // Optionally show a message if no files were uploaded
-        Alert.alert('Workspace Created', `Workspace "${newWorkspace.name}" created with no files.`);
+        Alert.alert('Workspace Created', `Workspace "${newWorkspace.name}" created successfully.`);
       }
 
     } catch (error) {
-      console.error('Error creating workspace:', error);
+      console.error('❌ Error creating workspace:', error);
       Alert.alert('Error', `Failed to create workspace: ${error.message}`);
     } finally {
       setIsLoading(false);

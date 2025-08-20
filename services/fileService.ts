@@ -14,6 +14,21 @@ export interface FileUploadResponse {
   };
 }
 
+export interface FileUploadResponse {
+  id: string;
+  originalName: string;
+  mimetype: string;
+  size: number;
+  uploadDate: string;
+  cloudinary?: {
+    thumbnailUrl: string;
+    pageUrls: string[];
+    fullPdfUrl: string;
+    totalPages: number;
+    secureUrl: string;
+  };
+}
+
 class FileService {
   async uploadWorkspaceFiles(files: Array<{ uri: string; name: string; type?: string }>, workspaceId: string): Promise<FileUploadResponse[]> {
     try {
@@ -290,5 +305,7 @@ class FileService {
     }
   }
 }
+
+export default new FileService();
 
 export default new FileService();
