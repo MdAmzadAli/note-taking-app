@@ -30,6 +30,74 @@ export interface FileUploadResponse {
 }
 
 class FileService {
+  async uploadWorkspaceMixed(fileItems: any[], workspaceId: string): Promise<FileUploadResponse[]> {
+    try {
+      console.log('📤 Starting mixed workspace file/URL upload...');
+      console.log('🏢 Workspace ID:', workspaceId);
+      console.log('📄 Number of items:', fileItems.length);
+
+      const formData = new FormData();
+      formData.append('workspaceId', workspaceId);
+
+      // Separate device files and URLs
+      const deviceFiles: any[] = [];
+      const urls: any[] = [];
+
+      fileItems.forEach((item, index) => {
+        if (item.type === 'device' && item.file) {
+          console.log(`📱 Adding device file ${index + 1}: ${item.file.name}`);
+          const mobileFile = {
+            uri: item.file.uri,
+            name: item.file.name,
+            type: item.file.mimeType || 'application/pdf'
+          };
+          formData.append('files', mobileFile as any);
+          deviceFiles.push(item);
+        } else if (item.type === 'url' || item.type === 'webpage') {
+          console.log(`🌐 Adding URL ${index + 1}: ${item.source}`);
+          urls.push({
+            url: item.source,
+            type: item.type
+          });
+        }
+      });
+
+      // Add URLs as JSON string to FormData
+      if (urls.length > 0) {
+        formData.append('urls', JSON.stringify(urls));
+        console.log('🌐 Added URLs to FormData:', urls.length, 'URLs');
+      }
+
+      console.log('🔄 Sending mixed upload request to:', API_ENDPOINTS.uploadWorkspace);
+      const response = await fetch(API_ENDPOINTS.uploadWorkspace, {
+        method: 'POST',
+        body: formData,
+      });
+
+      console.log('📨 Mixed upload response received');
+      console.log('📨 Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Mixed upload failed with status:', response.status);
+        console.error('❌ Error response:', errorText);
+        throw new Error(`Mixed upload failed: ${response.status} - ${errorText}`);
+      }
+
+      const result: ApiResponse<{ files: FileUploadResponse[] }> = await response.json();
+      const uploadedFiles = result.files!;
+      console.log('✅ Mixed files uploaded successfully:', uploadedFiles.length, 'files');
+
+      return uploadedFiles;
+    } catch (error) {
+      console.error('❌ Mixed file upload error occurred');
+      console.error('❌ Error type:', error.constructor.name);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error stack:', error.stack);
+      throw error;
+    }
+  }
+
   async uploadWorkspaceFiles(files: Array<{ uri: string; name: string; type?: string }>, workspaceId: string): Promise<FileUploadResponse[]> {
     try {
       console.log('📤 Starting batch workspace file upload...');

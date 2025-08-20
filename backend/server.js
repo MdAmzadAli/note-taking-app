@@ -206,100 +206,166 @@ app.delete('/file/:id', async (req, res) => {
   }
 });
 
-// Workspace batch file upload endpoint
+// Workspace mixed file and URL upload endpoint
 app.post('/upload/workspace', upload.array('files', 5), async (req, res) => {
   try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ error: 'No files uploaded' });
-    }
-
     const workspaceId = req.body.workspaceId;
     if (!workspaceId) {
       return res.status(400).json({ error: 'Workspace ID is required' });
     }
 
-    console.log('📤 Workspace batch file upload request received');
+    console.log('📤 Workspace mixed upload request received');
     console.log('🏢 Workspace ID:', workspaceId);
-    console.log('📄 Number of files:', req.files.length);
+    console.log('📄 Number of device files:', req.files ? req.files.length : 0);
+
+    // Parse URLs from FormData
+    let urls = [];
+    if (req.body.urls) {
+      try {
+        urls = JSON.parse(req.body.urls);
+        console.log('🌐 Number of URLs received:', urls.length);
+        urls.forEach((urlInfo, index) => {
+          console.log(`🌐 URL ${index + 1}: ${urlInfo.url} (${urlInfo.type})`);
+        });
+      } catch (parseError) {
+        console.error('❌ Failed to parse URLs:', parseError);
+      }
+    }
 
     const uploadedFiles = [];
     const errors = [];
 
-    // Process each file sequentially
-    for (let i = 0; i < req.files.length; i++) {
-      const file = req.files[i];
-      
-      try {
-        console.log(`📤 Processing file ${i + 1}/${req.files.length}: ${file.originalname}`);
-
-        const fileInfo = {
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          originalName: file.originalname,
-          mimetype: file.mimetype,
-          size: file.size,
-          path: file.path,
-          uploadDate: new Date().toISOString(),
-          workspaceId: workspaceId,
-        };
-
-        console.log(`💾 Saving metadata for file ${i + 1}: ${fileInfo.id}`);
-        await fileService.saveFileMetadata(fileInfo);
-
-        console.log(`🔄 Processing upload for file ${i + 1}...`);
-        const processedFile = await fileService.processFileUpload(fileInfo);
-
-        console.log(`🖼️ Generating preview for file ${i + 1}...`);
+    // Process device files first
+    if (req.files && req.files.length > 0) {
+      for (let i = 0; i < req.files.length; i++) {
+        const file = req.files[i];
+        
         try {
-          await fileService.generatePreview(fileInfo);
-          console.log(`✅ Preview generated for file ${i + 1}`);
-        } catch (previewError) {
-          console.error(`❌ Preview generation failed for file ${i + 1}:`, previewError);
-        }
+          console.log(`📤 Processing device file ${i + 1}/${req.files.length}: ${file.originalname}`);
 
-        // Auto-index PDF files for RAG with workspace ID
-        if (fileInfo.mimetype === 'application/pdf') {
-          console.log(`🔄 Starting RAG indexing for file ${i + 1} (${fileInfo.originalName})...`);
+          const fileInfo = {
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            originalName: file.originalname,
+            mimetype: file.mimetype,
+            size: file.size,
+            path: file.path,
+            uploadDate: new Date().toISOString(),
+            workspaceId: workspaceId,
+          };
+
+          console.log(`💾 Saving metadata for device file ${i + 1}: ${fileInfo.id}`);
+          await fileService.saveFileMetadata(fileInfo);
+
+          console.log(`🔄 Processing upload for device file ${i + 1}...`);
+          const processedFile = await fileService.processFileUpload(fileInfo);
+
+          console.log(`🖼️ Generating preview for device file ${i + 1}...`);
           try {
-            const indexResult = await ragService.indexDocument(
-              fileInfo.id,
-              fileInfo.path,
-              fileInfo.originalName,
-              workspaceId,
-              processedFile.cloudinary
-            );
-            console.log(`✅ RAG indexing completed for file ${i + 1}:`, indexResult.chunksCount, 'chunks');
-          } catch (ragError) {
-            console.warn(`⚠️ RAG indexing failed for file ${i + 1} (continuing anyway):`, ragError.message);
+            await fileService.generatePreview(fileInfo);
+            console.log(`✅ Preview generated for device file ${i + 1}`);
+          } catch (previewError) {
+            console.error(`❌ Preview generation failed for device file ${i + 1}:`, previewError);
           }
+
+          // Auto-index PDF files for RAG with workspace ID
+          if (fileInfo.mimetype === 'application/pdf') {
+            console.log(`🔄 Starting RAG indexing for device file ${i + 1} (${fileInfo.originalName})...`);
+            try {
+              const indexResult = await ragService.indexDocument(
+                fileInfo.id,
+                fileInfo.path,
+                fileInfo.originalName,
+                workspaceId,
+                processedFile.cloudinary
+              );
+              console.log(`✅ RAG indexing completed for device file ${i + 1}:`, indexResult.chunksCount, 'chunks');
+            } catch (ragError) {
+              console.warn(`⚠️ RAG indexing failed for device file ${i + 1} (continuing anyway):`, ragError.message);
+            }
+          }
+
+          uploadedFiles.push(processedFile);
+          console.log(`✅ Successfully processed device file ${i + 1}: ${file.originalname}`);
+
+        } catch (fileError) {
+          console.error(`❌ Failed to process device file ${i + 1} (${file.originalname}):`, fileError);
+          errors.push({
+            filename: file.originalname,
+            error: fileError.message,
+            type: 'device'
+          });
         }
-
-        uploadedFiles.push(processedFile);
-        console.log(`✅ Successfully processed file ${i + 1}: ${file.originalname}`);
-
-      } catch (fileError) {
-        console.error(`❌ Failed to process file ${i + 1} (${file.originalname}):`, fileError);
-        errors.push({
-          filename: file.originalname,
-          error: fileError.message
-        });
       }
+    }
+
+    // Process URLs
+    if (urls && urls.length > 0) {
+      for (let i = 0; i < urls.length; i++) {
+        const urlInfo = urls[i];
+        
+        try {
+          console.log(`🌐 Processing URL ${i + 1}/${urls.length}: ${urlInfo.url} (${urlInfo.type})`);
+          
+          const fileInfo = {
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            originalName: `${urlInfo.type}_${urlInfo.url.substring(urlInfo.url.lastIndexOf('/') + 1) || 'document'}`,
+            mimetype: urlInfo.type === 'webpage' ? 'text/html' : 'application/pdf',
+            size: 0,
+            path: null, // URL doesn't have a physical path
+            uploadDate: new Date().toISOString(),
+            workspaceId: workspaceId,
+            sourceUrl: urlInfo.url,
+            sourceType: urlInfo.type
+          };
+
+          console.log(`💾 Saving metadata for URL ${i + 1}: ${fileInfo.id}`);
+          await fileService.saveFileMetadata(fileInfo);
+
+          // For URLs, create a mock processed file response
+          const processedFile = {
+            id: fileInfo.id,
+            originalName: fileInfo.originalName,
+            mimetype: fileInfo.mimetype,
+            size: fileInfo.size,
+            uploadDate: fileInfo.uploadDate,
+            cloudinary: null // URLs don't go through Cloudinary processing yet
+          };
+
+          uploadedFiles.push(processedFile);
+          console.log(`✅ Successfully processed URL ${i + 1}: ${urlInfo.url}`);
+
+        } catch (urlError) {
+          console.error(`❌ Failed to process URL ${i + 1} (${urlInfo.url}):`, urlError);
+          errors.push({
+            filename: urlInfo.url,
+            error: urlError.message,
+            type: urlInfo.type
+          });
+        }
+      }
+    }
+
+    if (uploadedFiles.length === 0) {
+      return res.status(400).json({ error: 'No files or URLs were successfully processed' });
     }
 
     const response = {
       success: true,
       files: uploadedFiles,
       processedCount: uploadedFiles.length,
-      totalCount: req.files.length,
+      totalCount: (req.files ? req.files.length : 0) + (urls ? urls.length : 0),
+      deviceFilesCount: req.files ? req.files.length : 0,
+      urlsCount: urls ? urls.length : 0,
       errors: errors.length > 0 ? errors : undefined
     };
 
-    console.log(`📤 Workspace batch upload completed: ${uploadedFiles.length}/${req.files.length} files processed`);
+    console.log(`📤 Workspace mixed upload completed: ${uploadedFiles.length}/${response.totalCount} items processed`);
     res.status(201).json(response);
 
   } catch (error) {
-    console.error('❌ Workspace batch upload error:', error);
+    console.error('❌ Workspace mixed upload error:', error);
     console.error('❌ Stack trace:', error.stack);
-    res.status(500).json({ error: 'Workspace batch upload failed', details: error.message });
+    res.status(500).json({ error: 'Workspace mixed upload failed', details: error.message });
   }
 });
 

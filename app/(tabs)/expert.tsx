@@ -310,34 +310,13 @@ export default function ExpertTab() {
       console.log('🏢 Creating workspace locally:', newWorkspace.name);
       console.log('📄 Files to process:', workspaceData.files.length);
 
-      // Step 2: Process files for batch upload
-      const filesToUpload: Array<{ uri: string; name: string; type?: string }> = [];
-      const urlsToProcess: Array<{ url: string; type: 'url' | 'webpage' }> = [];
-
-      for (const fileInfo of workspaceData.files) {
-        if (fileInfo.type === 'device' && fileInfo.file) {
-          // Prepare device files for batch upload
-          filesToUpload.push({
-            uri: fileInfo.file.uri,
-            name: fileInfo.file.name,
-            type: fileInfo.file.mimeType || 'application/pdf'
-          });
-        } else if (fileInfo.type === 'url' || fileInfo.type === 'webpage') {
-          // URLs need separate handling as they can't be batched with device files
-          urlsToProcess.push({
-            url: fileInfo.source,
-            type: fileInfo.type
-          });
-        }
-      }
-
       const processedFiles: SingleFile[] = [];
 
-      // Step 3: Single batch upload call for device files
-      if (filesToUpload.length > 0 && isBackendConnected) {
-        console.log('📤 Making single batch upload call for', filesToUpload.length, 'device files');
+      // Step 2: Send all files and URLs to backend in one batch request
+      if (isBackendConnected && workspaceData.files.length > 0) {
+        console.log('📤 Making single batch upload call with both files and URLs');
         try {
-          const uploadedFiles = await fileService.uploadWorkspaceFiles(filesToUpload, newWorkspace.id);
+          const uploadedFiles = await fileService.uploadWorkspaceMixed(workspaceData.files, newWorkspace.id);
           
           // Convert uploaded files to SingleFile format
           for (const uploadedFile of uploadedFiles) {
@@ -360,27 +339,15 @@ export default function ExpertTab() {
         }
       }
 
-      // Step 4: Process URLs individually (as they require different handling)
-      for (const urlInfo of urlsToProcess) {
-        try {
-          const urlFile = await handleUrlUpload(urlInfo.url, newWorkspace.id);
-          if (urlFile) {
-            processedFiles.push(urlFile);
-          }
-        } catch (urlError) {
-          console.warn('⚠️ URL processing failed:', urlError.message);
-        }
-      }
-
-      // Step 5: Handle offline mode for device files
-      if (filesToUpload.length > 0 && !isBackendConnected) {
+      // Step 3: Handle offline mode
+      if (!isBackendConnected && workspaceData.files.length > 0) {
         console.log('📱 Backend offline - storing files locally');
-        for (const fileInfo of filesToUpload) {
+        for (const fileInfo of workspaceData.files) {
           const localFile: SingleFile = {
             id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-            name: fileInfo.name,
+            name: fileInfo.type === 'device' ? fileInfo.file?.name || 'unknown' : fileInfo.source,
             uploadDate: new Date().toLocaleDateString(),
-            mimetype: fileInfo.type || 'application/pdf',
+            mimetype: fileInfo.type === 'device' ? fileInfo.file?.mimeType || 'application/pdf' : 'text/html',
             size: 0,
             isUploaded: false,
           };
@@ -388,10 +355,10 @@ export default function ExpertTab() {
         }
       }
 
-      // Step 6: Update workspace with processed files
+      // Step 4: Update workspace with processed files
       newWorkspace.files = processedFiles;
 
-      // Step 7: Save workspace locally
+      // Step 5: Save workspace locally
       const updatedWorkspaces = [...workspaces, newWorkspace];
       setWorkspaces(updatedWorkspaces);
       await AsyncStorage.setItem('expert_workspaces', JSON.stringify(updatedWorkspaces));
@@ -399,7 +366,7 @@ export default function ExpertTab() {
       console.log('✅ Workspace created successfully:', newWorkspace.name);
       console.log('📄 Files processed:', processedFiles.length);
 
-      // Step 8: Clean up and navigate
+      // Step 6: Clean up and navigate
       setIsWorkspaceModalVisible(false);
       setWorkspaceName('');
       setSelectedWorkspace(newWorkspace);
