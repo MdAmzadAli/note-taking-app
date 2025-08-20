@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ActivityIndicator, ScrollView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ActivityIndicator, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import * as DocumentPicker from 'expo-document-picker';
 
@@ -35,6 +35,7 @@ export default function WorkspaceModal({
   const [description, setDescription] = useState('');
   const [files, setFiles] = useState<FileItem[]>([]);
   const [showFileOptions, setShowFileOptions] = useState(false);
+  const [activeUrlInput, setActiveUrlInput] = useState<'url' | 'webpage' | null>(null);
   const [urlInput, setUrlInput] = useState('');
 
   const handleClose = () => {
@@ -44,6 +45,7 @@ export default function WorkspaceModal({
     setFiles([]);
     setCurrentStep(1);
     setShowFileOptions(false);
+    setActiveUrlInput(null);
     setUrlInput('');
   };
 
@@ -87,12 +89,16 @@ export default function WorkspaceModal({
     }
   };
 
-  const handleAddFromUrl = () => {
+  const handleUrlOptionClick = (type: 'url' | 'webpage') => {
     if (files.length >= 5) {
       Alert.alert('Limit Reached', 'Maximum 5 files can be uploaded.');
       return;
     }
+    setActiveUrlInput(type);
+    setUrlInput('');
+  };
 
+  const handleAddUrl = () => {
     if (!urlInput.trim()) {
       Alert.alert('Error', 'Please enter a valid URL');
       return;
@@ -100,34 +106,13 @@ export default function WorkspaceModal({
 
     const newFile: FileItem = {
       id: Date.now().toString(),
-      name: 'URL Document',
-      type: 'url',
+      name: activeUrlInput === 'url' ? 'URL Document' : 'Webpage',
+      type: activeUrlInput!,
       source: urlInput.trim()
     };
     setFiles([...files, newFile]);
     setUrlInput('');
-    setShowFileOptions(false);
-  };
-
-  const handleAddWebpage = () => {
-    if (files.length >= 5) {
-      Alert.alert('Limit Reached', 'Maximum 5 files can be uploaded.');
-      return;
-    }
-
-    if (!urlInput.trim()) {
-      Alert.alert('Error', 'Please enter a valid webpage URL');
-      return;
-    }
-
-    const newFile: FileItem = {
-      id: Date.now().toString(),
-      name: 'Webpage',
-      type: 'webpage',
-      source: urlInput.trim()
-    };
-    setFiles([...files, newFile]);
-    setUrlInput('');
+    setActiveUrlInput(null);
     setShowFileOptions(false);
   };
 
@@ -260,33 +245,67 @@ export default function WorkspaceModal({
                 <Text style={styles.fileOptionText}>From Device</Text>
               </TouchableOpacity>
               
-              <View style={styles.urlInputSection}>
-                <TextInput
-                  style={styles.urlInput}
-                  value={urlInput}
-                  onChangeText={setUrlInput}
-                  placeholder="Enter URL..."
-                  placeholderTextColor="#999999"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="url"
-                />
-                <TouchableOpacity 
-                  style={styles.fileOption}
-                  onPress={handleAddFromUrl}
-                >
-                  <IconSymbol size={16} name="link" color="#4B5563" />
-                  <Text style={styles.fileOptionText}>From Internet</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.fileOption}
-                  onPress={handleAddWebpage}
-                >
-                  <IconSymbol size={16} name="globe" color="#4B5563" />
-                  <Text style={styles.fileOptionText}>Add Webpage</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity 
+                style={styles.fileOption}
+                onPress={() => handleUrlOptionClick('url')}
+              >
+                <IconSymbol size={16} name="link" color="#4B5563" />
+                <Text style={styles.fileOptionText}>From Internet</Text>
+              </TouchableOpacity>
+
+              {activeUrlInput === 'url' && (
+                <View style={styles.urlInputSection}>
+                  <View style={styles.urlInputContainer}>
+                    <TextInput
+                      style={styles.urlInput}
+                      value={urlInput}
+                      onChangeText={setUrlInput}
+                      placeholder="Enter URL..."
+                      placeholderTextColor="#999999"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="url"
+                    />
+                    <TouchableOpacity 
+                      style={styles.sendButton}
+                      onPress={handleAddUrl}
+                    >
+                      <IconSymbol size={16} name="arrow.right" color="#8B5CF6" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+              
+              <TouchableOpacity 
+                style={styles.fileOption}
+                onPress={() => handleUrlOptionClick('webpage')}
+              >
+                <IconSymbol size={16} name="globe" color="#4B5563" />
+                <Text style={styles.fileOptionText}>Add Webpage</Text>
+              </TouchableOpacity>
+
+              {activeUrlInput === 'webpage' && (
+                <View style={styles.urlInputSection}>
+                  <View style={styles.urlInputContainer}>
+                    <TextInput
+                      style={styles.urlInput}
+                      value={urlInput}
+                      onChangeText={setUrlInput}
+                      placeholder="Enter webpage URL..."
+                      placeholderTextColor="#999999"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="url"
+                    />
+                    <TouchableOpacity 
+                      style={styles.sendButton}
+                      onPress={handleAddUrl}
+                    >
+                      <IconSymbol size={16} name="arrow.right" color="#8B5CF6" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
             </View>
           )}
         </View>
@@ -320,16 +339,24 @@ export default function WorkspaceModal({
 
   return (
     <Modal visible={isVisible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          {currentStep === 1 ? renderStep1() : renderStep2()}
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoidingView}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {currentStep === 1 ? renderStep1() : renderStep2()}
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -342,8 +369,7 @@ const styles = StyleSheet.create({
     padding: 24,
     width: '90%',
     maxWidth: 450,
-    minHeight: '50%',
-    maxHeight:'85%',
+    height: '50%',
   },
   stepContainer: {
     flex: 1,
@@ -486,17 +512,29 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#F8F9FA',
   },
-  urlInput: {
+  urlInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#D1D5DB',
     borderRadius: 6,
+    paddingRight: 8,
+  },
+  urlInput: {
+    flex: 1,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 14,
     color: '#1F2937',
     fontFamily: 'Inter',
-    marginBottom: 8,
+  },
+  sendButton: {
+    padding: 8,
+    backgroundColor: '#F3F0FF',
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalButtons: {
     gap: 12,
