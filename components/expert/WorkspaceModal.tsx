@@ -342,7 +342,8 @@ const styles = StyleSheet.create({
     padding: 24,
     width: '90%',
     maxWidth: 450,
-    maxHeight: '85%',
+    minHeight: '50%',
+    maxHeight:'85%',
   },
   stepContainer: {
     flex: 1,
