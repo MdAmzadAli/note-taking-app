@@ -13,11 +13,11 @@ const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
 const mime = require('mime-types');
 
-const fileService = require('./services/fileService');
-const pdfService = require('./services/pdfService');
 const csvService = require('./services/csvService');
-const imageService = require('./services/imageService');
+const fileService = require('./services/fileService');
 const ragService = require('./services/ragService');
+const urlDownloadService = require('./component/urlDownloadService');
+const webpageTextExtractorService = require('./component/webpageTextExtractorService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -239,7 +239,7 @@ app.post('/upload/workspace', upload.array('files', 5), async (req, res) => {
     if (req.files && req.files.length > 0) {
       for (let i = 0; i < req.files.length; i++) {
         const file = req.files[i];
-        
+
         try {
           console.log(`📤 Processing device file ${i + 1}/${req.files.length}: ${file.originalname}`);
 
@@ -302,34 +302,69 @@ app.post('/upload/workspace', upload.array('files', 5), async (req, res) => {
     if (urls && urls.length > 0) {
       for (let i = 0; i < urls.length; i++) {
         const urlInfo = urls[i];
-        
+
         try {
           console.log(`🌐 Processing URL ${i + 1}/${urls.length}: ${urlInfo.url} (${urlInfo.type})`);
-          
-          const fileInfo = {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-            originalName: `${urlInfo.type}_${urlInfo.url.substring(urlInfo.url.lastIndexOf('/') + 1) || 'document'}`,
-            mimetype: urlInfo.type === 'webpage' ? 'text/html' : 'application/pdf',
-            size: 0,
-            path: null, // URL doesn't have a physical path
+
+          let fileContent;
+          let originalName;
+          let mimetype;
+
+          if (urlInfo.type === 'from_url') {
+            const downloadedData = await urlDownloadService.downloadFile(urlInfo.url);
+            fileContent = downloadedData.content;
+            originalName = downloadedData.filename;
+            mimetype = downloadedData.mimetype;
+            console.log(`✅ Downloaded from URL: ${originalName} (${mimetype})`);
+          } else if (urlInfo.type === 'webpage') {
+            const extractedText = await webpageTextExtractorService.extractAndCleanText(urlInfo.url);
+            fileContent = Buffer.from(extractedText.cleanedText, 'utf-8');
+            originalName = `${urlInfo.type}_${urlInfo.url.substring(urlInfo.url.lastIndexOf('/') + 1) || 'webpage'}.txt`;
+            mimetype = 'text/plain';
+            console.log(`✅ Extracted and cleaned text from webpage.`);
+          } else {
+            throw new Error(`Unsupported URL type: ${urlInfo.type}`);
+          }
+
+          const fileId = uuidv4();
+          const filePath = path.join(UPLOADS_DIR, `${fileId}-${originalName}`);
+          await fs.writeFile(filePath, fileContent);
+          console.log(`✅ Saved processed content to temporary path: ${filePath}`);
+
+          const fileMetadata = {
+            id: fileId,
+            originalName: originalName,
+            mimetype: mimetype,
+            size: fileContent.length,
+            path: filePath,
             uploadDate: new Date().toISOString(),
             workspaceId: workspaceId,
             sourceUrl: urlInfo.url,
             sourceType: urlInfo.type
           };
 
-          console.log(`💾 Saving metadata for URL ${i + 1}: ${fileInfo.id}`);
-          await fileService.saveFileMetadata(fileInfo);
+          console.log(`💾 Saving metadata for URL ${i + 1}: ${fileMetadata.id}`);
+          await fileService.saveFileMetadata(fileMetadata);
 
-          // For URLs, create a mock processed file response
-          const processedFile = {
-            id: fileInfo.id,
-            originalName: fileInfo.originalName,
-            mimetype: fileInfo.mimetype,
-            size: fileInfo.size,
-            uploadDate: fileInfo.uploadDate,
-            cloudinary: null // URLs don't go through Cloudinary processing yet
-          };
+          console.log(`🔄 Processing upload for URL ${i + 1}...`);
+          const processedFile = await fileService.processFileUpload(fileMetadata); // This might need adjustment if not all URL types are processed by processFileUpload
+
+          // Auto-index PDF files for RAG with workspace ID
+          if (fileMetadata.mimetype === 'application/pdf') {
+            console.log(`🔄 Starting RAG indexing for URL ${i + 1} (${fileMetadata.originalName})...`);
+            try {
+              const indexResult = await ragService.indexDocument(
+                fileMetadata.id,
+                fileMetadata.path,
+                fileMetadata.originalName,
+                workspaceId,
+                processedFile.cloudinary
+              );
+              console.log(`✅ RAG indexing completed for URL ${i + 1}:`, indexResult.chunksCount, 'chunks');
+            } catch (ragError) {
+              console.warn(`⚠️ RAG indexing failed for URL ${i + 1} (continuing anyway):`, ragError.message);
+            }
+          }
 
           uploadedFiles.push(processedFile);
           console.log(`✅ Successfully processed URL ${i + 1}: ${urlInfo.url}`);
@@ -895,4 +930,4 @@ async function startServer() {
 
 startServer().catch(console.error);
 
-module.exports = app;
+module.module.exports = app;
