@@ -184,29 +184,40 @@ class SearchService {
           }
           
           // Add document-specific context
-          const processedResults = docResults.map(result => ({
-            text: result.payload.text,
-            score: result.score,
-            fileId: result.payload.fileId,
-            vector: result.vector || null, // Store for MMR if available
-            metadata: {
+          const processedResults = docResults.map(result => {
+            const metadata = {
               fileId: result.payload.fileId,
               fileName: result.payload.fileName,
               chunkIndex: result.payload.chunkIndex,
               workspaceId: result.payload.workspaceId,
-              pageNumber: result.payload.pageNumber,
-              startLine: result.payload.startLine,
-              endLine: result.payload.endLine,
               linesUsed: result.payload.linesUsed || [],
               originalLines: result.payload.originalLines || [],
-              totalLinesOnPage: result.payload.totalLinesOnPage,
-              totalPages: result.payload.totalPages,
               pageUrl: result.payload.pageUrl,
               cloudinaryUrl: result.payload.cloudinaryUrl,
               thumbnailUrl: result.payload.thumbnailUrl,
               embeddingType: result.payload.embeddingType
+            };
+
+            // Add page and line numbers only if they exist (PDF content)
+            if (result.payload.pageNumber !== undefined && result.payload.pageNumber !== null) {
+              metadata.pageNumber = result.payload.pageNumber;
+              metadata.totalPages = result.payload.totalPages;
+              metadata.totalLinesOnPage = result.payload.totalLinesOnPage;
             }
-          }));
+            
+            if (result.payload.startLine !== undefined && result.payload.startLine !== null) {
+              metadata.startLine = result.payload.startLine;
+              metadata.endLine = result.payload.endLine;
+            }
+
+            return {
+              text: result.payload.text,
+              score: result.score,
+              fileId: result.payload.fileId,
+              vector: result.vector || null, // Store for MMR if available
+              metadata: metadata
+            };
+          });
 
           allCandidates.push(...processedResults);
           console.log(`📊 Added ${processedResults.length} candidates from ${fileId}, total: ${allCandidates.length}`);
@@ -321,27 +332,38 @@ class SearchService {
 
     console.log(`🎯 Found ${searchResult.length} relevant chunks using standard search`);
 
-    return searchResult.map(result => ({
-      text: result.payload.text,
-      score: result.score,
-      metadata: {
+    return searchResult.map(result => {
+      const metadata = {
         fileId: result.payload.fileId,
         fileName: result.payload.fileName,
         chunkIndex: result.payload.chunkIndex,
         workspaceId: result.payload.workspaceId,
-        pageNumber: result.payload.pageNumber,
-        startLine: result.payload.startLine,
-        endLine: result.payload.endLine,
         linesUsed: result.payload.linesUsed || [],
         originalLines: result.payload.originalLines || [],
-        totalLinesOnPage: result.payload.totalLinesOnPage,
-        totalPages: result.payload.totalPages,
         pageUrl: result.payload.pageUrl,
         cloudinaryUrl: result.payload.cloudinaryUrl,
         thumbnailUrl: result.payload.thumbnailUrl,
         embeddingType: result.payload.embeddingType
+      };
+
+      // Add page and line numbers only if they exist (PDF content)
+      if (result.payload.pageNumber !== undefined && result.payload.pageNumber !== null) {
+        metadata.pageNumber = result.payload.pageNumber;
+        metadata.totalPages = result.payload.totalPages;
+        metadata.totalLinesOnPage = result.payload.totalLinesOnPage;
       }
-    }));
+      
+      if (result.payload.startLine !== undefined && result.payload.startLine !== null) {
+        metadata.startLine = result.payload.startLine;
+        metadata.endLine = result.payload.endLine;
+      }
+
+      return {
+        text: result.payload.text,
+        score: result.score,
+        metadata: metadata
+      };
+    });
   }
 
   // MMR implementation for diversity and document representation

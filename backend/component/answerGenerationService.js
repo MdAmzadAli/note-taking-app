@@ -154,11 +154,18 @@ Return ONLY this JSON format:
     console.log(`📊 Step 1: Converting context to structured JSON...`);
 
     const numberedContexts = relevantChunks.map((chunk, index) => {
-      const pageInfo = `Page ${chunk.metadata.pageNumber || 1}`;
-      const lineInfo = chunk.metadata.startLine && chunk.metadata.endLine 
-        ? `Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`
-        : '';
-      const locationInfo = lineInfo ? `${pageInfo}, ${lineInfo}` : pageInfo;
+      let locationInfo = '';
+      
+      // Build location info only if page/line data exists
+      if (chunk.metadata.pageNumber !== undefined && chunk.metadata.pageNumber !== null) {
+        locationInfo = `Page ${chunk.metadata.pageNumber}`;
+        if (chunk.metadata.startLine !== undefined && chunk.metadata.startLine !== null) {
+          locationInfo += `, Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`;
+        }
+      } else {
+        locationInfo = 'Content';
+      }
+      
       return `[Context ${index + 1} - Doc: ${chunk.metadata.fileName} | ${locationInfo}]: ${chunk.text}`;
     });
 
@@ -318,24 +325,33 @@ ANSWER:`;
         const chunk = relevantChunks[contextNum - 1];
         if (!chunk) return null;
 
-        return {
+        const source = {
           id: `source_${contextNum}`,
           fileName: chunk.metadata.fileName,
           fileId: chunk.metadata.fileId,
           chunkIndex: chunk.metadata.chunkIndex,
           originalText: chunk.text,
           relevanceScore: chunk.score,
-          pageNumber: chunk.metadata.pageNumber || 1,
-          startLine: chunk.metadata.startLine,
-          endLine: chunk.metadata.endLine,
-          lineRange: chunk.metadata.startLine && chunk.metadata.endLine 
-            ? `Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`
-            : 'Full page content',
           pageUrl: chunk.metadata.pageUrl,
           cloudinaryUrl: chunk.metadata.cloudinaryUrl,
           thumbnailUrl: chunk.metadata.thumbnailUrl,
           confidencePercentage: (chunk.score * 100).toFixed(1)
         };
+
+        // Add page and line information only if available (PDF content)
+        if (chunk.metadata.pageNumber !== undefined && chunk.metadata.pageNumber !== null) {
+          source.pageNumber = chunk.metadata.pageNumber;
+        }
+        
+        if (chunk.metadata.startLine !== undefined && chunk.metadata.startLine !== null) {
+          source.startLine = chunk.metadata.startLine;
+          source.endLine = chunk.metadata.endLine;
+          source.lineRange = `Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`;
+        } else {
+          source.lineRange = 'Full content';
+        }
+
+        return source;
       })
       .filter(source => source !== null);
 
@@ -360,11 +376,18 @@ ANSWER:`;
     const context = relevantChunks
       .map((chunk, index) => {
         const confidence = (chunk.score * 100).toFixed(1);
-        const pageInfo = `Page ${chunk.metadata.pageNumber || 1}`;
-        const lineInfo = chunk.metadata.startLine && chunk.metadata.endLine 
-          ? `Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`
-          : '';
-        const locationInfo = lineInfo ? `${pageInfo}, ${lineInfo}` : pageInfo;
+        let locationInfo = '';
+        
+        // Build location info only if page/line data exists
+        if (chunk.metadata.pageNumber !== undefined && chunk.metadata.pageNumber !== null) {
+          locationInfo = `Page ${chunk.metadata.pageNumber}`;
+          if (chunk.metadata.startLine !== undefined && chunk.metadata.startLine !== null) {
+            locationInfo += `, Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`;
+          }
+        } else {
+          locationInfo = 'Content';
+        }
+        
         return `[Context ${index + 1} - ${chunk.metadata.fileName} - ${locationInfo} - Relevance: ${confidence}%]: ${chunk.text}`;
       })
       .join('\n\n');
@@ -427,24 +450,35 @@ ANSWER:`;
 
     // Prepare sources based on used contexts
     const filteredChunks = usedContextIndices.map(idx => relevantChunks[idx]);
-    const sources = filteredChunks.map((chunk, index) => ({
-      id: `source_${index + 1}`,
-      fileName: chunk.metadata.fileName,
-      fileId: chunk.metadata.fileId,
-      chunkIndex: chunk.metadata.chunkIndex,
-      originalText: chunk.text,
-      relevanceScore: chunk.score,
-      pageNumber: chunk.metadata.pageNumber || 1,
-      startLine: chunk.metadata.startLine,
-      endLine: chunk.metadata.endLine,
-      lineRange: chunk.metadata.startLine && chunk.metadata.endLine 
-        ? `Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`
-        : 'Full page content',
-      pageUrl: chunk.metadata.pageUrl,
-      cloudinaryUrl: chunk.metadata.cloudinaryUrl,
-      thumbnailUrl: chunk.metadata.thumbnailUrl,
-      confidencePercentage: (chunk.score * 100).toFixed(1)
-    }));
+    const sources = filteredChunks.map((chunk, index) => {
+      const source = {
+        id: `source_${index + 1}`,
+        fileName: chunk.metadata.fileName,
+        fileId: chunk.metadata.fileId,
+        chunkIndex: chunk.metadata.chunkIndex,
+        originalText: chunk.text,
+        relevanceScore: chunk.score,
+        pageUrl: chunk.metadata.pageUrl,
+        cloudinaryUrl: chunk.metadata.cloudinaryUrl,
+        thumbnailUrl: chunk.metadata.thumbnailUrl,
+        confidencePercentage: (chunk.score * 100).toFixed(1)
+      };
+
+      // Add page and line information only if available (PDF content)
+      if (chunk.metadata.pageNumber !== undefined && chunk.metadata.pageNumber !== null) {
+        source.pageNumber = chunk.metadata.pageNumber;
+      }
+      
+      if (chunk.metadata.startLine !== undefined && chunk.metadata.startLine !== null) {
+        source.startLine = chunk.metadata.startLine;
+        source.endLine = chunk.metadata.endLine;
+        source.lineRange = `Lines ${chunk.metadata.startLine}-${chunk.metadata.endLine}`;
+      } else {
+        source.lineRange = 'Full content';
+      }
+
+      return source;
+    });
 
     return {
       answer: answer,

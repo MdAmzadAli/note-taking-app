@@ -1003,8 +1003,11 @@ class ChunkingService {
 
       console.log(`📄 Extracted ${pdfData.totalPages} pages with layout info`);
 
+      // Ensure metadata indicates this is PDF content
+      const pdfMetadata = { ...metadata, contentType: 'pdf' };
+
       // Split into semantic chunks with unit-based overlap
-      const chunks = this.splitIntoChunks(pdfData, metadata);
+      const chunks = this.splitIntoChunks(pdfData, pdfMetadata);
 
       console.log(`📄 Created ${chunks.length} semantic chunks`);
 
@@ -1023,6 +1026,141 @@ class ChunkingService {
       console.error('❌ PDF processing failed:', error);
       throw error;
     }
+  }
+
+  // Process text content for webpages and other non-PDF sources
+  async processTextContent(text, metadata = {}) {
+    try {
+      console.log(`📄 Processing text content: ${text.length} characters`);
+
+      if (!text || text.trim().length === 0) {
+        throw new Error('No text content provided');
+      }
+
+      // Ensure metadata indicates this is webpage content
+      const webMetadata = { ...metadata, contentType: 'webpage' };
+
+      // Create a simple text data structure similar to PDF format
+      const textData = {
+        fullText: text.trim(),
+        pages: [{
+          pageNumber: null, // Not applicable for webpages
+          text: text.trim(),
+          lines: text.split('\n').filter(line => line.trim().length > 0),
+          structuredUnits: this._createSimpleTextUnits(text),
+          columns: 1,
+          hasTable: false
+        }],
+        totalPages: null // Not applicable for webpages
+      };
+
+      // Split into semantic chunks
+      const chunks = this.splitIntoChunks(textData, webMetadata);
+
+      console.log(`📄 Created ${chunks.length} text chunks`);
+
+      return {
+        textData: textData,
+        chunks: chunks,
+        summary: {
+          totalPages: null,
+          totalChunks: chunks.length,
+          fullTextLength: text.length,
+          hasStructuredContent: false,
+          averageColumnsPerPage: 1
+        }
+      };
+    } catch (error) {
+      console.error('❌ Text content processing failed:', error);
+      throw error;
+    }
+  }
+
+  // Create simple text units for webpage content
+  _createSimpleTextUnits(text) {
+    const lines = text.split('\n').filter(line => line.trim().length > 0);
+    const units = [];
+    let currentParagraph = [];
+    let unitIndex = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      if (this._isBulletPoint(line)) {
+        // End current paragraph if exists
+        if (currentParagraph.length > 0) {
+          units.push({
+            type: 'paragraph',
+            text: currentParagraph.join(' '),
+            lines: [...currentParagraph],
+            startLine: null, // Not applicable for webpages
+            endLine: null    // Not applicable for webpages
+          });
+          currentParagraph = [];
+        }
+
+        // Add bullet unit
+        units.push({
+          type: 'bullet',
+          text: line,
+          lines: [line],
+          startLine: null,
+          endLine: null
+        });
+      } else if (this._isHeader(line)) {
+        // End current paragraph if exists
+        if (currentParagraph.length > 0) {
+          units.push({
+            type: 'paragraph',
+            text: currentParagraph.join(' '),
+            lines: [...currentParagraph],
+            startLine: null,
+            endLine: null
+          });
+          currentParagraph = [];
+        }
+
+        // Add header unit
+        units.push({
+          type: 'header',
+          text: line,
+          lines: [line],
+          startLine: null,
+          endLine: null
+        });
+      } else {
+        // Add to current paragraph
+        currentParagraph.push(line);
+
+        // Check if we should end paragraph (empty line or significant break)
+        const nextLine = i < lines.length - 1 ? lines[i + 1] : null;
+        if (!nextLine || line.length === 0) {
+          if (currentParagraph.length > 0) {
+            units.push({
+              type: 'paragraph',
+              text: currentParagraph.join(' '),
+              lines: [...currentParagraph],
+              startLine: null,
+              endLine: null
+            });
+            currentParagraph = [];
+          }
+        }
+      }
+    }
+
+    // Add final paragraph if exists
+    if (currentParagraph.length > 0) {
+      units.push({
+        type: 'paragraph',
+        text: currentParagraph.join(' '),
+        lines: [...currentParagraph],
+        startLine: null,
+        endLine: null
+      });
+    }
+
+    return units;
   }
 
   // Split text into semantic chunks with unit-based overlap
@@ -1400,33 +1538,43 @@ class ChunkingService {
       .filter(u => u.columnRange)
       .map(u => u.columnRange);
 
+    // Determine content type for conditional metadata
+    const contentType = metadata.contentType || 'pdf'; // Default to PDF for backward compatibility
+    const isPdfContent = contentType === 'pdf';
+
+    const chunkMetadata = {
+      ...metadata,
+      chunkIndex: chunkIndex,
+      chunkSize: text.length,
+      semanticTypes: [...new Set(unitTypes)],
+      unitCount: semanticUnits.length,
+      strategy: 'layout_aware_semantic',
+      hasStructuredContent: unitTypes.some(t => ['bullet', 'table_row', 'header'].includes(t)),
+      hasTableContent: unitTypes.includes('table_row'),
+      tableColumns: semanticUnits
+        .filter(u => u.type === 'table_row' && u.columns)
+        .map(u => u.columns.length),
+      // Enhanced numeric metadata
+      numericMetadata: numericMetadata,
+      hasFinancialData: numericMetadata.currencies.length > 0,
+      hasNegativeValues: numericMetadata.hasNegativeValues,
+      // Column layout metadata
+      columnIndices: columnIndices,
+      columnRanges: columnRanges,
+      spansMultipleColumns: columnIndices.length > 1,
+      isColumnAware: columnIndices.length > 0
+    };
+
+    // Add page and line numbers only for PDF content
+    if (isPdfContent) {
+      chunkMetadata.pageNumber = pageNumber;
+      chunkMetadata.startLine = lineNumbers.length > 0 ? Math.min(...lineNumbers) : 1;
+      chunkMetadata.endLine = lineNumbers.length > 0 ? Math.max(...lineNumbers) : 1;
+    }
+
     return {
       text: text,
-      metadata: {
-        ...metadata,
-        chunkIndex: chunkIndex,
-        pageNumber: pageNumber,
-        chunkSize: text.length,
-        semanticTypes: [...new Set(unitTypes)],
-        startLine: lineNumbers.length > 0 ? Math.min(...lineNumbers) : 1,
-        endLine: lineNumbers.length > 0 ? Math.max(...lineNumbers) : 1,
-        unitCount: semanticUnits.length,
-        strategy: 'layout_aware_semantic',
-        hasStructuredContent: unitTypes.some(t => ['bullet', 'table_row', 'header'].includes(t)),
-        hasTableContent: unitTypes.includes('table_row'),
-        tableColumns: semanticUnits
-          .filter(u => u.type === 'table_row' && u.columns)
-          .map(u => u.columns.length),
-        // Enhanced numeric metadata
-        numericMetadata: numericMetadata,
-        hasFinancialData: numericMetadata.currencies.length > 0,
-        hasNegativeValues: numericMetadata.hasNegativeValues,
-        // Column layout metadata
-        columnIndices: columnIndices,
-        columnRanges: columnRanges,
-        spansMultipleColumns: columnIndices.length > 1,
-        isColumnAware: columnIndices.length > 0
-      }
+      metadata: chunkMetadata
     };
   }
 
