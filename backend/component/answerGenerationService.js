@@ -269,9 +269,9 @@ INSTRUCTIONS:
 1. Use the structured data to perform accurate calculations
 2. Standardize all values (convert 1.2k to 1200, 1.2M to 1,200,000, etc.)
 3. Handle different currencies appropriately
-4. Show your calculation steps clearly
+4. Explain your calculation steps clearly and in easy to understand language with respect to the user's point of view
 5. Use **bold text** for important numbers and results
-6. Structure your answer with clear sections
+6. Structure your answer with clear sections with one liner summary of answer at top like: "The total cost of bookings is **$12,345.67**
 7. Reference specific contexts when citing data
 
 CRITICAL: After your answer, list which contexts you actually used:
@@ -282,9 +282,9 @@ CONTEXTS_USED: [list only the context numbers (e.g., "1,3,5") that you reference
 ANSWER:`;
 
     const response = await this.embeddingService.genaiChat.models.generateContent({
-      model: 'gemini-2.5-flash-lite', // Main model for Step 2
+      model: 'gemini-2.5-flash', // Main model for Step 2
       config: {
-        temperature: 0.3,
+        temperature: 0.1,
         topP: 0.8,
         maxOutputTokens: 2048,
       },
