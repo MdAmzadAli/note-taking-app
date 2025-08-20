@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ActivityIndicator, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ActivityIndicator, ScrollView, Alert, KeyboardAvoidingView, Platform, Dimensions, Keyboard } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import * as DocumentPicker from 'expo-document-picker';
 
@@ -22,6 +22,9 @@ interface FileItem {
   file?: any; // actual file object for device uploads
 }
 
+const { height: screenHeight } = Dimensions.get('window');
+const MODAL_HEIGHT = screenHeight * 0.5;
+
 export default function WorkspaceModal({
   isVisible,
   onClose,
@@ -37,6 +40,27 @@ export default function WorkspaceModal({
   const [showFileOptions, setShowFileOptions] = useState(false);
   const [activeUrlInput, setActiveUrlInput] = useState<'url' | 'webpage' | null>(null);
   const [urlInput, setUrlInput] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  const modalContentRef = useRef<View>(null);
+
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+      setIsKeyboardVisible(true);
+    });
+
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+      setIsKeyboardVisible(false);
+    });
+
+    return () => {
+      keyboardDidShowListener?.remove();
+      keyboardDidHideListener?.remove();
+    };
+  }, []);
 
   const handleClose = () => {
     onClose();
@@ -47,6 +71,8 @@ export default function WorkspaceModal({
     setShowFileOptions(false);
     setActiveUrlInput(null);
     setUrlInput('');
+    setKeyboardHeight(0);
+    setIsKeyboardVisible(false);
   };
 
   const handleNext = () => {
@@ -57,6 +83,9 @@ export default function WorkspaceModal({
 
   const handleBack = () => {
     setCurrentStep(1);
+    setShowFileOptions(false);
+    setActiveUrlInput(null);
+    setUrlInput('');
   };
 
   const handleAddFromDevice = async () => {
@@ -131,39 +160,43 @@ export default function WorkspaceModal({
 
   const renderStep1 = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.modalTitle}>Create New Workspace</Text>
-      <Text style={styles.stepIndicator}>Step 1 of 2</Text>
-      <Text style={styles.modalSubtitle}>
-        {isBackendConnected 
-          ? 'Enter workspace details'
-          : 'Backend is offline. Files will be stored locally.'}
-      </Text>
-
-      <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>Workspace Name *</Text>
-        <TextInput
-          style={styles.workspaceNameInput}
-          value={workspaceName}
-          onChangeText={setWorkspaceName}
-          placeholder="Enter workspace name"
-          editable={!isLoading}
-        />
+      <View style={styles.headerSection}>
+        <Text style={styles.modalTitle}>Create New Workspace</Text>
+        <Text style={styles.stepIndicator}>Step 1 of 2</Text>
+        <Text style={styles.modalSubtitle}>
+          {isBackendConnected 
+            ? 'Enter workspace details'
+            : 'Backend is offline. Files will be stored locally.'}
+        </Text>
       </View>
 
-      <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>Description (Optional)</Text>
-        <TextInput
-          style={[styles.workspaceNameInput, styles.descriptionInput]}
-          value={description}
-          onChangeText={setDescription}
-          placeholder="Enter workspace description"
-          multiline
-          numberOfLines={3}
-          editable={!isLoading}
-        />
-      </View>
+      <ScrollView style={styles.contentSection} showsVerticalScrollIndicator={false}>
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputLabel}>Workspace Name *</Text>
+          <TextInput
+            style={styles.workspaceNameInput}
+            value={workspaceName}
+            onChangeText={setWorkspaceName}
+            placeholder="Enter workspace name"
+            editable={!isLoading}
+          />
+        </View>
 
-      <View style={styles.modalButtons}>
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputLabel}>Description (Optional)</Text>
+          <TextInput
+            style={[styles.workspaceNameInput, styles.descriptionInput]}
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Enter workspace description"
+            multiline
+            numberOfLines={3}
+            editable={!isLoading}
+          />
+        </View>
+      </ScrollView>
+
+      <View style={styles.buttonsSection}>
         <TouchableOpacity 
           style={[
             styles.modalButton, 
@@ -187,131 +220,135 @@ export default function WorkspaceModal({
 
   const renderStep2 = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.modalTitle}>Add Files</Text>
-      <Text style={styles.stepIndicator}>Step 2 of 2</Text>
-      <Text style={styles.modalSubtitle}>
-        Add up to 5 files for your workspace ({files.length}/5)
-      </Text>
+      <View style={styles.headerSection}>
+        <Text style={styles.modalTitle}>Add Files</Text>
+        <Text style={styles.stepIndicator}>Step 2 of 2</Text>
+        <Text style={styles.modalSubtitle}>
+          Add up to 5 files for your workspace ({files.length}/5)
+        </Text>
+      </View>
 
-      <ScrollView style={styles.filesContainer} showsVerticalScrollIndicator={false}>
-        {files.map((file, index) => (
-          <View key={file.id} style={styles.fileItem}>
-            <View style={styles.fileInfo}>
-              <View style={styles.fileIconContainer}>
-                <IconSymbol 
-                  size={16} 
-                  name={file.type === 'device' ? 'doc.text' : file.type === 'webpage' ? 'globe' : 'link'} 
-                  color="#8B5CF6" 
-                />
+      <View style={styles.contentSection}>
+        <ScrollView style={styles.filesContainer} showsVerticalScrollIndicator={false}>
+          {files.map((file, index) => (
+            <View key={file.id} style={styles.fileItem}>
+              <View style={styles.fileInfo}>
+                <View style={styles.fileIconContainer}>
+                  <IconSymbol 
+                    size={16} 
+                    name={file.type === 'device' ? 'doc.text' : file.type === 'webpage' ? 'globe' : 'link'} 
+                    color="#8B5CF6" 
+                  />
+                </View>
+                <View style={styles.fileDetails}>
+                  <Text style={styles.fileName} numberOfLines={1}>
+                    {file.type === 'device' ? file.source : file.source}
+                  </Text>
+                  <Text style={styles.fileType}>
+                    {file.type === 'device' ? 'From Device' : 
+                     file.type === 'url' ? 'From URL' : 'Webpage'}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.fileDetails}>
-                <Text style={styles.fileName} numberOfLines={1}>
-                  {file.type === 'device' ? file.source : file.source}
-                </Text>
-                <Text style={styles.fileType}>
-                  {file.type === 'device' ? 'From Device' : 
-                   file.type === 'url' ? 'From URL' : 'Webpage'}
-                </Text>
-              </View>
+              <TouchableOpacity 
+                style={styles.removeFileButton}
+                onPress={() => handleRemoveFile(file.id)}
+              >
+                <IconSymbol size={16} name="xmark" color="#FF4444" />
+              </TouchableOpacity>
             </View>
+          ))}
+        </ScrollView>
+
+        {files.length < 5 && (
+          <View style={styles.addFileSection}>
             <TouchableOpacity 
-              style={styles.removeFileButton}
-              onPress={() => handleRemoveFile(file.id)}
+              style={styles.addFileButton}
+              onPress={() => setShowFileOptions(!showFileOptions)}
             >
-              <IconSymbol size={16} name="xmark" color="#FF4444" />
+              <IconSymbol size={16} name="plus" color="#8B5CF6" />
+              <Text style={styles.addFileText}>Add File</Text>
+              <IconSymbol size={12} name="chevron.down" color="#8B5CF6" />
             </TouchableOpacity>
+
+            {showFileOptions && (
+              <View style={styles.fileOptionsContainer}>
+                <TouchableOpacity 
+                  style={styles.fileOption}
+                  onPress={handleAddFromDevice}
+                >
+                  <IconSymbol size={16} name="phone" color="#4B5563" />
+                  <Text style={styles.fileOptionText}>From Device</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.fileOption}
+                  onPress={() => handleUrlOptionClick('url')}
+                >
+                  <IconSymbol size={16} name="link" color="#4B5563" />
+                  <Text style={styles.fileOptionText}>From Internet</Text>
+                </TouchableOpacity>
+
+                {activeUrlInput === 'url' && (
+                  <View style={styles.urlInputSection}>
+                    <View style={styles.urlInputContainer}>
+                      <TextInput
+                        style={styles.urlInput}
+                        value={urlInput}
+                        onChangeText={setUrlInput}
+                        placeholder="Enter URL..."
+                        placeholderTextColor="#999999"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="url"
+                      />
+                      <TouchableOpacity 
+                        style={styles.sendButton}
+                        onPress={handleAddUrl}
+                      >
+                        <IconSymbol size={16} name="arrow.right" color="#8B5CF6" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+                
+                <TouchableOpacity 
+                  style={styles.fileOption}
+                  onPress={() => handleUrlOptionClick('webpage')}
+                >
+                  <IconSymbol size={16} name="globe" color="#4B5563" />
+                  <Text style={styles.fileOptionText}>Add Webpage</Text>
+                </TouchableOpacity>
+
+                {activeUrlInput === 'webpage' && (
+                  <View style={styles.urlInputSection}>
+                    <View style={styles.urlInputContainer}>
+                      <TextInput
+                        style={styles.urlInput}
+                        value={urlInput}
+                        onChangeText={setUrlInput}
+                        placeholder="Enter webpage URL..."
+                        placeholderTextColor="#999999"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="url"
+                      />
+                      <TouchableOpacity 
+                        style={styles.sendButton}
+                        onPress={handleAddUrl}
+                      >
+                        <IconSymbol size={16} name="arrow.right" color="#8B5CF6" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
-        ))}
-      </ScrollView>
+        )}
+      </View>
 
-      {files.length < 5 && (
-        <View style={styles.addFileSection}>
-          <TouchableOpacity 
-            style={styles.addFileButton}
-            onPress={() => setShowFileOptions(!showFileOptions)}
-          >
-            <IconSymbol size={16} name="plus" color="#8B5CF6" />
-            <Text style={styles.addFileText}>Add File</Text>
-            <IconSymbol size={12} name="chevron.down" color="#8B5CF6" />
-          </TouchableOpacity>
-
-          {showFileOptions && (
-            <View style={styles.fileOptionsContainer}>
-              <TouchableOpacity 
-                style={styles.fileOption}
-                onPress={handleAddFromDevice}
-              >
-                <IconSymbol size={16} name="phone" color="#4B5563" />
-                <Text style={styles.fileOptionText}>From Device</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.fileOption}
-                onPress={() => handleUrlOptionClick('url')}
-              >
-                <IconSymbol size={16} name="link" color="#4B5563" />
-                <Text style={styles.fileOptionText}>From Internet</Text>
-              </TouchableOpacity>
-
-              {activeUrlInput === 'url' && (
-                <View style={styles.urlInputSection}>
-                  <View style={styles.urlInputContainer}>
-                    <TextInput
-                      style={styles.urlInput}
-                      value={urlInput}
-                      onChangeText={setUrlInput}
-                      placeholder="Enter URL..."
-                      placeholderTextColor="#999999"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="url"
-                    />
-                    <TouchableOpacity 
-                      style={styles.sendButton}
-                      onPress={handleAddUrl}
-                    >
-                      <IconSymbol size={16} name="arrow.right" color="#8B5CF6" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-              
-              <TouchableOpacity 
-                style={styles.fileOption}
-                onPress={() => handleUrlOptionClick('webpage')}
-              >
-                <IconSymbol size={16} name="globe" color="#4B5563" />
-                <Text style={styles.fileOptionText}>Add Webpage</Text>
-              </TouchableOpacity>
-
-              {activeUrlInput === 'webpage' && (
-                <View style={styles.urlInputSection}>
-                  <View style={styles.urlInputContainer}>
-                    <TextInput
-                      style={styles.urlInput}
-                      value={urlInput}
-                      onChangeText={setUrlInput}
-                      placeholder="Enter webpage URL..."
-                      placeholderTextColor="#999999"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="url"
-                    />
-                    <TouchableOpacity 
-                      style={styles.sendButton}
-                      onPress={handleAddUrl}
-                    >
-                      <IconSymbol size={16} name="arrow.right" color="#8B5CF6" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-            </View>
-          )}
-        </View>
-      )}
-
-      <View style={styles.modalButtons}>
+      <View style={styles.buttonsSection}>
         <TouchableOpacity 
           style={[
             styles.modalButton, 
@@ -337,26 +374,31 @@ export default function WorkspaceModal({
     </View>
   );
 
+  const modalTransform = isKeyboardVisible && Platform.OS === 'ios' 
+    ? Math.max(-keyboardHeight / 3, -100) 
+    : 0;
+
   return (
     <Modal visible={isVisible} transparent animationType="slide">
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardAvoidingView}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {currentStep === 1 ? renderStep1() : renderStep2()}
-          </View>
+      <View style={styles.modalOverlay}>
+        <View 
+          ref={modalContentRef}
+          style={[
+            styles.modalContent,
+            {
+              transform: [{ translateY: modalTransform }],
+              height: MODAL_HEIGHT,
+            }
+          ]}
+        >
+          {currentStep === 1 ? renderStep1() : renderStep2()}
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  keyboardAvoidingView: {
-    flex: 1,
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -366,13 +408,23 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 24,
+    padding: 20,
     width: '90%',
     maxWidth: 450,
-    minHeight: '50%',
   },
   stepContainer: {
     flex: 1,
+    flexDirection: 'column',
+  },
+  headerSection: {
+    marginBottom: 16,
+  },
+  contentSection: {
+    flex: 1,
+    marginBottom: 16,
+  },
+  buttonsSection: {
+    gap: 12,
   },
   modalTitle: {
     fontSize: 18,
@@ -392,7 +444,6 @@ const styles = StyleSheet.create({
   modalSubtitle: {
     fontSize: 14,
     color: '#6B7280',
-    marginBottom: 20,
     textAlign: 'center',
     fontFamily: 'Inter',
   },
@@ -419,8 +470,8 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   filesContainer: {
-    maxHeight: 200,
-    marginBottom: 16,
+    maxHeight: 160,
+    marginBottom: 12,
   },
   fileItem: {
     flexDirection: 'row',
@@ -465,7 +516,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   addFileSection: {
-    marginBottom: 16,
+    marginBottom: 8,
   },
   addFileButton: {
     flexDirection: 'row',
@@ -535,9 +586,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  modalButtons: {
-    gap: 12,
   },
   modalButton: {
     backgroundColor: '#000000',
