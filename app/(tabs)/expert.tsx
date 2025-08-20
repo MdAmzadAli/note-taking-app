@@ -22,6 +22,9 @@ import FilePreviewModal from '../../components/expert/FilePreviewModal';
 // Import RAG service
 import { ragService } from '../../services/ragService';
 
+// Define API_BASE_URL if it's not already defined elsewhere
+const API_BASE_URL = 'http://localhost:5000'; // Example URL, replace with your actual backend URL
+
 interface SingleFile {
   id: string;
   name: string;
@@ -147,53 +150,19 @@ export default function ExpertTab() {
     });
   };
 
-  const handleUploadSingleFile = async (selectedFile?: any) => {
-    if (!isBackendConnected) {
-      Alert.alert('Backend Not Available', 'Backend server is not connected. Please check the connection.');
-      return;
-    }
+  const handleFileUpload = async (file: any, workspaceId?: string): Promise<SingleFile | null> => {
+    if (!file) return null;
+
+    setIsLoading(true);
 
     try {
-      setIsLoading(true);
-      console.log('🎯 Starting file upload process...');
-
-      let file;
-
-      if (selectedFile) {
-        // File was already selected from the modal
-        file = selectedFile;
-        console.log('📄 Using pre-selected file:', JSON.stringify(file, null, 2));
-      } else {
-        // Fallback: select file if none provided
-        console.log('🎯 No file provided, starting file selection...');
-        const result = await DocumentPicker.getDocumentAsync({
-          type: 'application/pdf',
-          copyToCacheDirectory: true,
-        });
-
-        console.log('📄 Document picker result:', JSON.stringify(result, null, 2));
-
-        if (!result.canceled && result.assets[0]) {
-          file = result.assets[0];
-        } else {
-          console.log('📄 File selection was canceled or no file selected');
-          return;
-        }
-      }
-
-      console.log('📄 Selected file details:', JSON.stringify(file, null, 2));
-
       const fileToUpload = {
         uri: file.uri,
         name: file.name,
         type: file.mimeType || 'application/octet-stream'
       };
 
-      console.log('📤 Preparing file for upload:', JSON.stringify(fileToUpload, null, 2));
-
       const uploadedFile = await fileService.uploadFile(fileToUpload);
-
-      console.log('✅ File uploaded successfully:', JSON.stringify(uploadedFile, null, 2));
 
       const newFile: SingleFile = {
         id: uploadedFile.id,
@@ -205,125 +174,173 @@ export default function ExpertTab() {
         cloudinary: uploadedFile.cloudinary,
       };
 
-      const successMessage = uploadedFile.cloudinary
-        ? 'File uploaded and processed successfully! PDF preview available.'
-        : 'File uploaded successfully! (Cloudinary not configured - using basic preview)';
+      // Index the document for RAG after successful upload
+      if (workspaceId) {
+        try {
+          console.log(`🔄 Starting RAG indexing for file ${newFile.id} in workspace ${workspaceId}...`);
+          const indexResult = await ragService.indexDocument(uploadedFile.id, workspaceId);
+          console.log('✅ RAG indexing completed:', indexResult);
+        } catch (ragError) {
+          console.warn('⚠️ RAG indexing failed for uploaded file (continuing anyway):', ragError.message);
+          // Don't fail the upload if RAG indexing fails
+        }
+      }
 
-      Alert.alert('Success', successMessage);
+      Alert.alert('Success', 'File uploaded successfully!');
+      return newFile;
 
-      const updatedFiles = [...singleFiles, newFile];
-      setSingleFiles(updatedFiles);
-      await saveData(updatedFiles, workspaces);
-      setIsUploadModalVisible(false);
     } catch (error) {
-      console.error('❌ File upload process failed');
-      console.error('❌ Error type:', error.constructor.name);
-      console.error('❌ Error message:', error.message);
-      console.error('❌ Error stack:', error.stack);
+      console.error('❌ File upload process failed:', error.message);
       Alert.alert('Error', `Failed to upload file: ${error.message}`);
+      return null;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleCreateWorkspace = async () => {
-    if (!workspaceName.trim()) {
-      Alert.alert('Error', 'Please enter a workspace name');
-      return;
-    }
+  const handleUploadSingleFile = async (file?: any) => {
+    if (!file) return;
 
-    if (!isBackendConnected) {
-      Alert.alert('Backend Not Available', 'Backend server is not connected. Please check the connection.');
-      return;
-    }
+    setIsLoading(true);
 
     try {
-      setIsLoading(true);
-      const results = await DocumentPicker.getDocumentAsync({
-        type: 'application/pdf',
-        copyToCacheDirectory: true,
-        multiple: true,
-      });
+      const processedFile = await handleFileUpload(file);
+      if (processedFile) {
+        const updatedFiles = [...singleFiles, processedFile];
+        setSingleFiles(updatedFiles);
+        await AsyncStorage.setItem('expert_single_files', JSON.stringify(updatedFiles)); // Corrected key
 
-      if (!results.canceled) {
-        // Step 1: Create workspace locally first with generated ID
-        const workspaceId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-        console.log(`🏢 Creating workspace locally with ID: ${workspaceId}`);
-
-        const newWorkspace: Workspace = {
-          id: workspaceId,
-          name: workspaceName,
-          files: [], // Empty initially
-          createdDate: new Date().toLocaleDateString(),
-        };
-
-        // Step 2: Save workspace immediately to local storage
-        const updatedWorkspaces = [...workspaces, newWorkspace];
-        setWorkspaces(updatedWorkspaces);
-        await saveData(singleFiles, updatedWorkspaces);
-        console.log(`💾 Workspace saved locally: ${workspaceName}`);
-
-        // Step 3: Batch upload all files for workspace
-        const filesToUpload = results.assets.slice(0, 5).map(file => ({
-          uri: file.uri,
-          name: file.name,
-          type: file.mimeType || 'application/pdf'
-        }));
-
-        console.log(`📤 Starting batch upload for workspace: ${workspaceId}`);
-        console.log(`📄 Files to upload:`, filesToUpload.length);
-
-        let uploadedFiles: SingleFile[] = [];
-
-        try {
-          const batchResult = await fileService.uploadWorkspaceFiles(filesToUpload, workspaceId);
-          
-          uploadedFiles = batchResult.map(uploadedFile => ({
-            id: uploadedFile.id,
-            name: uploadedFile.originalName,
-            uploadDate: new Date(uploadedFile.uploadDate).toLocaleDateString(),
-            mimetype: uploadedFile.mimetype,
-            size: uploadedFile.size,
-            isUploaded: true,
-            cloudinary: uploadedFile.cloudinary,
-          }));
-
-          console.log(`✅ Batch upload completed: ${uploadedFiles.length} files uploaded`);
-        } catch (batchError) {
-          console.error(`❌ Batch upload failed:`, batchError);
-          Alert.alert('Upload Failed', `Failed to upload files: ${batchError.message}`);
-        }
-
-        // Step 4: Update workspace with uploaded files
-        if (uploadedFiles.length > 0) {
-          const updatedWorkspace = {
-            ...newWorkspace,
-            files: uploadedFiles
-          };
-
-          const finalWorkspaces = updatedWorkspaces.map(w => 
-            w.id === workspaceId ? updatedWorkspace : w
-          );
-
-          setWorkspaces(finalWorkspaces);
-          await saveData(singleFiles, finalWorkspaces);
-
-          console.log(`🏢 Updated workspace ${workspaceId} with ${uploadedFiles.length} files`);
-
-          Alert.alert('Success', `Workspace "${workspaceName}" created with ${uploadedFiles.length} file(s)!`);
-          setIsWorkspaceModalVisible(false);
-          setWorkspaceName('');
-        } else {
-          // Remove workspace if no files were uploaded
-          const revertedWorkspaces = workspaces; // Original workspaces without the failed one
-          setWorkspaces(revertedWorkspaces);
-          await saveData(singleFiles, revertedWorkspaces);
-
-          Alert.alert('Error', 'No files were successfully uploaded. Workspace was not created.');
-        }
+        setSelectedFile(processedFile);
+        setIsUploadModalVisible(false);
+        setIsChatVisible(true);
       }
     } catch (error) {
-      console.error('❌ Workspace creation failed:', error);
+      console.error('Error uploading file:', error);
+      Alert.alert('Error', 'Failed to upload file');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUrlUpload = async (url: string, workspaceId?: string): Promise<SingleFile | null> => {
+    try {
+      const fileId = Date.now().toString();
+
+      if (isBackendConnected) {
+        // Send URL to backend for processing
+        const response = await fetch(`${API_BASE_URL}/api/upload-url`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url: url,
+            fileId: fileId,
+            workspaceId: workspaceId || null
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Upload failed: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        // Index the document for RAG after successful upload
+        if (workspaceId) {
+          try {
+            console.log(`🔄 Starting RAG indexing for URL file ${fileId} in workspace ${workspaceId}...`);
+            const indexResult = await ragService.indexDocument(fileId, workspaceId); // Assuming indexDocument can handle fileId from URL upload
+            console.log('✅ RAG indexing completed:', indexResult);
+          } catch (ragError) {
+            console.warn('⚠️ RAG indexing failed for URL file (continuing anyway):', ragError.message);
+            // Don't fail the upload if RAG indexing fails
+          }
+        }
+
+        return {
+          id: fileId,
+          name: result.filename || `URL_${fileId}`,
+          uploadDate: new Date().toISOString(),
+          mimetype: 'application/pdf', // Assuming PDF for URL uploads
+          size: result.size || 0,
+          isUploaded: true,
+          cloudinary: result.cloudinary
+        };
+      } else {
+        // Store URL locally for offline mode
+        return {
+          id: fileId,
+          name: `URL_${fileId}`,
+          uploadDate: new Date().toISOString(),
+          mimetype: 'application/pdf',
+          size: 0,
+          isUploaded: false,
+        };
+      }
+    } catch (error) {
+      console.error('Error uploading from URL:', error);
+      Alert.alert('Error', `Failed to upload from URL: ${error.message}`);
+      return null;
+    }
+  };
+
+  const handleCreateWorkspace = async (workspaceData: any) => {
+    if (!workspaceData.name.trim()) {
+      Alert.alert('Error', 'Workspace name is mandatory.');
+      return;
+    }
+    if (workspaceData.files.length > 5) {
+      Alert.alert('Error', 'Maximum of 5 files can be uploaded.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const newWorkspace: Workspace = {
+        id: Date.now().toString(),
+        name: workspaceData.name,
+        description: workspaceData.description, // Assuming description is part of workspaceData
+        files: [],
+        createdDate: new Date().toISOString(),
+      };
+
+      // Process files from the workspace data
+      const processedFiles: SingleFile[] = [];
+
+      for (const fileInfo of workspaceData.files) {
+        let processedFile: SingleFile | null = null;
+        if (fileInfo.type === 'device' && fileInfo.file) {
+          processedFile = await handleFileUpload(fileInfo.file, newWorkspace.id);
+        } else if (fileInfo.type === 'url' || fileInfo.type === 'webpage') {
+          processedFile = await handleUrlUpload(fileInfo.source, newWorkspace.id);
+        }
+
+        if (processedFile) {
+          processedFiles.push(processedFile);
+        }
+      }
+
+      newWorkspace.files = processedFiles;
+
+      const updatedWorkspaces = [...workspaces, newWorkspace];
+      setWorkspaces(updatedWorkspaces);
+      await AsyncStorage.setItem('expert_workspaces', JSON.stringify(updatedWorkspaces)); // Corrected key
+
+      setIsWorkspaceModalVisible(false);
+      setWorkspaceName(''); // Clear the input field
+      setSelectedWorkspace(newWorkspace);
+
+      if (processedFiles.length > 0) {
+        setIsChatVisible(true);
+      } else {
+        // Optionally show a message if no files were uploaded
+        Alert.alert('Workspace Created', `Workspace "${newWorkspace.name}" created with no files.`);
+      }
+
+    } catch (error) {
+      console.error('Error creating workspace:', error);
       Alert.alert('Error', `Failed to create workspace: ${error.message}`);
     } finally {
       setIsLoading(false);
@@ -407,12 +424,12 @@ export default function ExpertTab() {
       const response = await ragService.queryDocuments(message, fileIds, workspaceId);
 
       // Update message with response
-      setChatMessages(prev => 
-        prev.map((msg, index) => 
-          index === prev.length - 1 
+      setChatMessages(prev =>
+        prev.map((msg, index) =>
+          index === prev.length - 1
             ? {
                 ...msg,
-                ai: response.success 
+                ai: response.success
                   ? response.answer || 'No response generated'
                   : response.error || 'Failed to generate response',
                 sources: response.sources || [],
@@ -426,9 +443,9 @@ export default function ExpertTab() {
       console.error('RAG message error:', error);
 
       // Update with error message
-      setChatMessages(prev => 
-        prev.map((msg, index) => 
-          index === prev.length - 1 
+      setChatMessages(prev =>
+        prev.map((msg, index) =>
+          index === prev.length - 1
             ? {
                 ...msg,
                 ai: 'Sorry, I encountered an error while processing your request. Please try again.',
@@ -485,56 +502,30 @@ export default function ExpertTab() {
       if (!result.canceled && result.assets.length > 0) {
         const file = result.assets[0];
 
-        const fileToUpload = {
-          uri: file.uri,
-          name: file.name,
-          type: file.mimeType || 'application/octet-stream'
-        };
+        const newFile = await handleFileUpload(file, workspaceId); // Use handleFileUpload for consistency
 
-        const uploadedFile = await fileService.uploadFile(fileToUpload);
+        if (newFile) {
+          const updatedWorkspaces = workspaces.map(workspace => {
+            if (workspace.id === workspaceId && workspace.files.length < 5) {
+              return {
+                ...workspace,
+                files: [...workspace.files, newFile]
+              };
+            }
+            return workspace;
+          });
 
-        // Index the document for RAG after successful upload
-        try {
-          console.log(`🔄 Starting RAG indexing for added workspace file...`);
-          console.log(`🏢 Using workspaceId: ${workspaceId}`);
-          console.log(`📄 Indexing fileId: ${uploadedFile.id}`);
-          const indexResult = await ragService.indexDocument(uploadedFile.id, workspaceId);
-          console.log('✅ RAG indexing completed for added workspace file:', indexResult);
-        } catch (ragError) {
-          console.warn('⚠️ RAG indexing failed for added workspace file (continuing anyway):', ragError.message);
-          // Don't fail the upload if RAG indexing fails
-        }
+          setWorkspaces(updatedWorkspaces);
 
-        const newFile: SingleFile = {
-          id: uploadedFile.id,
-          name: uploadedFile.originalName,
-          uploadDate: new Date(uploadedFile.uploadDate).toLocaleDateString(),
-          mimetype: uploadedFile.mimetype,
-          size: uploadedFile.size,
-          isUploaded: true,
-          cloudinary: uploadedFile.cloudinary,
-        };
-
-        const updatedWorkspaces = workspaces.map(workspace => {
-          if (workspace.id === workspaceId && workspace.files.length < 5) {
-            return {
-              ...workspace,
-              files: [...workspace.files, newFile]
-            };
+          // Update selected workspace if it's the current one
+          if (selectedWorkspace && selectedWorkspace.id === workspaceId) {
+            const updatedWorkspace = updatedWorkspaces.find(w => w.id === workspaceId);
+            setSelectedWorkspace(updatedWorkspace || null);
           }
-          return workspace;
-        });
 
-        setWorkspaces(updatedWorkspaces);
-
-        // Update selected workspace if it's the current one
-        if (selectedWorkspace && selectedWorkspace.id === workspaceId) {
-          const updatedWorkspace = updatedWorkspaces.find(w => w.id === workspaceId);
-          setSelectedWorkspace(updatedWorkspace || null);
+          await saveData(singleFiles, updatedWorkspaces);
+          Alert.alert('Success', 'File added to workspace successfully!');
         }
-
-        await saveData(singleFiles, updatedWorkspaces);
-        Alert.alert('Success', 'File added to workspace successfully!');
       }
     } catch (error) {
       console.error('Error adding file to workspace:', error);
