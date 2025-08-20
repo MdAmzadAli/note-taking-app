@@ -370,7 +370,6 @@ export default function WorkspaceModal({
                       autoCapitalize="none"
                       autoCorrect={false}
                       keyboardType="url"
-                      autoFocus
                     />
                     <TouchableOpacity 
                       style={styles.sendButtonModal}
@@ -402,7 +401,6 @@ export default function WorkspaceModal({
                       autoCapitalize="none"
                       autoCorrect={false}
                       keyboardType="url"
-                      autoFocus
                     />
                     <TouchableOpacity 
                       style={styles.sendButtonModal}
@@ -704,6 +702,7 @@ const styles = StyleSheet.create({
     borderColor: '#D1D5DB',
     borderRadius: 6,
     paddingRight: 8,
+    gap: 8,
   },
   urlInputModal: {
     flex: 1,
@@ -719,5 +718,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 4,
   },
 });
