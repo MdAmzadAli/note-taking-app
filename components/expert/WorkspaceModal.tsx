@@ -39,7 +39,8 @@ export default function WorkspaceModal({
   const [files, setFiles] = useState<FileItem[]>([]);
   const [showFileOptions, setShowFileOptions] = useState(false);
   const [activeUrlInput, setActiveUrlInput] = useState<'url' | 'webpage' | null>(null);
-  const [urlInput, setUrlInput] = useState('');
+  const [urlInputs, setUrlInputs] = useState<{[key: string]: string}>({});
+  const [urlInputCount, setUrlInputCount] = useState<{url: number, webpage: number}>({url: 0, webpage: 0});
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [showFileOptionsModal, setShowFileOptionsModal] = useState(false);
@@ -71,7 +72,8 @@ export default function WorkspaceModal({
     setCurrentStep(1);
     setShowFileOptions(false);
     setActiveUrlInput(null);
-    setUrlInput('');
+    setUrlInputs({});
+    setUrlInputCount({url: 0, webpage: 0});
     setKeyboardHeight(0);
     setIsKeyboardVisible(false);
     setShowFileOptionsModal(false);
@@ -87,7 +89,8 @@ export default function WorkspaceModal({
     setCurrentStep(1);
     setShowFileOptions(false);
     setActiveUrlInput(null);
-    setUrlInput('');
+    setUrlInputs({});
+    setUrlInputCount({url: 0, webpage: 0});
     setShowFileOptionsModal(false);
   };
 
@@ -127,11 +130,14 @@ export default function WorkspaceModal({
       return;
     }
     setActiveUrlInput(type);
-    setUrlInput('');
+    if (urlInputCount[type] === 0) {
+      setUrlInputCount(prev => ({...prev, [type]: 1}));
+    }
   };
 
-  const handleAddUrl = () => {
-    if (!urlInput.trim()) {
+  const handleAddUrl = (inputId: string) => {
+    const urlValue = urlInputs[inputId];
+    if (!urlValue?.trim()) {
       Alert.alert('Error', 'Please enter a valid URL');
       return;
     }
@@ -140,12 +146,24 @@ export default function WorkspaceModal({
       id: Date.now().toString(),
       name: activeUrlInput === 'url' ? 'URL Document' : 'Webpage',
       type: activeUrlInput!,
-      source: urlInput.trim()
+      source: urlValue.trim()
     };
     setFiles([...files, newFile]);
-    setUrlInput('');
-    setActiveUrlInput(null);
-    setShowFileOptionsModal(false);
+    
+    // Clear this specific input
+    setUrlInputs(prev => ({...prev, [inputId]: ''}));
+  };
+
+  const handleAddMoreUrl = (type: 'url' | 'webpage') => {
+    if (files.length >= 5) {
+      Alert.alert('Limit Reached', 'Maximum 5 files can be uploaded.');
+      return;
+    }
+    setUrlInputCount(prev => ({...prev, [type]: prev[type] + 1}));
+  };
+
+  const handleUrlInputChange = (inputId: string, value: string) => {
+    setUrlInputs(prev => ({...prev, [inputId]: value}));
   };
 
   const handleRemoveFile = (fileId: string) => {
@@ -334,7 +352,8 @@ export default function WorkspaceModal({
                 onPress={() => {
                   setShowFileOptionsModal(false);
                   setActiveUrlInput(null);
-                  setUrlInput('');
+                  setUrlInputs({});
+                  setUrlInputCount({url: 0, webpage: 0});
                 }}
               >
                 <IconSymbol size={16} name="xmark" color="#6B7280" />
@@ -358,28 +377,37 @@ export default function WorkspaceModal({
                 <Text style={styles.fileOptionModalText}>From Internet</Text>
               </TouchableOpacity>
 
-              {activeUrlInput === 'url' && (
-                <View style={styles.urlInputModalSection}>
-                  <View style={styles.urlInputModalContainer}>
-                    <TextInput
-                      style={styles.urlInputModal}
-                      value={urlInput}
-                      onChangeText={setUrlInput}
-                      placeholder="Enter URL..."
-                      placeholderTextColor="#999999"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="url"
-                    />
-                    <TouchableOpacity 
-                      style={styles.sendButtonModal}
-                      onPress={handleAddUrl}
-                    >
-                      <IconSymbol size={16} name="arrow.right" color="#8B5CF6" />
-                    </TouchableOpacity>
+              {activeUrlInput === 'url' && Array.from({length: urlInputCount.url}, (_, index) => {
+                const inputId = `url-${index}`;
+                return (
+                  <View key={inputId} style={styles.urlInputModalSection}>
+                    <View style={styles.urlInputModalContainer}>
+                      <TextInput
+                        style={styles.urlInputModal}
+                        value={urlInputs[inputId] || ''}
+                        onChangeText={(value) => handleUrlInputChange(inputId, value)}
+                        placeholder="Enter URL..."
+                        placeholderTextColor="#999999"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="url"
+                      />
+                      <TouchableOpacity 
+                        style={styles.sendButtonModal}
+                        onPress={() => handleAddUrl(inputId)}
+                      >
+                        <IconSymbol size={16} name="arrow.right" color="#8B5CF6" />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={styles.addMoreButtonModal}
+                        onPress={() => handleAddMoreUrl('url')}
+                      >
+                        <IconSymbol size={16} name="plus" color="#8B5CF6" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
-              )}
+                );
+              })}
               
               <TouchableOpacity 
                 style={styles.fileOptionModal}
@@ -389,28 +417,37 @@ export default function WorkspaceModal({
                 <Text style={styles.fileOptionModalText}>Add Webpage</Text>
               </TouchableOpacity>
 
-              {activeUrlInput === 'webpage' && (
-                <View style={styles.urlInputModalSection}>
-                  <View style={styles.urlInputModalContainer}>
-                    <TextInput
-                      style={styles.urlInputModal}
-                      value={urlInput}
-                      onChangeText={setUrlInput}
-                      placeholder="Enter webpage URL..."
-                      placeholderTextColor="#999999"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="url"
-                    />
-                    <TouchableOpacity 
-                      style={styles.sendButtonModal}
-                      onPress={handleAddUrl}
-                    >
-                      <IconSymbol size={16} name="arrow.right" color="#8B5CF6" />
-                    </TouchableOpacity>
+              {activeUrlInput === 'webpage' && Array.from({length: urlInputCount.webpage}, (_, index) => {
+                const inputId = `webpage-${index}`;
+                return (
+                  <View key={inputId} style={styles.urlInputModalSection}>
+                    <View style={styles.urlInputModalContainer}>
+                      <TextInput
+                        style={styles.urlInputModal}
+                        value={urlInputs[inputId] || ''}
+                        onChangeText={(value) => handleUrlInputChange(inputId, value)}
+                        placeholder="Enter webpage URL..."
+                        placeholderTextColor="#999999"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="url"
+                      />
+                      <TouchableOpacity 
+                        style={styles.sendButtonModal}
+                        onPress={() => handleAddUrl(inputId)}
+                      >
+                        <IconSymbol size={16} name="arrow.right" color="#8B5CF6" />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={styles.addMoreButtonModal}
+                        onPress={() => handleAddMoreUrl('webpage')}
+                      >
+                        <IconSymbol size={16} name="plus" color="#8B5CF6" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
-              )}
+                );
+              })}
             </View>
           </View>
         </View>
@@ -701,7 +738,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#D1D5DB',
     borderRadius: 6,
-    paddingRight: 8,
     gap: 8,
   },
   urlInputModal: {
@@ -711,6 +747,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1F2937',
     fontFamily: 'Inter',
+    borderRightWidth: 1,
+    borderRightColor: '#E5E7EB',
   },
   sendButtonModal: {
     padding: 8,
@@ -718,6 +756,14 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 4,
+    marginHorizontal: 4,
+  },
+  addMoreButtonModal: {
+    padding: 8,
+    backgroundColor: '#F0F9FF',
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
   },
 });
