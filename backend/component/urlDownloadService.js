@@ -43,7 +43,7 @@ class UrlDownloadService {
       const filePath = path.join(this.uploadDir, fileName);
 
       // Choose http or https based on URL
-      const client = url.startsWith('https:') ? https : https : http;
+      const client = url.startsWith('https:') ? https :  http;
 
       const request = client.get(url, (response) => {
         // Handle redirects
@@ -157,7 +157,7 @@ class UrlDownloadService {
   }
 }
 
-module.exports = new UrlDownloadService()se.pipe(fileStream);
+module.exports = new UrlDownloadService().pipe(fileStream);
 
         fileStream.on('finish', () => {
           fileStream.close();
