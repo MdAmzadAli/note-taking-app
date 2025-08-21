@@ -1,4 +1,3 @@
-
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
@@ -28,7 +27,7 @@ class UrlDownloadService {
   async downloadPDF(url, fileId) {
     return new Promise((resolve, reject) => {
       console.log(`📥 Starting PDF download from: ${url}`);
-      
+
       // Validate URL
       if (!this.isValidUrl(url)) {
         return reject(new Error('Invalid URL format'));
@@ -43,7 +42,7 @@ class UrlDownloadService {
       const filePath = path.join(this.uploadDir, fileName);
 
       // Choose http or https based on URL
-      const client = url.startsWith('https:') ? https :  http;
+      const client = url.startsWith('https:') ? https : http;
 
       const request = client.get(url, (response) => {
         // Handle redirects
@@ -78,98 +77,17 @@ class UrlDownloadService {
 
         response.pipe(fileStream);
 
-        response.on('end', () => {
-          console.log(`✅ Download completed: ${downloadedBytes} bytes`);
-          
-          resolve({
-            success: true,
-            filePath: filePath,
-            filename: fileName,
-            mimetype: 'application/pdf',
-            size: downloadedBytes,
-            originalUrl: url
-          });
-        });
-
-        response.on('error', (error) => {
-          console.error('❌ Response error:', error);
-          reject(new Error(`Download failed: ${error.message}`));
-        });
-      });
-
-      request.on('error', (error) => {
-        console.error('❌ Request error:', error);
-        reject(new Error(`Request failed: ${error.message}`));
-      });
-
-      request.setTimeout(30000, () => {
-        request.destroy();
-        reject(new Error('Download timeout (30 seconds)'));
-      });
-    });
-  }
-
-  /**
-   * Check if URL is likely a PDF
-   * @param {string} url - URL to check
-   * @returns {boolean} Whether URL appears to be a PDF
-   */
-  isPdfUrl(url) {
-    return url.toLowerCase().includes('.pdf') || 
-           url.toLowerCase().includes('pdf') ||
-           url.toLowerCase().includes('application/pdf');
-  }
-
-  /**
-   * Extract filename from URL
-   * @param {string} url - URL to extract filename from
-   * @returns {string} Extracted filename
-   */
-  extractFilenameFromUrl(url) {
-    try {
-      const urlObj = new URL(url);
-      const pathname = urlObj.pathname;
-      const segments = pathname.split('/');
-      const lastSegment = segments[segments.length - 1];
-      
-      if (lastSegment && lastSegment.includes('.')) {
-        return lastSegment;
-      }
-      
-      return 'document';
-    } catch (error) {
-      return 'document';
-    }
-  }
-
-  /**
-   * Validate URL format
-   * @param {string} url - URL to validate
-   * @returns {boolean} Whether URL is valid
-   */
-  isValidUrl(url) {
-    try {
-      new URL(url);
-      return url.startsWith('http://') || url.startsWith('https://');
-    } catch (error) {
-      return false;
-    }
-  }
-}
-
-module.exports = new UrlDownloadService().pipe(fileStream);
-
         fileStream.on('finish', () => {
           fileStream.close();
           console.log(`✅ PDF downloaded successfully: ${fileName} (${downloadedBytes} bytes)`);
-          
+
           // Validate downloaded file
           this.validatePdfFile(filePath)
             .then((isValid) => {
               if (!isValid) {
                 console.warn('⚠️ Downloaded file may not be a valid PDF');
               }
-              
+
               resolve({
                 success: true,
                 filePath: filePath,
@@ -199,6 +117,12 @@ module.exports = new UrlDownloadService().pipe(fileStream);
           this.cleanupFile(filePath);
           reject(new Error(`File write failed: ${error.message}`));
         });
+
+        response.on('error', (error) => {
+          console.error('❌ Response error:', error);
+          this.cleanupFile(filePath);
+          reject(new Error(`Download failed: ${error.message}`));
+        });
       });
 
       request.on('error', (error) => {
@@ -223,7 +147,7 @@ module.exports = new UrlDownloadService().pipe(fileStream);
   async validatePdfFile(filePath) {
     try {
       const buffer = await fs.readFile(filePath);
-      
+
       // Check PDF magic number (first 4 bytes should be %PDF)
       const header = buffer.slice(0, 4).toString();
       if (header !== '%PDF') {
@@ -251,12 +175,12 @@ module.exports = new UrlDownloadService().pipe(fileStream);
       const urlObj = new URL(url);
       const pathname = urlObj.pathname;
       const filename = path.basename(pathname);
-      
+
       if (filename && filename !== '/') {
         // Remove extension for our naming
         return path.parse(filename).name;
       }
-      
+
       // Fallback: use domain name
       return urlObj.hostname.replace(/\./g, '_');
     } catch (error) {
