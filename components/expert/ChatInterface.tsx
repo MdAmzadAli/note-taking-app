@@ -173,15 +173,34 @@ export default function ChatInterface({
     setIsFilePreviewVisible(true);
   };
 
-  // Helper function to render formatted text with markdown-like styling
+  // Helper function to render formatted text with markdown-like styling including tables
   const renderFormattedText = (text: string) => {
     const lines = text.split('\n');
     const elements: React.ReactNode[] = [];
     let keyCounter = 0;
+    let tableRows: string[] = [];
+    let inTable = false;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       
+      // Check if this line is part of a table
+      if (line.includes('|') && line.trim().length > 0) {
+        if (!inTable) {
+          inTable = true;
+          tableRows = [];
+        }
+        tableRows.push(line);
+        continue;
+      } else if (inTable) {
+        // End of table, render it
+        if (tableRows.length > 0) {
+          elements.push(renderTable(tableRows, keyCounter++));
+          tableRows = [];
+          inTable = false;
+        }
+      }
+
       // Skip empty lines but add spacing
       if (line.trim() === '') {
         elements.push(<View key={keyCounter++} style={styles.lineSpacing} />);
@@ -219,7 +238,62 @@ export default function ChatInterface({
       );
     }
 
+    // Handle any remaining table at the end
+    if (inTable && tableRows.length > 0) {
+      elements.push(renderTable(tableRows, keyCounter++));
+    }
+
     return <View>{elements}</View>;
+  };
+
+  // Helper function to render tables
+  const renderTable = (tableRows: string[], key: number) => {
+    if (tableRows.length < 2) return null;
+
+    const rows = tableRows.map(row => 
+      row.split('|').map(cell => cell.trim()).filter(cell => cell.length > 0)
+    );
+
+    // Filter out separator rows (those with just dashes)
+    const dataRows = rows.filter(row => 
+      !row.every(cell => cell.match(/^[-\s]*$/))
+    );
+
+    if (dataRows.length === 0) return null;
+
+    const headerRow = dataRows[0];
+    const bodyRows = dataRows.slice(1);
+
+    return (
+      <ScrollView 
+        key={key} 
+        horizontal 
+        style={styles.tableContainer}
+        showsHorizontalScrollIndicator={true}
+      >
+        <View style={styles.table}>
+          {/* Header Row */}
+          <View style={styles.tableRow}>
+            {headerRow.map((cell, cellIndex) => (
+              <View key={cellIndex} style={[styles.tableCell, styles.tableHeaderCell]}>
+                <Text style={styles.tableHeaderText}>{cell}</Text>
+              </View>
+            ))}
+          </View>
+          
+          {/* Body Rows */}
+          {bodyRows.map((row, rowIndex) => (
+            <View key={rowIndex} style={styles.tableRow}>
+              {row.map((cell, cellIndex) => (
+                <View key={cellIndex} style={styles.tableCell}>
+                  <Text style={styles.tableCellText}>{formatInlineText(cell)}</Text>
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    );
   };
 
   // Helper function to format inline text (bold, italic, etc.)
@@ -429,7 +503,7 @@ export default function ChatInterface({
                       <Text style={styles.loadingText}>Analyzing documents...</Text>
                     </View>
                   ) : (
-                    <>
+                    <View style={styles.aiMessageContent}>
                       {renderFormattedText(msg.ai)}
                       {msg.sources && msg.sources.length > 0 && (
                         <TouchableOpacity 
@@ -442,7 +516,7 @@ export default function ChatInterface({
                           </Text>
                         </TouchableOpacity>
                       )}
-                    </>
+                    </View>
                   )}
                 </View>
               </View>
@@ -758,6 +832,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 20,
     maxWidth: '85%',
+  },
+  aiMessageContent: {
+    flex: 1,
   },
   pdfAiMessageText: {
     fontSize: 16,
@@ -1088,5 +1165,43 @@ const styles = StyleSheet.create({
   },
   lineSpacing: {
     height: 8,
+  },
+  // Table styles
+  tableContainer: {
+    marginVertical: 12,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 8,
+    padding: 4,
+  },
+  table: {
+    minWidth: '100%',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#444444',
+  },
+  tableCell: {
+    minWidth: 100,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRightWidth: 1,
+    borderRightColor: '#444444',
+    justifyContent: 'center',
+  },
+  tableHeaderCell: {
+    backgroundColor: '#333333',
+  },
+  tableHeaderText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  tableCellText: {
+    fontSize: 13,
+    color: '#CCCCCC',
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

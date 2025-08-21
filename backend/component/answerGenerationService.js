@@ -1,4 +1,3 @@
-
 class AnswerGenerationService {
   constructor(embeddingService, searchService) {
     this.embeddingService = embeddingService;
@@ -29,7 +28,7 @@ class AnswerGenerationService {
 
       // Step 0: Query recognition and refinement
       const step0Result = await this.step0_QueryRecognition(query, relevantChunks);
-      
+
       console.log(`📊 Step 0 Result: Type=${step0Result.queryType}, Refined="${step0Result.refinedQuery}"`);
 
       // Route to appropriate processing based on query type
@@ -103,7 +102,7 @@ Return ONLY this JSON format:
     try {
       const responseText = response.candidates[0].content.parts[0].text;
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      
+
       if (jsonMatch) {
         const result = JSON.parse(jsonMatch[0]);
         console.log(`✅ Step 0: ${result.queryType} query identified - ${result.reasoning}`);
@@ -155,7 +154,7 @@ Return ONLY this JSON format:
 
     const numberedContexts = relevantChunks.map((chunk, index) => {
       let locationInfo = '';
-      
+
       // Build location info only if page/line data exists
       if (chunk.metadata.pageNumber !== undefined && chunk.metadata.pageNumber !== null) {
         locationInfo = `Page ${chunk.metadata.pageNumber}`;
@@ -165,7 +164,7 @@ Return ONLY this JSON format:
       } else {
         locationInfo = 'Content';
       }
-      
+
       return `[Context ${index + 1} - Doc: ${chunk.metadata.fileName} | ${locationInfo}]: ${chunk.text}`;
     });
 
@@ -229,7 +228,7 @@ Return a structured JSON with this format:
     try {
       const responseText = response.candidates[0].content.parts[0].text;
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      
+
       if (jsonMatch) {
         const structuredData = JSON.parse(jsonMatch[0]);
         console.log(`✅ Step 1: Extracted ${structuredData.summary?.totalValues || 0} values from ${structuredData.summary?.totalContexts || 0} contexts`);
@@ -264,7 +263,8 @@ Return a structured JSON with this format:
   async step2_ComputationalProcessing(refinedQuery, originalQuery, structuredData, relevantChunks) {
     console.log(`🔢 Step 2: Computational processing with structured data...`);
 
-    const computationalPrompt = `You are an expert computational analyst. Perform the requested calculation using the structured data provided.
+    const computationalPrompt = `
+You are an expert analyst specialized in performing calculations and data analysis using the structured data provided.
 
 ORIGINAL USER QUERY: ${originalQuery}
 REFINED QUERY: ${refinedQuery}
@@ -273,13 +273,34 @@ STRUCTURED DATA:
 ${JSON.stringify(structuredData, null, 2)}
 
 INSTRUCTIONS:
-1. Use the structured data to perform accurate calculations
-2. Standardize all values (convert 1.2k to 1200, 1.2M to 1,200,000, etc.)
-3. Handle different currencies appropriately
-4. Explain your calculation steps clearly and in easy to understand language with respect to the user's point of view
-5. Use **bold text** for important numbers and results
-6. Structure your answer with clear sections with one liner summary of answer at top like: "The total cost of bookings is **$12,345.67**
-7. Reference specific contexts when citing data
+1. **START WITH A CLEAR SUMMARY**: Begin with a one-line answer like "The total cost is **$12,345.67**"
+2. **USE TABLES FOR DATA PRESENTATION**: When showing multiple values, costs, or comparisons, format as tables:
+   | Item | Value | Notes |
+   |------|-------|-------|
+   | Cost A | $1,200 | From source 1 |
+   | Cost B | $2,300 | From source 2 |
+
+3. **STRUCTURE WITH CLEAR SECTIONS**:
+   - ### Summary
+   - ### Detailed Breakdown  
+   - ### Calculation Steps
+   - ### Key Insights
+
+4. **USE VISUAL FORMATTING**:
+   - **Bold** for important numbers and results
+   - *Italic* for emphasis
+   - Bullet points for lists
+   - Tables for structured data
+   - Clear headings with ###
+
+5. **CALCULATION STEPS**: Show step-by-step calculations in easy-to-follow format:
+   1. **Step 1**: Identify base values
+   2. **Step 2**: Apply calculations  
+   3. **Step 3**: Final result
+
+6. **STANDARDIZE VALUES**: Convert 1.2k to 1,200, 1,200,000 to 1,200,000, etc.
+7. **HANDLE CURRENCIES**: Appropriately process different currency formats
+8. **REFERENCE SOURCES**: Clearly indicate which contexts provided each piece of data
 
 CRITICAL: After your answer, list which contexts you actually used:
 
@@ -311,7 +332,7 @@ ANSWER:`;
         .split(',')
         .map(s => parseInt(s.trim()))
         .filter(num => !isNaN(num) && num >= 1 && num <= relevantChunks.length);
-      
+
       answer = fullResponse.replace(/---\s*CONTEXTS_USED:.*$/s, '').trim();
       console.log(`🎯 Step 2: Used ${usedContextNumbers.length} contexts: [${usedContextNumbers.join(', ')}]`);
     } else {
@@ -342,7 +363,7 @@ ANSWER:`;
         if (chunk.metadata.pageNumber !== undefined && chunk.metadata.pageNumber !== null) {
           source.pageNumber = chunk.metadata.pageNumber;
         }
-        
+
         if (chunk.metadata.startLine !== undefined && chunk.metadata.startLine !== null) {
           source.startLine = chunk.metadata.startLine;
           source.endLine = chunk.metadata.endLine;
@@ -377,7 +398,7 @@ ANSWER:`;
       .map((chunk, index) => {
         const confidence = (chunk.score * 100).toFixed(1);
         let locationInfo = '';
-        
+
         // Build location info only if page/line data exists
         if (chunk.metadata.pageNumber !== undefined && chunk.metadata.pageNumber !== null) {
           locationInfo = `Page ${chunk.metadata.pageNumber}`;
@@ -387,35 +408,57 @@ ANSWER:`;
         } else {
           locationInfo = 'Content';
         }
-        
+
         return `[Context ${index + 1} - ${chunk.metadata.fileName} - ${locationInfo} - Relevance: ${confidence}%]: ${chunk.text}`;
       })
       .join('\n\n');
 
-    const factualPrompt = `You are an expert AI assistant providing accurate, detailed answers based on document content.
+    const factualPrompt = `
+You are an expert document analyst. Please provide a comprehensive and accurate answer based on the provided context. 
 
-ORIGINAL USER QUERY: ${originalQuery}
-REFINED QUERY: ${refinedQuery}
+IMPORTANT: Structure your response to be visually engaging and easy to understand. Use tables, bullet points, and clear formatting wherever possible.
 
-CONTEXT FROM DOCUMENTS:
-${context}
+QUERY: ${query}
+
+CONTEXT INFORMATION:
+${contextText}
 
 INSTRUCTIONS:
-1. Answer the refined query using the provided context
-2. Be comprehensive and well-structured with proper formatting
-3. Use **bold text** for important headings and key terms
-4. Use bullet points (•) or numbered lists for multiple items
-5. Structure complex answers with clear sections
-6. Include specific details and examples when relevant
-7. Reference context numbers when citing information (e.g., [Context 1])
-8. If multiple documents provide different perspectives, present them clearly
+1. Base your answer strictly on the provided context
+2. Be comprehensive and detailed in your response
+3. **PRIORITIZE VISUAL FORMATTING**: Use tables, bullet points, numbered lists, and clear sections
+4. **CREATE TABLES** when comparing data, showing categories, or presenting structured information
+5. **USE MARKDOWN FORMATTING**: 
+   - **Bold** for important terms and headings
+   - *Italic* for emphasis
+   - Tables with | Column 1 | Column 2 | format
+   - Bullet points with - or *
+   - Numbered lists with 1. 2. 3.
+6. **STRUCTURE WITH CLEAR SECTIONS**: Use ### headings for main sections
+7. **EXPLAIN IN SIMPLE TERMS**: Break down complex concepts into easy-to-understand language
+8. If the context doesn't contain enough information, clearly state this
+9. Use specific quotes and references where relevant
+10. Provide specific examples from the context when possible
 
-CRITICAL: After your answer, identify which contexts you actually used:
+**FORMATTING EXAMPLES TO FOLLOW:**
 
----
-CONTEXTS_USED: [list only the context numbers (e.g., "1,3,5") that you referenced in your answer]
+For comparisons, use tables like:
+| Category | Item A | Item B | Item C |
+|----------|--------|--------|--------|
+| Risk Level | High | Medium | Low |
+| Cost | $100 | $200 | $150 |
 
-ANSWER:`;
+For lists, use bullet points:
+- **Key Point 1**: Explanation here
+- **Key Point 2**: More details
+- **Key Point 3**: Additional information
+
+For processes, use numbered steps:
+1. **First Step**: Description
+2. **Second Step**: More details
+3. **Final Step**: Conclusion
+
+Please provide a well-structured, visually formatted, and informative response based on the available context.`;
 
     const response = await this.embeddingService.genaiChat.models.generateContent({
       model: 'gemini-2.5-flash-lite', // Main model for Step 2
@@ -440,7 +483,7 @@ ANSWER:`;
         .split(',')
         .map(s => parseInt(s.trim()) - 1) // Convert to 0-based indexing
         .filter(idx => !isNaN(idx) && idx >= 0 && idx < relevantChunks.length);
-      
+
       answer = fullResponse.replace(/---\s*CONTEXTS_USED:.*$/s, '').trim();
       console.log(`🎯 Step 2: Used ${usedContextIndices.length} contexts: [${usedContextIndices.map(i => i + 1).join(', ')}]`);
     } else {
@@ -468,7 +511,7 @@ ANSWER:`;
       if (chunk.metadata.pageNumber !== undefined && chunk.metadata.pageNumber !== null) {
         source.pageNumber = chunk.metadata.pageNumber;
       }
-      
+
       if (chunk.metadata.startLine !== undefined && chunk.metadata.startLine !== null) {
         source.startLine = chunk.metadata.startLine;
         source.endLine = chunk.metadata.endLine;
@@ -496,7 +539,7 @@ ANSWER:`;
       'revenue', 'profit', 'loss', 'financial', 'money', 'currency', 'dollar',
       'rupee', 'euro', 'pound', '$', '₹', '€', '£', 'calculate', 'calculation'
     ];
-    
+
     const queryLower = query.toLowerCase();
     return financialKeywords.some(keyword => queryLower.includes(keyword));
   }
@@ -512,12 +555,12 @@ ANSWER:`;
       'what are', 'list all', 'show me', 'find all', 'identify',
       'how many', 'which ones', 'what kind'
     ];
-    
+
     const queryLower = query.toLowerCase();
     const complexKeywordCount = complexIndicators.filter(keyword => 
       queryLower.includes(keyword)
     ).length;
-    
+
     return complexKeywordCount >= 2 || 
            query.length > 100 || 
            this.isFinancialQuery(query);
