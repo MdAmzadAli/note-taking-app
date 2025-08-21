@@ -311,17 +311,19 @@ app.post('/upload/workspace', upload.array('files', 5), async (req, res) => {
           let mimetype;
 
           if (urlInfo.type === 'from_url') {
-            const downloadedData = await urlDownloadService.downloadFile(urlInfo.url);
-            fileContent = downloadedData.content;
-            originalName = downloadedData.filename;
-            mimetype = downloadedData.mimetype;
-            console.log(`✅ Downloaded from URL: ${originalName} (${mimetype})`);
+            const fileId = uuidv4();
+            const downloadResult = await urlDownloadService.downloadPDF(urlInfo.url, fileId);
+            fileContent = await fs.readFile(downloadResult.filePath);
+            originalName = downloadResult.filename;
+            mimetype = downloadResult.mimetype;
+            console.log(`✅ Downloaded PDF from URL: ${originalName} (${mimetype})`);
           } else if (urlInfo.type === 'webpage') {
-            const extractedText = await webpageTextExtractorService.extractAndCleanText(urlInfo.url);
-            fileContent = Buffer.from(extractedText.cleanedText, 'utf-8');
-            originalName = `${urlInfo.type}_${urlInfo.url.substring(urlInfo.url.lastIndexOf('/') + 1) || 'webpage'}.txt`;
-            mimetype = 'text/plain';
-            console.log(`✅ Extracted and cleaned text from webpage.`);
+            const fileId = uuidv4();
+            const extractResult = await webpageTextExtractorService.extractWebpageText(urlInfo.url, fileId);
+            fileContent = Buffer.from(extractResult.text, 'utf-8');
+            originalName = extractResult.fileName;
+            mimetype = extractResult.mimetype;
+            console.log(`✅ Extracted and cleaned text from webpage: ${originalName}`);
           } else {
             throw new Error(`Unsupported URL type: ${urlInfo.type}`);
           }

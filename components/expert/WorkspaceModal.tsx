@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ActivityIndicator, ScrollView, Alert, KeyboardAvoidingView, Platform, Dimensions, Keyboard } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -17,7 +16,7 @@ interface WorkspaceModalProps {
 interface FileItem {
   id: string;
   name: string;
-  type: 'device' | 'url' | 'webpage';
+  type: 'device' | 'from_url' | 'webpage'; // Changed 'url' to 'from_url' to match backend expectation
   source: string; // file name for device, URL for others
   file?: any; // actual file object for device uploads
 }
@@ -114,13 +113,13 @@ export default function WorkspaceModal({
           source: file.name,
           file: file
         }));
-        
+
         setFiles([...files, ...newFiles]);
         setShowFileOptionsModal(false);
 
         if (result.assets.length > remainingSlots) {
           Alert.alert(
-            'Some files not added', 
+            'Some files not added',
             `Only ${filesToAdd.length} files were added due to the 5-file limit. ${result.assets.length - remainingSlots} files were skipped.`
           );
         }
@@ -141,20 +140,23 @@ export default function WorkspaceModal({
   };
 
   const handleAddUrl = () => {
-    if (!urlInput.trim()) {
-      Alert.alert('Error', 'Please enter a valid URL');
-      return;
-    }
+    if (urlInput.trim() && activeUrlInput) {
+      // Map frontend types to backend expected types
+      const backendType = activeUrlInput === 'url' ? 'from_url' : 'webpage';
 
-    const newFile: FileItem = {
-      id: Date.now().toString(),
-      name: activeUrlInput === 'url' ? 'URL Document' : 'Webpage',
-      type: activeUrlInput!,
-      source: urlInput.trim()
-    };
-    setFiles([...files, newFile]);
-    setUrlInput('');
-    setActiveUrlInput(null);
+      const newFile: FileItem = {
+        id: Date.now().toString(),
+        name: urlInput.trim(),
+        type: backendType, // 'from_url' or 'webpage'
+        source: urlInput.trim(),
+        isUrl: true,
+      };
+      setFiles([...files, newFile]);
+      setUrlInput('');
+      setActiveUrlInput(null);
+    } else {
+      Alert.alert('Error', 'Please enter a valid URL');
+    }
   };
 
   const handleRemoveFile = (fileId: string) => {
@@ -176,7 +178,7 @@ export default function WorkspaceModal({
         <Text style={styles.modalTitle}>Create New Workspace</Text>
         <Text style={styles.stepIndicator}>Step 1 of 2</Text>
         <Text style={styles.modalSubtitle}>
-          {isBackendConnected 
+          {isBackendConnected
             ? 'Enter workspace details'
             : 'Backend is offline. Files will be stored locally.'}
         </Text>
@@ -209,18 +211,18 @@ export default function WorkspaceModal({
       </ScrollView>
 
       <View style={styles.buttonsSection}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[
-            styles.modalButton, 
+            styles.modalButton,
             { opacity: (isLoading || !workspaceName.trim()) ? 0.5 : 1 }
-          ]} 
+          ]}
           onPress={handleNext}
           disabled={isLoading || !workspaceName.trim()}
         >
           <Text style={styles.modalButtonText}>Next</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.modalButton, styles.cancelButton]} 
+        <TouchableOpacity
+          style={[styles.modalButton, styles.cancelButton]}
           onPress={handleClose}
           disabled={isLoading}
         >
@@ -246,10 +248,10 @@ export default function WorkspaceModal({
             <View key={file.id} style={styles.fileItem}>
               <View style={styles.fileInfo}>
                 <View style={styles.fileIconContainer}>
-                  <IconSymbol 
-                    size={16} 
-                    name={file.type === 'device' ? 'doc.text' : file.type === 'webpage' ? 'globe' : 'link'} 
-                    color="#8B5CF6" 
+                  <IconSymbol
+                    size={16}
+                    name={file.type === 'device' ? 'doc.text' : file.type === 'webpage' ? 'globe' : 'link'}
+                    color="#8B5CF6"
                   />
                 </View>
                 <View style={styles.fileDetails}>
@@ -257,12 +259,12 @@ export default function WorkspaceModal({
                     {file.type === 'device' ? file.source : file.source}
                   </Text>
                   <Text style={styles.fileType}>
-                    {file.type === 'device' ? 'From Device' : 
-                     file.type === 'url' ? 'From URL' : 'Webpage'}
+                    {file.type === 'device' ? 'From Device' :
+                     file.type === 'from_url' ? 'From Internet' : 'Webpage'}
                   </Text>
                 </View>
               </View>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.removeFileButton}
                 onPress={() => handleRemoveFile(file.id)}
               >
@@ -274,7 +276,7 @@ export default function WorkspaceModal({
 
         {files.length < 5 && (
           <View style={styles.addFileSection}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.addFileButton}
               onPress={() => setShowFileOptionsModal(true)}
             >
@@ -286,11 +288,11 @@ export default function WorkspaceModal({
       </View>
 
       <View style={styles.buttonsSection}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[
-            styles.modalButton, 
+            styles.modalButton,
             { opacity: isLoading ? 0.5 : 1 }
-          ]} 
+          ]}
           onPress={handleCreate}
           disabled={isLoading}
         >
@@ -300,8 +302,8 @@ export default function WorkspaceModal({
             <Text style={styles.modalButtonText}>Create Workspace</Text>
           )}
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.modalButton, styles.cancelButton]} 
+        <TouchableOpacity
+          style={[styles.modalButton, styles.cancelButton]}
           onPress={handleBack}
           disabled={isLoading}
         >
@@ -311,14 +313,14 @@ export default function WorkspaceModal({
     </View>
   );
 
-  const modalTransform = isKeyboardVisible && Platform.OS === 'ios' 
-    ? Math.max(-keyboardHeight / 3, -100) 
+  const modalTransform = isKeyboardVisible && Platform.OS === 'ios'
+    ? Math.max(-keyboardHeight / 3, -100)
     : 0;
 
   return (
     <Modal visible={isVisible} transparent animationType="slide">
       <View style={styles.modalOverlay}>
-        <View 
+        <View
           ref={modalContentRef}
           style={[
             styles.modalContent,
@@ -338,7 +340,7 @@ export default function WorkspaceModal({
           <View style={styles.fileOptionsModal}>
             <View style={styles.fileOptionsHeader}>
               <Text style={styles.fileOptionsTitle}>Add File</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.closeOptionsButton}
                 onPress={() => {
                   setShowFileOptionsModal(false);
@@ -351,15 +353,15 @@ export default function WorkspaceModal({
             </View>
 
             <View style={styles.fileOptionsContent}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.fileOptionModal}
                 onPress={handleAddFromDevice}
               >
                 <IconSymbol size={20} name="phone" color="#4B5563" />
                 <Text style={styles.fileOptionModalText}>From Device</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={styles.fileOptionModal}
                 onPress={() => handleUrlOptionClick('url')}
               >
@@ -380,7 +382,7 @@ export default function WorkspaceModal({
                       autoCorrect={false}
                       keyboardType="url"
                     />
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.sendButtonModal}
                       onPress={handleAddUrl}
                     >
@@ -389,8 +391,8 @@ export default function WorkspaceModal({
                   </View>
                 </View>
               )}
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={styles.fileOptionModal}
                 onPress={() => handleUrlOptionClick('webpage')}
               >
@@ -411,7 +413,7 @@ export default function WorkspaceModal({
                       autoCorrect={false}
                       keyboardType="url"
                     />
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.sendButtonModal}
                       onPress={handleAddUrl}
                     >
