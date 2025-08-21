@@ -109,8 +109,8 @@ class EmbeddingService {
         throw new Error("Texts must be a non-empty array");
       }
 
-      if (texts.length > 168) {
-        throw new Error("Batch size cannot exceed 168 texts per API call");
+      if (texts.length > 100) {
+        throw new Error("Batch size cannot exceed 100 texts per API call");
       }
 
       const config = this.embeddingConfigs[taskType];

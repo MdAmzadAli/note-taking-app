@@ -1,4 +1,3 @@
-
 const fs = require('fs').promises;
 const fsSync = require('fs');
 
@@ -15,7 +14,7 @@ class DocumentIndexingService {
       console.log(`📄 Starting document indexing for: ${fileName} (${fileId})`);
       console.log(`🏢 Indexing with workspaceId: ${workspaceId || 'null'}`);
       console.log(`📋 Content type: ${contentType}`);
-      
+
       if (!this.vectorDatabaseService.isInitialized()) {
         throw new Error("Vector database not initialized");
       }
@@ -25,7 +24,7 @@ class DocumentIndexingService {
       if (documentExists) {
         console.log(`📄 Document already indexed: ${fileId} (found existing chunks)`);
         const chunksCount = await this.vectorDatabaseService.getDocumentChunkCount(fileId);
-        
+
         return {
           success: true,
           message: 'Document already indexed',
@@ -63,7 +62,7 @@ class DocumentIndexingService {
         // Log PDF analysis
         const structureAnalysis = this.chunkingService.analyzePDFStructure(pdfData);
         const chunkingStats = this.chunkingService.getChunkingStats(chunks);
-        
+
         console.log(`📊 PDF Processing Summary:`, {
           ...pdfResult.summary,
           structureAnalysis: structureAnalysis.recommendedStrategy,
@@ -120,7 +119,8 @@ class DocumentIndexingService {
   // Generate embeddings for chunks in batches
   async generateEmbeddingsForChunks(chunks) {
     const allEmbeddings = [];
-    const batchSize = 168; // Maximum chunks per API call
+    // Process in batches of 100 (API limit)
+    const batchSize = 100;
 
     for (let batchStart = 0; batchStart < chunks.length; batchStart += batchSize) {
       const batchEnd = Math.min(batchStart + batchSize, chunks.length);
