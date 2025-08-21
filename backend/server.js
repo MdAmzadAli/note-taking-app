@@ -22,6 +22,9 @@ const webpageTextExtractorService = require('./component/webpageTextExtractorSer
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Ensure pdfService is imported if used elsewhere, though not directly in this snippet
+// const pdfService = require('./services/pdfService'); // Assuming this exists if /pdf/:id/page/:pageNumber is used
+
 // Trust proxy - required for Replit environment with proper configuration
 app.set('trust proxy', 1); // trust first proxy
 
@@ -302,33 +305,48 @@ app.post('/upload/workspace', upload.array('files', 5), async (req, res) => {
     if (urls && urls.length > 0) {
       for (let i = 0; i < urls.length; i++) {
         const urlInfo = urls[i];
+        const fileId = uuidv4(); // Generate fileId here for use in both download/extract
 
         try {
           console.log(`🌐 Processing URL ${i + 1}/${urls.length}: ${urlInfo.url} (${urlInfo.type})`);
 
-          let fileContent;
-          let originalName;
-          let mimetype;
+          let fileContent, originalName, mimetype;
 
-          if (urlInfo.type === 'from_url') {
-            const fileId = uuidv4();
+          if (urlInfo.type === 'from_url' || urlInfo.type === 'url') {
+            // Download PDF from URL
+            console.log(`📥 Downloading PDF from URL: ${urlInfo.url}`);
             const downloadResult = await urlDownloadService.downloadPDF(urlInfo.url, fileId);
+
+            if (!downloadResult.success) {
+              throw new Error(`Failed to download PDF: ${downloadResult.error || 'Unknown error'}`);
+            }
+
+            // Read the downloaded file
             fileContent = await fs.readFile(downloadResult.filePath);
-            originalName = downloadResult.filename;
+            originalName = downloadResult.fileName;
             mimetype = downloadResult.mimetype;
-            console.log(`✅ Downloaded PDF from URL: ${originalName} (${mimetype})`);
+
+            // Clean up the temporary file
+            await fs.unlink(downloadResult.filePath);
+            console.log(`🧹 Cleaned up temporary download file: ${downloadResult.filePath}`);
+
           } else if (urlInfo.type === 'webpage') {
-            const fileId = uuidv4();
+            // Extract text from webpage
+            console.log(`🌐 Extracting text from webpage: ${urlInfo.url}`);
             const extractResult = await webpageTextExtractorService.extractWebpageText(urlInfo.url, fileId);
-            fileContent = Buffer.from(extractResult.text, 'utf-8');
+
+            if (!extractResult.success) {
+              throw new Error(`Failed to extract webpage text: ${extractResult.error || 'Unknown error'}`);
+            }
+
+            fileContent = Buffer.from(extractResult.text, 'utf8');
             originalName = extractResult.fileName;
             mimetype = extractResult.mimetype;
-            console.log(`✅ Extracted and cleaned text from webpage: ${originalName}`);
+
           } else {
             throw new Error(`Unsupported URL type: ${urlInfo.type}`);
           }
 
-          const fileId = uuidv4();
           const filePath = path.join(UPLOADS_DIR, `${fileId}-${originalName}`);
           await fs.writeFile(filePath, fileContent);
           console.log(`✅ Saved processed content to temporary path: ${filePath}`);
@@ -611,7 +629,11 @@ app.get('/pdf/:id/page/:pageNumber', async (req, res) => {
       return res.status(404).json({ error: 'PDF file not found' });
     }
 
-    const pageImage = await pdfService.renderPage(fileInfo.path, page);
+    // Assuming pdfService is available and has a renderPage method
+    if (!global.pdfService) { // Check if pdfService is globally available or imported
+        return res.status(500).json({ error: 'PDF rendering service not available' });
+    }
+    const pageImage = await global.pdfService.renderPage(fileInfo.path, page); // Use global or ensure import
 
     res.setHeader('Content-Type', 'image/jpeg');
     res.setHeader('Cache-Control', 'public, max-age=3600');
@@ -691,21 +713,16 @@ app.post('/rag/index/:id', async (req, res) => {
 
     console.log(`🔍 Looking for file metadata: ${id}`);
 
-    // Get file metadata
-    const metadataPath = path.join(__dirname, 'metadata', `${id}.json`);
-    console.log(`📁 Metadata path: ${metadataPath}`);
-    console.log(`📁 Metadata exists: ${fsSync.existsSync(metadataPath)}`);
+    // Get file metadata from fileService
+    const fileInfo = await fileService.getFileMetadata(id);
 
-    if (!fsSync.existsSync(metadataPath)) {
-      console.error(`❌ Metadata file not found: ${metadataPath}`);
+    if (!fileInfo) {
+      console.error(`❌ File metadata not found for ID: ${id}`);
       return res.status(404).json({ error: 'File not found' });
     }
+    console.log(`📊 File metadata:`, JSON.stringify(fileInfo, null, 2));
 
-    const metadata = JSON.parse(fsSync.readFileSync(metadataPath, 'utf8'));
-    console.log(`📊 File metadata:`, JSON.stringify(metadata, null, 2));
-
-    // Use the actual file path from metadata instead of reconstructing it
-    const filePath = metadata.path;
+    const filePath = fileInfo.path;
     console.log(`📁 File path from metadata: ${filePath}`);
     console.log(`📁 File exists: ${fsSync.existsSync(filePath)}`);
 
@@ -718,18 +735,18 @@ app.post('/rag/index/:id', async (req, res) => {
     console.log(`📄 Indexing parameters:`, {
       fileId: id,
       filePath: filePath,
-      fileName: metadata.originalName,
+      fileName: fileInfo.originalName,
       workspaceId: workspaceId,
-      cloudinaryData: metadata.cloudinary
+      cloudinaryData: fileInfo.cloudinary
     });
 
     // Index the document using RAG service
     const result = await ragService.indexDocument(
       id,
       filePath,
-      metadata.originalName,
+      fileInfo.originalName,
       workspaceId, // Pass workspaceId from request body
-      metadata.cloudinary
+      fileInfo.cloudinary
     );
 
     const processingTime = Date.now() - startTime;
