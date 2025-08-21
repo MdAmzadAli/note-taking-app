@@ -53,7 +53,7 @@ class FileService {
           };
           formData.append('files', mobileFile as any);
           deviceFiles.push(item);
-        } else if (item.type === 'url' || item.type === 'webpage') {
+        } else if (item.type === 'from_url' || item.type === 'webpage') {
           console.log(`🌐 Adding URL ${index + 1}: ${item.source}`);
           urls.push({
             url: item.source,
@@ -119,6 +119,7 @@ class FileService {
       });
 
       console.log('🔄 Sending batch upload request to:', API_ENDPOINTS.uploadWorkspace);
+      console.log('formData is :',Object.fromEntries(formData));
       const response = await fetch(API_ENDPOINTS.uploadWorkspace, {
         method: 'POST',
         body: formData,

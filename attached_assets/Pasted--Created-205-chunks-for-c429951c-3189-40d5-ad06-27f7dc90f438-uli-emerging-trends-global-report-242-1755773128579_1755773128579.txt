@@ -1,0 +1,39 @@
+📄 Created 205 chunks for c429951c-3189-40d5-ad06-27f7dc90f438_uli-emerging-trends-global-report-2425.pdf
+🔄 Processing batch 1/2 (168 chunks)
+🔧 Generating batch document embeddings for 168 texts with task type: RETRIEVAL_DOCUMENT
+❌ Batch document embedding generation failed: {"error":{"code":400,"message":"* BatchEmbedContentsRequest.requests: at most 100 requests can be in one batch\n","status":"INVALID_ARGUMENT"}}
+❌ Document indexing failed for c429951c-3189-40d5-ad06-27f7dc90f438_uli-emerging-trends-global-report-2425.pdf: ApiError: {"error":{"code":400,"message":"* BatchEmbedContentsRequest.requests: at most 100 requests can be in one batch\n","status":"INVALID_ARGUMENT"}}
+    at throwErrorIfNotOK (/home/runner/workspace/backend/node_modules/@google/genai/dist/node/index.cjs:13773:30)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async /home/runner/workspace/backend/node_modules/@google/genai/dist/node/index.cjs:13549:13
+    at async EmbeddingService.generateBatchEmbeddings (/home/runner/workspace/backend/component/embeddingService.js:124:24)
+    at async DocumentIndexingService.generateEmbeddingsForChunks (/home/runner/workspace/backend/component/documentIndexingService.js:135:31)
+    at async DocumentIndexingService.indexDocument (/home/runner/workspace/backend/component/documentIndexingService.js:98:26)
+    at async /home/runner/workspace/backend/server.js:376:35 {
+  status: 400
+}
+⚠️ RAG indexing failed for URL 1 (continuing anyway): {"error":{"code":400,"message":"* BatchEmbedContentsRequest.requests: at most 100 requests can be in one batch\n","status":"INVALID_ARGUMENT"}}
+✅ Successfully processed URL 1: https://www.pwc.com/gx/en/industries/financial-services/assets/uli-emerging-trends-global-report-2425.pdf?utm_source=chatgpt.com
+📤 Workspace mixed upload completed: 1/1 items processed
+🌐 CORS check for origin: undefined
+✅ No origin - allowing
+🌐 GET /rag/health - Content-Type: application/json - Origin: undefined
+🏥 RAG: Health check requested
+📍 Request from: 10.84.2.11
+📋 User Agent: okhttp/4.12.0
+🔄 Performing RAG service health check...
+📊 Health check result: {
+  "status": "healthy",
+  "qdrant": true,
+  "genaiEmbedding": true,
+  "genaiChat": true,
+  "initialized": true,
+  "embeddingConfigs": [
+    "document",
+    "query",
+    "similarity",
+    "code",
+    "classification",
+    "clustering",
+    "factVerification"
+  ]

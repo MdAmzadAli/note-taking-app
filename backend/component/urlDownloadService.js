@@ -131,11 +131,11 @@ class UrlDownloadService {
         reject(new Error(`Download failed: ${error.message}`));
       });
 
-      request.setTimeout(30000, () => {
-        request.destroy();
-        this.cleanupFile(filePath);
-        reject(new Error('Download timeout (30 seconds)'));
-      });
+      // request.setTimeout(30000, () => {
+      //   request.destroy();
+      //   this.cleanupFile(filePath);
+      //   reject(new Error('Download timeout (30 seconds)'));
+      // });
     });
   }
 
