@@ -1,3 +1,4 @@
+
 class SearchService {
   constructor(embeddingService, vectorDatabaseService) {
     this.embeddingService = embeddingService;
@@ -29,10 +30,10 @@ class SearchService {
     console.log(`🏢 Workspace search: ${fileIds.length} files, limit: ${totalLimit}`);
     console.log(`📄 File IDs: [${fileIds.join(', ')}]`);
     console.log(`🏢 Workspace ID: ${workspaceId}`);
-
+    
     const queryEmbedding = await this.embeddingService.generateEmbedding(query, 'query');
     console.log(`🔍 Query embedding generated (length: ${queryEmbedding.length})`);
-
+    
     const chunksPerDoc = Math.max(2, Math.ceil(totalLimit / fileIds.length)); // Ensure each doc contributes
     const retrievalLimit = chunksPerDoc * 3; // Get more candidates for MMR
     console.log(`📊 Per-doc limit: ${chunksPerDoc}, retrieval limit: ${retrievalLimit}`);
@@ -46,7 +47,7 @@ class SearchService {
       documentsSearched++;
       try {
         console.log(`📄 [${documentsSearched}/${fileIds.length}] Searching in document: ${fileId}`);
-
+        
         // Primary search: with both fileId and workspaceId filters
         const primaryFilter = { 
           must: [
@@ -68,35 +69,35 @@ class SearchService {
           documentsWithResults++;
         } else {
           console.log(`⚠️ No results from primary search for ${fileId}, trying fallbacks...`);
-
+          
           // Fallback 1: Search without workspace filter
           try {
             const fallbackFilter1 = { 
               must: [{ key: 'fileId', match: { value: fileId } }]
             };
             console.log(`🔍 Fallback 1 filter:`, JSON.stringify(fallbackFilter1));
-
+            
             docResults = await this.vectorDatabaseService.searchSimilarChunks(
               queryEmbedding, 
               fallbackFilter1, 
               retrievalLimit
             );
             console.log(`📊 Fallback 1 results for ${fileId}: ${docResults.length} chunks`);
-
+            
             if (docResults.length > 0) {
               console.log(`✅ Fallback 1 found ${docResults.length} candidates from ${fileId}`);
-
+              
               // Log detailed info about fallback 1 results
               console.log(`🔍 Fallback 1 results analysis for ${fileId}:`);
               docResults.forEach((result, index) => {
                 console.log(`   [${index}] fileId: ${result.payload.fileId}, workspaceId: ${result.payload.workspaceId}, score: ${result.score}`);
               });
-
+              
               // Manual workspace filtering
               if (workspaceId) {
                 const beforeFilter = docResults.length;
                 console.log(`🔍 Manual workspace filtering: looking for workspaceId="${workspaceId}"`);
-
+                
                 docResults = docResults.filter(result => {
                   const hasWorkspace = result.payload.workspaceId === workspaceId;
                   if (!hasWorkspace) {
@@ -108,21 +109,21 @@ class SearchService {
                 });
                 console.log(`📄 Manual workspace filter: ${beforeFilter} → ${docResults.length} candidates`);
               }
-
+              
               if (docResults.length > 0) {
                 documentsWithResults++;
               }
             } else {
               // Fallback 2: Search without any filters
               console.log(`⚠️ Fallback 1 failed, trying fallback 2 (no filters)...`);
-
+              
               docResults = await this.vectorDatabaseService.searchSimilarChunks(
                 queryEmbedding, 
                 undefined, 
                 retrievalLimit * 2 // Get more results to filter manually
               );
               console.log(`📊 Fallback 2 results (no filter): ${docResults.length} chunks`);
-
+              
               if (docResults.length > 0) {
                 // Log detailed info about fallback 2 results before filtering
                 console.log(`🔍 Fallback 2 results analysis (before filtering):`);
@@ -133,29 +134,29 @@ class SearchService {
                 if (docResults.length > 5) {
                   console.log(`   ... and ${docResults.length - 5} more results`);
                 }
-
+                
                 // Manual filtering for both fileId and workspaceId
                 const beforeFilter = docResults.length;
                 console.log(`🔍 Manual filtering: looking for fileId="${fileId}" and workspaceId="${workspaceId}"`);
-
+                
                 docResults = docResults.filter(result => {
                   const fileMatch = result.payload.fileId === fileId;
                   const workspaceMatch = !workspaceId || result.payload.workspaceId === workspaceId;
                   const shouldKeep = fileMatch && workspaceMatch;
-
+                  
                   if (!shouldKeep) {
                     console.log(`   ❌ Filtering out: fileId=${result.payload.fileId} (match:${fileMatch}), workspaceId="${result.payload.workspaceId}" (match:${workspaceMatch})`);
                   }
-
+                  
                   return shouldKeep;
                 });
-
+                
                 console.log(`📄 Manual filtering: ${beforeFilter} → ${docResults.length} candidates for ${fileId}`);
-
+                
                 if (docResults.length > 0) {
                   documentsWithResults++;
                   console.log(`✅ Fallback 2 found ${docResults.length} candidates from ${fileId}`);
-
+                  
                   // Log the final filtered results
                   console.log(`🔍 Final fallback 2 results for ${fileId}:`);
                   docResults.forEach((result, index) => {
@@ -181,7 +182,7 @@ class SearchService {
               chunkIndex: firstResult.payload.chunkIndex
             });
           }
-
+          
           // Add document-specific context
           const processedResults = docResults.map(result => {
             const metadata = {
@@ -203,7 +204,7 @@ class SearchService {
               metadata.totalPages = result.payload.totalPages;
               metadata.totalLinesOnPage = result.payload.totalLinesOnPage;
             }
-
+            
             if (result.payload.startLine !== undefined && result.payload.startLine !== null) {
               metadata.startLine = result.payload.startLine;
               metadata.endLine = result.payload.endLine;
@@ -235,7 +236,7 @@ class SearchService {
 
     if (allCandidates.length === 0) {
       console.log(`❌ No candidates found across ${fileIds.length} documents`);
-
+      
       // Additional debugging - check if documents exist in vector DB and their workspace info
       console.log(`🔍 Debugging: Checking if documents exist in vector database...`);
       for (const fileId of fileIds) {
@@ -248,7 +249,7 @@ class SearchService {
           console.warn(`⚠️ Could not check document ${fileId}:`, checkError.message);
         }
       }
-
+      
       return [];
     }
 
@@ -258,7 +259,7 @@ class SearchService {
 
     // Step 2: Apply MMR for diversity and document representation
     const selectedChunks = this.applyMMR(allCandidates, queryEmbedding, totalLimit, chunksPerDoc);
-
+    
     console.log(`🎯 Final selection: ${selectedChunks.length} chunks from workspace`);
     console.log(`📊 Final chunks distribution:`, 
       selectedChunks.reduce((acc, chunk) => {
@@ -266,7 +267,7 @@ class SearchService {
         return acc;
       }, {})
     );
-
+    
     return selectedChunks;
   }
 
@@ -301,7 +302,7 @@ class SearchService {
       );
     } catch (filterError) {
       console.warn('⚠️ Search with filter failed, trying without filters:', filterError.message);
-
+      
       if (filterError.message && filterError.message.includes('Index required')) {
         console.log('🔄 Retrying search without filters...');
         searchResult = await this.vectorDatabaseService.searchSimilarChunks(
@@ -351,7 +352,7 @@ class SearchService {
         metadata.totalPages = result.payload.totalPages;
         metadata.totalLinesOnPage = result.payload.totalLinesOnPage;
       }
-
+      
       if (result.payload.startLine !== undefined && result.payload.startLine !== null) {
         metadata.startLine = result.payload.startLine;
         metadata.endLine = result.payload.endLine;
@@ -385,15 +386,15 @@ class SearchService {
 
     // First, ensure minimum representation per document
     const uniqueFileIds = [...new Set(candidates.map(c => c.fileId))];
-
+    
     for (const fileId of uniqueFileIds) {
       const docCandidates = candidates.filter(c => c.fileId === fileId);
       const needed = Math.min(minPerDoc, docCandidates.length);
-
+      
       for (let i = 0; i < needed && selected.length < totalLimit; i++) {
         selected.push(docCandidates[i]);
         docCounts.set(fileId, (docCounts.get(fileId) || 0) + 1);
-
+        
         // Remove from remaining
         const idx = remaining.findIndex(r => 
           r.fileId === docCandidates[i].fileId && 
@@ -434,7 +435,7 @@ class SearchService {
       if (bestCandidate) {
         selected.push(bestCandidate);
         docCounts.set(bestCandidate.fileId, (docCounts.get(bestCandidate.fileId) || 0) + 1);
-
+        
         const idx = remaining.findIndex(r => 
           r.fileId === bestCandidate.fileId && 
           r.metadata.chunkIndex === bestCandidate.metadata.chunkIndex
@@ -455,10 +456,10 @@ class SearchService {
   computeTextSimilarity(text1, text2) {
     const words1 = new Set(text1.toLowerCase().split(/\s+/));
     const words2 = new Set(text2.toLowerCase().split(/\s+/));
-
+    
     const intersection = new Set([...words1].filter(word => words2.has(word)));
     const union = new Set([...words1, ...words2]);
-
+    
     return union.size > 0 ? intersection.size / union.size : 0;
   }
 }
