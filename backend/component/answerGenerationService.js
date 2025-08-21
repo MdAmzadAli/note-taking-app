@@ -16,7 +16,7 @@ class AnswerGenerationService {
         query,
         fileIds,
         workspaceId,
-        isWorkspaceQuery ? 12 : 6
+        isWorkspaceQuery ? 16 : 8
       );
 
       if (relevantChunks.length === 0) {
