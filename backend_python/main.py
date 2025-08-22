@@ -766,7 +766,7 @@ async def rag_health_check():
     """Check RAG service health"""
     try:
         print("🏥 RAG: Starting health check")
-        health_status = await rag_service.get_health_status()
+        health_status = await rag_service.health_check()
 
         # Add readiness checks
         health_status['ready_for_indexing'] = rag_service.is_ready_for_indexing()
