@@ -17,7 +17,20 @@ from dotenv import load_dotenv
 # Load environment variables from the backend_python directory
 import os
 from pathlib import Path
-load_dotenv(dotenv_path=Path(__file__).parent / '.env')
+
+env_path = Path(__file__).parent / '.env'
+print(f"🔧 ENV: Loading environment variables from: {env_path}")
+print(f"🔧 ENV: .env file exists: {env_path.exists()}")
+
+if env_path.exists():
+    with open(env_path, 'r') as f:
+        env_content = f.read()
+        print(f"🔧 ENV: .env file content preview (first 200 chars):")
+        print(f"🔧 ENV: {env_content[:200]}...")
+        print(f"🔧 ENV: Total .env file length: {len(env_content)} characters")
+
+load_dotenv(dotenv_path=env_path)
+print(f"🔧 ENV: load_dotenv() called with path: {env_path}")
 
 # Import services with logging
 print("🔧 Starting Python backend imports...")
@@ -790,17 +803,77 @@ async def start_server():
     print(f"📁 Uploads directory: {UPLOADS_DIR}")
     print(f"🖼️ Previews directory: {PREVIEWS_DIR}")
     
-    # Log environment variables status
+    # Log environment variables status with actual values (masked for security)
     print("🔧 Environment Variables Check:")
-    print(f"   PORT: {os.getenv('PORT', '5000')}")
-    print(f"   NODE_ENV: {os.getenv('NODE_ENV', 'development')}")
-    print(f"   QDRANT_URL: {'✅ Set' if os.getenv('QDRANT_URL') else '❌ Not set'}")
-    print(f"   QDRANT_API_KEY: {'✅ Set' if os.getenv('QDRANT_API_KEY') else '❌ Not set'}")
-    print(f"   GEMINI_EMBEDDING_API_KEY: {'✅ Set' if os.getenv('GEMINI_EMBEDDING_API_KEY') else '❌ Not set'}")
-    print(f"   GEMINI_CHAT_API_KEY: {'✅ Set' if os.getenv('GEMINI_CHAT_API_KEY') else '❌ Not set'}")
-    print(f"   CLOUDINARY_CLOUD_NAME: {'✅ Set' if os.getenv('CLOUDINARY_CLOUD_NAME') else '❌ Not set'}")
-    print(f"   CLOUDINARY_API_KEY: {'✅ Set' if os.getenv('CLOUDINARY_API_KEY') else '❌ Not set'}")
-    print(f"   CLOUDINARY_API_SECRET: {'✅ Set' if os.getenv('CLOUDINARY_API_SECRET') else '❌ Not set'}")
+    
+    # Basic server config
+    port_val = os.getenv('PORT', '5000')
+    node_env_val = os.getenv('NODE_ENV', 'development')
+    print(f"   PORT: {port_val}")
+    print(f"   NODE_ENV: {node_env_val}")
+    
+    # CORS origins
+    allowed_origins = os.getenv('ALLOWED_ORIGINS', '')
+    print(f"   ALLOWED_ORIGINS: {'✅ Set' if allowed_origins else '❌ Not set'} (length: {len(allowed_origins)})")
+    
+    # File upload config
+    max_file_size = os.getenv('MAX_FILE_SIZE', '')
+    upload_dir = os.getenv('UPLOAD_DIR', '')
+    preview_dir = os.getenv('PREVIEW_DIR', '')
+    print(f"   MAX_FILE_SIZE: {'✅ Set' if max_file_size else '❌ Not set'} ({max_file_size})")
+    print(f"   UPLOAD_DIR: {'✅ Set' if upload_dir else '❌ Not set'} ({upload_dir})")
+    print(f"   PREVIEW_DIR: {'✅ Set' if preview_dir else '❌ Not set'} ({preview_dir})")
+    
+    # RAG/Vector DB config
+    qdrant_url = os.getenv('QDRANT_URL', '')
+    qdrant_key = os.getenv('QDRANT_API_KEY', '')
+    print(f"   QDRANT_URL: {'✅ Set' if qdrant_url else '❌ Not set'} ({qdrant_url})")
+    print(f"   QDRANT_API_KEY: {'✅ Set' if qdrant_key else '❌ Not set'} ({'*' * min(len(qdrant_key), 8) if qdrant_key else 'None'})")
+    
+    # Gemini API keys
+    gemini_embedding_key = os.getenv('GEMINI_EMBEDDING_API_KEY', '')
+    gemini_chat_key = os.getenv('GEMINI_CHAT_API_KEY', '')
+    print(f"   GEMINI_EMBEDDING_API_KEY: {'✅ Set' if gemini_embedding_key else '❌ Not set'} ({'*' * min(len(gemini_embedding_key), 8) if gemini_embedding_key else 'None'})")
+    print(f"   GEMINI_CHAT_API_KEY: {'✅ Set' if gemini_chat_key else '❌ Not set'} ({'*' * min(len(gemini_chat_key), 8) if gemini_chat_key else 'None'})")
+    
+    # Cloudinary config
+    cloudinary_cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME', '')
+    cloudinary_api_key = os.getenv('CLOUDINARY_API_KEY', '')
+    cloudinary_api_secret = os.getenv('CLOUDINARY_API_SECRET', '')
+    cloudinary_upload_preset = os.getenv('CLOUDINARY_UPLOAD_PRESET', '')
+    print(f"   CLOUDINARY_CLOUD_NAME: {'✅ Set' if cloudinary_cloud_name else '❌ Not set'} ({cloudinary_cloud_name})")
+    print(f"   CLOUDINARY_API_KEY: {'✅ Set' if cloudinary_api_key else '❌ Not set'} ({'*' * min(len(cloudinary_api_key), 8) if cloudinary_api_key else 'None'})")
+    print(f"   CLOUDINARY_API_SECRET: {'✅ Set' if cloudinary_api_secret else '❌ Not set'} ({'*' * min(len(cloudinary_api_secret), 8) if cloudinary_api_secret else 'None'})")
+    print(f"   CLOUDINARY_UPLOAD_PRESET: {'✅ Set' if cloudinary_upload_preset else '❌ Not set'} ({cloudinary_upload_preset})")
+    
+    # Performance config
+    preview_cache_ttl = os.getenv('PREVIEW_CACHE_TTL', '')
+    rate_limit_window = os.getenv('RATE_LIMIT_WINDOW', '')
+    rate_limit_max = os.getenv('RATE_LIMIT_MAX', '')
+    print(f"   PREVIEW_CACHE_TTL: {'✅ Set' if preview_cache_ttl else '❌ Not set'} ({preview_cache_ttl})")
+    print(f"   RATE_LIMIT_WINDOW: {'✅ Set' if rate_limit_window else '❌ Not set'} ({rate_limit_window})")
+    print(f"   RATE_LIMIT_MAX: {'✅ Set' if rate_limit_max else '❌ Not set'} ({rate_limit_max})")
+    
+    # Optional AWS config
+    aws_access_key = os.getenv('AWS_ACCESS_KEY_ID', '')
+    aws_secret_key = os.getenv('AWS_SECRET_ACCESS_KEY', '')
+    aws_bucket = os.getenv('AWS_BUCKET_NAME', '')
+    aws_region = os.getenv('AWS_REGION', '')
+    print(f"   AWS_ACCESS_KEY_ID: {'✅ Set' if aws_access_key else '❌ Not set'} ({'*' * min(len(aws_access_key), 8) if aws_access_key else 'None'})")
+    print(f"   AWS_SECRET_ACCESS_KEY: {'✅ Set' if aws_secret_key else '❌ Not set'} ({'*' * min(len(aws_secret_key), 8) if aws_secret_key else 'None'})")
+    print(f"   AWS_BUCKET_NAME: {'✅ Set' if aws_bucket else '❌ Not set'} ({aws_bucket})")
+    print(f"   AWS_REGION: {'✅ Set' if aws_region else '❌ Not set'} ({aws_region})")
+    
+    # Optional Redis config
+    redis_url = os.getenv('REDIS_URL', '')
+    print(f"   REDIS_URL: {'✅ Set' if redis_url else '❌ Not set'} ({redis_url})")
+    
+    # Debug: Show all environment variables that start with common prefixes
+    print("🔧 ENV: All environment variables with common prefixes:")
+    for key, value in os.environ.items():
+        if any(key.startswith(prefix) for prefix in ['QDRANT_', 'GEMINI_', 'CLOUDINARY_', 'AWS_', 'REDIS_', 'PORT', 'NODE_ENV', 'ALLOWED_', 'MAX_', 'UPLOAD_', 'PREVIEW_', 'RATE_']):
+            masked_value = '*' * min(len(value), 8) if any(sensitive in key.lower() for sensitive in ['key', 'secret', 'password']) else value
+            print(f"     {key}: {masked_value}")
 
     # Initialize RAG service
     try:

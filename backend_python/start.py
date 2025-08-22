@@ -33,6 +33,21 @@ if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
     os.chdir(script_dir)
     
+    # Check for .env file before starting
+    env_file = os.path.join(script_dir, '.env')
+    print(f"🔧 ENV: Checking for .env file at: {env_file}")
+    print(f"🔧 ENV: .env file exists: {os.path.exists(env_file)}")
+    
+    if os.path.exists(env_file):
+        with open(env_file, 'r') as f:
+            content = f.read()
+            print(f"🔧 ENV: .env file size: {len(content)} bytes")
+            print(f"🔧 ENV: .env file first line: {content.split('\n')[0] if content else 'Empty file'}")
+    else:
+        print("🔧 ENV: .env file not found, will use .env.example or environment variables")
+        example_env = os.path.join(script_dir, '.env.example')
+        print(f"🔧 ENV: .env.example exists: {os.path.exists(example_env)}")
+    
     # Install requirements and start server
     install_requirements()
     start_server()
