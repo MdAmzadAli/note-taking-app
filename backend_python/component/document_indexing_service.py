@@ -1,4 +1,3 @@
-
 import asyncio
 import uuid
 import os
@@ -11,16 +10,12 @@ class DocumentIndexingService:
         self.chunking_service = chunking_service
         self.embedding_service = embedding_service
         self.vector_database_service = vector_database_service
-        
+
         # Add unified chunking service
         self.unified_chunking_service = UnifiedChunkingService(
             chunk_size=getattr(chunking_service, 'chunk_size', 800),
             chunk_overlap=getattr(chunking_service, 'chunk_overlap', 75)
         )
-
-    async def index_document(self, file_id: str, file_path: str, file_name: str, 
-                           workspace_id: Optional[str] = None, cloudinary_data: Optional[Dict] = None, 
-                           content_type: str = 'pdf') -> Dict[str, Any]:</old_str>
 
     async def index_document(self, file_id: str, file_path: str, file_name: str, 
                            workspace_id: Optional[str] = None, cloudinary_data: Optional[Dict] = None, 
@@ -60,7 +55,7 @@ class DocumentIndexingService:
                     'fileId': file_id,
                     'fileName': file_name,
                     'workspaceId': workspace_id,
-                    'cloudinaryData': cloudinary_data,
+                    'cloudinaryData':cloudinary_data,
                     'contentType': content_type
                 }
             )
@@ -71,7 +66,7 @@ class DocumentIndexingService:
 
             # Log processing summary
             print(f'📊 Unified Processing Summary:', processing_result.get('summary', {}))
-            
+
             # Add processing statistics
             processing_stats = self.unified_chunking_service.get_processing_stats(chunks)
             content_analysis = self.unified_chunking_service.analyze_content_structure(processing_result)
@@ -143,7 +138,7 @@ class DocumentIndexingService:
                                    content_type: Optional[str] = None) -> Dict[str, Any]:
         """
         Index a document using the unified chunking service with auto-detection
-        
+
         Args:
             file_id: Unique identifier for the document
             source: File path, URL, or text content
@@ -151,14 +146,14 @@ class DocumentIndexingService:
             workspace_id: Optional workspace identifier
             cloudinary_data: Optional cloudinary data for images/previews
             content_type: Optional content type override ('pdf', 'webpage', 'text')
-            
+
         Returns:
             Indexing result with success status and metadata
         """
         try:
             print(f'📄 Starting unified document indexing for: {file_name} ({file_id})')
             print(f'🏢 Indexing with workspaceId: {workspace_id or "null"}')
-            
+
             if not self.vector_database_service.is_initialized():
                 raise Exception("Vector database not initialized")
 
@@ -236,16 +231,7 @@ class DocumentIndexingService:
         self.chunking_service.set_chunk_size(chunk_size)
         self.chunking_service.set_chunk_overlap(chunk_overlap)
         self.unified_chunking_service.set_chunk_size(chunk_size)
-        self.unified_chunking_service.set_chunk_overlap(chunk_overlap)</old_str>
-
-    def update_chunking_config(self, chunk_size: int, chunk_overlap: int):
-        """
-        Update chunking configuration for both services
-        """
-        self.chunking_service.set_chunk_size(chunk_size)
-        self.chunking_service.set_chunk_overlap(chunk_overlap)
-        self.unified_chunking_service.set_chunk_size(chunk_size)
-        self.unified_chunking_service.set_chunk_overlap(chunk_overlap)</old_str>
+        self.unified_chunking_service.set_chunk_overlap(chunk_overlap)
 
     def get_processing_stats(self, chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
