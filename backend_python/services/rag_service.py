@@ -77,7 +77,8 @@ class RAGService:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.document_indexing_service.update_chunking_config(chunk_size, chunk_overlap)
-        self.unified_chunking_service.update_chunking_config(chunk_size, chunk_overlap)
+        self.unified_chunking_service.set_chunk_size(chunk_size)
+        self.unified_chunking_service.set_chunk_overlap(chunk_overlap)
 
     def split_with_strategy(self, data, metadata=None, strategy='semantic'):
         if metadata is None:
@@ -98,9 +99,13 @@ class RAGService:
         return await self.embedding_service.generate_batch_embeddings(texts, task_type)
 
     # Delegate to DocumentIndexingService
-    async def index_document(self, file_id, file_path, file_name, workspace_id=None, cloudinary_data=None):
+    async def index_document(self, file_id, file_path, file_name, workspace_id=None, cloudinary_data=None, content_type='pdf'):
         return await self.document_indexing_service.index_document(
-            file_id, file_path, file_name, workspace_id, cloudinary_data)
+            file_id, file_path, file_name, workspace_id, cloudinary_data, content_type)
+    
+    async def index_document_unified(self, file_id, source, file_name, workspace_id=None, cloudinary_data=None, content_type=None):
+        return await self.document_indexing_service.index_document_unified(
+            file_id, source, file_name, workspace_id, cloudinary_data, content_type)
 
     async def remove_document(self, file_id):
         return await self.document_indexing_service.remove_document(file_id)

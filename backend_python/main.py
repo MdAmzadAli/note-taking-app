@@ -577,13 +577,17 @@ async def rag_index(file_id: str, request: RAGIndexRequest):
         print(f"🔄 Starting RAG indexing process...")
         print(f"📄 Indexing parameters: fileId={file_id}, filePath={file_path}, fileName={file_info['originalName']}, workspaceId={request.workspaceId}")
 
-        # Index the document using RAG service
+        # Detect content type from file info
+        content_type = 'pdf' if file_info.get('mimetype') == 'application/pdf' else 'text'
+        
+        # Index the document using RAG service with content type
         result = await rag_service.index_document(
             file_id,
             file_path,
             file_info["originalName"],
             request.workspaceId,
-            file_info.get("cloudinary")
+            file_info.get("cloudinary"),
+            content_type
         )
 
         processing_time = (asyncio.get_event_loop().time() - start_time) * 1000

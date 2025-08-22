@@ -48,56 +48,29 @@ class DocumentIndexingService:
             chunks = []
             result = None
 
-            if content_type == 'pdf':
-                # Validate file path for PDF
-                if not file_path or not os.path.exists(file_path):
-                    raise Exception(f"File not found: {file_path}")
-
-                # Process PDF: extract and chunk in one call using enhanced ChunkingService
-                pdf_result = await self.chunking_service.process_pdf(file_path, {
-                    'fileId': file_id,
-                    'fileName': file_name,
-                    'workspaceId': workspace_id,
-                    'filePath': file_path,
-                    'cloudinaryData': cloudinary_data,
-                    'contentType': 'pdf'
-                })
-
-                pdf_data = pdf_result.get('pdfData')
-                chunks = pdf_result.get('chunks')
-
-                if not pdf_data or not pdf_data.get('fullText') or not pdf_data['fullText'].strip():
-                    raise Exception('No text content found in PDF')
-
-                # Log PDF analysis
-                structure_analysis = self.chunking_service.analyze_pdf_structure(pdf_data)
-                chunking_stats = self.chunking_service.get_chunking_stats(chunks)
-
-                print(f'📊 PDF Processing Summary:', {
-                    **pdf_result.get('summary', {}),
-                    'structureAnalysis': structure_analysis.get('recommendedStrategy'),
-                    'chunkingStats': {
-                        'avgSize': chunking_stats.get('averageChunkSize'),
-                        'range': f"{chunking_stats.get('minChunkSize')}-{chunking_stats.get('maxChunkSize')}"
-                    }
-                })
-            else:
-                # Process text content for webpages and other sources
-                # file_path contains the text content for non-PDF sources
-                text_result = await self.chunking_service.process_text_content(file_path, {
+            # Use unified chunking service for all content types
+            processing_result = await self.unified_chunking_service.process_content(
+                file_path, 
+                content_type, 
+                {
                     'fileId': file_id,
                     'fileName': file_name,
                     'workspaceId': workspace_id,
                     'cloudinaryData': cloudinary_data,
                     'contentType': content_type
-                })
+                }
+            )
 
-                chunks = text_result.get('chunks')
+            chunks = processing_result.get('chunks', [])
+            if not chunks:
+                raise Exception('No chunks generated from content')
 
-                if not text_result.get('textData', {}).get('fullText') or not text_result['textData']['fullText'].strip():
-                    raise Exception('No text content provided')
-
-                print(f'📊 Text Processing Summary:', text_result.get('summary', {}))
+            # Log processing summary
+            print(f'📊 Unified Processing Summary:', processing_result.get('summary', {}))
+            
+            # Add processing statistics
+            processing_stats = self.unified_chunking_service.get_processing_stats(chunks)
+            content_analysis = self.unified_chunking_service.analyze_content_structure(processing_result)
 
             print(f'📄 Created {len(chunks)} chunks for {file_name}')
 
