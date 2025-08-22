@@ -49,7 +49,16 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables from the backend_python directory
-load_dotenv(dotenv_path=Path(__file__).parent.parent / '.env')
+env_path = Path(__file__).parent.parent / '.env'
+print(f"🔧 RAG Service ENV: Loading environment variables from: {env_path}")
+load_dotenv(dotenv_path=env_path)
+
+# Log environment variables for debugging
+print(f"🔧 RAG Service ENV: Environment variables after loading:")
+print(f"   QDRANT_URL: {'✅ Set' if os.getenv('QDRANT_URL') else '❌ Not set'} ({os.getenv('QDRANT_URL', 'None')})")
+print(f"   QDRANT_API_KEY: {'✅ Set' if os.getenv('QDRANT_API_KEY') else '❌ Not set'} ({'*' * min(len(os.getenv('QDRANT_API_KEY', '')), 8) if os.getenv('QDRANT_API_KEY') else 'None'})")
+print(f"   GEMINI_EMBEDDING_API_KEY: {'✅ Set' if os.getenv('GEMINI_EMBEDDING_API_KEY') else '❌ Not set'} ({'*' * min(len(os.getenv('GEMINI_EMBEDDING_API_KEY', '')), 8) if os.getenv('GEMINI_EMBEDDING_API_KEY') else 'None'})")
+print(f"   GEMINI_CHAT_API_KEY: {'✅ Set' if os.getenv('GEMINI_CHAT_API_KEY') else '❌ Not set'} ({'*' * min(len(os.getenv('GEMINI_CHAT_API_KEY', '')), 8) if os.getenv('GEMINI_CHAT_API_KEY') else 'None'})")
 
 
 class RAGService:

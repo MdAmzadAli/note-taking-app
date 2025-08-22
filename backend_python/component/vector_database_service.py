@@ -6,10 +6,12 @@ from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from qdrant_client.http.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
 import uuid
+from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables with explicit path
+env_path = Path(__file__).parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
 
 # UUID namespace for consistent point IDs (matching JavaScript)
 POINT_NS = '2d3c0d3e-1e1a-4f6a-9e84-1b8de377e9c9'

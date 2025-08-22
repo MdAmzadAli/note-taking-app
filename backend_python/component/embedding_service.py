@@ -1,18 +1,26 @@
-
+import google.generativeai as genai
 import os
 import asyncio
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
+from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables with explicit path
+env_path = Path(__file__).parent.parent / '.env'
+print(f"🔧 Embedding Service ENV: Loading environment variables from: {env_path}")
+load_dotenv(dotenv_path=env_path)
+
+# Log environment variables for debugging
+print(f"🔧 Embedding Service ENV: Environment variables after loading:")
+print(f"   GEMINI_EMBEDDING_API_KEY: {'✅ Set' if os.getenv('GEMINI_EMBEDDING_API_KEY') else '❌ Not set'} ({'*' * min(len(os.getenv('GEMINI_EMBEDDING_API_KEY', '')), 8) if os.getenv('GEMINI_EMBEDDING_API_KEY') else 'None'})")
+print(f"   GEMINI_CHAT_API_KEY: {'✅ Set' if os.getenv('GEMINI_CHAT_API_KEY') else '❌ Not set'} ({'*' * min(len(os.getenv('GEMINI_CHAT_API_KEY', '')), 8) if os.getenv('GEMINI_CHAT_API_KEY') else 'None'})")
 
 class EmbeddingService:
     def __init__(self):
         self.genai_embedding = None
         self.genai_chat = None
         self.is_initialized_flag = False
-        
+
         # Task-specific embedding configurations (matching JavaScript version)
         self.embedding_configs = {
             'document': {

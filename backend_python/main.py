@@ -14,9 +14,10 @@ from pydantic import BaseModel
 import mimetypes
 from dotenv import load_dotenv
 
-# Load environment variables from the backend_python directory
+# Load environment variables from the backend_python directory FIRST
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 env_path = Path(__file__).parent / '.env'
 print(f"🔧 ENV: Loading environment variables from: {env_path}")
@@ -32,7 +33,14 @@ if env_path.exists():
 load_dotenv(dotenv_path=env_path)
 print(f"🔧 ENV: load_dotenv() called with path: {env_path}")
 
-# Import services with logging
+# Log critical environment variables after loading
+print("🔧 ENV: Critical environment variables status:")
+print(f"   QDRANT_URL: {'✅ Set' if os.getenv('QDRANT_URL') else '❌ Not set'} ({os.getenv('QDRANT_URL', 'None')})")
+print(f"   QDRANT_API_KEY: {'✅ Set' if os.getenv('QDRANT_API_KEY') else '❌ Not set'} ({'*' * min(len(os.getenv('QDRANT_API_KEY', '')), 8) if os.getenv('QDRANT_API_KEY') else 'None'})")
+print(f"   GEMINI_EMBEDDING_API_KEY: {'✅ Set' if os.getenv('GEMINI_EMBEDDING_API_KEY') else '❌ Not set'} ({'*' * min(len(os.getenv('GEMINI_EMBEDDING_API_KEY', '')), 8) if os.getenv('GEMINI_EMBEDDING_API_KEY') else 'None'})")
+print(f"   GEMINI_CHAT_API_KEY: {'✅ Set' if os.getenv('GEMINI_CHAT_API_KEY') else '❌ Not set'} ({'*' * min(len(os.getenv('GEMINI_CHAT_API_KEY', '')), 8) if os.getenv('GEMINI_CHAT_API_KEY') else 'None'})")
+
+# Import services with logging AFTER environment variables are loaded
 print("🔧 Starting Python backend imports...")
 
 try:
