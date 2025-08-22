@@ -6,7 +6,7 @@ from component.search_service import SearchService
 from component.answer_generation_service import AnswerGenerationService
 from component.document_indexing_service import DocumentIndexingService
 import os
-
+# added python_backend
 
 class RAGService:
     def __init__(self):
