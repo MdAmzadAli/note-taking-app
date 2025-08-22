@@ -16,7 +16,11 @@ class DocumentIndexingService:
         self.unified_chunking_service = UnifiedChunkingService(
             chunk_size=getattr(chunking_service, 'chunk_size', 800),
             chunk_overlap=getattr(chunking_service, 'chunk_overlap', 75)
-        )</old_str>
+        )
+
+    async def index_document(self, file_id: str, file_path: str, file_name: str, 
+                           workspace_id: Optional[str] = None, cloudinary_data: Optional[Dict] = None, 
+                           content_type: str = 'pdf') -> Dict[str, Any]:</old_str>
 
     async def index_document(self, file_id: str, file_path: str, file_name: str, 
                            workspace_id: Optional[str] = None, cloudinary_data: Optional[Dict] = None, 
@@ -223,7 +227,16 @@ class DocumentIndexingService:
 
         except Exception as error:
             print(f'❌ Unified document indexing failed for {file_name}: {error}')
-            raise error</old_str>
+            raise error
+
+    def update_chunking_config(self, chunk_size: int, chunk_overlap: int):
+        """
+        Update chunking configuration for both services
+        """
+        self.chunking_service.set_chunk_size(chunk_size)
+        self.chunking_service.set_chunk_overlap(chunk_overlap)
+        self.unified_chunking_service.set_chunk_size(chunk_size)
+        self.unified_chunking_service.set_chunk_overlap(chunk_overlap)</old_str>
 
     def update_chunking_config(self, chunk_size: int, chunk_overlap: int):
         """
