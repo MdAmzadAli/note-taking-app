@@ -344,7 +344,7 @@ class FileService {
 
   async checkHealth(): Promise<boolean> {
     try {
-      console.log('🔍 Checking backend health at:', API_ENDPOINTS.health);
+      console.log('🔍 Checking Python backend health at:', API_ENDPOINTS.health);
       const response = await fetch(API_ENDPOINTS.health, {
         method: 'GET',
         headers: {
@@ -354,10 +354,10 @@ class FileService {
       });
 
       if (response.ok) {
-        console.log('✅ Backend health check successful');
+        console.log('✅ Python backend health check successful');
         return true;
       } else {
-        console.error('❌ Backend health check failed with status:', response.status);
+        console.error('❌ Python backend health check failed with status:', response.status);
         const errorText = await response.text();
         console.error('❌ Health check error response:', errorText);
         return false;

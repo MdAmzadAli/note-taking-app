@@ -21,7 +21,7 @@ localPort = 8083
 externalPort = 3001
 
 [workflows]
-runButton = "Dev Server"
+runButton = "Dev Server Python"
 
 [[workflows.workflow]]
 name = "Dev Server"
@@ -75,6 +75,32 @@ mode = "parallel"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd backend && npm start"
+
+[[workflows.workflow]]
+name = "Dev Server Python (with deps)"
+author = 46753952
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "EXPO_PACKAGER_PROXY_URL=https://$REPLIT_DEV_DOMAIN REACT_NATIVE_PACKAGER_HOSTNAME=$REPLIT_DEV_DOMAIN npx expo start --tunnel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend_python && python start.py"
+
+[[workflows.workflow]]
+name = "Dev Server Python"
+author = 46753952
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "EXPO_PACKAGER_PROXY_URL=https://$REPLIT_DEV_DOMAIN REACT_NATIVE_PACKAGER_HOSTNAME=$REPLIT_DEV_DOMAIN npx expo start --tunnel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend_python && python main.py"
 
 [deployment]
 run = ["sh", "-c", "npm run start"]

@@ -54,11 +54,11 @@ export interface IndexResponse {
 
 class RAGService {
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
-    // Use the correct backend URL for Replit environment
+    // Use the Python backend URL for Replit environment
     // const backendUrl = this.getBackendUrl();
     const fullUrl = `${API_BASE_URL}${endpoint}`;
     
-    console.log(`🌐 RAG API Request Starting`);
+    console.log(`🌐 RAG API Request Starting (Python Backend)`);
     console.log(`📍 Full URL: ${fullUrl}`);
     console.log(`🔧 Method: ${options.method || 'GET'}`);
 
@@ -124,11 +124,11 @@ class RAGService {
       const hostname = window.location.hostname;
       const protocol = window.location.protocol;
       
-      // For Replit environment or local development
+      // For Replit environment or local development (Python backend)
       return `${protocol}//${hostname}:5000`;
     }
     
-    // Server-side or unknown environment
+    // Server-side or unknown environment (Python backend)
     return API_BASE_URL;
   }
 
