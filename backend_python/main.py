@@ -14,8 +14,10 @@ from pydantic import BaseModel
 import mimetypes
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from the backend_python directory
+import os
+from pathlib import Path
+load_dotenv(dotenv_path=Path(__file__).parent / '.env')
 
 # Import services
 from services.csv_service import CSVService

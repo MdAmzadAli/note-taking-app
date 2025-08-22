@@ -7,6 +7,11 @@ from component.document_indexing_service import DocumentIndexingService
 # added python_backend
 from component.unified_chunking_service import UnifiedChunkingService
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from the backend_python directory
+load_dotenv(dotenv_path=Path(__file__).parent.parent / '.env')
 
 
 class RAGService:
