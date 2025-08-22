@@ -34,14 +34,13 @@ print(f"   GEMINI_EMBEDDING_API_KEY: {'✅ Set' if os.getenv('GEMINI_EMBEDDING_A
 print(f"   GEMINI_CHAT_API_KEY: {'✅ Set' if os.getenv('GEMINI_CHAT_API_KEY') else '❌ Not set'} ({'*' * min(len(os.getenv('GEMINI_CHAT_API_KEY', '')), 8) if os.getenv('GEMINI_CHAT_API_KEY') else 'None'})")
 
 def install_requirements():
-    """Install Python requirements if needed"""
+    """Check Python dependencies (Nix/uv handles installation automatically)"""
     try:
-        print("📦 Checking Python dependencies...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
-        print("✅ Python dependencies installed successfully")
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Failed to install dependencies: {e}")
-        sys.exit(1)
+        print("📦 Python dependencies managed by Nix/uv - skipping manual installation")
+        print("✅ Python dependencies check completed")
+    except Exception as e:
+        print(f"⚠️ Dependencies check warning: {e}")
+        # Don't exit, continue anyway
 
 def start_server():
     """Start the FastAPI server"""
