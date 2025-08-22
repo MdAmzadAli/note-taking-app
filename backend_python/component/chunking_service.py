@@ -6,6 +6,8 @@ import asyncio
 from typing import Dict, List, Any, Optional, Tuple, Union
 import pdfplumber
 from dataclasses import dataclass, field
+import numpy as np
+from collections import defaultdict
 
 
 @dataclass
@@ -20,12 +22,51 @@ class TextItem:
 
 
 @dataclass
+class BoundingBox:
+    x_min: float
+    y_min: float
+    x_max: float
+    y_max: float
+    
+    @property
+    def width(self) -> float:
+        return self.x_max - self.x_min
+    
+    @property
+    def height(self) -> float:
+        return self.y_max - self.y_min
+    
+    @property
+    def area(self) -> float:
+        return self.width * self.height
+    
+    @property
+    def center_x(self) -> float:
+        return (self.x_min + self.x_max) / 2
+    
+    @property
+    def center_y(self) -> float:
+        return (self.y_min + self.y_max) / 2
+
+
+@dataclass
+class LayoutRegion:
+    bbox: BoundingBox
+    region_type: str  # 'text', 'table', 'mixed'
+    confidence: float
+    text_items: List[TextItem] = field(default_factory=list)
+    reading_order: int = 0
+    column_index: int = 0
+
+
+@dataclass
 class Line:
     text: str
     y: float
     min_x: float
     max_x: float
     items: List[TextItem] = field(default_factory=list)
+    bbox: Optional[BoundingBox] = None
 
 
 @dataclass
@@ -33,6 +74,7 @@ class Column:
     min_x: float
     max_x: float
     count: int
+    bbox: Optional[BoundingBox] = None
 
 
 @dataclass
@@ -46,6 +88,16 @@ class StructuredUnit:
     numeric_metadata: Dict = field(default_factory=dict)
     column_index: Optional[int] = None
     column_range: Optional[Dict] = None
+    bbox: Optional[BoundingBox] = None
+    reading_order: int = 0
+
+
+@dataclass
+class PageLayout:
+    regions: List[LayoutRegion]
+    columns: List[Column]
+    page_bbox: BoundingBox
+    layout_type: str  # 'single_column', 'multi_column', 'mixed', 'complex'
 
 
 @dataclass
@@ -56,6 +108,7 @@ class PageData:
     structured_units: List[StructuredUnit]
     columns: int
     has_table: bool
+    layout: Optional[PageLayout] = None
 
 
 @dataclass
@@ -94,22 +147,20 @@ class ChunkingService:
         self.chunk_overlap = chunk_overlap
 
     async def extract_text_from_pdf(self, file_path: str) -> PDFData:
-        """Layout-aware PDF text extraction using pdfplumber"""
+        """Enhanced PDF text extraction with 2-step layout analysis"""
         try:
-            # Validate input
             if not file_path or not isinstance(file_path, str):
                 raise ValueError('Invalid file path provided')
 
             if not os.path.exists(file_path):
                 raise FileNotFoundError(f'File not found: {file_path}')
 
-            # Validate file size (prevent memory issues)
             file_size = os.path.getsize(file_path)
             max_size = 50 * 1024 * 1024  # 50MB limit
             if file_size > max_size:
                 print(f"⚠️ Large PDF file: {file_size / 1024 / 1024:.1f}MB")
 
-            print('📄 Starting layout-aware PDF extraction...')
+            print('📄 Starting enhanced layout-aware PDF extraction...')
 
             pages = []
             full_text = ''
@@ -118,15 +169,12 @@ class ChunkingService:
                 total_pages = len(pdf.pages)
                 print(f"📄 PDF loaded: {total_pages} pages")
 
-                # Process each page with layout awareness
                 for page_num, page in enumerate(pdf.pages, 1):
-                    page_data = await self._extract_page_with_layout(page, page_num)
+                    page_data = await self._extract_page_with_enhanced_layout(page, page_num)
                     pages.append(page_data)
                     full_text += page_data.text + '\n\n'
 
-            print(f"📄 Layout-aware extraction completed: {len(pages)} pages processed")
-
-            # Apply soft hyphen merging to the full text as well
+            print(f"📄 Enhanced layout extraction completed: {len(pages)} pages processed")
             clean_full_text = self._merge_soft_hyphens(full_text.strip())
 
             return PDFData(
@@ -136,14 +184,15 @@ class ChunkingService:
             )
 
         except Exception as error:
-            print(f'❌ Layout-aware PDF extraction failed: {error}')
-            # Fallback to basic extraction if layout-aware fails
+            print(f'❌ Enhanced layout extraction failed: {error}')
             print('📄 Falling back to basic PDF extraction...')
             return await self._fallback_extraction(file_path)
 
-    async def _extract_page_with_layout(self, page, page_number: int) -> PageData:
-        """Extract page content with layout information (x, y coordinates)"""
+    async def _extract_page_with_enhanced_layout(self, page, page_number: int) -> PageData:
+        """2-Step enhanced page extraction: 1) Layout analysis, 2) Reading-order extraction"""
         try:
+            print(f"📄 Page {page_number}: Starting 2-step layout analysis...")
+            
             # Get characters with position information
             chars = page.chars
             
@@ -173,407 +222,706 @@ class ChunkingService:
 
             print(f"📄 Page {page_number}: Extracted {len(text_items)} text items")
 
-            # Group text items into lines by Y proximity
-            lines = self._group_into_lines(text_items)
+            # STEP 1: Analyze page layout
+            page_layout = await self._analyze_page_layout(text_items, page)
+            print(f"📄 Page {page_number}: Layout type: {page_layout.layout_type}, Regions: {len(page_layout.regions)}")
 
-            # Detect columns by clustering X ranges
-            columns = self._detect_columns(lines)
+            # STEP 2: Extract content in reading order
+            structured_units = await self._extract_content_in_reading_order(page_layout, text_items)
+            print(f"📄 Page {page_number}: Extracted {len(structured_units)} units in reading order")
 
-            # Build structured units (paragraphs, table rows, etc.)
-            structured_units = self._build_structured_units(lines, columns)
-
-            # Generate clean text from structured units
+            # Generate text from structured units (already in reading order)
             page_text = '\n'.join(unit.text for unit in structured_units)
-
-            # Merge soft hyphens at line ends to prevent embedding similarity and number parsing issues
             page_text = self._merge_soft_hyphens(page_text)
 
             return PageData(
                 page_number=page_number,
                 text=page_text,
-                lines=[line.text for line in lines],
+                lines=[unit.text for unit in structured_units],
                 structured_units=structured_units,
-                columns=max(1, len(columns)),
-                has_table=any(unit.type == 'table_row' for unit in structured_units)
+                columns=len(page_layout.columns),
+                has_table=any(unit.type == 'table_row' for unit in structured_units),
+                layout=page_layout
             )
 
         except Exception as error:
-            print(f"❌ Layout extraction failed for page {page_number}: {error}")
-            raise error
+            print(f"❌ Enhanced layout extraction failed for page {page_number}: {error}")
+            return await self._fallback_page_extraction(page, page_number)
 
-    def _group_into_lines(self, text_items: List[TextItem]) -> List[Line]:
-        """Group text items into lines by Y coordinate proximity"""
+    async def _analyze_page_layout(self, text_items: List[TextItem], page) -> PageLayout:
+        """STEP 1: Comprehensive layout analysis with region detection"""
+        if not text_items:
+            return PageLayout(
+                regions=[],
+                columns=[],
+                page_bbox=BoundingBox(0, 0, 1000, 1000),
+                layout_type='empty'
+            )
+
+        # Get page dimensions
+        page_bbox = BoundingBox(
+            x_min=0,
+            y_min=0,
+            x_max=page.width,
+            y_max=page.height
+        )
+
+        # Group text items into lines for analysis
+        lines = self._group_items_into_lines(text_items)
+        
+        # Detect columns using improved algorithm
+        columns = self._detect_columns_enhanced(lines, page_bbox)
+        
+        # Detect text vs table regions
+        regions = await self._detect_regions(lines, columns, page_bbox, page)
+        
+        # Classify layout type
+        layout_type = self._classify_layout_type(regions, columns)
+        
+        return PageLayout(
+            regions=regions,
+            columns=columns,
+            page_bbox=page_bbox,
+            layout_type=layout_type
+        )
+
+    def _group_items_into_lines(self, text_items: List[TextItem]) -> List[Line]:
+        """Enhanced line grouping with better spacing detection"""
         if not text_items:
             return []
 
-        # Sort strictly by Y coordinate first, then by X coordinate
+        # Sort by Y coordinate first, then X coordinate
         text_items.sort(key=lambda item: (item.y, item.x))
 
         lines = []
-        if not text_items:
-            return lines
-
-        current_line = {
-            'items': [text_items[0]], 
-            'y': text_items[0].y, 
-            'min_x': text_items[0].x, 
-            'max_x': text_items[0].x + text_items[0].width
-        }
-
-        # Use configurable Y tolerance for better handling of low-DPI scans
-        y_tolerance = 5  # Increased from 3px to 5px for better robustness
-
+        current_line_items = [text_items[0]]
+        current_y = text_items[0].y
+        
+        # Adaptive Y tolerance based on font size
+        base_tolerance = 5
+        
         for item in text_items[1:]:
-            y_diff = abs(item.y - current_line['y'])
-
-            if y_diff <= y_tolerance:  # Same line (5px tolerance)
-                current_line['items'].append(item)
-                current_line['min_x'] = min(current_line['min_x'], item.x)
-                current_line['max_x'] = max(current_line['max_x'], item.x + item.width)
+            # Calculate adaptive tolerance based on font sizes
+            avg_font_size = np.mean([i.font_size for i in current_line_items + [item] if i.font_size > 0])
+            y_tolerance = max(base_tolerance, avg_font_size * 0.3) if avg_font_size > 0 else base_tolerance
+            
+            y_diff = abs(item.y - current_y)
+            
+            if y_diff <= y_tolerance:
+                # Same line
+                current_line_items.append(item)
             else:
-                # Finalize current line
-                lines.append(self._finalize_line(current_line))
-
+                # Create line from current items
+                lines.append(self._create_line_from_items(current_line_items))
+                
                 # Start new line
-                current_line = {
-                    'items': [item], 
-                    'y': item.y, 
-                    'min_x': item.x, 
-                    'max_x': item.x + item.width
-                }
+                current_line_items = [item]
+                current_y = item.y
 
         # Add final line
-        if current_line['items']:
-            lines.append(self._finalize_line(current_line))
+        if current_line_items:
+            lines.append(self._create_line_from_items(current_line_items))
 
         return lines
 
-    def _finalize_line(self, line_data: Dict) -> Line:
-        """Finalize line by sorting items and building text"""
+    def _create_line_from_items(self, items: List[TextItem]) -> Line:
+        """Create line object with proper spacing and bounding box"""
         # Sort items by X coordinate
-        line_data['items'].sort(key=lambda item: item.x)
-
-        # Build text with proper spacing
-        text = ''
-        for i, item in enumerate(line_data['items']):
-            text += item.text
+        items.sort(key=lambda item: item.x)
+        
+        # Build text with intelligent spacing
+        text_parts = []
+        for i, item in enumerate(items):
+            text_parts.append(item.text)
             
-            # Add space if there's a gap to next item
-            if i < len(line_data['items']) - 1:
-                next_item = line_data['items'][i + 1]
+            # Add space if there's a significant gap to next item
+            if i < len(items) - 1:
+                next_item = items[i + 1]
                 gap = next_item.x - (item.x + item.width)
-                if gap > 5:  # Significant gap
-                    text += ' '
+                
+                # Adaptive gap threshold based on font size
+                gap_threshold = max(3, item.font_size * 0.2) if item.font_size > 0 else 3
+                
+                if gap > gap_threshold:
+                    # Determine number of spaces based on gap size
+                    space_count = min(int(gap / gap_threshold), 5)  # Max 5 spaces
+                    text_parts.append(' ' * space_count)
 
+        line_text = ''.join(text_parts).strip()
+        
+        # Calculate bounding box
+        min_x = min(item.x for item in items)
+        max_x = max(item.x + item.width for item in items)
+        min_y = min(item.y for item in items)
+        max_y = max(item.y + item.height for item in items)
+        
+        bbox = BoundingBox(min_x, min_y, max_x, max_y)
+        
         return Line(
-            text=text.strip(),
-            y=line_data['y'],
-            min_x=line_data['min_x'],
-            max_x=line_data['max_x'],
-            items=line_data['items']
+            text=line_text,
+            y=np.mean([item.y for item in items]),
+            min_x=min_x,
+            max_x=max_x,
+            items=items,
+            bbox=bbox
         )
 
-    def _detect_columns(self, lines: List[Line]) -> List[Column]:
-        """Detect columns by clustering X ranges"""
+    def _detect_columns_enhanced(self, lines: List[Line], page_bbox: BoundingBox) -> List[Column]:
+        """Enhanced column detection using clustering and density analysis"""
         if not lines:
-            return [Column(min_x=0, max_x=1000, count=1)]
+            return [Column(
+                min_x=page_bbox.x_min,
+                max_x=page_bbox.x_max,
+                count=1,
+                bbox=page_bbox
+            )]
 
-        # Collect all X ranges
-        x_ranges = [{'min_x': line.min_x, 'max_x': line.max_x} for line in lines]
+        # Collect X positions for clustering
+        x_starts = [line.min_x for line in lines]
+        x_ends = [line.max_x for line in lines]
+        
+        # Use density-based clustering for column detection
+        columns = self._cluster_columns(x_starts, x_ends, page_bbox)
+        
+        return columns
 
-        # Simple column detection: group by similar min_x values
+    def _cluster_columns(self, x_starts: List[float], x_ends: List[float], page_bbox: BoundingBox) -> List[Column]:
+        """Density-based column clustering"""
+        if not x_starts:
+            return [Column(
+                min_x=page_bbox.x_min,
+                max_x=page_bbox.x_max,
+                count=1,
+                bbox=page_bbox
+            )]
+
+        # Create histogram of X positions
+        page_width = page_bbox.width
+        bin_width = page_width / 50  # 50 bins across page width
+        bins = np.arange(page_bbox.x_min, page_bbox.x_max + bin_width, bin_width)
+        
+        # Count occurrences in each bin
+        hist_starts, _ = np.histogram(x_starts, bins=bins)
+        hist_ends, _ = np.histogram(x_ends, bins=bins)
+        
+        # Find peaks in the histogram (potential column boundaries)
+        start_peaks = self._find_peaks(hist_starts, min_height=len(x_starts) * 0.05)
+        end_peaks = self._find_peaks(hist_ends, min_height=len(x_ends) * 0.05)
+        
+        # Create columns based on peaks
         columns = []
-        tolerance = 20  # 20px tolerance for column alignment
+        
+        if len(start_peaks) <= 1:
+            # Single column
+            columns.append(Column(
+                min_x=min(x_starts),
+                max_x=max(x_ends),
+                count=len(x_starts),
+                bbox=BoundingBox(min(x_starts), page_bbox.y_min, max(x_ends), page_bbox.y_max)
+            ))
+        else:
+            # Multiple columns
+            for i, start_peak in enumerate(start_peaks):
+                start_x = bins[start_peak]
+                
+                # Find corresponding end boundary
+                if i < len(start_peaks) - 1:
+                    end_x = bins[start_peaks[i + 1]] - bin_width
+                else:
+                    end_x = page_bbox.x_max
+                
+                # Count lines in this column
+                count = sum(1 for x in x_starts if start_x <= x < end_x)
+                
+                if count > 0:
+                    columns.append(Column(
+                        min_x=start_x,
+                        max_x=end_x,
+                        count=count,
+                        bbox=BoundingBox(start_x, page_bbox.y_min, end_x, page_bbox.y_max)
+                    ))
 
-        for range_data in x_ranges:
-            existing_column = None
-            for col in columns:
-                if abs(col.min_x - range_data['min_x']) < tolerance:
-                    existing_column = col
+        return columns if columns else [Column(
+            min_x=page_bbox.x_min,
+            max_x=page_bbox.x_max,
+            count=len(x_starts),
+            bbox=page_bbox
+        )]
+
+    def _find_peaks(self, data: np.ndarray, min_height: float = 0) -> List[int]:
+        """Simple peak detection"""
+        peaks = []
+        for i in range(1, len(data) - 1):
+            if data[i] > data[i-1] and data[i] > data[i+1] and data[i] >= min_height:
+                peaks.append(i)
+        return peaks
+
+    async def _detect_regions(self, lines: List[Line], columns: List[Column], page_bbox: BoundingBox, page) -> List[LayoutRegion]:
+        """Detect text vs table regions with high accuracy"""
+        regions = []
+        
+        # Try to detect tables using pdfplumber's table detection
+        try:
+            tables = page.find_tables()
+            table_bboxes = []
+            
+            for table in tables:
+                if table.bbox:
+                    table_bbox = BoundingBox(
+                        x_min=table.bbox[0],
+                        y_min=table.bbox[1],
+                        x_max=table.bbox[2],
+                        y_max=table.bbox[3]
+                    )
+                    table_bboxes.append(table_bbox)
+                    
+                    # Find lines that belong to this table
+                    table_lines = [
+                        line for line in lines 
+                        if self._line_intersects_bbox(line, table_bbox, overlap_threshold=0.5)
+                    ]
+                    
+                    regions.append(LayoutRegion(
+                        bbox=table_bbox,
+                        region_type='table',
+                        confidence=0.9,
+                        text_items=[item for line in table_lines for item in line.items]
+                    ))
+            
+            print(f"🔍 Detected {len(table_bboxes)} table regions using pdfplumber")
+            
+        except Exception as e:
+            print(f"⚠️ Table detection failed: {e}")
+            table_bboxes = []
+
+        # Detect text regions (areas not covered by tables)
+        text_lines = []
+        for line in lines:
+            is_in_table = False
+            for table_bbox in table_bboxes:
+                if self._line_intersects_bbox(line, table_bbox, overlap_threshold=0.3):
+                    is_in_table = True
                     break
+            
+            if not is_in_table:
+                text_lines.append(line)
 
-            if existing_column:
-                existing_column.min_x = min(existing_column.min_x, range_data['min_x'])
-                existing_column.max_x = max(existing_column.max_x, range_data['max_x'])
-                existing_column.count += 1
-            else:
-                columns.append(Column(
-                    min_x=range_data['min_x'],
-                    max_x=range_data['max_x'],
-                    count=1
+        # Group text lines into regions by column and proximity
+        if text_lines:
+            text_regions = self._group_text_lines_into_regions(text_lines, columns)
+            regions.extend(text_regions)
+
+        # If no regions detected, create a default text region
+        if not regions:
+            all_items = [item for line in lines for item in line.items]
+            if all_items:
+                min_x = min(item.x for item in all_items)
+                max_x = max(item.x + item.width for item in all_items)
+                min_y = min(item.y for item in all_items)
+                max_y = max(item.y + item.height for item in all_items)
+                
+                regions.append(LayoutRegion(
+                    bbox=BoundingBox(min_x, min_y, max_x, max_y),
+                    region_type='text',
+                    confidence=0.8,
+                    text_items=all_items
                 ))
 
-        # Sort columns by X position and filter out single occurrences
-        detected_columns = [col for col in columns if col.count > 1]
-        detected_columns.sort(key=lambda col: col.min_x)
+        return regions
 
-        # Default to single column if no columns detected
-        if not detected_columns:
-            max_x = max((line.max_x for line in lines), default=1000)
-            return [Column(min_x=0, max_x=max_x, count=len(lines))]
+    def _line_intersects_bbox(self, line: Line, bbox: BoundingBox, overlap_threshold: float = 0.5) -> bool:
+        """Check if line intersects with bounding box"""
+        if not line.bbox:
+            return False
+            
+        # Calculate intersection
+        intersection_x = max(0, min(line.bbox.x_max, bbox.x_max) - max(line.bbox.x_min, bbox.x_min))
+        intersection_y = max(0, min(line.bbox.y_max, bbox.y_max) - max(line.bbox.y_min, bbox.y_min))
+        
+        if intersection_x <= 0 or intersection_y <= 0:
+            return False
+        
+        intersection_area = intersection_x * intersection_y
+        line_area = line.bbox.area
+        
+        if line_area == 0:
+            return False
+        
+        overlap_ratio = intersection_area / line_area
+        return overlap_ratio >= overlap_threshold
 
-        return detected_columns
-
-    def _build_structured_units(self, lines: List[Line], columns: List[Column]) -> List[StructuredUnit]:
-        """Build structured units from lines and columns"""
-        if not lines:
-            return []
-
-        # If only one column detected, use original logic
-        if len(columns) == 1:
-            return self._build_units_from_lines(lines)
-
-        # Partition lines into column buckets based on detected column ranges
-        column_buckets = self._partition_lines_by_columns(lines, columns)
-
-        # Build units within each column independently (left-to-right order)
-        all_units = []
-        global_line_offset = 0
-
-        # Sort columns by X position (left to right)
-        sorted_columns = sorted(columns, key=lambda col: col.min_x)
-
-        for col_index, column in enumerate(sorted_columns):
-            column_lines = column_buckets[col_index] if col_index < len(column_buckets) else []
-
+    def _group_text_lines_into_regions(self, text_lines: List[Line], columns: List[Column]) -> List[LayoutRegion]:
+        """Group text lines into coherent regions"""
+        regions = []
+        
+        # Group lines by column
+        for col_idx, column in enumerate(columns):
+            column_lines = [
+                line for line in text_lines 
+                if column.min_x <= line.min_x < column.max_x
+            ]
+            
             if not column_lines:
                 continue
+            
+            # Group lines by Y proximity within column
+            column_lines.sort(key=lambda l: l.y)
+            
+            current_group = [column_lines[0]]
+            
+            for line in column_lines[1:]:
+                # Check Y gap between lines
+                prev_line = current_group[-1]
+                y_gap = abs(line.y - prev_line.y)
+                
+                # Adaptive gap threshold
+                gap_threshold = 30  # pixels
+                
+                if y_gap <= gap_threshold:
+                    current_group.append(line)
+                else:
+                    # Create region from current group
+                    if current_group:
+                        regions.append(self._create_text_region(current_group, col_idx))
+                    current_group = [line]
+            
+            # Add final group
+            if current_group:
+                regions.append(self._create_text_region(current_group, col_idx))
+        
+        return regions
 
-            # Build units for this column
-            column_units = self._build_units_from_lines(column_lines, global_line_offset)
+    def _create_text_region(self, lines: List[Line], column_index: int) -> LayoutRegion:
+        """Create text region from grouped lines"""
+        all_items = [item for line in lines for item in line.items]
+        
+        if not all_items:
+            return None
+        
+        min_x = min(item.x for item in all_items)
+        max_x = max(item.x + item.width for item in all_items)
+        min_y = min(item.y for item in all_items)
+        max_y = max(item.y + item.height for item in all_items)
+        
+        bbox = BoundingBox(min_x, min_y, max_x, max_y)
+        
+        return LayoutRegion(
+            bbox=bbox,
+            region_type='text',
+            confidence=0.8,
+            text_items=all_items,
+            column_index=column_index
+        )
 
-            # Add column metadata to each unit
-            for unit in column_units:
-                unit.column_index = col_index
-                unit.column_range = {'min_x': column.min_x, 'max_x': column.max_x}
+    def _classify_layout_type(self, regions: List[LayoutRegion], columns: List[Column]) -> str:
+        """Classify the overall layout type"""
+        if not regions:
+            return 'empty'
+        
+        has_table = any(r.region_type == 'table' for r in regions)
+        has_text = any(r.region_type == 'text' for r in regions)
+        
+        if len(columns) == 1:
+            if has_table and has_text:
+                return 'single_column_mixed'
+            elif has_table:
+                return 'single_column_table'
+            else:
+                return 'single_column'
+        else:
+            if has_table and has_text:
+                return 'multi_column_mixed'
+            elif has_table:
+                return 'multi_column_table'
+            else:
+                return 'multi_column'
 
-            all_units.extend(column_units)
-            global_line_offset += len(column_lines)
+    async def _extract_content_in_reading_order(self, layout: PageLayout, text_items: List[TextItem]) -> List[StructuredUnit]:
+        """STEP 2: Extract content in proper reading order"""
+        if not layout.regions:
+            return []
 
-        # Sort all units by line number to maintain reading order
-        all_units.sort(key=lambda unit: unit.start_line or 0)
+        # Sort regions by reading order (left-to-right, top-to-bottom)
+        sorted_regions = self._sort_regions_by_reading_order(layout.regions)
+        
+        structured_units = []
+        reading_order = 0
+        
+        for region in sorted_regions:
+            if region.region_type == 'table':
+                # Extract table content
+                table_units = await self._extract_table_content(region, reading_order)
+                structured_units.extend(table_units)
+                reading_order += len(table_units)
+                
+            elif region.region_type == 'text':
+                # Extract text content
+                text_units = await self._extract_text_content(region, reading_order)
+                structured_units.extend(text_units)
+                reading_order += len(text_units)
+        
+        return structured_units
 
-        return all_units
+    def _sort_regions_by_reading_order(self, regions: List[LayoutRegion]) -> List[LayoutRegion]:
+        """Sort regions by natural reading order (left-to-right, top-to-bottom)"""
+        # Primary sort: Y position (top to bottom)
+        # Secondary sort: X position (left to right)
+        
+        def reading_order_key(region):
+            # Use center points for sorting
+            y_center = region.bbox.center_y
+            x_center = region.bbox.center_x
+            
+            # Group by approximate Y bands (to handle side-by-side content)
+            y_band = int(y_center / 50) * 50  # 50-pixel bands
+            
+            return (y_band, x_center)
+        
+        sorted_regions = sorted(regions, key=reading_order_key)
+        
+        # Assign reading order
+        for i, region in enumerate(sorted_regions):
+            region.reading_order = i
+        
+        return sorted_regions
 
-    def _partition_lines_by_columns(self, lines: List[Line], columns: List[Column]) -> List[List[Line]]:
-        """Partition lines into column buckets based on detected column ranges"""
-        sorted_columns = sorted(columns, key=lambda col: col.min_x)
-        column_buckets = [[] for _ in sorted_columns]
-
-        for line in lines:
-            # Find which column this line belongs to based on its X position
-            assigned_column = -1
-
-            for i, column in enumerate(sorted_columns):
-                # Check if line's X range overlaps with column range
-                line_overlap = min(line.max_x, column.max_x) - max(line.min_x, column.min_x)
-
-                if line_overlap > 0:
-                    # Calculate overlap percentage
-                    line_width = line.max_x - line.min_x
-                    overlap_percentage = line_overlap / line_width if line_width > 0 else 1
-
-                    # Assign to column if significant overlap (>50%)
-                    if overlap_percentage > 0.5:
-                        assigned_column = i
-                        break
-
-            # If no column assignment found, assign to closest column by X position
-            if assigned_column == -1:
-                min_distance = float('inf')
-                for i, column in enumerate(sorted_columns):
-                    distance = abs(line.min_x - column.min_x)
-                    if distance < min_distance:
-                        min_distance = distance
-                        assigned_column = i
-
-            # Add line to assigned column bucket
-            if 0 <= assigned_column < len(column_buckets):
-                column_buckets[assigned_column].append(line)
-
-        # Sort lines within each column by Y position (top to bottom)
-        for bucket in column_buckets:
-            bucket.sort(key=lambda line: line.y)
-
-        return column_buckets
-
-    def _build_units_from_lines(self, lines: List[Line], line_offset: int = 0) -> List[StructuredUnit]:
-        """Build structured units from a set of lines"""
-        units = []
-        current_paragraph = []
-        paragraph_start_index = None  # Track when paragraph starts (1-based)
-
-        for i, line in enumerate(lines):
-            next_line = lines[i + 1] if i + 1 < len(lines) else None
-            global_line_index = line_offset + i
-
-            # Detect table rows by checking for regular vertical alignment
-            if self._is_table_row(line, lines):
-                # End current paragraph
-                if current_paragraph:
-                    units.append(StructuredUnit(
-                        type='paragraph',
-                        text=' '.join(l.text for l in current_paragraph),
-                        lines=[l.text for l in current_paragraph],
-                        start_line=paragraph_start_index,
-                        end_line=global_line_index
-                    ))
-                    current_paragraph = []
-                    paragraph_start_index = None
-
-                # Add table row unit with enhanced metadata
-                table_columns = self._extract_table_columns(line)
-                row_normalized = self._normalize_currency_and_numbers(line.text)
-
-                numeric_metadata = {
-                    'total_numbers': len(row_normalized.numbers),
-                    'total_currencies': row_normalized.currencies,
-                    'has_negative_values': row_normalized.has_negative,
-                    'numeric_columns': len([col for col in table_columns if col.get('is_numeric', False)]),
-                    'primary_values': [
-                        {
-                            'column_index': col['index'],
-                            'value': col.get('primary_value'),
-                            'currency': col.get('primary_currency'),
-                            'is_percentage': col.get('is_percentage', False)
-                        }
-                        for col in table_columns if col.get('primary_value') is not None
-                    ]
-                }
-
-                units.append(StructuredUnit(
+    async def _extract_table_content(self, region: LayoutRegion, start_order: int) -> List[StructuredUnit]:
+        """Extract table content while preserving structure"""
+        # Group items into table rows
+        items_by_y = defaultdict(list)
+        
+        for item in region.text_items:
+            # Round Y coordinate to group into rows
+            y_key = round(item.y, 1)
+            items_by_y[y_key].append(item)
+        
+        # Sort rows by Y coordinate
+        sorted_rows = sorted(items_by_y.items(), key=lambda x: x[0])
+        
+        table_units = []
+        for row_idx, (y_coord, row_items) in enumerate(sorted_rows):
+            # Sort items in row by X coordinate
+            row_items.sort(key=lambda item: item.x)
+            
+            # Build row text
+            row_text = ' '.join(item.text for item in row_items)
+            
+            if row_text.strip():
+                # Create table row unit
+                unit = StructuredUnit(
                     type='table_row',
-                    text=line.text,
-                    lines=[line.text],
-                    start_line=global_line_index + 1,
-                    end_line=global_line_index + 1,
-                    columns=table_columns,
-                    numeric_metadata=numeric_metadata
-                ))
+                    text=row_text.strip(),
+                    lines=[row_text.strip()],
+                    start_line=None,
+                    end_line=None,
+                    bbox=BoundingBox(
+                        min(item.x for item in row_items),
+                        min(item.y for item in row_items),
+                        max(item.x + item.width for item in row_items),
+                        max(item.y + item.height for item in row_items)
+                    ),
+                    reading_order=start_order + row_idx
+                )
+                
+                # Extract table columns
+                unit.columns = self._extract_table_columns_from_items(row_items)
+                unit.numeric_metadata = self._analyze_row_numeric_content(row_text)
+                
+                table_units.append(unit)
+        
+        return table_units
 
-            elif self._is_header_with_context(line, lines, i):
+    async def _extract_text_content(self, region: LayoutRegion, start_order: int) -> List[StructuredUnit]:
+        """Extract text content with proper structure detection"""
+        # Group items into lines
+        lines = self._group_items_into_lines(region.text_items)
+        
+        # Build structured units from lines
+        text_units = []
+        current_paragraph = []
+        unit_order = start_order
+        
+        for line_idx, line in enumerate(lines):
+            next_line = lines[line_idx + 1] if line_idx + 1 < len(lines) else None
+            
+            # Detect different content types
+            if self._is_header(line.text):
                 # End current paragraph
                 if current_paragraph:
-                    units.append(StructuredUnit(
-                        type='paragraph',
-                        text=' '.join(l.text for l in current_paragraph),
-                        lines=[l.text for l in current_paragraph],
-                        start_line=paragraph_start_index,
-                        end_line=global_line_index
-                    ))
+                    text_units.append(self._create_paragraph_unit(current_paragraph, unit_order))
+                    unit_order += 1
                     current_paragraph = []
-                    paragraph_start_index = None
-
+                
                 # Add header unit
-                units.append(StructuredUnit(
+                text_units.append(StructuredUnit(
                     type='header',
                     text=line.text,
                     lines=[line.text],
-                    start_line=global_line_index + 1,
-                    end_line=global_line_index + 1
+                    bbox=line.bbox,
+                    reading_order=unit_order
                 ))
-
+                unit_order += 1
+                
             elif self._is_bullet_point(line.text):
                 # End current paragraph
                 if current_paragraph:
-                    units.append(StructuredUnit(
-                        type='paragraph',
-                        text=' '.join(l.text for l in current_paragraph),
-                        lines=[l.text for l in current_paragraph],
-                        start_line=paragraph_start_index,
-                        end_line=global_line_index
-                    ))
+                    text_units.append(self._create_paragraph_unit(current_paragraph, unit_order))
+                    unit_order += 1
                     current_paragraph = []
-                    paragraph_start_index = None
-
+                
                 # Add bullet unit
-                units.append(StructuredUnit(
+                text_units.append(StructuredUnit(
                     type='bullet',
                     text=line.text,
                     lines=[line.text],
-                    start_line=global_line_index + 1,
-                    end_line=global_line_index + 1
+                    bbox=line.bbox,
+                    reading_order=unit_order
                 ))
-
+                unit_order += 1
+                
             else:
-                # Regular text - add to current paragraph
-                if not current_paragraph:
-                    # Starting new paragraph - track start index (1-based)
-                    paragraph_start_index = global_line_index + 1
+                # Regular text - add to paragraph
                 current_paragraph.append(line)
-
+                
                 # Check if paragraph should end
                 if not next_line or self._should_end_paragraph(line, next_line):
-                    units.append(StructuredUnit(
-                        type='paragraph',
-                        text=' '.join(l.text for l in current_paragraph),
-                        lines=[l.text for l in current_paragraph],
-                        start_line=paragraph_start_index,
-                        end_line=global_line_index + 1
-                    ))
-                    current_paragraph = []
-                    paragraph_start_index = None
-
-        # Add final paragraph if exists
+                    if current_paragraph:
+                        text_units.append(self._create_paragraph_unit(current_paragraph, unit_order))
+                        unit_order += 1
+                        current_paragraph = []
+        
+        # Add final paragraph
         if current_paragraph:
-            global_line_index = line_offset + len(lines) - 1
-            units.append(StructuredUnit(
-                type='paragraph',
-                text=' '.join(l.text for l in current_paragraph),
-                lines=[l.text for l in current_paragraph],
-                start_line=paragraph_start_index,
-                end_line=global_line_index + 1
-            ))
+            text_units.append(self._create_paragraph_unit(current_paragraph, unit_order))
+        
+        return text_units
 
-        return units
+    def _create_paragraph_unit(self, lines: List[Line], reading_order: int) -> StructuredUnit:
+        """Create paragraph unit from lines"""
+        paragraph_text = ' '.join(line.text for line in lines)
+        
+        # Calculate bounding box
+        if lines:
+            min_x = min(line.bbox.x_min for line in lines if line.bbox)
+            max_x = max(line.bbox.x_max for line in lines if line.bbox)
+            min_y = min(line.bbox.y_min for line in lines if line.bbox)
+            max_y = max(line.bbox.y_max for line in lines if line.bbox)
+            bbox = BoundingBox(min_x, min_y, max_x, max_y)
+        else:
+            bbox = None
+        
+        return StructuredUnit(
+            type='paragraph',
+            text=paragraph_text,
+            lines=[line.text for line in lines],
+            bbox=bbox,
+            reading_order=reading_order
+        )
 
-    def _is_table_row(self, line: Line, all_lines: List[Line]) -> bool:
-        """Enhanced table row detection with robust numeric analysis"""
-        text = line.text
+    def _extract_table_columns_from_items(self, row_items: List[TextItem]) -> List[Dict]:
+        """Extract table columns from row items"""
+        # Sort items by X position
+        sorted_items = sorted(row_items, key=lambda item: item.x)
+        
+        columns = []
+        for idx, item in enumerate(sorted_items):
+            normalized = self._normalize_currency_and_numbers(item.text)
+            
+            column_data = {
+                'index': idx,
+                'text': item.text,
+                'normalized_text': normalized.normalized_text,
+                'is_numeric': len(normalized.numbers) > 0,
+                'numbers': [
+                    {
+                        'original_text': num.original_text,
+                        'value': num.value,
+                        'currency': num.currency,
+                        'is_percentage': num.is_percentage,
+                        'is_negative': num.is_negative
+                    }
+                    for num in normalized.numbers
+                ],
+                'x_position': item.x,
+                'width': item.width
+            }
+            
+            if normalized.numbers:
+                primary_number = normalized.numbers[0]
+                column_data['primary_value'] = primary_number.value
+                column_data['primary_currency'] = primary_number.currency
+                column_data['is_percentage'] = primary_number.is_percentage
+            
+            columns.append(column_data)
+        
+        return columns
 
-        # Use enhanced normalization to detect numbers/currencies
-        normalized = self._normalize_currency_and_numbers(text)
+    def _analyze_row_numeric_content(self, row_text: str) -> Dict:
+        """Analyze numeric content in table row"""
+        normalized = self._normalize_currency_and_numbers(row_text)
+        
+        return {
+            'total_numbers': len(normalized.numbers),
+            'currencies': normalized.currencies,
+            'has_negative_values': normalized.has_negative,
+            'primary_values': [
+                {
+                    'value': num.value,
+                    'currency': num.currency,
+                    'is_percentage': num.is_percentage,
+                    'is_negative': num.is_negative
+                }
+                for num in normalized.numbers
+            ]
+        }
 
-        # Require at least 2 numeric values for table row classification
-        if len(normalized.numbers) < 2:
-            return False
-
-        # Test column extraction to ensure proper structure
-        columns = self._extract_table_columns(line)
-        if len(columns) < 3:
-            return False
-
-        # Count numeric columns
-        numeric_columns = len([col for col in columns if col.get('is_numeric', False)])
-        if numeric_columns < 2:
-            return False
-
-        # Check for similar structure in nearby lines
+    async def _fallback_page_extraction(self, page, page_number: int) -> PageData:
+        """Fallback extraction when enhanced layout fails"""
         try:
-            line_index = all_lines.index(line)
-        except ValueError:
-            return False
+            page_text = page.extract_text() or ""
+            
+            if not page_text.strip():
+                return PageData(
+                    page_number=page_number,
+                    text="",
+                    lines=[],
+                    structured_units=[],
+                    columns=1,
+                    has_table=False
+                )
 
-        nearby_lines = all_lines[max(0, line_index - 2):min(len(all_lines), line_index + 3)]
+            lines = [line.strip() for line in page_text.split('\n') if line.strip()]
+            structured_units = self._build_simple_units_from_lines(lines)
+            clean_text = self._merge_soft_hyphens(page_text)
 
-        similar_structure = []
-        for l in nearby_lines:
-            if l == line:
-                continue
+            return PageData(
+                page_number=page_number,
+                text=clean_text,
+                lines=lines,
+                structured_units=structured_units,
+                columns=1,
+                has_table=False
+            )
 
-            l_normalized = self._normalize_currency_and_numbers(l.text)
-            l_columns = self._extract_table_columns(l)
-            l_numeric_columns = len([col for col in l_columns if col.get('is_numeric', False)])
+        except Exception as error:
+            print(f"❌ Fallback extraction failed for page {page_number}: {error}")
+            
+            return PageData(
+                page_number=page_number,
+                text="Text extraction failed",
+                lines=["Text extraction failed"],
+                structured_units=[StructuredUnit(
+                    type='paragraph',
+                    text="Text extraction failed",
+                    lines=["Text extraction failed"],
+                    start_line=1,
+                    end_line=1
+                )],
+                columns=1,
+                has_table=False
+            )
 
-            # Check for similar structure
-            if (len(l_normalized.numbers) >= 2 and 
-                len(l_columns) >= 3 and 
-                l_numeric_columns >= 2 and
-                abs(len(l_columns) - len(columns)) <= 1):
-                similar_structure.append(l)
-
-        return len(similar_structure) > 0
-
+    # Keep all existing helper methods from the original implementation
     def _normalize_currency_and_numbers(self, text: str) -> NormalizedData:
         """Enhanced currency/number normalizer with EU/IN format support and multipliers"""
         normalized_data = NormalizedData(
@@ -711,82 +1059,54 @@ class ChunkingService:
 
             return None
 
-    def _extract_table_columns(self, line: Line) -> List[Dict]:
-        """Enhanced table column extraction with robust number/currency parsing"""
-        text = line.text
+    def _is_bullet_point(self, line: str) -> bool:
+        """Check if line is a bullet point"""
+        return bool(re.match(r'^[\u2022\u2023\u25E6\u2043\u2219•·‣⁃▪▫‧∙∘‰◦⦾⦿]', line) or
+                    re.match(r'^[-*+]\s', line) or
+                    re.match(r'^\d+[\.\)]\s', line) or
+                    re.match(r'^[a-zA-Z][\.\)]\s', line))
 
-        # Try multiple delimiter strategies
-        delimiters = [
-            r'\s{3,}|\t',  # 3+ spaces or tabs (most common)
-            r'\s{2,}',     # 2+ spaces
-            r'\|',         # Pipe delimiter
-            r';',          # Semicolon
-            r',(?=\s)',    # Comma followed by space (not within numbers)
-        ]
+    def _is_header(self, line: str) -> bool:
+        """Check if line is a header"""
+        text = line
 
-        best_columns = []
-        best_score = 0
+        # Basic length and content checks
+        if len(text) > 80 or len(text) < 3:
+            return False
 
-        # Test each delimiter strategy
-        for delimiter in delimiters:
-            columns = [col.strip() for col in re.split(delimiter, text) if col.strip()]
+        # Pattern 1: All caps with colon (strong header indicator)
+        all_caps_with_colon = re.match(r'^[A-Z\s]+:\s*$', text) and len(text) < 60
+        if all_caps_with_colon:
+            return True
 
-            if len(columns) >= 2:
-                # Score based on number of numeric columns
-                numeric_columns = 0
-                for col in columns:
-                    normalized = self._normalize_currency_and_numbers(col)
-                    if normalized.numbers:
-                        numeric_columns += 1
+        # Pattern 2: Numbered headers (1. Title, Section 1, etc.)
+        numbered_header = re.match(r'^(\d+\.|\d+\s+|Section\s+\d+|Chapter\s+\d+)\s*[A-Z]', text)
+        if numbered_header:
+            return True
 
-                # Prefer delimiters that create more numeric columns
-                score = numeric_columns + (2 if len(columns) >= 3 else 0)
+        # Pattern 3: Title case with colon and reasonable length
+        title_case_with_colon = re.match(r'^[A-Z][a-z]+(\s+[A-Z][a-z]+)*:\s*$', text) and len(text) < 60
+        if title_case_with_colon:
+            return True
 
-                if score > best_score:
-                    best_score = score
-                    best_columns = columns
+        # Pattern 4: All caps but require additional context checks
+        all_caps = re.match(r'^[A-Z\s]+$', text) and len(text) < 50
+        if all_caps:
+            # Additional checks to reduce false positives
 
-        # Fallback to space-based splitting if no good delimiter found
-        if not best_columns:
-            best_columns = [col.strip() for col in re.split(r'\s{2,}|\t', text) if col.strip()]
+            # Reject if it looks like an acronym (too short, no spaces)
+            if len(text) < 8 and not re.search(r'\s', text):
+                return False
 
-        # Process each column with enhanced normalization
-        result_columns = []
-        for index, col in enumerate(best_columns):
-            trimmed_col = col.strip()
-            normalized = self._normalize_currency_and_numbers(trimmed_col)
+            # Reject common false positives
+            false_positives = re.match(r'^(USD|EUR|GBP|INR|CAD|AUD|CHF|CNY|JPY|YES|NO|TRUE|FALSE|NULL|TOTAL|SUM|AVG|MAX|MIN|COUNT|ID|NAME|DATE|TIME|TYPE|STATUS)$', text.strip())
+            if false_positives:
+                return False
 
-            column_data = {
-                'index': index,
-                'text': trimmed_col,
-                'normalized_text': normalized.normalized_text,
-                'is_numeric': len(normalized.numbers) > 0,
-                'numbers': [
-                    {
-                        'original_text': num.original_text,
-                        'value': num.value,
-                        'currency': num.currency,
-                        'is_percentage': num.is_percentage,
-                        'is_negative': num.is_negative
-                    }
-                    for num in normalized.numbers
-                ],
-                'currencies': normalized.currencies,
-                'has_negative': normalized.has_negative,
-                # Legacy compatibility
-                'is_legacy_numeric': bool(re.match(r'^\$?[\d,]+\.?\d*%?$', trimmed_col))
-            }
+            # For plain text, be more restrictive - require at least one space (multi-word)
+            return re.search(r'\s', text) and len(text.split()) >= 2
 
-            # Add primary numeric value for easy access
-            if normalized.numbers:
-                primary_number = normalized.numbers[0]
-                column_data['primary_value'] = primary_number.value
-                column_data['primary_currency'] = primary_number.currency
-                column_data['is_percentage'] = primary_number.is_percentage
-
-            result_columns.append(column_data)
-
-        return result_columns
+        return False
 
     def _should_end_paragraph(self, current_line: Line, next_line: Line) -> bool:
         """Check if paragraph should end"""
@@ -802,105 +1122,9 @@ class ChunkingService:
 
         return False
 
-    async def _fallback_extraction(self, file_path: str) -> PDFData:
-        """Improved fallback extraction using pdfplumber"""
-        try:
-            print('📄 Using basic pdfplumber fallback extraction...')
-
-            pages = []
-            full_text = ''
-
-            with pdfplumber.open(file_path) as pdf:
-                total_pages = len(pdf.pages)
-
-                # Extract text from each page using simple method
-                for page_num, page in enumerate(pdf.pages, 1):
-                    page_data = await self._extract_page_with_layout_fallback(page, page_num)
-                    pages.append(page_data)
-                    full_text += page_data.text + '\n\n'
-
-            print(f"📄 Fallback extraction completed: {total_pages} pages processed")
-
-            return PDFData(
-                full_text=full_text.strip(),
-                pages=pages,
-                total_pages=total_pages
-            )
-
-        except Exception as error:
-            print(f'❌ Fallback extraction failed: {error}')
-
-            # Final fallback - return minimal structure
-            return PDFData(
-                full_text='Text extraction failed',
-                pages=[PageData(
-                    page_number=1,
-                    text='Text extraction failed',
-                    lines=['Text extraction failed'],
-                    structured_units=[StructuredUnit(
-                        type='paragraph',
-                        text='Text extraction failed',
-                        lines=['Text extraction failed'],
-                        start_line=1,
-                        end_line=1
-                    )],
-                    columns=1,
-                    has_table=False
-                )],
-                total_pages=1
-            )
-
-    async def _extract_page_with_layout_fallback(self, page, page_number: int) -> PageData:
-        """Fallback page extraction with simplified layout detection"""
-        try:
-            # Simple text extraction
-            page_text = page.extract_text() or ""
-            
-            if not page_text.strip():
-                return PageData(
-                    page_number=page_number,
-                    text="",
-                    lines=[],
-                    structured_units=[],
-                    columns=1,
-                    has_table=False
-                )
-
-            lines = [line.strip() for line in page_text.split('\n') if line.strip()]
-
-            # Build simple structured units without column/table detection
-            structured_units = self._build_simple_units_from_lines(lines)
-
-            # Merge soft hyphens
-            clean_text = self._merge_soft_hyphens(page_text)
-
-            return PageData(
-                page_number=page_number,
-                text=clean_text,
-                lines=lines,
-                structured_units=structured_units,
-                columns=1,
-                has_table=False
-            )
-
-        except Exception as error:
-            print(f"❌ Fallback layout extraction failed for page {page_number}: {error}")
-
-            # Ultimate fallback
-            return PageData(
-                page_number=page_number,
-                text="Text extraction failed",
-                lines=["Text extraction failed"],
-                structured_units=[StructuredUnit(
-                    type='paragraph',
-                    text="Text extraction failed",
-                    lines=["Text extraction failed"],
-                    start_line=1,
-                    end_line=1
-                )],
-                columns=1,
-                has_table=False
-            )
+    def _merge_soft_hyphens(self, text: str) -> str:
+        """Merges soft hyphens at line ends"""
+        return re.sub(r'-\s*\n(?=\w)', '', text)
 
     def _build_simple_units_from_lines(self, lines: List[str]) -> List[StructuredUnit]:
         """Simplified unit building for fallback"""
@@ -987,14 +1211,62 @@ class ChunkingService:
 
         return units
 
+    async def _fallback_extraction(self, file_path: str) -> PDFData:
+        """Improved fallback extraction using pdfplumber"""
+        try:
+            print('📄 Using basic pdfplumber fallback extraction...')
+
+            pages = []
+            full_text = ''
+
+            with pdfplumber.open(file_path) as pdf:
+                total_pages = len(pdf.pages)
+
+                # Extract text from each page using simple method
+                for page_num, page in enumerate(pdf.pages, 1):
+                    page_data = await self._fallback_page_extraction(page, page_num)
+                    pages.append(page_data)
+                    full_text += page_data.text + '\n\n'
+
+            print(f"📄 Fallback extraction completed: {total_pages} pages processed")
+
+            return PDFData(
+                full_text=full_text.strip(),
+                pages=pages,
+                total_pages=total_pages
+            )
+
+        except Exception as error:
+            print(f'❌ Fallback extraction failed: {error}')
+
+            # Final fallback - return minimal structure
+            return PDFData(
+                full_text='Text extraction failed',
+                pages=[PageData(
+                    page_number=1,
+                    text='Text extraction failed',
+                    lines=['Text extraction failed'],
+                    structured_units=[StructuredUnit(
+                        type='paragraph',
+                        text='Text extraction failed',
+                        lines=['Text extraction failed'],
+                        start_line=1,
+                        end_line=1
+                    )],
+                    columns=1,
+                    has_table=False
+                )],
+                total_pages=1
+            )
+
     # Complete PDF processing with layout-aware extraction
     async def process_pdf(self, file_path: str, metadata: Optional[Dict] = None) -> Dict:
-        """Complete PDF processing with layout-aware extraction"""
+        """Complete PDF processing with enhanced layout awareness"""
         if metadata is None:
             metadata = {}
 
         try:
-            print(f"📄 Processing PDF with layout awareness: {file_path}")
+            print(f"📄 Processing PDF with enhanced layout awareness: {file_path}")
 
             # Extract text with layout information
             pdf_data = await self.extract_text_from_pdf(file_path)
@@ -1002,7 +1274,7 @@ class ChunkingService:
             if not pdf_data.full_text or not pdf_data.full_text.strip():
                 raise ValueError('No text content found in PDF')
 
-            print(f"📄 Extracted {pdf_data.total_pages} pages with layout info")
+            print(f"📄 Extracted {pdf_data.total_pages} pages with enhanced layout info")
 
             # Ensure metadata indicates this is PDF content
             pdf_metadata = {**metadata, 'content_type': 'pdf'}
@@ -1020,11 +1292,12 @@ class ChunkingService:
                     'total_chunks': len(chunks),
                     'full_text_length': len(pdf_data.full_text),
                     'has_structured_content': any(p.has_table for p in pdf_data.pages),
-                    'average_columns_per_page': sum(p.columns for p in pdf_data.pages) / len(pdf_data.pages) if pdf_data.pages else 1
+                    'average_columns_per_page': sum(p.columns for p in pdf_data.pages) / len(pdf_data.pages) if pdf_data.pages else 1,
+                    'layout_types': [p.layout.layout_type for p in pdf_data.pages if p.layout]
                 }
             }
         except Exception as error:
-            print(f'❌ PDF processing failed: {error}')
+            print(f'❌ Enhanced PDF processing failed: {error}')
             raise error
 
     # Process text content for webpages and other non-PDF sources
@@ -1156,34 +1429,38 @@ class ChunkingService:
 
     # Split text into semantic chunks with unit-based overlap
     def split_into_chunks(self, pdf_data: PDFData, metadata: Optional[Dict] = None) -> List[Dict]:
-        """Split text into semantic chunks with unit-based overlap"""
+        """Split text into semantic chunks with unit-based overlap (preserving reading order)"""
         if metadata is None:
             metadata = {}
 
         chunks = []
         global_chunk_index = 0
 
-        # Process each page using structured units
+        # Process each page using structured units (already in reading order)
         for page_data in pdf_data.pages:
             page_number = page_data.page_number
             structured_units = page_data.structured_units or []
+
+            # Sort units by reading order to ensure proper sequence
+            structured_units.sort(key=lambda unit: unit.reading_order if hasattr(unit, 'reading_order') else 0)
 
             # Create chunks using unit-based approach
             page_chunks = self._create_units_based_chunks(structured_units, page_number, metadata, global_chunk_index)
             chunks.extend(page_chunks)
             global_chunk_index += len(page_chunks)
 
-        print(f"📄 Created {len(chunks)} chunks using unit-based approach")
+        print(f"📄 Created {len(chunks)} chunks using enhanced unit-based approach")
         return chunks
 
     def _create_units_based_chunks(self, units: List[StructuredUnit], page_number: Optional[int], 
                                    metadata: Dict, start_index: int) -> List[Dict]:
-        """Create chunks based on structured units with controlled overlap"""
+        """Create chunks based on structured units with controlled overlap (preserving reading order)"""
         chunks = []
         chunk_index = start_index
         current_chunk = ''
         current_units = []
 
+        # Units are already sorted by reading order
         for unit in units:
             unit_text = unit.text
 
@@ -1256,9 +1533,10 @@ class ChunkingService:
 
     def _create_semantic_chunk(self, text: str, metadata: Dict, chunk_index: int, 
                               page_number: Optional[int], semantic_units: List[StructuredUnit]) -> Dict:
-        """Create a semantic chunk object with enhanced metadata"""
+        """Create a semantic chunk object with enhanced metadata (reading order preserved)"""
         unit_types = [u.type for u in semantic_units]
         line_numbers = [u.start_line for u in semantic_units if u.start_line]
+        reading_orders = [getattr(u, 'reading_order', 0) for u in semantic_units]
 
         # Analyze numeric content across the entire chunk
         chunk_normalized = self._normalize_currency_and_numbers(text)
@@ -1272,13 +1550,14 @@ class ChunkingService:
             'table_rows_count': len(table_rows),
             'total_numeric_columns': sum(
                 row.numeric_metadata.get('numeric_columns', 0) for row in table_rows
+                if hasattr(row, 'numeric_metadata') and row.numeric_metadata
             ),
             'primary_values': []
         }
 
         # Collect all primary values from table rows
         for row_index, row in enumerate(table_rows):
-            if row.numeric_metadata and row.numeric_metadata.get('primary_values'):
+            if hasattr(row, 'numeric_metadata') and row.numeric_metadata and row.numeric_metadata.get('primary_values'):
                 for val in row.numeric_metadata['primary_values']:
                     numeric_metadata['primary_values'].append({
                         **val,
@@ -1287,8 +1566,8 @@ class ChunkingService:
                     })
 
         # Collect column information
-        column_indices = list(set(u.column_index for u in semantic_units if u.column_index is not None))
-        column_ranges = [u.column_range for u in semantic_units if u.column_range]
+        column_indices = list(set(u.column_index for u in semantic_units if hasattr(u, 'column_index') and u.column_index is not None))
+        column_ranges = [u.column_range for u in semantic_units if hasattr(u, 'column_range') and u.column_range]
 
         # Determine content type for conditional metadata
         content_type = metadata.get('content_type', 'pdf')  # Default to PDF for backward compatibility
@@ -1300,10 +1579,10 @@ class ChunkingService:
             'chunk_size': len(text),
             'semantic_types': list(set(unit_types)),
             'unit_count': len(semantic_units),
-            'strategy': 'layout_aware_semantic',
+            'strategy': 'enhanced_layout_aware_semantic',
             'has_structured_content': any(t in ['bullet', 'table_row', 'header'] for t in unit_types),
             'has_table_content': 'table_row' in unit_types,
-            'table_columns': [len(u.columns) for u in semantic_units if u.type == 'table_row' and u.columns],
+            'table_columns': [len(u.columns) for u in semantic_units if u.type == 'table_row' and hasattr(u, 'columns') and u.columns],
             # Enhanced numeric metadata
             'numeric_metadata': numeric_metadata,
             'has_financial_data': len(numeric_metadata['currencies']) > 0,
@@ -1312,7 +1591,10 @@ class ChunkingService:
             'column_indices': column_indices,
             'column_ranges': column_ranges,
             'spans_multiple_columns': len(column_indices) > 1,
-            'is_column_aware': len(column_indices) > 0
+            'is_column_aware': len(column_indices) > 0,
+            # Reading order metadata
+            'reading_order_range': [min(reading_orders), max(reading_orders)] if reading_orders else [0, 0],
+            'maintains_reading_order': True
         }
 
         # Add page and line numbers only for PDF content
@@ -1325,111 +1607,6 @@ class ChunkingService:
             'text': text,
             'metadata': chunk_metadata
         }
-
-    # Helper methods
-    def _is_bullet_point(self, line: str) -> bool:
-        """Check if line is a bullet point"""
-        return bool(re.match(r'^[\u2022\u2023\u25E6\u2043\u2219•·‣⁃▪▫‧∙∘‰◦⦾⦿]', line) or
-                    re.match(r'^[-*+]\s', line) or
-                    re.match(r'^\d+[\.\)]\s', line) or
-                    re.match(r'^[a-zA-Z][\.\)]\s', line))
-
-    def _is_header(self, line: str) -> bool:
-        """Check if line is a header"""
-        text = line
-
-        # Basic length and content checks
-        if len(text) > 80 or len(text) < 3:
-            return False
-
-        # Pattern 1: All caps with colon (strong header indicator)
-        all_caps_with_colon = re.match(r'^[A-Z\s]+:\s*$', text) and len(text) < 60
-        if all_caps_with_colon:
-            return True
-
-        # Pattern 2: Numbered headers (1. Title, Section 1, etc.)
-        numbered_header = re.match(r'^(\d+\.|\d+\s+|Section\s+\d+|Chapter\s+\d+)\s*[A-Z]', text)
-        if numbered_header:
-            return True
-
-        # Pattern 3: Title case with colon and reasonable length
-        title_case_with_colon = re.match(r'^[A-Z][a-z]+(\s+[A-Z][a-z]+)*:\s*$', text) and len(text) < 60
-        if title_case_with_colon:
-            return True
-
-        # Pattern 4: All caps but require additional context checks
-        all_caps = re.match(r'^[A-Z\s]+$', text) and len(text) < 50
-        if all_caps:
-            # Additional checks to reduce false positives
-
-            # Reject if it looks like an acronym (too short, no spaces)
-            if len(text) < 8 and not re.search(r'\s', text):
-                return False
-
-            # Reject common false positives
-            false_positives = re.match(r'^(USD|EUR|GBP|INR|CAD|AUD|CHF|CNY|JPY|YES|NO|TRUE|FALSE|NULL|TOTAL|SUM|AVG|MAX|MIN|COUNT|ID|NAME|DATE|TIME|TYPE|STATUS)$', text.strip())
-            if false_positives:
-                return False
-
-            # For plain text, be more restrictive - require at least one space (multi-word)
-            return re.search(r'\s', text) and len(text.split()) >= 2
-
-        return False
-
-    def _is_header_with_context(self, line: Line, all_lines: List[Line], current_index: int) -> bool:
-        """Enhanced header detection with context from surrounding lines"""
-        # First check basic header patterns
-        if not self._is_header(line.text):
-            return False
-
-        text = line.text
-        is_all_caps = re.match(r'^[A-Z\s]+:?\s*$', text)
-
-        # If it's not all caps, trust the basic header detection
-        if not is_all_caps:
-            return True
-
-        # For all-caps lines, require additional context validation
-        prev_line = all_lines[current_index - 1] if current_index > 0 else None
-        next_line = all_lines[current_index + 1] if current_index < len(all_lines) - 1 else None
-
-        has_y_gap_context = False
-
-        if prev_line and next_line:
-            # Check for significant Y gaps (indicating spacing around header)
-            gap_above = abs(line.y - prev_line.y)
-            gap_below = abs(next_line.y - line.y)
-
-            # Header should have larger gaps than normal line spacing
-            normal_line_spacing = 15  # Based on y_tolerance used elsewhere
-            has_y_gap_context = gap_above > normal_line_spacing * 1.5 or gap_below > normal_line_spacing * 1.5
-        elif not prev_line or not next_line:
-            # At document boundaries, be more lenient
-            has_y_gap_context = True
-
-        # Check for title case pattern (more likely to be headers)
-        is_title_case = re.match(r'^[A-Z][a-z]+(\s+[A-Z][a-z]+)*', text)
-
-        # Additional validation for all-caps headers
-        if is_all_caps:
-            # Require either:
-            # 1. Y-gap context, OR
-            # 2. Colon at end, OR  
-            # 3. Title case pattern, OR
-            # 4. Multiple words (reduces acronym false positives)
-            return (has_y_gap_context or 
-                    text.endswith(':') or 
-                    is_title_case or 
-                    (len(text.split()) >= 3 and len(text) >= 15))
-
-        return True
-
-    def _merge_soft_hyphens(self, text: str) -> str:
-        """Merges soft hyphens at line ends"""
-        # Regex to find hyphen followed by whitespace and newline, and then a word character.
-        # It replaces this pattern with an empty string, effectively merging the hyphenated word.
-        # Example: "construc-\n tion" becomes "construction"
-        return re.sub(r'-\s*\n(?=\w)', '', text)
 
     # Configuration methods
     def set_chunk_size(self, size: int):
@@ -1446,249 +1623,6 @@ class ChunkingService:
         """Get current configuration"""
         return {
             'chunk_size': self.chunk_size,
-            'chunk_overlap': self.chunk_overlap
+            'chunk_overlap': self.chunk_overlap,
+            'strategy': 'enhanced_layout_aware_semantic'
         }
-
-    # Utility methods
-    def analyze_numeric_content(self, text: str) -> NormalizedData:
-        """Utility method to analyze numeric content in text"""
-        return self._normalize_currency_and_numbers(text)
-
-    def test_normalization(self, test_cases: List[str] = None) -> List[NormalizedData]:
-        """Utility method to test currency/number normalization"""
-        if test_cases is None:
-            test_cases = [
-                '₹1,23,456.78',
-                '$1,234.56',
-                '(1,234.56)',
-                '€ 1.234,56',        # EU format: should parse as 1234.56
-                '€1.234.567,89',     # EU format: should parse as 1234567.89
-                'USD 1,000.00',
-                '12.5%',
-                '₹(50,000)',
-                '$1.2M',             # Should parse as 1,200,000
-                '£250k',             # Should parse as 250,000
-                '€2.5B',             # Should parse as 2,500,000,000
-                '₹1 234.56',
-                'INR 1,00,000.00',
-                '15,67',             # Simple EU decimal
-                '1.500,25',          # EU thousands + decimal
-                '$500K',             # US format with multiplier
-                '(€1.200,50)',       # Negative EU format
-                '75.5%'              # Percentage
-            ]
-
-        print('🧪 Testing Currency/Number Normalization:')
-        results = []
-        for index, test in enumerate(test_cases):
-            try:
-                result = self._normalize_currency_and_numbers(test)
-                print(f'Input: "{test}" → Numbers: {len(result.numbers)}, Currencies: [{", ".join(result.currencies)}]')
-                for i, num in enumerate(result.numbers):
-                    currency_str = f' {num.currency}' if num.currency else ''
-                    percentage_str = ' %' if num.is_percentage else ''
-                    negative_str = ' (negative)' if num.is_negative else ''
-                    print(f'  Number {i + 1}: {num.value}{currency_str}{percentage_str}{negative_str}')
-                results.append(result)
-            except Exception as error:
-                print(f'❌ Test {index + 1} failed for "{test}": {error}')
-                results.append(NormalizedData(
-                    original_text=test,
-                    normalized_text=test,
-                    currencies=[],
-                    numbers=[],
-                    has_negative=False
-                ))
-
-        return results
-
-    def get_chunking_stats(self, chunks: List[Dict]) -> Dict:
-        """Get chunking statistics with layout information"""
-        if not chunks:
-            return {
-                'total_chunks': 0,
-                'average_chunk_size': 0,
-                'min_chunk_size': 0,
-                'max_chunk_size': 0,
-                'pages_spanned': 0,
-                'chunk_size_distribution': {},
-                'strategy': 'layout_aware_semantic',
-                'structured_content_chunks': 0,
-                'table_content_chunks': 0,
-                'unit_types_distribution': {}
-            }
-
-        stats = {
-            'total_chunks': len(chunks),
-            'average_chunk_size': 0,
-            'min_chunk_size': float('inf'),
-            'max_chunk_size': 0,
-            'pages_spanned': set(),
-            'chunk_size_distribution': {},
-            'strategy': chunks[0].get('metadata', {}).get('strategy', 'layout_aware_semantic'),
-            'structured_content_chunks': 0,
-            'table_content_chunks': 0,
-            'unit_types_distribution': {}
-        }
-
-        for chunk in chunks:
-            size = len(chunk['text'])
-            stats['average_chunk_size'] += size
-            stats['min_chunk_size'] = min(stats['min_chunk_size'], size)
-            stats['max_chunk_size'] = max(stats['max_chunk_size'], size)
-            
-            page_number = chunk.get('metadata', {}).get('page_number')
-            if page_number is not None:
-                stats['pages_spanned'].add(page_number)
-
-            # Count structured content
-            metadata = chunk.get('metadata', {})
-            if metadata.get('has_structured_content'):
-                stats['structured_content_chunks'] += 1
-            if metadata.get('has_table_content'):
-                stats['table_content_chunks'] += 1
-
-            # Track unit types
-            semantic_types = metadata.get('semantic_types', [])
-            for unit_type in semantic_types:
-                stats['unit_types_distribution'][unit_type] = stats['unit_types_distribution'].get(unit_type, 0) + 1
-
-            # Distribution in 100-char buckets
-            bucket = (size // 100) * 100
-            stats['chunk_size_distribution'][bucket] = stats['chunk_size_distribution'].get(bucket, 0) + 1
-
-        stats['average_chunk_size'] = round(stats['average_chunk_size'] / len(chunks))
-        stats['pages_spanned'] = len(stats['pages_spanned'])
-
-        if stats['min_chunk_size'] == float('inf'):
-            stats['min_chunk_size'] = 0
-
-        print(f"📈 Layout-Aware Chunking Statistics: {stats}")
-        return stats
-
-    def analyze_pdf_structure(self, pdf_data: PDFData) -> Dict:
-        """Analyze PDF structure with layout information"""
-        analysis = {
-            'total_pages': pdf_data.total_pages,
-            'total_structured_units': 0,
-            'average_units_per_page': 0,
-            'structure_types': {},
-            'has_tabular_data': False,
-            'average_columns_per_page': 0,
-            'recommended_strategy': 'layout_aware_semantic'
-        }
-
-        # Analyze structure across all pages
-        for page in pdf_data.pages:
-            if page.structured_units:
-                analysis['total_structured_units'] += len(page.structured_units)
-
-                for unit in page.structured_units:
-                    analysis['structure_types'][unit.type] = analysis['structure_types'].get(unit.type, 0) + 1
-
-            if page.has_table:
-                analysis['has_tabular_data'] = True
-
-            analysis['average_columns_per_page'] += page.columns
-
-        if pdf_data.total_pages and pdf_data.total_pages > 0:
-            analysis['average_units_per_page'] = analysis['total_structured_units'] / pdf_data.total_pages
-            analysis['average_columns_per_page'] = analysis['average_columns_per_page'] / pdf_data.total_pages
-
-        # Recommend strategy based on structure
-        if analysis['has_tabular_data']:
-            analysis['recommended_strategy'] = 'layout_aware_semantic'
-        elif analysis['average_columns_per_page'] > 1.5:
-            analysis['recommended_strategy'] = 'column_aware'
-        elif analysis['structure_types'].get('paragraph', 0) > analysis['total_structured_units'] * 0.8:
-            analysis['recommended_strategy'] = 'paragraph_based'
-
-        print(f"📊 Layout-Aware PDF Structure Analysis: {analysis}")
-        return analysis
-
-    def split_with_strategy(self, pdf_data: PDFData, metadata: Optional[Dict] = None, strategy: str = 'semantic') -> List[Dict]:
-        """Alternative chunking strategy selector"""
-        if metadata is None:
-            metadata = {}
-
-        if strategy == 'fixed_size':
-            return self._split_by_fixed_size_advanced(pdf_data.full_text, metadata)
-        elif strategy in ['semantic', 'layout_aware_semantic']:
-            return self.split_into_chunks(pdf_data, metadata)
-        else:
-            return self.split_into_chunks(pdf_data, metadata)
-
-    def _split_by_fixed_size_advanced(self, text: str, metadata: Optional[Dict] = None) -> List[Dict]:
-        """Safe fixed-size chunking with proper step calculation and blank line preservation"""
-        if metadata is None:
-            metadata = {}
-
-        chunks = []
-        current_position = 0
-        chunk_index = 0
-
-        # Preserve significant line breaks as structure signals
-        preserved_text = re.sub(r'\n\s*\n', '\n\n__PARAGRAPH_BREAK__\n\n', text)
-
-        while current_position < len(preserved_text):
-            # Calculate safe chunk end position
-            chunk_end = min(current_position + self.chunk_size, len(preserved_text))
-
-            # If not at document end, try to break at word/sentence boundary
-            if chunk_end < len(preserved_text):
-                # Look for good break points in descending order of preference
-                break_points = [
-                    preserved_text.rfind('\n\n__PARAGRAPH_BREAK__\n\n', current_position, chunk_end),
-                    preserved_text.rfind('. ', current_position, chunk_end),
-                    preserved_text.rfind('! ', current_position, chunk_end),
-                    preserved_text.rfind('? ', current_position, chunk_end),
-                    preserved_text.rfind('\n', current_position, chunk_end),
-                    preserved_text.rfind(' ', current_position, chunk_end)
-                ]
-
-                for break_point in break_points:
-                    if break_point > current_position + (self.chunk_size * 0.3):  # At least 30% of target size
-                        chunk_end = break_point + 1
-                        break
-
-            # Extract chunk text
-            chunk_text = preserved_text[current_position:chunk_end].strip()
-
-            # Restore paragraph breaks
-            chunk_text = chunk_text.replace('__PARAGRAPH_BREAK__', '')
-
-            # Skip empty chunks
-            if not chunk_text:
-                current_position = chunk_end
-                continue
-
-            # Create chunk object
-            chunks.append({
-                'text': chunk_text,
-                'metadata': {
-                    **metadata,
-                    'chunk_index': chunk_index,
-                    'chunk_size': len(chunk_text),
-                    'start_position': current_position,
-                    'end_position': chunk_end,
-                    'strategy': 'fixed_size_advanced',
-                    'preserved_structure': '\n\n' in chunk_text
-                }
-            })
-            chunk_index += 1
-
-            # Calculate next position with safe step
-            effective_chunk_length = chunk_end - current_position
-            step = max(
-                effective_chunk_length - self.chunk_overlap,
-                min(50, effective_chunk_length * 0.1)  # Minimum step: 50 chars or 10% of chunk
-            )
-
-            current_position += int(step)
-
-            # Safety check to prevent infinite loops
-            if step <= 0 or current_position >= len(preserved_text):
-                break
-
-        print(f"📄 Fixed-size advanced chunking created {len(chunks)} chunks")
-        return chunks
