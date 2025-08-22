@@ -21,7 +21,7 @@ localPort = 8083
 externalPort = 3001
 
 [workflows]
-runButton = "Dev Server Python"
+runButton = "Dev Server"
 
 [[workflows.workflow]]
 name = "Dev Server"
@@ -33,7 +33,7 @@ args = "EXPO_PACKAGER_PROXY_URL=https://$REPLIT_DEV_DOMAIN REACT_NATIVE_PACKAGER
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd backend && npm start"
+args = "cd backend_python && python main.py"
 
 [[workflows.workflow]]
 name = "EAS Init"
