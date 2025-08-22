@@ -191,7 +191,7 @@ class RAGService:
     async def index_document(self, file_id, file_path, file_name, workspace_id=None, cloudinary_data=None, content_type='pdf'):
         return await self.document_indexing_service.index_document(
             file_id, file_path, file_name, workspace_id, cloudinary_data, content_type)
-    
+
     async def index_document_unified(self, file_id, source, file_name, workspace_id=None, cloudinary_data=None, content_type=None):
         return await self.document_indexing_service.index_document_unified(
             file_id, source, file_name, workspace_id, cloudinary_data, content_type)
@@ -261,6 +261,42 @@ class RAGService:
                 'initialized': self.is_initialized,
                 'error': str(error)
             }
+
+    def is_ready_for_indexing(self) -> bool:
+        """Check if RAG service is ready for document indexing"""
+        return (self.is_initialized and 
+                self.document_indexing_service is not None and
+                self.vector_database_service is not None and
+                self.embedding_service is not None)
+
+    def is_ready_for_search(self) -> bool:
+        """Check if RAG service is ready for searching"""
+        return (self.is_initialized and 
+                self.search_service is not None and
+                self.vector_database_service is not None and
+                self.embedding_service is not None)
+
+    async def search_query(self, query: str, limit: int = 5, workspace_id: str = None) -> Dict[str, Any]:
+        """
+        Search for relevant documents based on a query
+        """
+        try:
+            if not self.search_service:
+                raise Exception("Search service not initialized")
+
+            print(f"🔍 RAG: Starting search for query: '{query[:50]}{'...' if len(query) > 50 else ''}'")
+            print(f"🏢 RAG: Using workspaceId filter: {workspace_id or 'null'}")
+
+            # Perform search using the search service
+            search_results = await self.search_service.search_documents(query, limit, workspace_id)
+
+            print(f"📊 RAG: Search completed, found {len(search_results.get('chunks', []))} relevant chunks")
+
+            return search_results
+
+        except Exception as error:
+            print(f"❌ RAG: Search failed: {error}")
+            raise error
 
 
 # Create singleton instance
