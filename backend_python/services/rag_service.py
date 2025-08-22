@@ -1,11 +1,49 @@
-from component.chunking_service import ChunkingService
-from component.embedding_service import EmbeddingService
-from component.vector_database_service import VectorDatabaseService
-from component.search_service import SearchService
-from component.answer_generation_service import AnswerGenerationService
-from component.document_indexing_service import DocumentIndexingService
-# added python_backend
-from component.unified_chunking_service import UnifiedChunkingService
+# Import components with logging
+print("🔧 RAG Service: Starting component imports...")
+
+try:
+    from component.chunking_service import ChunkingService
+    print("✅ RAG: ChunkingService imported successfully")
+except ImportError as e:
+    print(f"❌ RAG: Failed to import ChunkingService: {e}")
+
+try:
+    from component.embedding_service import EmbeddingService
+    print("✅ RAG: EmbeddingService imported successfully")
+except ImportError as e:
+    print(f"❌ RAG: Failed to import EmbeddingService: {e}")
+
+try:
+    from component.vector_database_service import VectorDatabaseService
+    print("✅ RAG: VectorDatabaseService imported successfully")
+except ImportError as e:
+    print(f"❌ RAG: Failed to import VectorDatabaseService: {e}")
+
+try:
+    from component.search_service import SearchService
+    print("✅ RAG: SearchService imported successfully")
+except ImportError as e:
+    print(f"❌ RAG: Failed to import SearchService: {e}")
+
+try:
+    from component.answer_generation_service import AnswerGenerationService
+    print("✅ RAG: AnswerGenerationService imported successfully")
+except ImportError as e:
+    print(f"❌ RAG: Failed to import AnswerGenerationService: {e}")
+
+try:
+    from component.document_indexing_service import DocumentIndexingService
+    print("✅ RAG: DocumentIndexingService imported successfully")
+except ImportError as e:
+    print(f"❌ RAG: Failed to import DocumentIndexingService: {e}")
+
+try:
+    from component.unified_chunking_service import UnifiedChunkingService
+    print("✅ RAG: UnifiedChunkingService imported successfully")
+except ImportError as e:
+    print(f"❌ RAG: Failed to import UnifiedChunkingService: {e}")
+
+print("🔧 RAG Service: All component imports completed")
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -16,20 +54,57 @@ load_dotenv(dotenv_path=Path(__file__).parent.parent / '.env')
 
 class RAGService:
     def __init__(self):
+        print("🔧 RAG Service: Starting initialization...")
         self.chunk_size = 800
         self.chunk_overlap = 100
         self.is_initialized = False
 
-        # Initialize component services
-        self.chunking_service = ChunkingService(self.chunk_size, self.chunk_overlap)
-        self.unified_chunking_service = UnifiedChunkingService(self.chunk_size, self.chunk_overlap)
-        self.embedding_service = EmbeddingService()
-        self.vector_database_service = VectorDatabaseService()
-        self.search_service = SearchService(self.embedding_service, self.vector_database_service)
-        self.answer_generation_service = AnswerGenerationService(self.embedding_service, self.search_service)
-        self.document_indexing_service = DocumentIndexingService(
-            self.chunking_service, self.embedding_service, self.vector_database_service
-        )
+        # Initialize component services with logging
+        try:
+            self.chunking_service = ChunkingService(self.chunk_size, self.chunk_overlap)
+            print("✅ RAG: ChunkingService component initialized")
+        except Exception as e:
+            print(f"❌ RAG: Failed to initialize ChunkingService: {e}")
+
+        try:
+            self.unified_chunking_service = UnifiedChunkingService(self.chunk_size, self.chunk_overlap)
+            print("✅ RAG: UnifiedChunkingService component initialized")
+        except Exception as e:
+            print(f"❌ RAG: Failed to initialize UnifiedChunkingService: {e}")
+
+        try:
+            self.embedding_service = EmbeddingService()
+            print("✅ RAG: EmbeddingService component initialized")
+        except Exception as e:
+            print(f"❌ RAG: Failed to initialize EmbeddingService: {e}")
+
+        try:
+            self.vector_database_service = VectorDatabaseService()
+            print("✅ RAG: VectorDatabaseService component initialized")
+        except Exception as e:
+            print(f"❌ RAG: Failed to initialize VectorDatabaseService: {e}")
+
+        try:
+            self.search_service = SearchService(self.embedding_service, self.vector_database_service)
+            print("✅ RAG: SearchService component initialized")
+        except Exception as e:
+            print(f"❌ RAG: Failed to initialize SearchService: {e}")
+
+        try:
+            self.answer_generation_service = AnswerGenerationService(self.embedding_service, self.search_service)
+            print("✅ RAG: AnswerGenerationService component initialized")
+        except Exception as e:
+            print(f"❌ RAG: Failed to initialize AnswerGenerationService: {e}")
+
+        try:
+            self.document_indexing_service = DocumentIndexingService(
+                self.chunking_service, self.embedding_service, self.vector_database_service
+            )
+            print("✅ RAG: DocumentIndexingService component initialized")
+        except Exception as e:
+            print(f"❌ RAG: Failed to initialize DocumentIndexingService: {e}")
+
+        print("🔧 RAG Service: Component initialization completed")
 
     async def initialize(self):
         print('🔄 RAG Service: Starting initialization...')

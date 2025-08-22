@@ -19,12 +19,40 @@ import os
 from pathlib import Path
 load_dotenv(dotenv_path=Path(__file__).parent / '.env')
 
-# Import services
-from services.csv_service import CSVService
-from services.file_service import FileService
-from services.rag_service import RAGService
-from component.url_download_service import URLDownloadService
-from component.webpage_text_extractor_service import WebpageTextExtractorService
+# Import services with logging
+print("🔧 Starting Python backend imports...")
+
+try:
+    from services.csv_service import CSVService
+    print("✅ CSVService imported successfully")
+except ImportError as e:
+    print(f"❌ Failed to import CSVService: {e}")
+
+try:
+    from services.file_service import FileService
+    print("✅ FileService imported successfully")
+except ImportError as e:
+    print(f"❌ Failed to import FileService: {e}")
+
+try:
+    from services.rag_service import RAGService
+    print("✅ RAGService imported successfully")
+except ImportError as e:
+    print(f"❌ Failed to import RAGService: {e}")
+
+try:
+    from component.url_download_service import URLDownloadService
+    print("✅ URLDownloadService imported successfully")
+except ImportError as e:
+    print(f"❌ Failed to import URLDownloadService: {e}")
+
+try:
+    from component.webpage_text_extractor_service import WebpageTextExtractorService
+    print("✅ WebpageTextExtractorService imported successfully")
+except ImportError as e:
+    print(f"❌ Failed to import WebpageTextExtractorService: {e}")
+
+print("🔧 All imports completed")
 
 app = FastAPI(title="Document Management API")
 
@@ -64,12 +92,40 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Access-Control-Allow-Origin"],
 )
 
-# Initialize services
-csv_service = CSVService()
-file_service = FileService()
-rag_service = RAGService()
-url_download_service = URLDownloadService()
-webpage_text_extractor_service = WebpageTextExtractorService()
+# Initialize services with logging
+print("🔧 Initializing backend services...")
+
+try:
+    csv_service = CSVService()
+    print("✅ CSVService initialized successfully")
+except Exception as e:
+    print(f"❌ Failed to initialize CSVService: {e}")
+
+try:
+    file_service = FileService()
+    print("✅ FileService initialized successfully")
+except Exception as e:
+    print(f"❌ Failed to initialize FileService: {e}")
+
+try:
+    rag_service = RAGService()
+    print("✅ RAGService initialized successfully")
+except Exception as e:
+    print(f"❌ Failed to initialize RAGService: {e}")
+
+try:
+    url_download_service = URLDownloadService()
+    print("✅ URLDownloadService initialized successfully")
+except Exception as e:
+    print(f"❌ Failed to initialize URLDownloadService: {e}")
+
+try:
+    webpage_text_extractor_service = WebpageTextExtractorService()
+    print("✅ WebpageTextExtractorService initialized successfully")
+except Exception as e:
+    print(f"❌ Failed to initialize WebpageTextExtractorService: {e}")
+
+print("🔧 All services initialization completed")
 
 # Request models
 class WorkspaceUploadRequest(BaseModel):
@@ -733,18 +789,34 @@ async def general_exception_handler(request: Request, exc: Exception):
 async def start_server():
     print(f"📁 Uploads directory: {UPLOADS_DIR}")
     print(f"🖼️ Previews directory: {PREVIEWS_DIR}")
+    
+    # Log environment variables status
+    print("🔧 Environment Variables Check:")
+    print(f"   PORT: {os.getenv('PORT', '5000')}")
+    print(f"   NODE_ENV: {os.getenv('NODE_ENV', 'development')}")
+    print(f"   QDRANT_URL: {'✅ Set' if os.getenv('QDRANT_URL') else '❌ Not set'}")
+    print(f"   QDRANT_API_KEY: {'✅ Set' if os.getenv('QDRANT_API_KEY') else '❌ Not set'}")
+    print(f"   GEMINI_EMBEDDING_API_KEY: {'✅ Set' if os.getenv('GEMINI_EMBEDDING_API_KEY') else '❌ Not set'}")
+    print(f"   GEMINI_CHAT_API_KEY: {'✅ Set' if os.getenv('GEMINI_CHAT_API_KEY') else '❌ Not set'}")
+    print(f"   CLOUDINARY_CLOUD_NAME: {'✅ Set' if os.getenv('CLOUDINARY_CLOUD_NAME') else '❌ Not set'}")
+    print(f"   CLOUDINARY_API_KEY: {'✅ Set' if os.getenv('CLOUDINARY_API_KEY') else '❌ Not set'}")
+    print(f"   CLOUDINARY_API_SECRET: {'✅ Set' if os.getenv('CLOUDINARY_API_SECRET') else '❌ Not set'}")
 
     # Initialize RAG service
     try:
+        print("🔄 Initializing RAG service...")
         await rag_service.initialize()
+        print("✅ RAG service initialization completed successfully")
     except Exception as error:
-        print("⚠️ RAG service initialization failed, continuing without RAG features")
+        print(f"⚠️ RAG service initialization failed: {error}")
+        print("⚠️ Continuing without RAG features")
 
     print(f"🚀 Server running on port {PORT}")
     print(f"🌐 Server accessible at http://0.0.0.0:{PORT}")
     print(f"🌐 Replit external URL: https://{os.getenv('REPLIT_DEV_DOMAIN')}:{PORT}")
     print(f"🛡️ Environment: {os.getenv('NODE_ENV', 'development')}")
     print(f"🔧 RAG Service initialized: {'Yes' if rag_service.is_initialized else 'No'}")
+    print("🎯 All APIs and services status logged above")
 
 if __name__ == "__main__":
     import uvicorn
