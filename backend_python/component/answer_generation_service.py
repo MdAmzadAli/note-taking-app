@@ -1,18 +1,18 @@
 
-import google.generativeai as genai
+import asyncio
 import json
 import re
-
+from typing import List, Dict, Any, Optional
 
 class AnswerGenerationService:
     def __init__(self, embedding_service, search_service):
         self.embedding_service = embedding_service
         self.search_service = search_service
 
-    # Main entry point - uses structured 3-step flow
-    async def generate_answer(self, query, file_ids=None, workspace_id=None):
+    async def generate_answer(self, query: str, file_ids: Optional[List[str]] = None, 
+                            workspace_id: Optional[str] = None) -> Dict[str, Any]:
         try:
-            print(f"🤖 Starting structured 3-step LLM flow for: \"{query}\"")
+            print(f'🤖 Starting structured 3-step LLM flow for: "{query}"')
 
             # Search for relevant chunks
             is_workspace_query = workspace_id and file_ids and len(file_ids) > 1
@@ -23,7 +23,7 @@ class AnswerGenerationService:
                 12 if is_workspace_query else 6
             )
 
-            if len(relevant_chunks) == 0:
+            if not relevant_chunks:
                 return {
                     'answer': "I couldn't find relevant information in the uploaded documents to answer your question.",
                     'sources': [],
@@ -33,7 +33,7 @@ class AnswerGenerationService:
             # Step 0: Query recognition and refinement
             step0_result = await self.step0_query_recognition(query, relevant_chunks)
             
-            print(f"📊 Step 0 Result: Type={step0_result['queryType']}, Refined=\"{step0_result['refinedQuery']}\"")
+            print(f'📊 Step 0 Result: Type={step0_result["queryType"]}, Refined="{step0_result["refinedQuery"]}"')
 
             # Route to appropriate processing based on query type
             if step0_result['queryType'] == 'computational':
@@ -42,18 +42,17 @@ class AnswerGenerationService:
                 return await self.process_factual_query(step0_result['refinedQuery'], query, relevant_chunks)
 
         except Exception as error:
-            print(f"❌ Structured answer generation failed: {error}")
+            print(f'❌ Structured answer generation failed: {error}')
             raise error
 
-    # Step 0: Query recognition and refinement using cheapest model
-    async def step0_query_recognition(self, user_query, relevant_chunks):
-        print(f"🔍 Step 0: Query recognition and refinement...")
+    async def step0_query_recognition(self, user_query: str, relevant_chunks: List[Dict]) -> Dict[str, Any]:
+        print('🔍 Step 0: Query recognition and refinement...')
 
         if not self.embedding_service.genai_chat:
             raise Exception("Google GenAI Chat client not initialized")
 
         # Analyze document context for better query understanding
-        document_types = list(set([chunk['metadata']['fileName'] for chunk in relevant_chunks]))
+        document_types = list(set(chunk['metadata']['fileName'] for chunk in relevant_chunks))
         has_table_content = any(chunk['metadata'].get('hasTableContent', False) for chunk in relevant_chunks)
         has_financial_data = any(chunk['metadata'].get('hasFinancialData', False) for chunk in relevant_chunks)
 
@@ -90,25 +89,26 @@ Return ONLY this JSON format:
 }}"""
 
         try:
-            model = genai.GenerativeModel('gemini-1.5-flash-8b')
-            response = model.generate_content(
+            response = await asyncio.to_thread(
+                self.embedding_service.genai_chat.generate_content,
                 recognition_prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.1,
-                    top_p=0.8,
-                    max_output_tokens=512,
-                )
+                generation_config={
+                    'temperature': 0.1,
+                    'top_p': 0.8,
+                    'max_output_tokens': 512,
+                }
             )
 
             response_text = response.text
             json_match = re.search(r'\{[\s\S]*\}', response_text)
             
             if json_match:
-                result = json.loads(json_match.group(0))
-                print(f"✅ Step 0: {result['queryType']} query identified - {result['reasoning']}")
+                result = json.loads(json_match.group())
+                print(f'✅ Step 0: {result["queryType"]} query identified - {result["reasoning"]}')
                 return result
+
         except Exception as parse_error:
-            print(f"⚠️ Step 0: JSON parsing failed, using fallback classification")
+            print(f'⚠️ Step 0: JSON parsing failed, using fallback classification')
 
         # Fallback classification based on keywords
         computational_keywords = [
@@ -125,9 +125,9 @@ Return ONLY this JSON format:
             'reasoning': 'Fallback keyword-based classification'
         }
 
-    # Process computational queries with structured JSON conversion
-    async def process_computational_query(self, refined_query, original_query, relevant_chunks):
-        print(f"🧮 Processing computational query through Step 1 → Step 2")
+    async def process_computational_query(self, refined_query: str, original_query: str, 
+                                        relevant_chunks: List[Dict]) -> Dict[str, Any]:
+        print('🧮 Processing computational query through Step 1 → Step 2')
 
         # Step 1: Convert context to structured JSON using cheap model
         structured_data = await self.step1_context_to_json(refined_query, relevant_chunks)
@@ -135,15 +135,14 @@ Return ONLY this JSON format:
         # Step 2: Process structured data with main model
         return await self.step2_computational_processing(refined_query, original_query, structured_data, relevant_chunks)
 
-    # Process factual queries directly with main model
-    async def process_factual_query(self, refined_query, original_query, relevant_chunks):
-        print(f"📚 Processing factual query directly with Step 2")
+    async def process_factual_query(self, refined_query: str, original_query: str, 
+                                   relevant_chunks: List[Dict]) -> Dict[str, Any]:
+        print('📚 Processing factual query directly with Step 2')
 
         return await self.step2_factual_processing(refined_query, original_query, relevant_chunks)
 
-    # Step 1: Convert context to structured JSON format for computational queries
-    async def step1_context_to_json(self, refined_query, relevant_chunks):
-        print(f"📊 Step 1: Converting context to structured JSON...")
+    async def step1_context_to_json(self, refined_query: str, relevant_chunks: List[Dict]) -> Dict[str, Any]:
+        print('📊 Step 1: Converting context to structured JSON...')
 
         numbered_contexts = []
         for index, chunk in enumerate(relevant_chunks):
@@ -157,9 +156,7 @@ Return ONLY this JSON format:
             else:
                 location_info = 'Content'
             
-            numbered_contexts.append(
-                f"[Context {index + 1} - Doc: {chunk['metadata']['fileName']} | {location_info}]: {chunk['text']}"
-            )
+            numbered_contexts.append(f"[Context {index + 1} - Doc: {chunk['metadata']['fileName']} | {location_info}]: {chunk['text']}")
 
         structuring_prompt = f"""You are a data extraction expert. Convert the provided context into a well-structured JSON format for computational analysis.
 
@@ -209,39 +206,40 @@ Return a structured JSON with this format:
 }}"""
 
         try:
-            model = genai.GenerativeModel('gemini-1.5-flash-8b')
-            response = model.generate_content(
+            response = await asyncio.to_thread(
+                self.embedding_service.genai_chat.generate_content,
                 structuring_prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.1,
-                    top_p=0.8,
-                    max_output_tokens=4096,
-                )
+                generation_config={
+                    'temperature': 0.1,
+                    'top_p': 0.8,
+                    'max_output_tokens': 4096,
+                }
             )
 
             response_text = response.text
             json_match = re.search(r'\{[\s\S]*\}', response_text)
             
             if json_match:
-                structured_data = json.loads(json_match.group(0))
-                print(f"✅ Step 1: Extracted {structured_data.get('summary', {}).get('totalValues', 0)} values from {structured_data.get('summary', {}).get('totalContexts', 0)} contexts")
+                structured_data = json.loads(json_match.group())
+                print(f'✅ Step 1: Extracted {structured_data.get("summary", {}).get("totalValues", 0)} values from {structured_data.get("summary", {}).get("totalContexts", 0)} contexts')
                 return structured_data
+
         except Exception as parse_error:
-            print(f"⚠️ Step 1: JSON parsing failed, using fallback structure")
+            print(f'⚠️ Step 1: JSON parsing failed, using fallback structure')
 
         # Fallback: create basic structure
         return {
             'extractedData': [
                 {
-                    'contextNumber': i + 1,
+                    'contextNumber': index + 1,
                     'sourceDocument': chunk['metadata']['fileName'],
                     'pageNumber': chunk['metadata'].get('pageNumber'),
                     'values': [],
                     'categories': [],
                     'calculations': [],
-                    'relevantText': chunk['text'][:200] + '...'
+                    'relevantText': chunk['text'][:200] + '...' if len(chunk['text']) > 200 else chunk['text']
                 }
-                for i, chunk in enumerate(relevant_chunks)
+                for index, chunk in enumerate(relevant_chunks)
             ],
             'summary': {
                 'totalContexts': len(relevant_chunks),
@@ -252,9 +250,9 @@ Return a structured JSON with this format:
             }
         }
 
-    # Step 2: Process computational queries with structured data
-    async def step2_computational_processing(self, refined_query, original_query, structured_data, relevant_chunks):
-        print(f"🔢 Step 2: Computational processing with structured data...")
+    async def step2_computational_processing(self, refined_query: str, original_query: str, 
+                                           structured_data: Dict, relevant_chunks: List[Dict]) -> Dict[str, Any]:
+        print('🔢 Step 2: Computational processing with structured data...')
 
         computational_prompt = f"""You are an expert computational analyst. Perform the requested calculation using the structured data provided.
 
@@ -280,168 +278,43 @@ CONTEXTS_USED: [list only the context numbers (e.g., "1,3,5") that you reference
 
 ANSWER:"""
 
-        try:
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
-            response = model.generate_content(
-                computational_prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.1,
-                    top_p=0.8,
-                    max_output_tokens=2048,
-                )
-            )
-
-            full_response = response.text
-
-            # Extract used contexts and clean answer
-            answer = full_response
-            used_context_numbers = []
-
-            contexts_used_match = re.search(r'CONTEXTS_USED:\s*\[(.*?)\]', full_response)
-            if contexts_used_match:
-                contexts_used_str = contexts_used_match.group(1)
-                used_context_numbers = [
-                    int(s.strip()) for s in contexts_used_str.split(',')
-                    if s.strip().isdigit() and 1 <= int(s.strip()) <= len(relevant_chunks)
-                ]
-                
-                answer = re.sub(r'---\s*CONTEXTS_USED:.*$', '', full_response, flags=re.DOTALL).strip()
-                print(f"🎯 Step 2: Used {len(used_context_numbers)} contexts: [{', '.join(map(str, used_context_numbers))}]")
-            else:
-                print(f"⚠️ Could not extract CONTEXTS_USED, using all contexts")
-                used_context_numbers = list(range(1, len(relevant_chunks) + 1))
-
-            # Prepare sources based on used contexts
-            sources = []
-            for context_num in used_context_numbers:
-                if 1 <= context_num <= len(relevant_chunks):
-                    chunk = relevant_chunks[context_num - 1]
-                    
-                    source = {
-                        'id': f"source_{context_num}",
-                        'fileName': chunk['metadata']['fileName'],
-                        'fileId': chunk['metadata']['fileId'],
-                        'chunkIndex': chunk['metadata']['chunkIndex'],
-                        'originalText': chunk['text'],
-                        'relevanceScore': chunk['score'],
-                        'pageUrl': chunk['metadata'].get('pageUrl'),
-                        'cloudinaryUrl': chunk['metadata'].get('cloudinaryUrl'),
-                        'thumbnailUrl': chunk['metadata'].get('thumbnailUrl'),
-                        'confidencePercentage': f"{chunk['score'] * 100:.1f}"
-                    }
-
-                    # Add page and line information only if available (PDF content)
-                    if chunk['metadata'].get('pageNumber') is not None:
-                        source['pageNumber'] = chunk['metadata']['pageNumber']
-                    
-                    if chunk['metadata'].get('startLine') is not None:
-                        source['startLine'] = chunk['metadata']['startLine']
-                        source['endLine'] = chunk['metadata']['endLine']
-                        source['lineRange'] = f"Lines {chunk['metadata']['startLine']}-{chunk['metadata']['endLine']}"
-                    else:
-                        source['lineRange'] = 'Full content'
-
-                    sources.append(source)
-
-            return {
-                'answer': answer,
-                'sources': sources,
-                'confidence': relevant_chunks[0]['score'] if relevant_chunks else 0,
-                'analysisType': 'computational-structured',
-                'processingStats': {
-                    'totalContexts': len(relevant_chunks),
-                    'extractedValues': structured_data.get('summary', {}).get('totalValues', 0),
-                    'usedContexts': len(used_context_numbers),
-                    'currencies': structured_data.get('summary', {}).get('currencies', [])
-                }
+        response = await asyncio.to_thread(
+            self.embedding_service.genai_chat.generate_content,
+            computational_prompt,
+            generation_config={
+                'temperature': 0.1,
+                'top_p': 0.8,
+                'max_output_tokens': 2048,
             }
-        except Exception as error:
-            print(f"❌ Step 2 computational processing failed: {error}")
-            raise error
+        )
 
-    # Step 2: Process factual queries directly
-    async def step2_factual_processing(self, refined_query, original_query, relevant_chunks):
-        print(f"📖 Step 2: Factual processing...")
+        full_response = response.text
 
-        context = []
-        for index, chunk in enumerate(relevant_chunks):
-            confidence = f"{chunk['score'] * 100:.1f}"
-            location_info = ''
+        # Extract used contexts and clean answer
+        answer = full_response
+        used_context_numbers = []
+
+        contexts_used_match = re.search(r'CONTEXTS_USED:\s*\[(.*?)\]', full_response)
+        if contexts_used_match:
+            contexts_used_str = contexts_used_match.group(1)
+            used_context_numbers = [
+                int(s.strip()) for s in contexts_used_str.split(',') 
+                if s.strip().isdigit() and 1 <= int(s.strip()) <= len(relevant_chunks)
+            ]
             
-            # Build location info only if page/line data exists
-            if chunk['metadata'].get('pageNumber') is not None:
-                location_info = f"Page {chunk['metadata']['pageNumber']}"
-                if chunk['metadata'].get('startLine') is not None:
-                    location_info += f", Lines {chunk['metadata']['startLine']}-{chunk['metadata']['endLine']}"
-            else:
-                location_info = 'Content'
-            
-            context.append(
-                f"[Context {index + 1} - {chunk['metadata']['fileName']} - {location_info} - Relevance: {confidence}%]: {chunk['text']}"
-            )
+            answer = re.sub(r'---\s*CONTEXTS_USED:.*$', '', full_response, flags=re.DOTALL).strip()
+            print(f'🎯 Step 2: Used {len(used_context_numbers)} contexts: [{", ".join(map(str, used_context_numbers))}]')
+        else:
+            print('⚠️ Could not extract CONTEXTS_USED, using all contexts')
+            used_context_numbers = list(range(1, len(relevant_chunks) + 1))
 
-        factual_prompt = f"""You are an expert AI assistant providing accurate, detailed answers based on document content.
-
-ORIGINAL USER QUERY: {original_query}
-REFINED QUERY: {refined_query}
-
-CONTEXT FROM DOCUMENTS:
-{chr(10).join(context)}
-
-INSTRUCTIONS:
-1. Answer the refined query using the provided context
-2. Be comprehensive and well-structured with proper formatting
-3. Use **bold text** for important headings and key terms
-4. Use bullet points (•) or numbered lists for multiple items
-5. Structure complex answers with clear sections
-6. Include specific details and examples when relevant
-7. Reference context numbers when citing information (e.g., [Context 1])
-8. If multiple documents provide different perspectives, present them clearly
-
-CRITICAL: After your answer, identify which contexts you actually used:
-
----
-CONTEXTS_USED: [list only the context numbers (e.g., "1,3,5") that you referenced in your answer]
-
-ANSWER:"""
-
-        try:
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
-            response = model.generate_content(
-                factual_prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.3,
-                    top_p=0.8,
-                    max_output_tokens=2048,
-                )
-            )
-
-            full_response = response.text
-
-            # Extract used contexts and clean answer
-            answer = full_response
-            used_context_indices = []
-
-            contexts_used_match = re.search(r'CONTEXTS_USED:\s*\[(.*?)\]', full_response)
-            if contexts_used_match:
-                contexts_used_str = contexts_used_match.group(1)
-                used_context_indices = [
-                    int(s.strip()) - 1 for s in contexts_used_str.split(',')  # Convert to 0-based indexing
-                    if s.strip().isdigit() and 1 <= int(s.strip()) <= len(relevant_chunks)
-                ]
-                
-                answer = re.sub(r'---\s*CONTEXTS_USED:.*$', '', full_response, flags=re.DOTALL).strip()
-                print(f"🎯 Step 2: Used {len(used_context_indices)} contexts: [{', '.join(str(i + 1) for i in used_context_indices)}]")
-            else:
-                print(f"⚠️ Could not extract CONTEXTS_USED, using all contexts")
-                used_context_indices = list(range(len(relevant_chunks)))
-
-            # Prepare sources based on used contexts
-            filtered_chunks = [relevant_chunks[idx] for idx in used_context_indices]
-            sources = []
-            for index, chunk in enumerate(filtered_chunks):
+        # Prepare sources based on used contexts
+        sources = []
+        for context_num in used_context_numbers:
+            if 1 <= context_num <= len(relevant_chunks):
+                chunk = relevant_chunks[context_num - 1]
                 source = {
-                    'id': f"source_{index + 1}",
+                    'id': f'source_{context_num}',
                     'fileName': chunk['metadata']['fileName'],
                     'fileId': chunk['metadata']['fileId'],
                     'chunkIndex': chunk['metadata']['chunkIndex'],
@@ -466,18 +339,134 @@ ANSWER:"""
 
                 sources.append(source)
 
-            return {
-                'answer': answer,
-                'sources': sources,
-                'confidence': relevant_chunks[0]['score'] if relevant_chunks else 0,
-                'analysisType': 'factual-direct'
+        return {
+            'answer': answer,
+            'sources': sources,
+            'confidence': relevant_chunks[0]['score'] if relevant_chunks else 0,
+            'analysisType': 'computational-structured',
+            'processingStats': {
+                'totalContexts': len(relevant_chunks),
+                'extractedValues': structured_data.get('summary', {}).get('totalValues', 0),
+                'usedContexts': len(used_context_numbers),
+                'currencies': structured_data.get('summary', {}).get('currencies', [])
             }
-        except Exception as error:
-            print(f"❌ Step 2 factual processing failed: {error}")
-            raise error
+        }
+
+    async def step2_factual_processing(self, refined_query: str, original_query: str, 
+                                     relevant_chunks: List[Dict]) -> Dict[str, Any]:
+        print('📖 Step 2: Factual processing...')
+
+        context_parts = []
+        for index, chunk in enumerate(relevant_chunks):
+            confidence = f"{chunk['score'] * 100:.1f}"
+            location_info = ''
+            
+            # Build location info only if page/line data exists
+            if chunk['metadata'].get('pageNumber') is not None:
+                location_info = f"Page {chunk['metadata']['pageNumber']}"
+                if chunk['metadata'].get('startLine') is not None:
+                    location_info += f", Lines {chunk['metadata']['startLine']}-{chunk['metadata']['endLine']}"
+            else:
+                location_info = 'Content'
+            
+            context_parts.append(f"[Context {index + 1} - {chunk['metadata']['fileName']} - {location_info} - Relevance: {confidence}%]: {chunk['text']}")
+
+        context = '\n\n'.join(context_parts)
+
+        factual_prompt = f"""You are an expert AI assistant providing accurate, detailed answers based on document content.
+
+ORIGINAL USER QUERY: {original_query}
+REFINED QUERY: {refined_query}
+
+CONTEXT FROM DOCUMENTS:
+{context}
+
+INSTRUCTIONS:
+1. Answer the refined query using the provided context
+2. Be comprehensive and well-structured with proper formatting
+3. Use **bold text** for important headings and key terms
+4. Use bullet points (•) or numbered lists for multiple items
+5. Structure complex answers with clear sections
+6. Include specific details and examples when relevant
+7. Reference context numbers when citing information (e.g., [Context 1])
+8. If multiple documents provide different perspectives, present them clearly
+
+CRITICAL: After your answer, identify which contexts you actually used:
+
+---
+CONTEXTS_USED: [list only the context numbers (e.g., "1,3,5") that you referenced in your answer]
+
+ANSWER:"""
+
+        response = await asyncio.to_thread(
+            self.embedding_service.genai_chat.generate_content,
+            factual_prompt,
+            generation_config={
+                'temperature': 0.3,
+                'top_p': 0.8,
+                'max_output_tokens': 2048,
+            }
+        )
+
+        full_response = response.text
+
+        # Extract used contexts and clean answer
+        answer = full_response
+        used_context_indices = []
+
+        contexts_used_match = re.search(r'CONTEXTS_USED:\s*\[(.*?)\]', full_response)
+        if contexts_used_match:
+            contexts_used_str = contexts_used_match.group(1)
+            used_context_indices = [
+                int(s.strip()) - 1 for s in contexts_used_str.split(',') 
+                if s.strip().isdigit() and 1 <= int(s.strip()) <= len(relevant_chunks)
+            ]
+            
+            answer = re.sub(r'---\s*CONTEXTS_USED:.*$', '', full_response, flags=re.DOTALL).strip()
+            print(f'🎯 Step 2: Used {len(used_context_indices)} contexts: [{", ".join(str(i + 1) for i in used_context_indices)}]')
+        else:
+            print('⚠️ Could not extract CONTEXTS_USED, using all contexts')
+            used_context_indices = list(range(len(relevant_chunks)))
+
+        # Prepare sources based on used contexts
+        filtered_chunks = [relevant_chunks[idx] for idx in used_context_indices]
+        sources = []
+        for index, chunk in enumerate(filtered_chunks):
+            source = {
+                'id': f'source_{index + 1}',
+                'fileName': chunk['metadata']['fileName'],
+                'fileId': chunk['metadata']['fileId'],
+                'chunkIndex': chunk['metadata']['chunkIndex'],
+                'originalText': chunk['text'],
+                'relevanceScore': chunk['score'],
+                'pageUrl': chunk['metadata'].get('pageUrl'),
+                'cloudinaryUrl': chunk['metadata'].get('cloudinaryUrl'),
+                'thumbnailUrl': chunk['metadata'].get('thumbnailUrl'),
+                'confidencePercentage': f"{chunk['score'] * 100:.1f}"
+            }
+
+            # Add page and line information only if available (PDF content)
+            if chunk['metadata'].get('pageNumber') is not None:
+                source['pageNumber'] = chunk['metadata']['pageNumber']
+            
+            if chunk['metadata'].get('startLine') is not None:
+                source['startLine'] = chunk['metadata']['startLine']
+                source['endLine'] = chunk['metadata']['endLine']
+                source['lineRange'] = f"Lines {chunk['metadata']['startLine']}-{chunk['metadata']['endLine']}"
+            else:
+                source['lineRange'] = 'Full content'
+
+            sources.append(source)
+
+        return {
+            'answer': answer,
+            'sources': sources,
+            'confidence': relevant_chunks[0]['score'] if relevant_chunks else 0,
+            'analysisType': 'factual-direct'
+        }
 
     # Legacy compatibility methods (kept for backward compatibility)
-    def is_financial_query(self, query):
+    def is_financial_query(self, query: str) -> bool:
         financial_keywords = [
             'cost', 'costs', 'price', 'prices', 'amount', 'amounts', 'budget', 'budgets',
             'expense', 'expenses', 'fee', 'fees', 'payment', 'payments', 'total', 'sum',
@@ -488,10 +477,28 @@ ANSWER:"""
         query_lower = query.lower()
         return any(keyword in query_lower for keyword in financial_keywords)
 
-    async def generate_two_step_answer(self, query, relevant_chunks):
-        print(f"🔄 Legacy method called, redirecting to structured flow...")
+    def is_complex_query(self, query: str) -> bool:
+        complex_indicators = [
+            'cost', 'costs', 'price', 'prices', 'total', 'sum', 'calculate', 'calculation',
+            'budget', 'expense', 'revenue', 'profit', 'financial',
+            'compare', 'comparison', 'analyze', 'analysis', 'evaluate', 'assessment',
+            'summary', 'summarize', 'overview', 'breakdown', 'detailed', 'comprehensive',
+            'all', 'entire', 'complete', 'overall', 'across', 'throughout',
+            'multiple', 'various', 'different', 'each', 'every',
+            'what are', 'list all', 'show me', 'find all', 'identify',
+            'how many', 'which ones', 'what kind'
+        ]
+        
+        query_lower = query.lower()
+        complex_keyword_count = sum(1 for keyword in complex_indicators if keyword in query_lower)
+        
+        return complex_keyword_count >= 2 or len(query) > 100 or self.is_financial_query(query)
+
+    # Legacy methods for backward compatibility
+    async def generate_two_step_answer(self, query: str, relevant_chunks: List[Dict]) -> Dict[str, Any]:
+        print('🔄 Legacy method called, redirecting to structured flow...')
         return await self.generate_answer(query, None, None)
 
-    async def generate_standard_answer(self, query, relevant_chunks):
-        print(f"📝 Legacy method called, redirecting to structured flow...")
+    async def generate_standard_answer(self, query: str, relevant_chunks: List[Dict]) -> Dict[str, Any]:
+        print('📝 Legacy method called, redirecting to structured flow...')
         return await self.generate_answer(query, None, None)
