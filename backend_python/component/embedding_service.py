@@ -1,9 +1,7 @@
 
 import os
-# import google.generativeai as genai
-# from google.generativeai import GenerativeModel
-from typing import List, Optional
 import asyncio
+from typing import List, Optional, Dict, Any
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -13,95 +11,161 @@ class EmbeddingService:
     def __init__(self):
         self.genai_embedding = None
         self.genai_chat = None
-        self.embedding_model = None
-        self.chat_model = None
         self.is_initialized_flag = False
+        
+        # Task-specific embedding configurations (matching JavaScript version)
+        self.embedding_configs = {
+            'document': {
+                'model': 'text-embedding-004',
+                'taskType': 'RETRIEVAL_DOCUMENT'
+            },
+            'query': {
+                'model': 'text-embedding-004',
+                'taskType': 'QUESTION_ANSWERING'
+            },
+            'similarity': {
+                'model': 'text-embedding-004',
+                'taskType': 'SEMANTIC_SIMILARITY'
+            },
+            'code': {
+                'model': 'text-embedding-004',
+                'taskType': 'CODE_RETRIEVAL_QUERY'
+            },
+            'classification': {
+                'model': 'text-embedding-004',
+                'taskType': 'CLASSIFICATION'
+            },
+            'clustering': {
+                'model': 'text-embedding-004',
+                'taskType': 'CLUSTERING'
+            },
+            'factVerification': {
+                'model': 'text-embedding-004',
+                'taskType': 'FACT_VERIFICATION'
+            }
+        }
 
     async def initialize(self):
-        print('🔧 EmbeddingService: Starting initialization...')
-        
         try:
-            # Configure Google AI with embedding API key
+            # Initialize Google GenAI for embeddings
             embedding_api_key = os.getenv('GEMINI_EMBEDDING_API_KEY')
-            chat_api_key = os.getenv('GEMINI_CHAT_API_KEY')
-            
-            if not embedding_api_key:
-                raise Exception('GEMINI_EMBEDDING_API_KEY environment variable is required')
-            
-            if not chat_api_key:
-                raise Exception('GEMINI_CHAT_API_KEY environment variable is required')
+            if embedding_api_key:
+                print('🔄 Initializing Google GenAI for embeddings...')
+                # Import google.genai (not google.generativeai)
+                import google.genai as genai
+                self.genai_embedding = genai.Client(api_key=embedding_api_key)
+                print('✅ Google GenAI Embedding client initialized')
 
-            # Initialize embedding client
-            genai.configure(api_key=embedding_api_key)
-            self.genai_embedding = genai
-            self.embedding_model = 'text-embedding-004'
-            
-            # Initialize chat client with separate API key if different
-            if chat_api_key != embedding_api_key:
-                # Create a separate client for chat with different API key
-                import google.generativeai as chat_genai
-                chat_genai.configure(api_key=chat_api_key)
-                self.genai_chat = chat_genai
-            else:
-                self.genai_chat = genai
-            
-            self.chat_model = GenerativeModel('gemini-2.5-flash')
-            
-            print('✅ EmbeddingService: Google AI clients configured successfully')
-            print('🔧 Models configured:')
-            print(f'   Embedding: {self.embedding_model}')
-            print('   Chat: gemini-2.5-flash')
-            
+            # Initialize Google GenAI for chat
+            chat_api_key = os.getenv('GEMINI_CHAT_API_KEY')
+            if chat_api_key:
+                print('🔄 Initializing Google GenAI for chat...')
+                # Use separate client for chat if different API key
+                if chat_api_key != embedding_api_key:
+                    import google.genai as chat_genai
+                    self.genai_chat = chat_genai.Client(api_key=chat_api_key)
+                else:
+                    self.genai_chat = self.genai_embedding
+                print('✅ Google GenAI Chat client initialized')
+
             self.is_initialized_flag = True
-            print('✅ EmbeddingService initialized successfully')
-            
+
         except Exception as error:
-            print(f'❌ EmbeddingService initialization failed: {error}')
+            print(f'❌ Embedding Service initialization failed: {error}')
             self.is_initialized_flag = False
             raise error
 
-    async def generate_embedding(self, text: str) -> List[float]:
-        if not self.is_initialized_flag:
-            raise Exception('EmbeddingService not initialized')
-        
-        if not text or not text.strip():
-            raise Exception('Text cannot be empty')
-        
+    async def generate_embedding(self, text: str, task_type: str = 'document') -> List[float]:
+        """Generate task-specific embeddings using Google GenAI"""
         try:
-            # Generate embedding using Google AI
+            if not self.genai_embedding:
+                raise Exception("Google GenAI Embedding client not initialized")
+
+            config = self.embedding_configs.get(task_type)
+            if not config:
+                print(f'⚠️ Unknown task type: {task_type}, using document config')
+                config = self.embedding_configs['document']
+
+            print(f'🔧 Generating {task_type} embedding with task type: {config["taskType"]}')
+
+            # Use proper Google GenAI SDK method
             response = await asyncio.to_thread(
-                self.genai_embedding.embed_content,
-                model=self.embedding_model,
-                content=text,
-                task_type="retrieval_document"
+                self.genai_embedding.models.embed_content,
+                model=config['model'],
+                contents=[text],
+                task_type=config['taskType']
             )
-            
-            if not response or 'embedding' not in response:
-                raise Exception('Invalid embedding response')
-            
-            return response['embedding']
-            
+
+            if not response or not hasattr(response, 'embeddings') or not response.embeddings:
+                raise Exception("No embedding values returned")
+
+            if not response.embeddings[0] or not hasattr(response.embeddings[0], 'values'):
+                raise Exception("Invalid embedding format - no values property")
+
+            embedding = response.embeddings[0].values
+            print(f'✅ Generated {task_type} embedding (dimension: {len(embedding)})')
+            return embedding
+
         except Exception as error:
-            print(f'❌ Embedding generation failed: {error}')
+            print(f'❌ {task_type} embedding generation failed: {str(error)}')
             raise error
 
-    async def generate_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
-        """Generate embeddings for multiple texts"""
-        if not self.is_initialized_flag:
-            raise Exception('EmbeddingService not initialized')
-        
-        if not texts:
-            return []
-        
-        embeddings = []
-        for text in texts:
-            embedding = await self.generate_embedding(text)
-            embeddings.append(embedding)
-        
-        return embeddings
+    async def generate_batch_embeddings(self, texts: List[str], task_type: str = 'document') -> List[List[float]]:
+        """Generate batch embeddings for multiple texts (up to 100 per call)"""
+        try:
+            if not self.genai_embedding:
+                raise Exception("Google GenAI Embedding client not initialized")
+
+            if not isinstance(texts, list) or len(texts) == 0:
+                raise Exception("Texts must be a non-empty array")
+
+            if len(texts) > 100:
+                raise Exception("Batch size cannot exceed 100 texts per API call")
+
+            config = self.embedding_configs.get(task_type)
+            if not config:
+                print(f'⚠️ Unknown task type: {task_type}, using document config')
+                config = self.embedding_configs['document']
+
+            print(f'🔧 Generating batch {task_type} embeddings for {len(texts)} texts with task type: {config["taskType"]}')
+
+            # Use proper Google GenAI SDK method for batch processing
+            response = await asyncio.to_thread(
+                self.genai_embedding.models.embed_content,
+                model=config['model'],
+                contents=texts,
+                task_type=config['taskType']
+            )
+
+            if not response or not hasattr(response, 'embeddings') or not isinstance(response.embeddings, list):
+                raise Exception("No embeddings array returned")
+
+            if len(response.embeddings) != len(texts):
+                raise Exception(f"Expected {len(texts)} embeddings, got {len(response.embeddings)}")
+
+            embeddings = []
+            for emb in response.embeddings:
+                if not emb or not hasattr(emb, 'values'):
+                    raise Exception("Invalid embedding format - no values property")
+                embeddings.append(emb.values)
+
+            print(f'✅ Generated batch {task_type} embeddings ({len(embeddings)} embeddings, dimension: {len(embeddings[0]) if embeddings else 0})')
+            return embeddings
+
+        except Exception as error:
+            print(f'❌ Batch {task_type} embedding generation failed: {str(error)}')
+            raise error
 
     def is_initialized(self) -> bool:
         return self.is_initialized_flag
+
+    def get_status(self) -> Dict[str, Any]:
+        """Get comprehensive status information matching JavaScript version"""
+        return {
+            'genai_embedding': bool(self.genai_embedding),
+            'genai_chat': bool(self.genai_chat),
+            'embedding_configs': list(self.embedding_configs.keys())
+        }
 
     def get_embedding_dimension(self) -> int:
         """Returns the dimension of embeddings produced by the model"""
