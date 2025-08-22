@@ -47,6 +47,7 @@ print("🔧 RAG Service: All component imports completed")
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+from typing import Dict, Any
 
 # Load environment variables from the backend_python directory
 env_path = Path(__file__).parent.parent / '.env'
