@@ -637,7 +637,7 @@ class ChunkingService:
                 return 'multi_column'
 
     async def _extract_content_in_reading_order(self, layout: PageLayout, text_items: List[TextItem]) -> List[StructuredUnit]:
-        """STEP 2: Extract content in proper reading order"""
+        """STEP 2: Extract content in proper reading order with heading-table association"""
         if not layout.regions:
             return []
 
@@ -647,16 +647,40 @@ class ChunkingService:
         structured_units = []
         reading_order = 0
         
-        for region in sorted_regions:
+        # Track recent headings for table association
+        recent_headings = []
+        max_heading_distance = 100  # pixels
+        
+        for region_idx, region in enumerate(sorted_regions):
             if region.region_type == 'table':
-                # Extract table content
-                table_units = await self._extract_table_content(region, reading_order)
+                # Find associated headings for this table
+                associated_headings = self._find_associated_headings(region, recent_headings, max_heading_distance)
+                
+                # Extract table content with associated headings
+                table_units = await self._extract_table_content_with_headings(
+                    region, reading_order, associated_headings
+                )
                 structured_units.extend(table_units)
                 reading_order += len(table_units)
+                
+                # Clear used headings
+                for heading in associated_headings:
+                    if heading in recent_headings:
+                        recent_headings.remove(heading)
                 
             elif region.region_type == 'text':
                 # Extract text content
                 text_units = await self._extract_text_content(region, reading_order)
+                
+                # Track headings for future table association
+                for unit in text_units:
+                    if unit.type == 'header':
+                        unit.region_bbox = region.bbox  # Store region info for distance calculation
+                        recent_headings.append(unit)
+                        
+                        # Keep only recent headings (within reasonable distance)
+                        recent_headings = [h for h in recent_headings[-3:]]  # Keep last 3 headings
+                
                 structured_units.extend(text_units)
                 reading_order += len(text_units)
         
@@ -685,8 +709,50 @@ class ChunkingService:
         
         return sorted_regions
 
-    async def _extract_table_content(self, region: LayoutRegion, start_order: int) -> List[StructuredUnit]:
-        """Extract table content while preserving structure"""
+    def _find_associated_headings(self, table_region: LayoutRegion, recent_headings: List[StructuredUnit], 
+                                  max_distance: float) -> List[StructuredUnit]:
+        """Find headings that should be associated with this table"""
+        associated_headings = []
+        
+        for heading in recent_headings:
+            if not hasattr(heading, 'region_bbox') or not heading.region_bbox:
+                continue
+                
+            # Calculate distance between heading and table
+            heading_bbox = heading.region_bbox
+            table_bbox = table_region.bbox
+            
+            # Check if heading is above the table and within reasonable distance
+            vertical_distance = table_bbox.y_min - heading_bbox.y_max
+            horizontal_overlap = min(heading_bbox.x_max, table_bbox.x_max) - max(heading_bbox.x_min, table_bbox.x_min)
+            
+            # Associate if heading is above table, within distance, and has some horizontal overlap
+            if (0 <= vertical_distance <= max_distance and 
+                horizontal_overlap > 0 and
+                horizontal_overlap >= min(heading_bbox.width, table_bbox.width) * 0.3):  # 30% overlap
+                associated_headings.append(heading)
+        
+        return associated_headings
+
+    async def _extract_table_content_with_headings(self, region: LayoutRegion, start_order: int, 
+                                                 associated_headings: List[StructuredUnit]) -> List[StructuredUnit]:
+        """Extract table content with associated headings included"""
+        table_units = []
+        current_order = start_order
+        
+        # Add associated headings first
+        for heading in associated_headings:
+            heading_unit = StructuredUnit(
+                type='table_header',  # Special type for table-associated headings
+                text=heading.text,
+                lines=heading.lines,
+                bbox=heading.bbox,
+                reading_order=current_order,
+                associated_table_region=region.bbox  # Link to table
+            )
+            table_units.append(heading_unit)
+            current_order += 1
+        
         # Group items into table rows
         items_by_y = defaultdict(list)
         
@@ -698,7 +764,6 @@ class ChunkingService:
         # Sort rows by Y coordinate
         sorted_rows = sorted(items_by_y.items(), key=lambda x: x[0])
         
-        table_units = []
         for row_idx, (y_coord, row_items) in enumerate(sorted_rows):
             # Sort items in row by X coordinate
             row_items.sort(key=lambda item: item.x)
@@ -720,7 +785,8 @@ class ChunkingService:
                         max(item.x + item.width for item in row_items),
                         max(item.y + item.height for item in row_items)
                     ),
-                    reading_order=start_order + row_idx
+                    reading_order=current_order,
+                    associated_headings=[h.text for h in associated_headings]  # Store heading texts
                 )
                 
                 # Extract table columns
@@ -728,8 +794,15 @@ class ChunkingService:
                 unit.numeric_metadata = self._analyze_row_numeric_content(row_text)
                 
                 table_units.append(unit)
+                current_order += 1
         
         return table_units
+
+    async def _extract_table_content(self, region: LayoutRegion, start_order: int) -> List[StructuredUnit]:
+        """Extract table content while preserving structure (fallback method)"""
+        return await self._extract_table_content_with_headings(region, start_order, [])
+        
+    # Legacy method for backward compatibility
 
     async def _extract_text_content(self, region: LayoutRegion, start_order: int) -> List[StructuredUnit]:
         """Extract text content with proper structure detection"""
@@ -1454,38 +1527,127 @@ class ChunkingService:
 
     def _create_units_based_chunks(self, units: List[StructuredUnit], page_number: Optional[int], 
                                    metadata: Dict, start_index: int) -> List[Dict]:
-        """Create chunks based on structured units with controlled overlap (preserving reading order)"""
+        """Create chunks based on structured units with enhanced heading-table association"""
         chunks = []
         chunk_index = start_index
         current_chunk = ''
         current_units = []
 
-        # Units are already sorted by reading order
-        for unit in units:
-            unit_text = unit.text
-
-            # Check if adding this unit would exceed chunk size
-            if len(current_chunk) + len(unit_text) > self.chunk_size and current_chunk.strip():
-                # Create chunk with current content
-                chunk_text = current_chunk.strip()
-                chunks.append(self._create_semantic_chunk(
-                    chunk_text, metadata, chunk_index, page_number, current_units
-                ))
-                chunk_index += 1
-
-                # Calculate controlled overlap (70-110 characters)
-                overlap_text = self._get_controlled_overlap(chunk_text, 70, 110)
+        i = 0
+        while i < len(units):
+            unit = units[i]
+            
+            # Check if this is a table header followed by table rows
+            if unit.type == 'table_header':
+                # Find all related table content
+                table_group = [unit]
+                j = i + 1
                 
-                # Start new chunk with overlap + current unit
-                current_chunk = f"{overlap_text}\n{unit_text}" if overlap_text else unit_text
-                current_units = [unit]
-            else:
-                # Add unit to current chunk
-                if current_chunk:
-                    current_chunk += f'\n{unit_text}'
+                # Collect all table rows that follow this header
+                while j < len(units) and units[j].type == 'table_row':
+                    table_group.append(units[j])
+                    j += 1
+                
+                # Calculate total size of table group
+                table_group_text = '\n'.join(u.text for u in table_group)
+                
+                # Check if adding this table group would exceed chunk size
+                if (len(current_chunk) + len(table_group_text) > self.chunk_size and 
+                    current_chunk.strip()):
+                    
+                    # Create chunk with current content
+                    chunk_text = current_chunk.strip()
+                    chunks.append(self._create_semantic_chunk(
+                        chunk_text, metadata, chunk_index, page_number, current_units
+                    ))
+                    chunk_index += 1
+
+                    # Calculate controlled overlap
+                    overlap_text = self._get_controlled_overlap(chunk_text, 70, 110)
+                    
+                    # Start new chunk with overlap + table group
+                    current_chunk = f"{overlap_text}\n{table_group_text}" if overlap_text else table_group_text
+                    current_units = table_group.copy()
                 else:
-                    current_chunk = unit_text
-                current_units.append(unit)
+                    # Add table group to current chunk
+                    if current_chunk:
+                        current_chunk += f'\n{table_group_text}'
+                    else:
+                        current_chunk = table_group_text
+                    current_units.extend(table_group)
+                
+                # Skip the processed table rows
+                i = j
+                continue
+            
+            # Check if this is a regular table row without header (standalone table)
+            elif unit.type == 'table_row':
+                # Look for consecutive table rows to group them
+                table_group = [unit]
+                j = i + 1
+                
+                # Collect consecutive table rows
+                while j < len(units) and units[j].type == 'table_row':
+                    table_group.append(units[j])
+                    j += 1
+                
+                # Calculate total size of table group
+                table_group_text = '\n'.join(u.text for u in table_group)
+                
+                # Try to keep table rows together in same chunk
+                if (len(current_chunk) + len(table_group_text) > self.chunk_size and 
+                    current_chunk.strip() and len(table_group) > 1):
+                    
+                    # Create chunk with current content
+                    chunk_text = current_chunk.strip()
+                    chunks.append(self._create_semantic_chunk(
+                        chunk_text, metadata, chunk_index, page_number, current_units
+                    ))
+                    chunk_index += 1
+
+                    # Start new chunk with table group
+                    current_chunk = table_group_text
+                    current_units = table_group.copy()
+                else:
+                    # Add table group to current chunk
+                    if current_chunk:
+                        current_chunk += f'\n{table_group_text}'
+                    else:
+                        current_chunk = table_group_text
+                    current_units.extend(table_group)
+                
+                # Skip the processed table rows
+                i = j
+                continue
+            
+            # Handle regular units (headers, paragraphs, bullets)
+            else:
+                unit_text = unit.text
+
+                # Check if adding this unit would exceed chunk size
+                if len(current_chunk) + len(unit_text) > self.chunk_size and current_chunk.strip():
+                    # Create chunk with current content
+                    chunk_text = current_chunk.strip()
+                    chunks.append(self._create_semantic_chunk(
+                        chunk_text, metadata, chunk_index, page_number, current_units
+                    ))
+                    chunk_index += 1
+
+                    # Calculate controlled overlap
+                    overlap_text = self._get_controlled_overlap(chunk_text, 70, 110)
+                    
+                    # Start new chunk with overlap + current unit
+                    current_chunk = f"{overlap_text}\n{unit_text}" if overlap_text else unit_text
+                    current_units = [unit]
+                else:
+                    # Add unit to current chunk
+                    if current_chunk:
+                        current_chunk += f'\n{unit_text}'
+                    else:
+                        current_chunk = unit_text
+                    current_units.append(unit)
+            
+            i += 1
 
         # Add final chunk if it has content
         if current_chunk.strip():
@@ -1541,18 +1703,40 @@ class ChunkingService:
         # Analyze numeric content across the entire chunk
         chunk_normalized = self._normalize_currency_and_numbers(text)
 
-        # Collect numeric metadata from table rows
+        # Enhanced table analysis with heading associations
         table_rows = [u for u in semantic_units if u.type == 'table_row']
+        table_headers = [u for u in semantic_units if u.type == 'table_header']
+        
+        # Extract heading-table associations
+        heading_table_associations = []
+        table_context_headings = []
+        
+        for unit in semantic_units:
+            if unit.type == 'table_row' and hasattr(unit, 'associated_headings'):
+                table_context_headings.extend(unit.associated_headings)
+            elif unit.type == 'table_header':
+                heading_table_associations.append({
+                    'heading_text': unit.text,
+                    'reading_order': unit.reading_order,
+                    'has_associated_table': any(u.type == 'table_row' for u in semantic_units 
+                                              if u.reading_order > unit.reading_order)
+                })
+
         numeric_metadata = {
             'total_numbers': len(chunk_normalized.numbers),
             'currencies': list(set(chunk_normalized.currencies)),
             'has_negative_values': chunk_normalized.has_negative,
             'table_rows_count': len(table_rows),
+            'table_headers_count': len(table_headers),
             'total_numeric_columns': sum(
                 row.numeric_metadata.get('numeric_columns', 0) for row in table_rows
                 if hasattr(row, 'numeric_metadata') and row.numeric_metadata
             ),
-            'primary_values': []
+            'primary_values': [],
+            # Enhanced heading-table association metadata
+            'has_heading_table_pairs': len(heading_table_associations) > 0,
+            'heading_table_associations': heading_table_associations,
+            'table_context_headings': list(set(table_context_headings))
         }
 
         # Collect all primary values from table rows
@@ -1579,9 +1763,10 @@ class ChunkingService:
             'chunk_size': len(text),
             'semantic_types': list(set(unit_types)),
             'unit_count': len(semantic_units),
-            'strategy': 'enhanced_layout_aware_semantic',
-            'has_structured_content': any(t in ['bullet', 'table_row', 'header'] for t in unit_types),
-            'has_table_content': 'table_row' in unit_types,
+            'strategy': 'enhanced_layout_aware_semantic_with_heading_table_association',
+            'has_structured_content': any(t in ['bullet', 'table_row', 'header', 'table_header'] for t in unit_types),
+            'has_table_content': 'table_row' in unit_types or 'table_header' in unit_types,
+            'has_contextualized_tables': len(table_context_headings) > 0 or len(heading_table_associations) > 0,
             'table_columns': [len(u.columns) for u in semantic_units if u.type == 'table_row' and hasattr(u, 'columns') and u.columns],
             # Enhanced numeric metadata
             'numeric_metadata': numeric_metadata,
@@ -1594,7 +1779,10 @@ class ChunkingService:
             'is_column_aware': len(column_indices) > 0,
             # Reading order metadata
             'reading_order_range': [min(reading_orders), max(reading_orders)] if reading_orders else [0, 0],
-            'maintains_reading_order': True
+            'maintains_reading_order': True,
+            # Enhanced searchability metadata
+            'searchable_table_contexts': table_context_headings + [h['heading_text'] for h in heading_table_associations],
+            'chunk_coherence_score': self._calculate_chunk_coherence_score(semantic_units, heading_table_associations)
         }
 
         # Add page and line numbers only for PDF content
@@ -1607,6 +1795,31 @@ class ChunkingService:
             'text': text,
             'metadata': chunk_metadata
         }
+
+    def _calculate_chunk_coherence_score(self, semantic_units: List[StructuredUnit], 
+                                       heading_table_associations: List[Dict]) -> float:
+        """Calculate a coherence score for the chunk based on heading-table associations"""
+        if not semantic_units:
+            return 0.0
+            
+        # Base score
+        coherence_score = 0.5
+        
+        # Bonus for having heading-table pairs
+        if heading_table_associations:
+            coherence_score += 0.3
+        
+        # Bonus for proper reading order
+        reading_orders = [getattr(u, 'reading_order', 0) for u in semantic_units]
+        if reading_orders == sorted(reading_orders):
+            coherence_score += 0.2
+            
+        # Bonus for table content with context
+        table_units = [u for u in semantic_units if u.type in ['table_row', 'table_header']]
+        if table_units and any(hasattr(u, 'associated_headings') for u in table_units):
+            coherence_score += 0.1
+            
+        return min(1.0, coherence_score)
 
     # Configuration methods
     def set_chunk_size(self, size: int):
