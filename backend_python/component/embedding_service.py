@@ -58,22 +58,40 @@ class EmbeddingService:
             embedding_api_key = os.getenv('GEMINI_EMBEDDING_API_KEY')
             if embedding_api_key:
                 print('🔄 Initializing Google GenAI for embeddings...')
-                import google.genai as genai
-                self.genai_embedding = genai.Client(api_key=embedding_api_key)
-                print('✅ Google GenAI Embedding client initialized')
+                try:
+                    import google.genai as genai
+                    self.genai_embedding = genai.Client(api_key=embedding_api_key)
+                    print('✅ Google GenAI Embedding client initialized')
+                except ImportError as import_error:
+                    print(f'❌ Failed to import google.genai: {import_error}')
+                    raise Exception(f'Google GenAI SDK not available: {import_error}')
+            else:
+                print('⚠️ GEMINI_EMBEDDING_API_KEY not set, embedding service will not be available')
 
             # Initialize Google GenAI for chat
             chat_api_key = os.getenv('GEMINI_CHAT_API_KEY')
             if chat_api_key:
                 print('🔄 Initializing Google GenAI for chat...')
-                if chat_api_key != embedding_api_key:
-                    import google.genai as genai
-                    self.genai_chat = genai.Client(api_key=chat_api_key)
-                else:
-                    self.genai_chat = self.genai_embedding
-                print('✅ Google GenAI Chat client initialized')
+                try:
+                    if chat_api_key != embedding_api_key:
+                        import google.genai as genai
+                        self.genai_chat = genai.Client(api_key=chat_api_key)
+                    else:
+                        self.genai_chat = self.genai_embedding
+                    print('✅ Google GenAI Chat client initialized')
+                except ImportError as import_error:
+                    print(f'❌ Failed to import google.genai for chat: {import_error}')
+                    # Don't raise here, allow embedding to work even if chat fails
+            else:
+                print('⚠️ GEMINI_CHAT_API_KEY not set, chat service will not be available')
 
-            self.is_initialized_flag = True
+            # Set initialized flag based on whether we have at least embeddings
+            self.is_initialized_flag = self.genai_embedding is not None
+            
+            if self.is_initialized_flag:
+                print('✅ Embedding Service initialized successfully')
+            else:
+                print('❌ Embedding Service initialization failed - no valid API keys or SDK issues')
 
         except Exception as error:
             print(f'❌ Embedding Service initialization failed: {error}')

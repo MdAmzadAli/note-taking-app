@@ -917,13 +917,17 @@ async def start_server():
             print(f"     {key}: {masked_value}")
 
     # Initialize RAG service
-    try:
-        print("🔄 Initializing RAG service...")
-        await rag_service.initialize()
+    print("🔄 Initializing RAG service...")
+    await rag_service.initialize()
+    
+    if rag_service.is_initialized:
         print("✅ RAG service initialization completed successfully")
-    except Exception as error:
-        print(f"⚠️ RAG service initialization failed: {error}")
-        print("⚠️ Continuing without RAG features")
+        print("🎯 RAG is ready for document indexing and search")
+    else:
+        print("⚠️ RAG service initialization completed with issues")
+        print("⚠️ Some RAG features may not be available")
+        
+    # Always continue - partial functionality is better than no functionality
 
     print(f"🚀 Server running on port {PORT}")
     print(f"🌐 Server accessible at http://0.0.0.0:{PORT}")

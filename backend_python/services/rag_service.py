@@ -124,56 +124,46 @@ class RAGService:
         print(f'   GEMINI_EMBEDDING_API_KEY: {"✅ Set" if os.getenv("GEMINI_EMBEDDING_API_KEY") else "❌ Not set"} ({'*' * min(len(os.getenv("GEMINI_EMBEDDING_API_KEY", "")), 8) if os.getenv("GEMINI_EMBEDDING_API_KEY") else "None"})')
         print(f'   GEMINI_CHAT_API_KEY: {"✅ Set" if os.getenv("GEMINI_CHAT_API_KEY") else "❌ Not set"} ({'*' * min(len(os.getenv("GEMINI_CHAT_API_KEY", "")), 8) if os.getenv("GEMINI_CHAT_API_KEY") else "None"})')
 
+        # Initialize component services with detailed error reporting
+        embedding_initialized = False
+        vector_db_initialized = False
+
+        print('🔧 Initializing EmbeddingService...')
         try:
-            # Check if required environment variables are available
-            required_env_vars = ['QDRANT_URL', 'GEMINI_EMBEDDING_API_KEY', 'GEMINI_CHAT_API_KEY']
-            missing_vars = [var for var in required_env_vars if not os.getenv(var)]
-            
-            if missing_vars:
-                print(f'⚠️ RAG environment variables missing: {missing_vars}, running in mock mode')
-                self.is_initialized = False
-                return
+            await self.embedding_service.initialize()
+            embedding_initialized = self.embedding_service.is_initialized()
+            print(f'✅ EmbeddingService initialized: {embedding_initialized}')
+        except Exception as embed_error:
+            print(f'❌ EmbeddingService initialization failed: {embed_error}')
+            embedding_initialized = False
 
-            print('🔧 All required environment variables present, proceeding with initialization...')
+        print('🔧 Initializing VectorDatabaseService...')
+        try:
+            await self.vector_database_service.initialize()
+            vector_db_initialized = self.vector_database_service.is_initialized()
+            print(f'✅ VectorDatabaseService initialized: {vector_db_initialized}')
+        except Exception as vector_error:
+            print(f'❌ VectorDatabaseService initialization failed: {vector_error}')
+            vector_db_initialized = False
 
-            # Initialize component services with detailed error reporting
-            print('🔧 Initializing EmbeddingService...')
-            try:
-                await self.embedding_service.initialize()
-                print(f'✅ EmbeddingService initialized: {self.embedding_service.is_initialized()}')
-            except Exception as embed_error:
-                print(f'❌ EmbeddingService initialization failed: {embed_error}')
-                raise embed_error
+        # Set initialization status based on component success
+        self.is_initialized = embedding_initialized and vector_db_initialized
 
-            print('🔧 Initializing VectorDatabaseService...')
-            try:
-                await self.vector_database_service.initialize()
-                print(f'✅ VectorDatabaseService initialized: {self.vector_database_service.is_initialized()}')
-            except Exception as vector_error:
-                print(f'❌ VectorDatabaseService initialization failed: {vector_error}')
-                raise vector_error
-
-            # Verify both services are actually initialized
-            if not self.embedding_service.is_initialized():
-                raise Exception('EmbeddingService failed to initialize properly')
-            
-            if not self.vector_database_service.is_initialized():
-                raise Exception('VectorDatabaseService failed to initialize properly')
-
-            self.is_initialized = True
+        if self.is_initialized:
             print('✅ RAG Service initialized successfully')
             print('📊 Final state:', {
-                'qdrant': self.vector_database_service.is_initialized(),
-                'embedding': self.embedding_service.is_initialized(),
+                'qdrant': vector_db_initialized,
+                'embedding': embedding_initialized,
                 'initialized': self.is_initialized
             })
-        except Exception as error:
-            print('❌ RAG Service initialization failed')
-            print(f'❌ Error type: {type(error).__name__}')
-            print(f'❌ Error message: {error}')
-            print(f'❌ Error details: {str(error)}')
-            self.is_initialized = False
-            # Don't throw error, allow app to continue without RAG
+        else:
+            print('⚠️ RAG Service partially initialized - some components failed')
+            print('📊 Component states:', {
+                'qdrant': vector_db_initialized,
+                'embedding': embedding_initialized,
+                'initialized': self.is_initialized
+            })
+            # Continue anyway to allow partial functionality
 
     # Delegate to ChunkingService
     async def extract_text_from_pdf(self, file_path):
@@ -258,50 +248,62 @@ class RAGService:
     # Health check with all components
     async def health_check(self):
         try:
-            if not self.is_initialized:
-                return {
-                    'status': 'degraded',
-                    'qdrant': False,
-                    'genaiEmbedding': False,
-                    'genaiChat': False,
-                    'initialized': False,
-                    'message': 'RAG service not configured (missing environment variables)'
-                }
-
+            # Get component health status
             vector_db_health = await self.vector_database_service.health_check()
             embedding_status = self.embedding_service.get_status()
 
+            # Determine overall health status
+            qdrant_healthy = vector_db_health.get('qdrant', False)
+            embedding_healthy = embedding_status.get('genai_embedding', False)
+            chat_healthy = embedding_status.get('genai_chat', False)
+
+            # If both core services are working, we're healthy
+            # If at least one is working, we're degraded but functional
+            # If neither is working, we're unhealthy
+            if qdrant_healthy and embedding_healthy:
+                overall_status = 'healthy'
+            elif qdrant_healthy or embedding_healthy:
+                overall_status = 'degraded'
+            else:
+                overall_status = 'unhealthy'
+
+            # Update our initialization status based on component health
+            self.is_initialized = qdrant_healthy and embedding_healthy
+
             return {
-                'status': vector_db_health['status'],
-                'qdrant': vector_db_health['qdrant'],
-                'genaiEmbedding': embedding_status['genai_embedding'],
-                'genaiChat': embedding_status['genai_chat'],
+                'status': overall_status,
+                'qdrant': qdrant_healthy,
+                'genaiEmbedding': embedding_healthy,
+                'genaiChat': chat_healthy,
                 'initialized': self.is_initialized,
-                'embeddingConfigs': embedding_status['embedding_configs']
+                'embeddingConfigs': embedding_status.get('embedding_configs', []),
+                'message': f'RAG service status: {overall_status}'
             }
         except Exception as error:
             return {
                 'status': 'unhealthy',
                 'qdrant': False,
-                'genaiEmbedding': self.embedding_service.get_status()['genai_embedding'],
-                'genaiChat': self.embedding_service.get_status()['genai_chat'],
-                'initialized': self.is_initialized,
+                'genaiEmbedding': False,
+                'genaiChat': False,
+                'initialized': False,
                 'error': str(error)
             }
 
     def is_ready_for_indexing(self) -> bool:
         """Check if RAG service is ready for document indexing"""
-        return (self.is_initialized and 
-                self.document_indexing_service is not None and
+        return (self.document_indexing_service is not None and
                 self.vector_database_service is not None and
-                self.embedding_service is not None)
+                self.vector_database_service.is_initialized() and
+                self.embedding_service is not None and
+                self.embedding_service.is_initialized())
 
     def is_ready_for_search(self) -> bool:
         """Check if RAG service is ready for searching"""
-        return (self.is_initialized and 
-                self.search_service is not None and
+        return (self.search_service is not None and
                 self.vector_database_service is not None and
-                self.embedding_service is not None)
+                self.vector_database_service.is_initialized() and
+                self.embedding_service is not None and
+                self.embedding_service.is_initialized())
 
     async def search_query(self, query: str, limit: int = 5, workspace_id: str = None) -> Dict[str, Any]:
         """
