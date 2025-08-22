@@ -1,0 +1,40 @@
+🔧 RAG Service: Starting component imports...
+✅ RAG: ChunkingService imported successfully
+❌ RAG: Failed to import EmbeddingService: No module named 'google.generativeai'
+✅ RAG: VectorDatabaseService imported successfully
+✅ RAG: SearchService imported successfully
+✅ RAG: AnswerGenerationService imported successfully
+✅ RAG: DocumentIndexingService imported successfully
+✅ RAG: UnifiedChunkingService imported successfully
+🔧 RAG Service: All component imports completed
+🔧 RAG Service ENV: Loading environment variables from: /home/runner/workspace/backend_python/.env
+🔧 RAG Service ENV: Environment variables after loading:
+   QDRANT_URL: ✅ Set (https://88400bcb-09a0-4ddb-a90d-78abcb266b4c.us-west-1-0.aws.cloud.qdrant.io:6333)
+   QDRANT_API_KEY: ✅ Set (********)
+   GEMINI_EMBEDDING_API_KEY: ✅ Set (********)
+   GEMINI_CHAT_API_KEY: ✅ Set (********)
+🔧 RAG Service: Starting initialization...
+✅ RAG: ChunkingService component initialized
+✅ RAG: UnifiedChunkingService component initialized
+❌ RAG: Failed to initialize EmbeddingService: name 'EmbeddingService' is not defined
+✅ RAG: VectorDatabaseService component initialized
+❌ RAG: Failed to initialize SearchService: 'RAGService' object has no attribute 'embedding_service'
+❌ RAG: Failed to initialize AnswerGenerationService: 'RAGService' object has no attribute 'embedding_service'
+❌ RAG: Failed to initialize DocumentIndexingService: 'RAGService' object has no attribute 'embedding_service'
+🔧 RAG Service: Component initialization completed
+✅ RAGService imported successfully
+✅ URLDownloadService imported successfully
+✅ WebpageTextExtractorService imported successfully
+🔧 All imports completed
+🌐 CORS check for origin
+🔧 Initializing backend services...
+✅ CSVService initialized successfully
+✅ FileService initialized successfully
+🔧 RAG Service: Starting initialization...
+✅ RAG: ChunkingService component initialized
+✅ RAG: UnifiedChunkingService component initialized
+❌ RAG: Failed to initialize EmbeddingService: name 'EmbeddingService' is not defined
+✅ RAG: VectorDatabaseService component initialized
+❌ RAG: Failed to initialize SearchService: 'RAGService' object has no attribute 'embedding_service'
+❌ RAG: Failed to initialize AnswerGenerationService: 'RAGService' object has no attribute 'embedding_service'
+❌ RAG: Failed to initialize DocumentIndexingService: 'RAGService' object has no attribute 'embedding_service'
