@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "nix"]
+modules = ["nix", "nodejs-20", "python-3.11"]
 run = "npm run start"
 
 [nix]
@@ -96,7 +96,7 @@ mode = "parallel"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "EXPO_PACKAGER_PROXY_URL=https://$REPLIT_DEV_DOMAIN REACT_NATIVE_PACKAGER_HOSTNAME=$REPLIT_DEV_DOMAIN npx expo start --tunnel"
+args = "npx expo start"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
