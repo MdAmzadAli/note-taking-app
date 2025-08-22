@@ -13,3 +13,4 @@ numpy==2.0.2
 pandas==2.2.3
 aiohttp==3.10.11
 beautifulsoup4==4.12.3
+google-genai[aiohttp]

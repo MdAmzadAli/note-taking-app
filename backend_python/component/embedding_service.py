@@ -1,7 +1,7 @@
 
 import os
-import google.generativeai as genai
-from google.generativeai import GenerativeModel
+# import google.generativeai as genai
+# from google.generativeai import GenerativeModel
 from typing import List, Optional
 import asyncio
 from dotenv import load_dotenv
