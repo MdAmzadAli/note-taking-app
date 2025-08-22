@@ -1,12 +1,13 @@
-
 from component.chunking_service import ChunkingService
 from component.embedding_service import EmbeddingService
 from component.vector_database_service import VectorDatabaseService
 from component.search_service import SearchService
 from component.answer_generation_service import AnswerGenerationService
 from component.document_indexing_service import DocumentIndexingService
-import os
 # added python_backend
+from component.unified_chunking_service import UnifiedChunkingService
+import os
+
 
 class RAGService:
     def __init__(self):
@@ -16,14 +17,13 @@ class RAGService:
 
         # Initialize component services
         self.chunking_service = ChunkingService(self.chunk_size, self.chunk_overlap)
+        self.unified_chunking_service = UnifiedChunkingService(self.chunk_size, self.chunk_overlap)
         self.embedding_service = EmbeddingService()
         self.vector_database_service = VectorDatabaseService()
         self.search_service = SearchService(self.embedding_service, self.vector_database_service)
         self.answer_generation_service = AnswerGenerationService(self.embedding_service, self.search_service)
         self.document_indexing_service = DocumentIndexingService(
-            self.chunking_service,
-            self.embedding_service,
-            self.vector_database_service
+            self.chunking_service, self.embedding_service, self.vector_database_service
         )
 
     async def initialize(self):
@@ -77,11 +77,12 @@ class RAGService:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.document_indexing_service.update_chunking_config(chunk_size, chunk_overlap)
+        self.unified_chunking_service.update_chunking_config(chunk_size, chunk_overlap)
 
-    def split_with_strategy(self, pdf_data, metadata=None, strategy='semantic'):
+    def split_with_strategy(self, data, metadata=None, strategy='semantic'):
         if metadata is None:
             metadata = {}
-        return self.chunking_service.split_with_strategy(pdf_data, metadata, strategy)
+        return self.unified_chunking_service.split_with_strategy(data, metadata, strategy)
 
     def analyze_pdf_structure(self, pdf_data):
         return self.chunking_service.analyze_pdf_structure(pdf_data)
