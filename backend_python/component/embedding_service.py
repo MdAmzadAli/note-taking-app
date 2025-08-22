@@ -1,4 +1,3 @@
-import google.generativeai as genai
 import os
 import asyncio
 from typing import List, Dict, Any
@@ -59,7 +58,6 @@ class EmbeddingService:
             embedding_api_key = os.getenv('GEMINI_EMBEDDING_API_KEY')
             if embedding_api_key:
                 print('🔄 Initializing Google GenAI for embeddings...')
-                # Import google.genai (not google.generativeai)
                 import google.genai as genai
                 self.genai_embedding = genai.Client(api_key=embedding_api_key)
                 print('✅ Google GenAI Embedding client initialized')
@@ -68,10 +66,9 @@ class EmbeddingService:
             chat_api_key = os.getenv('GEMINI_CHAT_API_KEY')
             if chat_api_key:
                 print('🔄 Initializing Google GenAI for chat...')
-                # Use separate client for chat if different API key
                 if chat_api_key != embedding_api_key:
-                    import google.genai as chat_genai
-                    self.genai_chat = chat_genai.Client(api_key=chat_api_key)
+                    import google.genai as genai
+                    self.genai_chat = genai.Client(api_key=chat_api_key)
                 else:
                     self.genai_chat = self.genai_embedding
                 print('✅ Google GenAI Chat client initialized')

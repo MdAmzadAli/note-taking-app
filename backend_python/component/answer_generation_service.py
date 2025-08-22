@@ -279,9 +279,10 @@ CONTEXTS_USED: [list only the context numbers (e.g., "1,3,5") that you reference
 ANSWER:"""
 
         response = await asyncio.to_thread(
-            self.embedding_service.genai_chat.generate_content,
-            computational_prompt,
-            generation_config={
+            self.embedding_service.genai_chat.models.generate_content,
+            model='gemini-1.5-flash-8b',
+            contents=[{'parts': [{'text': computational_prompt}]}],
+            config={
                 'temperature': 0.1,
                 'top_p': 0.8,
                 'max_output_tokens': 2048,
