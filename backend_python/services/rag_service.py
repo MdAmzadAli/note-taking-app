@@ -119,21 +119,46 @@ class RAGService:
     async def initialize(self):
         print('🔄 RAG Service: Starting initialization...')
         print('🔧 Environment check:')
-        print(f'   QDRANT_URL: {"✅ Set" if os.getenv("QDRANT_URL") else "❌ Not set"}')
-        print(f'   QDRANT_API_KEY: {"✅ Set" if os.getenv("QDRANT_API_KEY") else "⚠️ Not set (optional)"}')
-        print(f'   GEMINI_EMBEDDING_API_KEY: {"✅ Set" if os.getenv("GEMINI_EMBEDDING_API_KEY") else "❌ Not set"}')
-        print(f'   GEMINI_CHAT_API_KEY: {"✅ Set" if os.getenv("GEMINI_CHAT_API_KEY") else "❌ Not set"}')
+        print(f'   QDRANT_URL: {"✅ Set" if os.getenv("QDRANT_URL") else "❌ Not set"} ({os.getenv("QDRANT_URL", "None")})')
+        print(f'   QDRANT_API_KEY: {"✅ Set" if os.getenv("QDRANT_API_KEY") else "⚠️ Not set (optional)"} ({'*' * min(len(os.getenv("QDRANT_API_KEY", "")), 8) if os.getenv("QDRANT_API_KEY") else "None"})')
+        print(f'   GEMINI_EMBEDDING_API_KEY: {"✅ Set" if os.getenv("GEMINI_EMBEDDING_API_KEY") else "❌ Not set"} ({'*' * min(len(os.getenv("GEMINI_EMBEDDING_API_KEY", "")), 8) if os.getenv("GEMINI_EMBEDDING_API_KEY") else "None"})')
+        print(f'   GEMINI_CHAT_API_KEY: {"✅ Set" if os.getenv("GEMINI_CHAT_API_KEY") else "❌ Not set"} ({'*' * min(len(os.getenv("GEMINI_CHAT_API_KEY", "")), 8) if os.getenv("GEMINI_CHAT_API_KEY") else "None"})')
 
         try:
             # Check if required environment variables are available
-            if not (os.getenv('QDRANT_URL') and os.getenv('GEMINI_EMBEDDING_API_KEY') and os.getenv('GEMINI_CHAT_API_KEY')):
-                print('⚠️ RAG environment variables not configured, running in mock mode')
+            required_env_vars = ['QDRANT_URL', 'GEMINI_EMBEDDING_API_KEY', 'GEMINI_CHAT_API_KEY']
+            missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+            
+            if missing_vars:
+                print(f'⚠️ RAG environment variables missing: {missing_vars}, running in mock mode')
                 self.is_initialized = False
                 return
 
-            # Initialize all component services
-            await self.embedding_service.initialize()
-            await self.vector_database_service.initialize()
+            print('🔧 All required environment variables present, proceeding with initialization...')
+
+            # Initialize component services with detailed error reporting
+            print('🔧 Initializing EmbeddingService...')
+            try:
+                await self.embedding_service.initialize()
+                print(f'✅ EmbeddingService initialized: {self.embedding_service.is_initialized()}')
+            except Exception as embed_error:
+                print(f'❌ EmbeddingService initialization failed: {embed_error}')
+                raise embed_error
+
+            print('🔧 Initializing VectorDatabaseService...')
+            try:
+                await self.vector_database_service.initialize()
+                print(f'✅ VectorDatabaseService initialized: {self.vector_database_service.is_initialized()}')
+            except Exception as vector_error:
+                print(f'❌ VectorDatabaseService initialization failed: {vector_error}')
+                raise vector_error
+
+            # Verify both services are actually initialized
+            if not self.embedding_service.is_initialized():
+                raise Exception('EmbeddingService failed to initialize properly')
+            
+            if not self.vector_database_service.is_initialized():
+                raise Exception('VectorDatabaseService failed to initialize properly')
 
             self.is_initialized = True
             print('✅ RAG Service initialized successfully')
@@ -146,6 +171,7 @@ class RAGService:
             print('❌ RAG Service initialization failed')
             print(f'❌ Error type: {type(error).__name__}')
             print(f'❌ Error message: {error}')
+            print(f'❌ Error details: {str(error)}')
             self.is_initialized = False
             # Don't throw error, allow app to continue without RAG
 

@@ -279,17 +279,23 @@ async def upload_workspace(
                 # Auto-index PDF files for RAG with workspace ID
                 if file_info["mimetype"] == "application/pdf":
                     print(f"🔄 Starting RAG indexing for device file {i + 1} ({file_info['originalName']})...")
-                    try:
-                        index_result = await rag_service.index_document(
-                            file_info["id"],
-                            file_info["path"],
-                            file_info["originalName"],
-                            workspaceId,
-                            processed_file.get("cloudinary")
-                        )
-                        print(f"✅ RAG indexing completed for device file {i + 1}: {index_result.get('chunksCount', 0)} chunks")
-                    except Exception as rag_error:
-                        print(f"⚠️ RAG indexing failed for device file {i + 1} (continuing anyway): {rag_error}")
+                    
+                    # Check if RAG service is ready for indexing
+                    if not rag_service.is_ready_for_indexing():
+                        print(f"⚠️ RAG service not ready for indexing device file {i + 1}, skipping RAG indexing")
+                        print(f"🔧 RAG status: initialized={rag_service.is_initialized}, ready_for_indexing={rag_service.is_ready_for_indexing()}")
+                    else:
+                        try:
+                            index_result = await rag_service.index_document(
+                                file_info["id"],
+                                file_info["path"],
+                                file_info["originalName"],
+                                workspaceId,
+                                processed_file.get("cloudinary")
+                            )
+                            print(f"✅ RAG indexing completed for device file {i + 1}: {index_result.get('chunksCount', 0)} chunks")
+                        except Exception as rag_error:
+                            print(f"❌ RAG indexing failed for device file {i + 1}: {rag_error}")
 
                 uploaded_files.append(processed_file)
                 print(f"✅ Successfully processed device file {i + 1}: {file.filename}")
@@ -369,17 +375,23 @@ async def upload_workspace(
                 # Auto-index PDF files for RAG with workspace ID
                 if file_metadata["mimetype"] == "application/pdf":
                     print(f"🔄 Starting RAG indexing for URL {i + 1} ({file_metadata['originalName']})...")
-                    try:
-                        index_result = await rag_service.index_document(
-                            file_metadata["id"],
-                            file_metadata["path"],
-                            file_metadata["originalName"],
-                            workspaceId,
-                            processed_file.get("cloudinary")
-                        )
-                        print(f"✅ RAG indexing completed for URL {i + 1}: {index_result.get('chunksCount', 0)} chunks")
-                    except Exception as rag_error:
-                        print(f"⚠️ RAG indexing failed for URL {i + 1} (continuing anyway): {rag_error}")
+                    
+                    # Check if RAG service is ready for indexing
+                    if not rag_service.is_ready_for_indexing():
+                        print(f"⚠️ RAG service not ready for indexing URL {i + 1}, skipping RAG indexing")
+                        print(f"🔧 RAG status: initialized={rag_service.is_initialized}, ready_for_indexing={rag_service.is_ready_for_indexing()}")
+                    else:
+                        try:
+                            index_result = await rag_service.index_document(
+                                file_metadata["id"],
+                                file_metadata["path"],
+                                file_metadata["originalName"],
+                                workspaceId,
+                                processed_file.get("cloudinary")
+                            )
+                            print(f"✅ RAG indexing completed for URL {i + 1}: {index_result.get('chunksCount', 0)} chunks")
+                        except Exception as rag_error:
+                            print(f"❌ RAG indexing failed for URL {i + 1}: {rag_error}")
 
                 uploaded_files.append(processed_file)
                 print(f"✅ Successfully processed URL {i + 1}: {url_info.get('url')}")
