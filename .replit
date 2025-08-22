@@ -1,4 +1,4 @@
-modules = ["nix", "nodejs-20", "python-3.11"]
+modules = ["nodejs-20", "python-3.12", "nix"]
 run = "npm run start"
 
 [nix]
