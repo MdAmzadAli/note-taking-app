@@ -90,14 +90,13 @@ Return ONLY this JSON format:
 
         try:
             response = await asyncio.to_thread(
-                self.embedding_service.genai_chat.models.generate_content(
+                self.embedding_service.genai_chat.generate_content,        
                 recognition_prompt,
                 generation_config={
                     'temperature': 0.1,
                     'top_p': 0.8,
                     'max_output_tokens': 512,
                 }
-            )
             )
 
             response_text = response.text
