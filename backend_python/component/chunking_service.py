@@ -90,6 +90,9 @@ class StructuredUnit:
     column_range: Optional[Dict] = None
     bbox: Optional[BoundingBox] = None
     reading_order: int = 0
+    associated_headings: List[str] = field(default_factory=list)
+    region_bbox: Optional[BoundingBox] = None
+    associated_table_region: Optional[BoundingBox] = None
 
 
 @dataclass
@@ -1024,7 +1027,12 @@ class ChunkingService:
 
         processed_text = text
         for match in re.finditer(number_pattern, text, re.IGNORECASE):
-            full_match, currency_symbol, currency_code_before, number_part, multiplier, percentage, currency_code_after = match.groups()
+            groups = match.groups()
+            # Ensure we have exactly 6 groups, pad with None if needed
+            while len(groups) < 6:
+                groups = groups + (None,)
+            
+            currency_symbol, currency_code_before, number_part, multiplier, percentage, currency_code_after = groups[:6]
 
             # Skip if number_part is too short or doesn't contain digits
             if not number_part or not re.search(r'\d', number_part):
@@ -1040,7 +1048,8 @@ class ChunkingService:
                 currency = currency_map[currency_code_after]
 
             # Check for negatives
-            is_negative = ('(' in match.group(0) and ')' in match.group(0)) or '-' in number_part
+            full_match_text = match.group()
+            is_negative = ('(' in full_match_text and ')' in full_match_text) or '-' in number_part
             if is_negative:
                 normalized_data.has_negative = True
 
@@ -1058,7 +1067,7 @@ class ChunkingService:
                     final_value = final_value * multiplier_value
 
                 number_data = NumberData(
-                    original_text=match.group(0).strip(),
+                    original_text=full_match_text.strip(),
                     value=final_value,
                     raw_value=raw_value,
                     multiplier=multiplier,
@@ -1067,7 +1076,7 @@ class ChunkingService:
                     is_percentage=bool(percentage),
                     is_negative=is_negative,
                     position=match.start(),
-                    length=len(match.group(0))
+                    length=len(full_match_text)
                 )
 
                 normalized_data.numbers.append(number_data)
@@ -1081,7 +1090,7 @@ class ChunkingService:
                     normalized_num += '%'
 
                 # Replace in processed text
-                processed_text = processed_text.replace(match.group(0), normalized_num)
+                processed_text = processed_text.replace(full_match_text, normalized_num)
 
         normalized_data.normalized_text = processed_text
         return normalized_data
