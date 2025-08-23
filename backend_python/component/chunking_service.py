@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from collections import defaultdict
 
-
+# given the code
 @dataclass
 class TextItem:
     text: str
