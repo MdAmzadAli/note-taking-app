@@ -1823,6 +1823,40 @@ class ChunkingService:
                 table_sizes = [len(chunk.get('text', '')) for chunk in table_chunks]
                 print(f"   Table chunks ({len(table_chunks)}): min={min(table_sizes)}, max={max(table_sizes)}, avg={sum(table_sizes)//len(table_sizes)}")
         
+        # Log table chunks specifically (max 4 chunks)
+        table_chunks = [chunk for chunk in chunks if chunk.get('metadata', {}).get('has_table_content')]
+        if table_chunks:
+            print(f"📊 TABLE DATA EXTRACTION ANALYSIS:")
+            print(f"   Total table chunks: {len(table_chunks)}")
+            print(f"   Showing first {min(4, len(table_chunks))} table chunks:")
+            
+            for i, chunk in enumerate(table_chunks[:4]):
+                metadata = chunk.get('metadata', {})
+                numeric_metadata = metadata.get('numeric_metadata', {})
+                
+                print(f"\n   🔢 TABLE CHUNK {i+1}:")
+                print(f"      Size: {len(chunk.get('text', ''))} chars")
+                print(f"      Semantic types: {metadata.get('semantic_types', [])}")
+                print(f"      Table rows: {numeric_metadata.get('table_rows_count', 0)}")
+                print(f"      Table headers: {numeric_metadata.get('table_headers_count', 0)}")
+                print(f"      Numbers found: {numeric_metadata.get('total_numbers', 0)}")
+                print(f"      Currencies: {numeric_metadata.get('currencies', [])}")
+                print(f"      Has contextualized tables: {metadata.get('has_contextualized_tables', False)}")
+                
+                # Show associated headings
+                table_context_headings = numeric_metadata.get('table_context_headings', [])
+                if table_context_headings:
+                    print(f"      Associated headings: {table_context_headings}")
+                
+                # Show first 300 chars of text
+                text_preview = chunk.get('text', '')[:300]
+                print(f"      Text preview: {text_preview}...")
+                
+                # Show table columns info if available
+                table_columns = metadata.get('table_columns', [])
+                if table_columns:
+                    print(f"      Table structure: {len(table_columns)} columns per row")
+
         return chunks
 
     def _create_units_based_chunks(self, units: List[StructuredUnit], page_number: Optional[int], 
