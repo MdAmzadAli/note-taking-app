@@ -90,7 +90,7 @@ Return ONLY this JSON format:
 
         try:
             response = await asyncio.to_thread(
-                self.embedding_service.genai_chat.generate_content,
+                self.embedding_service.genai_chat.models.generate_content(
                 recognition_prompt,
                 generation_config={
                     'temperature': 0.1,
@@ -98,8 +98,10 @@ Return ONLY this JSON format:
                     'max_output_tokens': 512,
                 }
             )
+            )
 
             response_text = response.text
+            print(f'📊 Step 0: Raw response: {response_text}')
             json_match = re.search(r'\{[\s\S]*\}', response_text)
             
             if json_match:
