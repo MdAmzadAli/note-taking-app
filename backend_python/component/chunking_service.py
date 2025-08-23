@@ -332,6 +332,16 @@ class ChunkingService:
 
     def _create_line_from_items(self, items: List[TextItem]) -> Line:
         """Create line object with proper spacing and bounding box"""
+        if not items:
+            return Line(
+                text="",
+                y=0,
+                min_x=0,
+                max_x=0,
+                items=[],
+                bbox=BoundingBox(0, 0, 0, 0)
+            )
+        
         # Sort items by X coordinate
         items.sort(key=lambda item: item.x)
         
@@ -361,8 +371,7 @@ class ChunkingService:
         
         # Remove excessive whitespace and normalize spacing
         line_text = ' '.join(line_text.split())
-        
-        return line_text.strip()
+        line_text = line_text.strip()
         
         # Calculate bounding box
         min_x = min(item.x for item in items)
@@ -391,9 +400,17 @@ class ChunkingService:
                 bbox=page_bbox
             )]
 
-        # Collect X positions for clustering
-        x_starts = [line.min_x for line in lines]
-        x_ends = [line.max_x for line in lines]
+        # Collect X positions for clustering, filtering out None values
+        x_starts = [line.min_x for line in lines if hasattr(line, 'min_x') and line.min_x is not None]
+        x_ends = [line.max_x for line in lines if hasattr(line, 'max_x') and line.max_x is not None]
+        
+        if not x_starts or not x_ends:
+            return [Column(
+                min_x=page_bbox.x_min,
+                max_x=page_bbox.x_max,
+                count=len(lines),
+                bbox=page_bbox
+            )]
         
         # Use density-based clustering for column detection
         columns = self._cluster_columns(x_starts, x_ends, page_bbox)
@@ -981,10 +998,11 @@ class ChunkingService:
             lines = [line.strip() for line in page_text.split('\n') if line.strip()]
             structured_units = self._build_simple_units_from_lines(lines)
             clean_text = self._merge_soft_hyphens(page_text)
+            normalized_text = self._normalize_text_spacing(clean_text)
 
             return PageData(
                 page_number=page_number,
-                text=clean_text,
+                text=normalized_text,
                 lines=lines,
                 structured_units=structured_units,
                 columns=1,
