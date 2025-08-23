@@ -101,7 +101,7 @@ Return ONLY this JSON format:
                 )
             )
 
-            response_text = response.candidates[0].content.parts[0].text
+            response_text = response.text
             print(f'📊 Step 0: Raw response: {response_text}')
             json_match = re.search(r'\{[\s\S]*\}', response_text)
             
@@ -221,7 +221,7 @@ Return a structured JSON with this format:
                 )
             )
 
-            response_text = response.candidates[0].content.parts[0].text
+            response_text = response.text
             json_match = re.search(r'\{[\s\S]*\}', response_text)
             
             if json_match:
@@ -295,7 +295,7 @@ ANSWER:"""
             )
         )
 
-        full_response = response.candidates[0].content.parts[0].text
+        full_response = response.text
 
         # Extract used contexts and clean answer
         answer = full_response
@@ -417,7 +417,7 @@ ANSWER:"""
             )
         )
 
-        full_response = response.candidates[0].content.parts[0].text
+        full_response = response.text
 
         # Extract used contexts and clean answer
         answer = full_response
