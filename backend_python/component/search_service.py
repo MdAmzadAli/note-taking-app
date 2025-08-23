@@ -239,36 +239,36 @@ class SearchService:
                                 print(f'⚠️ Skipping result with empty text from {file_id}')
                                 continue
 
-                        metadata = {
-                            'fileId': file_id,
-                            'fileName': file_name,
-                            'chunkIndex': chunk_index,
-                            'workspaceId': workspace_id,
-                            'linesUsed': lines_used,
-                            'originalLines': original_lines,
-                            'pageUrl': page_url,
-                            'cloudinaryUrl':cloudinary_url,
-                            'thumbnailUrl': thumbnail_url,
-                            'embeddingType': embedding_type
-                        }
-
-                        # Add page and line numbers only if they exist (PDF content)
-                        if page_number is not None:
-                            metadata['pageNumber'] = page_number
-                            metadata['totalPages'] = total_pages
-                            metadata['totalLinesOnPage'] = total_lines_on_page
-
-                        if start_line is not None:
-                            metadata['startLine'] = start_line
-                            metadata['endLine'] = end_line
-
-                        processed_results.append({
-                                'text': text,
-                                'score': score,
+                            metadata = {
                                 'fileId': file_id,
-                                'vector': vector,  # Store for MMR if available
-                                'metadata': metadata
-                            })
+                                'fileName': file_name,
+                                'chunkIndex': chunk_index,
+                                'workspaceId': workspace_id,
+                                'linesUsed': lines_used,
+                                'originalLines': original_lines,
+                                'pageUrl': page_url,
+                                'cloudinaryUrl':cloudinary_url,
+                                'thumbnailUrl': thumbnail_url,
+                                'embeddingType': embedding_type
+                            }
+
+                            # Add page and line numbers only if they exist (PDF content)
+                            if page_number is not None:
+                                metadata['pageNumber'] = page_number
+                                metadata['totalPages'] = total_pages
+                                metadata['totalLinesOnPage'] = total_lines_on_page
+
+                            if start_line is not None:
+                                metadata['startLine'] = start_line
+                                metadata['endLine'] = end_line
+
+                            processed_results.append({
+                                    'text': text,
+                                    'score': score,
+                                    'fileId': file_id,
+                                    'vector': vector,  # Store for MMR if available
+                                    'metadata': metadata
+                                })
                         except Exception as result_error:
                             print(f'⚠️ Error processing result from {file_id}: {result_error}')
                             print(f'   Result type: {type(result)}, keys: {list(result.keys()) if isinstance(result, dict) else "not dict"}')
@@ -417,7 +417,7 @@ class SearchService:
                     'linesUsed': lines_used,
                     'originalLines': original_lines,
                     'pageUrl': page_url,
-                    'cloudinaryUrl': cloudinary_url,
+                    'cloudinaryUrl':cloudinary_url,
                     'thumbnailUrl': thumbnail_url,
                     'embeddingType': embedding_type
                 }
