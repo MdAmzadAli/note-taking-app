@@ -154,62 +154,90 @@ class SearchService:
                     # Log sample results for debugging
                     if len(doc_results) > 0:
                         first_result = doc_results[0]
+                        # Handle both dictionary and object formats for debugging
+                        if isinstance(first_result, dict):
+                            payload = first_result.get('payload', first_result)
+                            score = first_result.get('score', 0.0)
+                            if isinstance(payload, dict):
+                                text_preview = payload.get('text', '')[:100] + '...'
+                                file_name = payload.get('fileName', '')
+                                workspace_id = payload.get('workspaceId', '')
+                                chunk_index = payload.get('chunkIndex', 0)
+                            else:
+                                text_preview = getattr(payload, 'text', '')[:100] + '...'
+                                file_name = getattr(payload, 'fileName', '')
+                                workspace_id = getattr(payload, 'workspaceId', '')
+                                chunk_index = getattr(payload, 'chunkIndex', 0)
+                        else:
+                            payload = first_result.payload
+                            score = first_result.score
+                            text_preview = payload.text[:100] + '...'
+                            file_name = payload.fileName
+                            workspace_id = payload.workspaceId
+                            chunk_index = payload.chunkIndex
+
                         print(f'📝 Sample result from {file_id}:', {
-                            'score': first_result.score,
-                            'textPreview': first_result.payload.text[:100] + '...',
-                            'fileName': first_result.payload.fileName,
-                            'workspaceId': first_result.payload.workspaceId,
-                            'chunkIndex': first_result.payload.chunkIndex
+                            'score': score,
+                            'textPreview': text_preview,
+                            'fileName': file_name,
+                            'workspaceId': workspace_id,
+                            'chunkIndex': chunk_index
                         })
 
                     # Add document-specific context
                     processed_results = []
                     for result in doc_results:
-                        # Handle both dictionary and object formats
-                        if isinstance(result, dict):
-                            payload = result.get('payload', result)
-                            score = result.get('score', 0.0)
-                            vector = result.get('vector', None)
-                        else:
-                            payload = result.payload
-                            score = result.score
-                            vector = getattr(result, 'vector', None)
+                        try:
+                            # Handle both dictionary and object formats
+                            if isinstance(result, dict):
+                                payload = result.get('payload', result)
+                                score = result.get('score', 0.0)
+                                vector = result.get('vector', None)
+                            else:
+                                payload = result.payload if hasattr(result, 'payload') else result
+                                score = result.score if hasattr(result, 'score') else 0.0
+                                vector = getattr(result, 'vector', None)
 
-                        # Handle payload as both dict and object
-                        if isinstance(payload, dict):
-                            file_id = payload.get('fileId', '')
-                            file_name = payload.get('fileName', '')
-                            chunk_index = payload.get('chunkIndex', 0)
-                            workspace_id = payload.get('workspaceId', '')
-                            text = payload.get('text', '')
-                            page_number = payload.get('pageNumber')
-                            start_line = payload.get('startLine')
-                            end_line = payload.get('endLine')
-                            total_pages = payload.get('totalPages')
-                            total_lines_on_page = payload.get('totalLinesOnPage')
-                            lines_used = payload.get('linesUsed', [])
-                            original_lines = payload.get('originalLines', [])
-                            page_url = payload.get('pageUrl')
-                            cloudinary_url = payload.get('cloudinaryUrl')
-                            thumbnail_url = payload.get('thumbnailUrl')
-                            embedding_type = payload.get('embeddingType')
-                        else:
-                            file_id = payload.fileId
-                            file_name = payload.fileName
-                            chunk_index = payload.chunkIndex
-                            workspace_id = payload.workspaceId
-                            text = payload.text
-                            page_number = getattr(payload, 'pageNumber', None)
-                            start_line = getattr(payload, 'startLine', None)
-                            end_line = getattr(payload, 'endLine', None)
-                            total_pages = getattr(payload, 'totalPages', None)
-                            total_lines_on_page = getattr(payload, 'totalLinesOnPage', None)
-                            lines_used = getattr(payload, 'linesUsed', [])
-                            original_lines = getattr(payload, 'originalLines', [])
-                            page_url = getattr(payload, 'pageUrl', None)
-                            cloudinary_url = getattr(payload, 'cloudinaryUrl', None)
-                            thumbnail_url = getattr(payload, 'thumbnailUrl', None)
-                            embedding_type = getattr(payload, 'embeddingType', None)
+                            # Handle payload as both dict and object
+                            if isinstance(payload, dict):
+                                file_id = payload.get('fileId', '')
+                                file_name = payload.get('fileName', '')
+                                chunk_index = payload.get('chunkIndex', 0)
+                                workspace_id = payload.get('workspaceId', '')
+                                text = payload.get('text', '')
+                                page_number = payload.get('pageNumber')
+                                start_line = payload.get('startLine')
+                                end_line = payload.get('endLine')
+                                total_pages = payload.get('totalPages')
+                                total_lines_on_page = payload.get('totalLinesOnPage')
+                                lines_used = payload.get('linesUsed', [])
+                                original_lines = payload.get('originalLines', [])
+                                page_url = payload.get('pageUrl')
+                                cloudinary_url = payload.get('cloudinaryUrl')
+                                thumbnail_url = payload.get('thumbnailUrl')
+                                embedding_type = payload.get('embeddingType')
+                            else:
+                                file_id = getattr(payload, 'fileId', '')
+                                file_name = getattr(payload, 'fileName', '')
+                                chunk_index = getattr(payload, 'chunkIndex', 0)
+                                workspace_id = getattr(payload, 'workspaceId', '')
+                                text = getattr(payload, 'text', '')
+                                page_number = getattr(payload, 'pageNumber', None)
+                                start_line = getattr(payload, 'startLine', None)
+                                end_line = getattr(payload, 'endLine', None)
+                                total_pages = getattr(payload, 'totalPages', None)
+                                total_lines_on_page = getattr(payload, 'totalLinesOnPage', None)
+                                lines_used = getattr(payload, 'linesUsed', [])
+                                original_lines = getattr(payload, 'originalLines', [])
+                                page_url = getattr(payload, 'pageUrl', None)
+                                cloudinary_url = getattr(payload, 'cloudinaryUrl', None)
+                                thumbnail_url = getattr(payload, 'thumbnailUrl', None)
+                                embedding_type = getattr(payload, 'embeddingType', None)
+
+                            # Skip empty text entries
+                            if not text or text.strip() == '':
+                                print(f'⚠️ Skipping result with empty text from {file_id}')
+                                continue
 
                         metadata = {
                             'fileId': file_id,
@@ -235,12 +263,16 @@ class SearchService:
                             metadata['endLine'] = end_line
 
                         processed_results.append({
-                            'text': text,
-                            'score': score,
-                            'fileId': file_id,
-                            'vector': vector,  # Store for MMR if available
-                            'metadata': metadata
-                        })
+                                'text': text,
+                                'score': score,
+                                'fileId': file_id,
+                                'vector': vector,  # Store for MMR if available
+                                'metadata': metadata
+                            })
+                        except Exception as result_error:
+                            print(f'⚠️ Error processing result from {file_id}: {result_error}')
+                            print(f'   Result type: {type(result)}, keys: {list(result.keys()) if isinstance(result, dict) else "not dict"}')
+                            continue
 
                     all_candidates.extend(processed_results)
                     print(f'📊 Added {len(processed_results)} candidates from {file_id}, total: {len(all_candidates)}')
@@ -248,6 +280,8 @@ class SearchService:
                     print(f'❌ No candidates found for document {file_id} after all search attempts')
             except Exception as doc_error:
                 print(f'⚠️ Failed to search document {file_id}: {doc_error}')
+                import traceback
+                print(f'   Full traceback: {traceback.format_exc()}')
 
         print(f'📊 Workspace search summary:')
         print(f'   - Documents searched: {documents_searched}')
@@ -330,34 +364,88 @@ class SearchService:
 
         formatted_results = []
         for result in search_result:
-            metadata = {
-                'fileId': result.payload.fileId,
-                'fileName': result.payload.fileName,
-                'chunkIndex': result.payload.chunkIndex,
-                'workspaceId': result.payload.workspaceId,
-                'linesUsed': getattr(result.payload, 'linesUsed', []),
-                'originalLines': getattr(result.payload, 'originalLines', []),
-                'pageUrl': getattr(result.payload, 'pageUrl', None),
-                'cloudinaryUrl': getattr(result.payload, 'cloudinaryUrl', None),
-                'thumbnailUrl': getattr(result.payload, 'thumbnailUrl', None),
-                'embeddingType': getattr(result.payload, 'embeddingType', None)
-            }
+            try:
+                # Handle both dictionary and object formats
+                if isinstance(result, dict):
+                    payload = result.get('payload', result)
+                    score = result.get('score', 0.0)
+                else:
+                    payload = result.payload if hasattr(result, 'payload') else result
+                    score = result.score if hasattr(result, 'score') else 0.0
 
-            # Add page and line numbers only if they exist (PDF content)
-            if hasattr(result.payload, 'pageNumber') and result.payload.pageNumber is not None:
-                metadata['pageNumber'] = result.payload.pageNumber
-                metadata['totalPages'] = getattr(result.payload, 'totalPages', None)
-                metadata['totalLinesOnPage'] = getattr(result.payload, 'totalLinesOnPage', None)
+                # Extract data from payload
+                if isinstance(payload, dict):
+                    file_id = payload.get('fileId', '')
+                    file_name = payload.get('fileName', '')
+                    chunk_index = payload.get('chunkIndex', 0)
+                    workspace_id = payload.get('workspaceId', '')
+                    text = payload.get('text', '')
+                    lines_used = payload.get('linesUsed', [])
+                    original_lines = payload.get('originalLines', [])
+                    page_url = payload.get('pageUrl', None)
+                    cloudinary_url = payload.get('cloudinaryUrl', None)
+                    thumbnail_url = payload.get('thumbnailUrl', None)
+                    embedding_type = payload.get('embeddingType', None)
+                    page_number = payload.get('pageNumber', None)
+                    total_pages = payload.get('totalPages', None)
+                    total_lines_on_page = payload.get('totalLinesOnPage', None)
+                    start_line = payload.get('startLine', None)
+                    end_line = payload.get('endLine', None)
+                else:
+                    file_id = getattr(payload, 'fileId', '')
+                    file_name = getattr(payload, 'fileName', '')
+                    chunk_index = getattr(payload, 'chunkIndex', 0)
+                    workspace_id = getattr(payload, 'workspaceId', '')
+                    text = getattr(payload, 'text', '')
+                    lines_used = getattr(payload, 'linesUsed', [])
+                    original_lines = getattr(payload, 'originalLines', [])
+                    page_url = getattr(payload, 'pageUrl', None)
+                    cloudinary_url = getattr(payload, 'cloudinaryUrl', None)
+                    thumbnail_url = getattr(payload, 'thumbnailUrl', None)
+                    embedding_type = getattr(payload, 'embeddingType', None)
+                    page_number = getattr(payload, 'pageNumber', None)
+                    total_pages = getattr(payload, 'totalPages', None)
+                    total_lines_on_page = getattr(payload, 'totalLinesOnPage', None)
+                    start_line = getattr(payload, 'startLine', None)
+                    end_line = getattr(payload, 'endLine', None)
 
-            if hasattr(result.payload, 'startLine') and result.payload.startLine is not None:
-                metadata['startLine'] = result.payload.startLine
-                metadata['endLine'] = getattr(result.payload, 'endLine', None)
+                metadata = {
+                    'fileId': file_id,
+                    'fileName': file_name,
+                    'chunkIndex': chunk_index,
+                    'workspaceId': workspace_id,
+                    'linesUsed': lines_used,
+                    'originalLines': original_lines,
+                    'pageUrl': page_url,
+                    'cloudinaryUrl': cloudinary_url,
+                    'thumbnailUrl': thumbnail_url,
+                    'embeddingType': embedding_type
+                }
 
-            formatted_results.append({
-                'text': result.payload.text,
-                'score': result.score,
-                'metadata': metadata
-            })
+                # Add page and line numbers only if they exist (PDF content)
+                if page_number is not None:
+                    metadata['pageNumber'] = page_number
+                    metadata['totalPages'] = total_pages
+                    metadata['totalLinesOnPage'] = total_lines_on_page
+
+                if start_line is not None:
+                    metadata['startLine'] = start_line
+                    metadata['endLine'] = end_line
+
+                # Skip empty text entries
+                if not text or text.strip() == '':
+                    print(f'⚠️ Skipping result with empty text from {file_id}')
+                    continue
+
+                formatted_results.append({
+                    'text': text,
+                    'score': score,
+                    'metadata': metadata
+                })
+            except Exception as format_error:
+                print(f'⚠️ Error formatting search result: {format_error}')
+                print(f'   Result type: {type(result)}, keys: {list(result.keys()) if isinstance(result, dict) else "not dict"}')
+                continue
 
         return formatted_results
 
