@@ -1849,8 +1849,213 @@ class ChunkingService:
             'strategy': 'enhanced_layout_aware_semantic'
         }
 
+    def split_with_strategy(self, pdf_data: PDFData, metadata: Optional[Dict] = None, strategy: str = 'semantic') -> List[Dict]:
+        """Alternative chunking strategy selector"""
+        if metadata is None:
+            metadata = {}
+        
+        if strategy == 'fixed_size':
+            return self._split_by_fixed_size_advanced(pdf_data.full_text, metadata)
+        elif strategy in ['semantic', 'layout_aware_semantic']:
+            return self.split_into_chunks(pdf_data, metadata)
+        else:
+            # Default to semantic
+            return self.split_into_chunks(pdf_data, metadata)
+
+    def _split_by_fixed_size_advanced(self, text: str, metadata: Optional[Dict] = None) -> List[Dict]:
+        """Safe fixed-size chunking with proper step calculation and blank line preservation"""
+        if metadata is None:
+            metadata = {}
+        
+        chunks = []
+        current_position = 0
+        chunk_index = 0
+
+        # Preserve significant line breaks as structure signals
+        preserved_text = re.sub(r'\n\s*\n', '\n\n__PARAGRAPH_BREAK__\n\n', text)
+
+        while current_position < len(preserved_text):
+            # Calculate safe chunk end position
+            chunk_end = min(current_position + self.chunk_size, len(preserved_text))
+
+            # If not at document end, try to break at word/sentence boundary
+            if chunk_end < len(preserved_text):
+                # Look for good break points in descending order of preference
+                search_start = max(current_position + int(self.chunk_size * 0.3), current_position)
+                search_text = preserved_text[search_start:chunk_end + 100]
+                
+                break_points = [
+                    search_text.rfind('\n\n__PARAGRAPH_BREAK__\n\n'),
+                    search_text.rfind('. '),
+                    search_text.rfind('! '),
+                    search_text.rfind('? '),
+                    search_text.rfind('\n'),
+                    search_text.rfind(' ')
+                ]
+
+                for break_point in break_points:
+                    if break_point > 0:
+                        chunk_end = search_start + break_point + 1
+                        break
+
+            # Extract chunk text
+            chunk_text = preserved_text[current_position:chunk_end].strip()
+
+            # Restore paragraph breaks
+            chunk_text = chunk_text.replace('__PARAGRAPH_BREAK__', '')
+
+            # Skip empty chunks
+            if not chunk_text:
+                current_position = chunk_end
+                continue
+
+            # Create chunk object
+            chunks.append({
+                'text': chunk_text,
+                'metadata': {
+                    **metadata,
+                    'chunk_index': chunk_index,
+                    'chunk_size': len(chunk_text),
+                    'start_position': current_position,
+                    'end_position': chunk_end,
+                    'strategy': 'fixed_size_advanced',
+                    'preserved_structure': '\n\n' in chunk_text
+                }
+            })
+            chunk_index += 1
+
+            # Calculate next position with safe step
+            effective_chunk_length = chunk_end - current_position
+            step = max(
+                effective_chunk_length - self.chunk_overlap,
+                min(50, int(effective_chunk_length * 0.1))  # Minimum step: 50 chars or 10% of chunk
+            )
+
+            current_position += step
+
+            # Safety check to prevent infinite loops
+            if step <= 0 or current_position >= len(preserved_text):
+                break
+
+        print(f"📄 Fixed-size advanced chunking created {len(chunks)} chunks")
+        return chunks
+
+    def analyze_numeric_content(self, text: str) -> NormalizedData:
+        """Utility method to analyze numeric content in text"""
+        return self._normalize_currency_and_numbers(text)
+
+    def test_normalization(self, test_cases: Optional[List[str]] = None) -> List[NormalizedData]:
+        """Utility method to test currency/number normalization"""
+        default_tests = [
+            '₹1,23,456.78',
+            '$1,234.56',
+            '(1,234.56)',
+            '€ 1.234,56',        # EU format: should parse as 1234.56
+            '€1.234.567,89',     # EU format: should parse as 1234567.89
+            'USD 1,000.00',
+            '12.5%',
+            '₹(50,000)',
+            '$1.2M',             # Should parse as 1,200,000
+            '£250k',             # Should parse as 250,000
+            '€2.5B',             # Should parse as 2,500,000,000
+            '₹1 234.56',
+            'INR 1,00,000.00',
+            '15,67',             # Simple EU decimal
+            '1.500,25',          # EU thousands + decimal
+            '$500K',             # US format with multiplier
+            '(€1.200,50)',       # Negative EU format
+            '75.5%'              # Percentage
+        ]
+
+        tests = test_cases if test_cases else default_tests
+
+        print('🧪 Testing Currency/Number Normalization:')
+        results = []
+        
+        for i, test in enumerate(tests):
+            try:
+                result = self._normalize_currency_and_numbers(test)
+                results.append(result)
+                
+                print(f'Input: "{test}" → Numbers: {len(result.numbers)}, Currencies: [{", ".join(result.currencies)}]')
+                for j, num in enumerate(result.numbers):
+                    currency_str = f'{num.currency} ' if num.currency else ''
+                    percentage_str = '%' if num.is_percentage else ''
+                    negative_str = '(negative)' if num.is_negative else ''
+                    print(f'  Number {j + 1}: {currency_str}{num.value}{percentage_str} {negative_str}')
+                    
+            except Exception as error:
+                print(f'❌ Test {i + 1} failed for "{test}": {error}')
+                results.append(NormalizedData(
+                    original_text=test,
+                    normalized_text=test,
+                    currencies=[],
+                    numbers=[],
+                    has_negative=False
+                ))
+
+        return results
+
+    def analyze_pdf_structure(self, pdf_data: PDFData) -> Dict[str, Any]:
+        """Analyze PDF structure with enhanced layout information"""
+        analysis = {
+            'total_pages': pdf_data.total_pages or len(pdf_data.pages),
+            'total_structured_units': 0,
+            'average_units_per_page': 0,
+            'structure_types': {},
+            'has_tabular_data': False,
+            'average_columns_per_page': 0,
+            'recommended_strategy': 'enhanced_layout_aware_semantic',
+            'layout_types': [],
+            'has_enhanced_layout': False,
+            'reading_order_preserved': False
+        }
+
+        if not pdf_data.pages:
+            return analysis
+
+        # Analyze structure across all pages
+        for page in pdf_data.pages:
+            if page.structured_units:
+                analysis['total_structured_units'] += len(page.structured_units)
+
+                for unit in page.structured_units:
+                    unit_type = unit.type
+                    analysis['structure_types'][unit_type] = analysis['structure_types'].get(unit_type, 0) + 1
+
+            if page.has_table:
+                analysis['has_tabular_data'] = True
+
+            analysis['average_columns_per_page'] += page.columns
+
+            # Check for enhanced layout features
+            if hasattr(page, 'layout') and page.layout:
+                analysis['has_enhanced_layout'] = True
+                analysis['layout_types'].append(page.layout.layout_type)
+                
+                # Check for reading order preservation
+                if any(hasattr(unit, 'reading_order') for unit in page.structured_units):
+                    analysis['reading_order_preserved'] = True
+
+        analysis['average_units_per_page'] = analysis['total_structured_units'] / len(pdf_data.pages)
+        analysis['average_columns_per_page'] = analysis['average_columns_per_page'] / len(pdf_data.pages)
+        analysis['layout_types'] = list(set(analysis['layout_types']))
+
+        # Enhanced strategy recommendation
+        if analysis['has_enhanced_layout'] and analysis['reading_order_preserved']:
+            analysis['recommended_strategy'] = 'enhanced_layout_aware_semantic_with_heading_table_association'
+        elif analysis['has_tabular_data'] and analysis['average_columns_per_page'] > 1:
+            analysis['recommended_strategy'] = 'layout_aware_semantic'
+        elif analysis['average_columns_per_page'] > 1.5:
+            analysis['recommended_strategy'] = 'column_aware'
+        elif analysis['structure_types'].get('paragraph', 0) > analysis['total_structured_units'] * 0.8:
+            analysis['recommended_strategy'] = 'paragraph_based'
+
+        print(f"📊 Enhanced PDF Structure Analysis: {analysis}")
+        return analysis
+
     def get_chunking_stats(self, chunks: List[Dict]) -> Dict[str, Any]:
-        """Get processing statistics for chunks"""
+        """Get processing statistics for chunks with enhanced layout information"""
         if not chunks:
             return {
                 'total_chunks': 0,
@@ -1861,7 +2066,8 @@ class ChunkingService:
                 'has_structured_content': False,
                 'chunk_types': [],
                 'has_table_content': False,
-                'has_financial_data': False
+                'has_financial_data': False,
+                'strategy': 'unknown'
             }
 
         chunk_sizes = [len(chunk.get('text', '')) for chunk in chunks]
@@ -1869,6 +2075,11 @@ class ChunkingService:
         has_structured = False
         has_tables = False
         has_financial = False
+        pages_spanned = set()
+        strategy = 'layout_aware_semantic'
+        unit_types_distribution = {}
+        has_contextualized_tables = False
+        reading_order_preserved = False
 
         for chunk in chunks:
             metadata = chunk.get('metadata', {})
@@ -1881,10 +2092,33 @@ class ChunkingService:
                 has_tables = True
             if metadata.get('has_financial_data', False):
                 has_financial = True
+            if metadata.get('has_contextualized_tables', False):
+                has_contextualized_tables = True
+            if metadata.get('maintains_reading_order', False):
+                reading_order_preserved = True
+            
+            # Track pages spanned
+            page_num = metadata.get('page_number')
+            if page_num is not None:
+                pages_spanned.add(page_num)
+            
+            # Get strategy from first chunk
+            if metadata.get('strategy'):
+                strategy = metadata['strategy']
+            
+            # Track unit types
+            for unit_type in semantic_types:
+                unit_types_distribution[unit_type] = unit_types_distribution.get(unit_type, 0) + 1
 
-        return {
+        # Calculate distribution in 100-char buckets
+        chunk_size_distribution = {}
+        for size in chunk_sizes:
+            bucket = (size // 100) * 100
+            chunk_size_distribution[bucket] = chunk_size_distribution.get(bucket, 0) + 1
+
+        stats = {
             'total_chunks': len(chunks),
-            'average_chunk_size': sum(chunk_sizes) / len(chunk_sizes) if chunk_sizes else 0,
+            'average_chunk_size': int(sum(chunk_sizes) / len(chunk_sizes)) if chunk_sizes else 0,
             'min_chunk_size': min(chunk_sizes) if chunk_sizes else 0,
             'max_chunk_size': max(chunk_sizes) if chunk_sizes else 0,
             'total_text_length': sum(chunk_sizes),
@@ -1892,9 +2126,25 @@ class ChunkingService:
             'chunk_types': list(set(chunk_types)),
             'has_table_content': has_tables,
             'has_financial_data': has_financial,
-            'chunk_size_distribution': {
-                'small_chunks': len([s for s in chunk_sizes if s < 400]),
-                'medium_chunks': len([s for s in chunk_sizes if 400 <= s < 800]),
-                'large_chunks': len([s for s in chunk_sizes if s >= 800])
+            'strategy': strategy,
+            'pages_spanned': len(pages_spanned),
+            'chunk_size_distribution': chunk_size_distribution,
+            'unit_types_distribution': unit_types_distribution,
+            'structured_content_chunks': sum(1 for chunk in chunks 
+                                           if chunk.get('metadata', {}).get('has_structured_content')),
+            'table_content_chunks': sum(1 for chunk in chunks 
+                                      if chunk.get('metadata', {}).get('has_table_content')),
+            'has_contextualized_tables': has_contextualized_tables,
+            'reading_order_preserved': reading_order_preserved,
+            'enhanced_features': {
+                'heading_table_associations': any(chunk.get('metadata', {}).get('numeric_metadata', {}).get('has_heading_table_pairs')
+                                                for chunk in chunks),
+                'column_aware_processing': any(chunk.get('metadata', {}).get('is_column_aware')
+                                             for chunk in chunks),
+                'numeric_analysis': any(chunk.get('metadata', {}).get('numeric_metadata', {}).get('total_numbers', 0) > 0
+                                      for chunk in chunks)
             }
         }
+
+        print(f"📈 Enhanced Layout-Aware Chunking Statistics: {stats}")
+        return stats
