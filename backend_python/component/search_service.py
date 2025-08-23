@@ -103,12 +103,12 @@ class SearchService:
                                 
                                 filtered_results = []
                                 for result in doc_results:
-                                    has_workspace = result.get('payload', {}).get('workspaceId') == workspace_id
+                                    has_workspace = result.payload.workspaceId == workspace_id
                                     if has_workspace:
                                         filtered_results.append(result)
-                                        print(f'   ✅ Keeping: fileId={result.get("payload", {}).get("fileId")}, workspaceId="{result.get("payload", {}).get("workspaceId")}" (matches "{workspace_id}")')
+                                        print(f'   ✅ Keeping: fileId={result.payload.fileId}, workspaceId="{result.payload.workspaceId}" (matches "{workspace_id}")')
                                     else:
-                                        print(f'   ❌ Filtering out: fileId={result.get("payload", {}).get("fileId")}, workspaceId="{result.get("payload", {}).get("workspaceId")}" (doesn\'t match "{workspace_id}")')
+                                        print(f'   ❌ Filtering out: fileId={result.payload.fileId}, workspaceId="{result.payload.workspaceId}" (doesn\'t match "{workspace_id}")')
                                 
                                 doc_results = filtered_results
                                 print(f'📄 Manual workspace filter: {before_filter} → {len(doc_results)} candidates')
@@ -133,14 +133,14 @@ class SearchService:
                                 
                                 filtered_results = []
                                 for result in doc_results:
-                                    file_match = result.get('payload', {}).get('fileId') == file_id
-                                    workspace_match = not workspace_id or result.get('payload', {}).get('workspaceId') == workspace_id
+                                    file_match = result.payload.fileId == file_id
+                                    workspace_match = not workspace_id or result.payload.workspaceId == workspace_id
                                     should_keep = file_match and workspace_match
                                     
                                     if should_keep:
                                         filtered_results.append(result)
                                     else:
-                                        print(f'   ❌ Filtering out: fileId={result.get("payload", {}).get("fileId")} (match:{file_match}), workspaceId="{result.get("payload", {}).get("workspaceId")}" (match:{workspace_match})')
+                                        print(f'   ❌ Filtering out: fileId={result.payload.fileId} (match:{file_match}), workspaceId="{result.payload.workspaceId}" (match:{workspace_match})')
                                 
                                 doc_results = filtered_results
                                 print(f'📄 Manual filtering: {before_filter} → {len(doc_results)} candidates for {file_id}')
@@ -155,47 +155,45 @@ class SearchService:
                     # Log sample results for debugging
                     if len(doc_results) > 0:
                         first_result = doc_results[0]
-                        payload = first_result.get('payload', {})
                         print(f'📝 Sample result from {file_id}:', {
-                            'score': first_result.get('score'),
-                            'textPreview': payload.get('text', '')[:100] + '...',
-                            'fileName': payload.get('fileName'),
-                            'workspaceId': payload.get('workspaceId'),
-                            'chunkIndex': payload.get('chunkIndex')
+                            'score': first_result.score,
+                            'textPreview': first_result.payload.text[:100] + '...',
+                            'fileName': first_result.payload.fileName,
+                            'workspaceId': first_result.payload.workspaceId,
+                            'chunkIndex': first_result.payload.chunkIndex
                         })
                     
                     # Add document-specific context
                     processed_results = []
                     for result in doc_results:
-                        payload = result.get('payload', {})
                         metadata = {
-                            'fileId': payload.get('fileId'),
-                            'fileName': payload.get('fileName'),
-                            'chunkIndex': payload.get('chunkIndex'),
-                            'workspaceId': payload.get('workspaceId'),
-                            'linesUsed': payload.get('linesUsed', []),
-                            'originalLines': payload.get('originalLines', []),
-                            'pageUrl': payload.get('pageUrl'),
-                            'cloudinaryUrl': payload.get('cloudinaryUrl'),
-                            'thumbnailUrl': payload.get('thumbnailUrl'),
-                            'embeddingType': payload.get('embeddingType')
+                            'fileId': result.payload.fileId,
+                            'fileName': result.payload.fileName,
+                            'chunkIndex': result.payload.chunkIndex,
+                            'workspaceId': result.payload.workspaceId,
+                            'linesUsed': getattr(result.payload, 'linesUsed', []),
+                            'originalLines': getattr(result.payload, 'originalLines', []),
+                            'pageUrl': getattr(result.payload, 'pageUrl', None),
+                            'cloudinaryUrl': getattr(result.payload, 'cloudinaryUrl', None),
+                            'thumbnailUrl': getattr(result.payload, 'thumbnailUrl', None),
+                            'embeddingType': getattr(result.payload, 'embeddingType', None)
                         }
 
                         # Add page and line numbers only if they exist (PDF content)
-                        if payload.get('pageNumber') is not None:
-                            metadata['pageNumber'] = payload.get('pageNumber')
-                            metadata['totalPages'] = payload.get('totalPages')
-                            metadata['totalLinesOnPage'] = payload.get('totalLinesOnPage')
+                        if hasattr(result.payload, 'pageNumber') and result.payload.pageNumber is not None:
+                            metadata['pageNumber'] = result.payload.pageNumber
+                            metadata['totalPages'] = getattr(result.payload, 'totalPages', None)
+                            metadata['totalLinesOnPage'] = getattr(result.payload, 'totalLinesOnPage', None)
                         
-                        if payload.get('startLine') is not None:
-                            metadata['startLine'] = payload.get('startLine')
-                            metadata['endLine'] = payload.get('endLine')
+                        if hasattr(result.payload, 'startLine') and result.payload.startLine is not None:
+                            metadata['startLine'] = result.payload.startLine
+                            metadata['endLine'] = getattr(result.payload, 'endLine', None)
 
                         processed_results.append({
-                            'text': payload.get('text'),
-                            'score': result.get('score'),
-                            'fileId': payload.get('fileId'),
-                            'vector': result.get('vector'),  # Store for MMR if available
+                            'text': result.payload.text,
+                            'score': result.score,
+                            'fileId': result.payload.fileId,
+                            'vector': getattr(result, 'vector', None),  # Store for MMR if available
                             'metadata': metadata
                         })
 
@@ -273,11 +271,11 @@ class SearchService:
                 # Manual filtering
                 if file_ids and len(file_ids) > 0:
                     search_result = [result for result in search_result 
-                                   if result.get('payload', {}).get('fileId') in file_ids]
+                                   if result.payload.fileId in file_ids]
 
                 if workspace_id:
                     search_result = [result for result in search_result 
-                                   if result.get('payload', {}).get('workspaceId') == workspace_id]
+                                   if result.payload.workspaceId == workspace_id]
 
                 search_result = search_result[:limit]
             else:
@@ -287,33 +285,32 @@ class SearchService:
 
         formatted_results = []
         for result in search_result:
-            payload = result.get('payload', {})
             metadata = {
-                'fileId': payload.get('fileId'),
-                'fileName': payload.get('fileName'),
-                'chunkIndex': payload.get('chunkIndex'),
-                'workspaceId': payload.get('workspaceId'),
-                'linesUsed': payload.get('linesUsed', []),
-                'originalLines': payload.get('originalLines', []),
-                'pageUrl': payload.get('pageUrl'),
-                'cloudinaryUrl': payload.get('cloudinaryUrl'),
-                'thumbnailUrl': payload.get('thumbnailUrl'),
-                'embeddingType': payload.get('embeddingType')
+                'fileId': result.payload.fileId,
+                'fileName': result.payload.fileName,
+                'chunkIndex': result.payload.chunkIndex,
+                'workspaceId': result.payload.workspaceId,
+                'linesUsed': getattr(result.payload, 'linesUsed', []),
+                'originalLines': getattr(result.payload, 'originalLines', []),
+                'pageUrl': getattr(result.payload, 'pageUrl', None),
+                'cloudinaryUrl': getattr(result.payload, 'cloudinaryUrl', None),
+                'thumbnailUrl': getattr(result.payload, 'thumbnailUrl', None),
+                'embeddingType': getattr(result.payload, 'embeddingType', None)
             }
 
             # Add page and line numbers only if they exist (PDF content)
-            if payload.get('pageNumber') is not None:
-                metadata['pageNumber'] = payload.get('pageNumber')
-                metadata['totalPages'] = payload.get('totalPages')
-                metadata['totalLinesOnPage'] = payload.get('totalLinesOnPage')
+            if hasattr(result.payload, 'pageNumber') and result.payload.pageNumber is not None:
+                metadata['pageNumber'] = result.payload.pageNumber
+                metadata['totalPages'] = getattr(result.payload, 'totalPages', None)
+                metadata['totalLinesOnPage'] = getattr(result.payload, 'totalLinesOnPage', None)
             
-            if payload.get('startLine') is not None:
-                metadata['startLine'] = payload.get('startLine')
-                metadata['endLine'] = payload.get('endLine')
+            if hasattr(result.payload, 'startLine') and result.payload.startLine is not None:
+                metadata['startLine'] = result.payload.startLine
+                metadata['endLine'] = getattr(result.payload, 'endLine', None)
 
             formatted_results.append({
-                'text': payload.get('text'),
-                'score': result.get('score'),
+                'text': result.payload.text,
+                'score': result.score,
                 'metadata': metadata
             })
 
