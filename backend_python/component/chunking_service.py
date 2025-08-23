@@ -1848,3 +1848,53 @@ class ChunkingService:
             'chunk_overlap': self.chunk_overlap,
             'strategy': 'enhanced_layout_aware_semantic'
         }
+
+    def get_chunking_stats(self, chunks: List[Dict]) -> Dict[str, Any]:
+        """Get processing statistics for chunks"""
+        if not chunks:
+            return {
+                'total_chunks': 0,
+                'average_chunk_size': 0,
+                'min_chunk_size': 0,
+                'max_chunk_size': 0,
+                'total_text_length': 0,
+                'has_structured_content': False,
+                'chunk_types': [],
+                'has_table_content': False,
+                'has_financial_data': False
+            }
+
+        chunk_sizes = [len(chunk.get('text', '')) for chunk in chunks]
+        chunk_types = []
+        has_structured = False
+        has_tables = False
+        has_financial = False
+
+        for chunk in chunks:
+            metadata = chunk.get('metadata', {})
+            semantic_types = metadata.get('semantic_types', [])
+            chunk_types.extend(semantic_types)
+            
+            if metadata.get('has_structured_content', False):
+                has_structured = True
+            if metadata.get('has_table_content', False):
+                has_tables = True
+            if metadata.get('has_financial_data', False):
+                has_financial = True
+
+        return {
+            'total_chunks': len(chunks),
+            'average_chunk_size': sum(chunk_sizes) / len(chunk_sizes) if chunk_sizes else 0,
+            'min_chunk_size': min(chunk_sizes) if chunk_sizes else 0,
+            'max_chunk_size': max(chunk_sizes) if chunk_sizes else 0,
+            'total_text_length': sum(chunk_sizes),
+            'has_structured_content': has_structured,
+            'chunk_types': list(set(chunk_types)),
+            'has_table_content': has_tables,
+            'has_financial_data': has_financial,
+            'chunk_size_distribution': {
+                'small_chunks': len([s for s in chunk_sizes if s < 400]),
+                'medium_chunks': len([s for s in chunk_sizes if 400 <= s < 800]),
+                'large_chunks': len([s for s in chunk_sizes if s >= 800])
+            }
+        }
