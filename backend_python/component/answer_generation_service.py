@@ -48,7 +48,7 @@ class AnswerGenerationService:
     async def step0_query_recognition(self, user_query: str, relevant_chunks: List[Dict]) -> Dict[str, Any]:
         print('🔍 Step 0: Query recognition and refinement...')
 
-        if not self.embedding_service.genai_chat:
+        if not self.embedding_service.chat_client:
             raise Exception("Google GenAI Chat client not initialized")
 
         # Analyze document context for better query understanding
@@ -89,17 +89,19 @@ Return ONLY this JSON format:
 }}"""
 
         try:
+            # Use correct Google GenAI SDK structure with cheapest model for Step 0
             response = await asyncio.to_thread(
-                self.embedding_service.genai_chat.generate_content,        
-                recognition_prompt,
-                generation_config={
-                    'temperature': 0.1,
-                    'top_p': 0.8,
-                    'max_output_tokens': 512,
-                }
+                self.embedding_service.chat_client.models.generate_content,
+                model='gemini-1.5-flash-8b',  # Cheapest model for Step 0
+                contents=[recognition_prompt],
+                config=self.embedding_service.genai_types.GenerateContentConfig(
+                    temperature=0.1,
+                    top_p=0.8,
+                    max_output_tokens=512
+                )
             )
 
-            response_text = response.text
+            response_text = response.candidates[0].content.parts[0].text
             print(f'📊 Step 0: Raw response: {response_text}')
             json_match = re.search(r'\{[\s\S]*\}', response_text)
             
@@ -109,7 +111,7 @@ Return ONLY this JSON format:
                 return result
 
         except Exception as parse_error:
-            print(f'⚠️ Step 0: JSON parsing failed, using fallback classification')
+            print(f'⚠️ Step 0: JSON parsing failed, using fallback classification: {parse_error}')
 
         # Fallback classification based on keywords
         computational_keywords = [
@@ -207,17 +209,19 @@ Return a structured JSON with this format:
 }}"""
 
         try:
+            # Use correct Google GenAI SDK structure with cheap model for Step 1
             response = await asyncio.to_thread(
-                self.embedding_service.genai_chat.generate_content,
-                structuring_prompt,
-                generation_config={
-                    'temperature': 0.1,
-                    'top_p': 0.8,
-                    'max_output_tokens': 4096,
-                }
+                self.embedding_service.chat_client.models.generate_content,
+                model='gemini-1.5-flash-8b',  # Cheap model for Step 1
+                contents=[structuring_prompt],
+                config=self.embedding_service.genai_types.GenerateContentConfig(
+                    temperature=0.1,
+                    top_p=0.8,
+                    max_output_tokens=4096
+                )
             )
 
-            response_text = response.text
+            response_text = response.candidates[0].content.parts[0].text
             json_match = re.search(r'\{[\s\S]*\}', response_text)
             
             if json_match:
@@ -226,7 +230,7 @@ Return a structured JSON with this format:
                 return structured_data
 
         except Exception as parse_error:
-            print(f'⚠️ Step 1: JSON parsing failed, using fallback structure')
+            print(f'⚠️ Step 1: JSON parsing failed, using fallback structure: {parse_error}')
 
         # Fallback: create basic structure
         return {
@@ -279,18 +283,19 @@ CONTEXTS_USED: [list only the context numbers (e.g., "1,3,5") that you reference
 
 ANSWER:"""
 
+        # Use correct Google GenAI SDK structure with main model for Step 2
         response = await asyncio.to_thread(
-            self.embedding_service.genai_chat.models.generate_content,
-            model='gemini-1.5-flash-8b',
-            contents=[{'parts': [{'text': computational_prompt}]}],
-            config={
-                'temperature': 0.1,
-                'top_p': 0.8,
-                'max_output_tokens': 2048,
-            }
+            self.embedding_service.chat_client.models.generate_content,
+            model='gemini-2.5-flash',  # Main model for Step 2
+            contents=[computational_prompt],
+            config=self.embedding_service.genai_types.GenerateContentConfig(
+                temperature=0.1,
+                top_p=0.8,
+                max_output_tokens=2048
+            )
         )
 
-        full_response = response.text
+        full_response = response.candidates[0].content.parts[0].text
 
         # Extract used contexts and clean answer
         answer = full_response
@@ -400,17 +405,19 @@ CONTEXTS_USED: [list only the context numbers (e.g., "1,3,5") that you reference
 
 ANSWER:"""
 
+        # Use correct Google GenAI SDK structure for factual processing
         response = await asyncio.to_thread(
-            self.embedding_service.genai_chat.generate_content,
-            factual_prompt,
-            generation_config={
-                'temperature': 0.3,
-                'top_p': 0.8,
-                'max_output_tokens': 2048,
-            }
+            self.embedding_service.chat_client.models.generate_content,
+            model='gemini-2.5-flash-lite',  # Main model for Step 2 factual
+            contents=[factual_prompt],
+            config=self.embedding_service.genai_types.GenerateContentConfig(
+                temperature=0.3,
+                top_p=0.8,
+                max_output_tokens=2048
+            )
         )
 
-        full_response = response.text
+        full_response = response.candidates[0].content.parts[0].text
 
         # Extract used contexts and clean answer
         answer = full_response

@@ -79,9 +79,12 @@ class EmbeddingService:
                 try:
                     if chat_api_key != embedding_api_key:
                         import google.genai as genai
+                        from google.genai import types
                         self.chat_client = genai.Client(api_key=chat_api_key)
+                        self.genai_types = types  # Make sure types is available
                     else:
                         self.chat_client = self.embedding_client
+                        # genai_types already set above
                     print('✅ Google GenAI Chat client initialized')
                 except ImportError as import_error:
                     print(f'❌ Failed to import google.genai for chat: {import_error}')
