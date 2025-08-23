@@ -209,12 +209,14 @@ class ChunkingService:
                     has_table=False
                 )
 
-            # Convert to TextItem objects
+            # Convert to TextItem objects with better character filtering
             text_items = []
             for char in chars:
-                if char.get('text', '').strip():
+                char_text = char.get('text', '').strip()
+                # Only include meaningful characters (not just spaces or empty)
+                if char_text and len(char_text) > 0:
                     text_items.append(TextItem(
-                        text=char['text'],
+                        text=char_text,
                         x=char['x0'],
                         y=char['y0'],
                         width=char['x1'] - char['x0'],
@@ -236,6 +238,7 @@ class ChunkingService:
             # Generate text from structured units (already in reading order)
             page_text = '\n'.join(unit.text for unit in structured_units)
             page_text = self._merge_soft_hyphens(page_text)
+            page_text = self._normalize_text_spacing(page_text)
 
             return PageData(
                 page_number=page_number,
@@ -335,22 +338,31 @@ class ChunkingService:
         # Build text with intelligent spacing
         text_parts = []
         for i, item in enumerate(items):
-            text_parts.append(item.text)
-            
-            # Add space if there's a significant gap to next item
-            if i < len(items) - 1:
-                next_item = items[i + 1]
-                gap = next_item.x - (item.x + item.width)
+            # Only add non-whitespace text items
+            if item.text.strip():
+                text_parts.append(item.text.strip())
                 
-                # Adaptive gap threshold based on font size
-                gap_threshold = max(3, item.font_size * 0.2) if item.font_size > 0 else 3
-                
-                if gap > gap_threshold:
-                    # Determine number of spaces based on gap size
-                    space_count = min(int(gap / gap_threshold), 5)  # Max 5 spaces
-                    text_parts.append(' ' * space_count)
+                # Add space if there's a significant gap to next item
+                if i < len(items) - 1:
+                    next_item = items[i + 1]
+                    gap = next_item.x - (item.x + item.width)
+                    
+                    # More conservative gap threshold - only add space for significant gaps
+                    # Use character width as baseline (typically font_size * 0.6)
+                    char_width = max(2, item.font_size * 0.6) if item.font_size > 0 else 4
+                    gap_threshold = char_width * 0.8  # 80% of character width
+                    
+                    # Only add single space for significant gaps, avoid multiple spaces
+                    if gap > gap_threshold and next_item.text.strip():
+                        text_parts.append(' ')
 
-        line_text = ''.join(text_parts).strip()
+        # Join and clean up the text
+        line_text = ''.join(text_parts)
+        
+        # Remove excessive whitespace and normalize spacing
+        line_text = ' '.join(line_text.split())
+        
+        return line_text.strip()
         
         # Calculate bounding box
         min_x = min(item.x for item in items)
@@ -1207,6 +1219,56 @@ class ChunkingService:
     def _merge_soft_hyphens(self, text: str) -> str:
         """Merges soft hyphens at line ends"""
         return re.sub(r'-\s*\n(?=\w)', '', text)
+    
+    def _normalize_text_spacing(self, text: str) -> str:
+        """Normalize text spacing to fix character-level spacing issues"""
+        if not text:
+            return text
+            
+        # Fix excessive character spacing (e.g., "H e l l o" -> "Hello")
+        # Look for patterns where single characters are separated by spaces
+        text = re.sub(r'\b([a-zA-Z])\s+(?=[a-zA-Z]\s+[a-zA-Z])', r'\1', text)
+        
+        # More aggressive fix for character-level spacing
+        # Replace patterns like "W h i l e" with "While"
+        words = text.split()
+        normalized_words = []
+        
+        i = 0
+        while i < len(words):
+            current_word = words[i]
+            
+            # Check if this looks like character-spaced text
+            if (len(current_word) == 1 and current_word.isalpha() and 
+                i + 1 < len(words) and len(words[i + 1]) == 1 and words[i + 1].isalpha()):
+                
+                # Collect consecutive single characters
+                char_sequence = [current_word]
+                j = i + 1
+                while (j < len(words) and len(words[j]) == 1 and 
+                       (words[j].isalpha() or words[j].isdigit())):
+                    char_sequence.append(words[j])
+                    j += 1
+                
+                # If we found a sequence of single characters, join them
+                if len(char_sequence) > 2:
+                    normalized_words.append(''.join(char_sequence))
+                    i = j
+                else:
+                    normalized_words.append(current_word)
+                    i += 1
+            else:
+                normalized_words.append(current_word)
+                i += 1
+        
+        # Join words back and clean up spacing
+        result = ' '.join(normalized_words)
+        
+        # Final cleanup: remove multiple spaces and normalize line breaks
+        result = re.sub(r'\s+', ' ', result)
+        result = re.sub(r'\n\s*\n', '\n\n', result)
+        
+        return result.strip()
 
     def _build_simple_units_from_lines(self, lines: List[str]) -> List[StructuredUnit]:
         """Simplified unit building for fallback"""
