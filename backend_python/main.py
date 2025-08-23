@@ -131,9 +131,21 @@ except Exception as e:
 
 try:
     rag_service = RAGService()
+    print("✅ RAGService created successfully")
+
+    # Initialize RAG service immediately
+    print("🔄 Initializing RAG service...")
+    import asyncio
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(rag_service.initialize())
+    loop.close()
     print("✅ RAGService initialized successfully")
+
 except Exception as e:
     print(f"❌ Failed to initialize RAGService: {e}")
+
+print("🔧 All services initialization completed")
 
 try:
     url_download_service = URLDownloadService()
@@ -146,8 +158,6 @@ try:
     print("✅ WebpageTextExtractorService initialized successfully")
 except Exception as e:
     print(f"❌ Failed to initialize WebpageTextExtractorService: {e}")
-
-print("🔧 All services initialization completed")
 
 # Request models
 class WorkspaceUploadRequest(BaseModel):
@@ -176,8 +186,8 @@ async def log_requests(request: Request, call_next):
 async def health_check():
     print("💗 Health check requested")
     return {
-        "status": "healthy", 
-        "timestamp": "2024-01-01T00:00:00Z", 
+        "status": "healthy",
+        "timestamp": "2024-01-01T00:00:00Z",
         "uptime": 0
     }
 
@@ -279,7 +289,7 @@ async def upload_workspace(
                 # Auto-index PDF files for RAG with workspace ID
                 if file_info["mimetype"] == "application/pdf":
                     print(f"🔄 Starting RAG indexing for device file {i + 1} ({file_info['originalName']})...")
-                    
+
                     # Check if RAG service is ready for indexing
                     if not rag_service.is_ready_for_indexing():
                         print(f"⚠️ RAG service not ready for indexing device file {i + 1}, skipping RAG indexing")
@@ -375,7 +385,7 @@ async def upload_workspace(
                 # Auto-index PDF files for RAG with workspace ID
                 if file_metadata["mimetype"] == "application/pdf":
                     print(f"🔄 Starting RAG indexing for URL {i + 1} ({file_metadata['originalName']})...")
-                    
+
                     # Check if RAG service is ready for indexing
                     if not rag_service.is_ready_for_indexing():
                         print(f"⚠️ RAG service not ready for indexing URL {i + 1}, skipping RAG indexing")
@@ -919,14 +929,14 @@ async def start_server():
     # Initialize RAG service
     print("🔄 Initializing RAG service...")
     await rag_service.initialize()
-    
+
     if rag_service.is_initialized:
         print("✅ RAG service initialization completed successfully")
         print("🎯 RAG is ready for document indexing and search")
     else:
         print("⚠️ RAG service initialization completed with issues")
         print("⚠️ Some RAG features may not be available")
-        
+
     # Always continue - partial functionality is better than no functionality
 
     print(f"🚀 Server running on port {PORT}")
