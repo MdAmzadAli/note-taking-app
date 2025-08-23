@@ -116,7 +116,7 @@ class EmbeddingService:
                 self.genai_embedding.models.embed_content,
                 model=config['model'],
                 contents=[text],
-                task_type=config['taskType']
+                taskType=config['taskType']
             )
 
             if not response or not hasattr(response, 'embeddings') or not response.embeddings:
@@ -157,7 +157,7 @@ class EmbeddingService:
                 self.genai_embedding.models.embed_content,
                 model=config['model'],
                 contents=texts,
-                task_type=config['taskType']
+                taskType=config['taskType']
             )
 
             if not response or not hasattr(response, 'embeddings') or not isinstance(response.embeddings, list):
