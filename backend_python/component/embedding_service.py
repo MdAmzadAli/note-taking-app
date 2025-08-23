@@ -1,5 +1,7 @@
+
 import os
 import asyncio
+import numpy as np
 from typing import List, Dict, Any
 from pathlib import Path
 from dotenv import load_dotenv
@@ -16,39 +18,39 @@ print(f"   GEMINI_CHAT_API_KEY: {'✅ Set' if os.getenv('GEMINI_CHAT_API_KEY') e
 
 class EmbeddingService:
     def __init__(self):
-        self.genai_embedding = None
-        self.genai_chat = None
+        self.embedding_client = None
+        self.chat_client = None
         self.is_initialized_flag = False
 
         # Task-specific embedding configurations (matching JavaScript version)
         self.embedding_configs = {
             'document': {
                 'model': 'text-embedding-004',
-                'taskType': 'RETRIEVAL_DOCUMENT'
+                'task_type': 'RETRIEVAL_DOCUMENT'
             },
             'query': {
                 'model': 'text-embedding-004',
-                'taskType': 'QUESTION_ANSWERING'
+                'task_type': 'QUESTION_ANSWERING'
             },
             'similarity': {
                 'model': 'text-embedding-004',
-                'taskType': 'SEMANTIC_SIMILARITY'
+                'task_type': 'SEMANTIC_SIMILARITY'
             },
             'code': {
                 'model': 'text-embedding-004',
-                'taskType': 'CODE_RETRIEVAL_QUERY'
+                'task_type': 'CODE_RETRIEVAL_QUERY'
             },
             'classification': {
                 'model': 'text-embedding-004',
-                'taskType': 'CLASSIFICATION'
+                'task_type': 'CLASSIFICATION'
             },
             'clustering': {
                 'model': 'text-embedding-004',
-                'taskType': 'CLUSTERING'
+                'task_type': 'CLUSTERING'
             },
             'factVerification': {
                 'model': 'text-embedding-004',
-                'taskType': 'FACT_VERIFICATION'
+                'task_type': 'FACT_VERIFICATION'
             }
         }
 
@@ -60,7 +62,9 @@ class EmbeddingService:
                 print('🔄 Initializing Google GenAI for embeddings...')
                 try:
                     import google.genai as genai
-                    self.genai_embedding = genai.Client(api_key=embedding_api_key)
+                    from google.genai import types
+                    self.embedding_client = genai.Client(api_key=embedding_api_key)
+                    self.genai_types = types
                     print('✅ Google GenAI Embedding client initialized')
                 except ImportError as import_error:
                     print(f'❌ Failed to import google.genai: {import_error}')
@@ -75,9 +79,9 @@ class EmbeddingService:
                 try:
                     if chat_api_key != embedding_api_key:
                         import google.genai as genai
-                        self.genai_chat = genai.Client(api_key=chat_api_key)
+                        self.chat_client = genai.Client(api_key=chat_api_key)
                     else:
-                        self.genai_chat = self.genai_embedding
+                        self.chat_client = self.embedding_client
                     print('✅ Google GenAI Chat client initialized')
                 except ImportError as import_error:
                     print(f'❌ Failed to import google.genai for chat: {import_error}')
@@ -86,7 +90,7 @@ class EmbeddingService:
                 print('⚠️ GEMINI_CHAT_API_KEY not set, chat service will not be available')
 
             # Set initialized flag based on whether we have at least embeddings
-            self.is_initialized_flag = self.genai_embedding is not None
+            self.is_initialized_flag = self.embedding_client is not None
             
             if self.is_initialized_flag:
                 print('✅ Embedding Service initialized successfully')
@@ -101,7 +105,7 @@ class EmbeddingService:
     async def generate_embedding(self, text: str, task_type: str = 'document') -> List[float]:
         """Generate task-specific embeddings using Google GenAI"""
         try:
-            if not self.genai_embedding:
+            if not self.embedding_client:
                 raise Exception("Google GenAI Embedding client not initialized")
 
             config = self.embedding_configs.get(task_type)
@@ -109,14 +113,14 @@ class EmbeddingService:
                 print(f'⚠️ Unknown task type: {task_type}, using document config')
                 config = self.embedding_configs['document']
 
-            print(f'🔧 Generating {task_type} embedding with task type: {config["taskType"]}')
+            print(f'🔧 Generating {task_type} embedding with task type: {config["task_type"]}')
 
             # Use proper Google GenAI SDK method
             response = await asyncio.to_thread(
-                self.genai_embedding.models.embed_content,
+                self.embedding_client.models.embed_content,
                 model=config['model'],
                 contents=[text],
-                taskType=config['taskType']
+                config=self.genai_types.EmbedContentConfig(task_type=config['task_type'])
             )
 
             if not response or not hasattr(response, 'embeddings') or not response.embeddings:
@@ -125,7 +129,8 @@ class EmbeddingService:
             if not response.embeddings[0] or not hasattr(response.embeddings[0], 'values'):
                 raise Exception("Invalid embedding format - no values property")
 
-            embedding = response.embeddings[0].values
+            # Convert to numpy array and then to list for consistency
+            embedding = np.array(response.embeddings[0].values).tolist()
             print(f'✅ Generated {task_type} embedding (dimension: {len(embedding)})')
             return embedding
 
@@ -136,7 +141,7 @@ class EmbeddingService:
     async def generate_batch_embeddings(self, texts: List[str], task_type: str = 'document') -> List[List[float]]:
         """Generate batch embeddings for multiple texts (up to 100 per call)"""
         try:
-            if not self.genai_embedding:
+            if not self.embedding_client:
                 raise Exception("Google GenAI Embedding client not initialized")
 
             if not isinstance(texts, list) or len(texts) == 0:
@@ -150,14 +155,14 @@ class EmbeddingService:
                 print(f'⚠️ Unknown task type: {task_type}, using document config')
                 config = self.embedding_configs['document']
 
-            print(f'🔧 Generating batch {task_type} embeddings for {len(texts)} texts with task type: {config["taskType"]}')
+            print(f'🔧 Generating batch {task_type} embeddings for {len(texts)} texts with task type: {config["task_type"]}')
 
             # Use proper Google GenAI SDK method for batch processing
             response = await asyncio.to_thread(
-                self.genai_embedding.models.embed_content,
+                self.embedding_client.models.embed_content,
                 model=config['model'],
                 contents=texts,
-                taskType=config['taskType']
+                config=self.genai_types.EmbedContentConfig(task_type=config['task_type'])
             )
 
             if not response or not hasattr(response, 'embeddings') or not isinstance(response.embeddings, list):
@@ -166,11 +171,12 @@ class EmbeddingService:
             if len(response.embeddings) != len(texts):
                 raise Exception(f"Expected {len(texts)} embeddings, got {len(response.embeddings)}")
 
+            # Convert embeddings to numpy arrays and then to lists
             embeddings = []
             for emb in response.embeddings:
                 if not emb or not hasattr(emb, 'values'):
                     raise Exception("Invalid embedding format - no values property")
-                embeddings.append(emb.values)
+                embeddings.append(np.array(emb.values).tolist())
 
             print(f'✅ Generated batch {task_type} embeddings ({len(embeddings)} embeddings, dimension: {len(embeddings[0]) if embeddings else 0})')
             return embeddings
@@ -185,11 +191,20 @@ class EmbeddingService:
     def get_status(self) -> Dict[str, Any]:
         """Get comprehensive status information matching JavaScript version"""
         return {
-            'genai_embedding': bool(self.genai_embedding),
-            'genai_chat': bool(self.genai_chat),
-            'embedding_configs': list(self.embedding_configs.keys())
+            'genaiEmbedding': bool(self.embedding_client),
+            'genaiChat': bool(self.chat_client),
+            'embeddingConfigs': list(self.embedding_configs.keys())
         }
 
     def get_embedding_dimension(self) -> int:
         """Returns the dimension of embeddings produced by the model"""
         return 768  # text-embedding-004 produces 768-dimensional embeddings
+
+    # Legacy properties for backward compatibility
+    @property
+    def genai_embedding(self):
+        return self.embedding_client
+
+    @property
+    def genai_chat(self):
+        return self.chat_client
