@@ -1,4 +1,3 @@
-
 import asyncio
 import numpy as np
 from typing import List, Dict, Any, Optional
@@ -39,10 +38,10 @@ class SearchService:
         print(f'🏢 Workspace search: {len(file_ids)} files, limit: {total_limit}')
         print(f'📄 File IDs: [{", ".join(file_ids)}]')
         print(f'🏢 Workspace ID: {workspace_id}')
-        
+
         query_embedding = await self.embedding_service.generate_embedding(query, 'query')
         print(f'🔍 Query embedding generated (length: {len(query_embedding)})')
-        
+
         chunks_per_doc = max(2, total_limit // len(file_ids))  # Ensure each doc contributes
         retrieval_limit = chunks_per_doc * 3  # Get more candidates for MMR
         print(f'📊 Per-doc limit: {chunks_per_doc}, retrieval limit: {retrieval_limit}')
@@ -56,7 +55,7 @@ class SearchService:
             documents_searched += 1
             try:
                 print(f'📄 [{documents_searched}/{len(file_ids)}] Searching in document: {file_id}')
-                
+
                 # Primary search: with both fileId and workspaceId filters
                 primary_filter = { 
                     'must': [
@@ -78,29 +77,29 @@ class SearchService:
                     documents_with_results += 1
                 else:
                     print(f'⚠️ No results from primary search for {file_id}, trying fallbacks...')
-                    
+
                     # Fallback 1: Search without workspace filter
                     try:
                         fallback_filter1 = { 
                             'must': [{'key': 'fileId', 'match': {'value': file_id}}]
                         }
                         print(f'🔍 Fallback 1 filter: {fallback_filter1}')
-                        
+
                         doc_results = await self.vector_database_service.search_similar_chunks(
                             query_embedding, 
                             fallback_filter1, 
                             retrieval_limit
                         )
                         print(f'📊 Fallback 1 results for {file_id}: {len(doc_results)} chunks')
-                        
+
                         if len(doc_results) > 0:
                             print(f'✅ Fallback 1 found {len(doc_results)} candidates from {file_id}')
-                            
+
                             # Manual workspace filtering
                             if workspace_id:
                                 before_filter = len(doc_results)
                                 print(f'🔍 Manual workspace filtering: looking for workspaceId="{workspace_id}"')
-                                
+
                                 filtered_results = []
                                 for result in doc_results:
                                     has_workspace = result.payload.workspaceId == workspace_id
@@ -109,42 +108,42 @@ class SearchService:
                                         print(f'   ✅ Keeping: fileId={result.payload.fileId}, workspaceId="{result.payload.workspaceId}" (matches "{workspace_id}")')
                                     else:
                                         print(f'   ❌ Filtering out: fileId={result.payload.fileId}, workspaceId="{result.payload.workspaceId}" (doesn\'t match "{workspace_id}")')
-                                
+
                                 doc_results = filtered_results
                                 print(f'📄 Manual workspace filter: {before_filter} → {len(doc_results)} candidates')
-                            
+
                             if len(doc_results) > 0:
                                 documents_with_results += 1
                         else:
                             # Fallback 2: Search without any filters
                             print(f'⚠️ Fallback 1 failed, trying fallback 2 (no filters)...')
-                            
+
                             doc_results = await self.vector_database_service.search_similar_chunks(
                                 query_embedding, 
                                 None, 
                                 retrieval_limit * 2  # Get more results to filter manually
                             )
                             print(f'📊 Fallback 2 results (no filter): {len(doc_results)} chunks')
-                            
+
                             if len(doc_results) > 0:
                                 # Manual filtering for both fileId and workspaceId
                                 before_filter = len(doc_results)
                                 print(f'🔍 Manual filtering: looking for fileId="{file_id}" and workspaceId="{workspace_id}"')
-                                
+
                                 filtered_results = []
                                 for result in doc_results:
                                     file_match = result.payload.fileId == file_id
                                     workspace_match = not workspace_id or result.payload.workspaceId == workspace_id
                                     should_keep = file_match and workspace_match
-                                    
+
                                     if should_keep:
                                         filtered_results.append(result)
                                     else:
                                         print(f'   ❌ Filtering out: fileId={result.payload.fileId} (match:{file_match}), workspaceId="{result.payload.workspaceId}" (match:{workspace_match})')
-                                
+
                                 doc_results = filtered_results
                                 print(f'📄 Manual filtering: {before_filter} → {len(doc_results)} candidates for {file_id}')
-                                
+
                                 if len(doc_results) > 0:
                                     documents_with_results += 1
                                     print(f'✅ Fallback 2 found {len(doc_results)} candidates from {file_id}')
@@ -162,38 +161,84 @@ class SearchService:
                             'workspaceId': first_result.payload.workspaceId,
                             'chunkIndex': first_result.payload.chunkIndex
                         })
-                    
+
                     # Add document-specific context
                     processed_results = []
                     for result in doc_results:
+                        # Handle both dictionary and object formats
+                        if isinstance(result, dict):
+                            payload = result.get('payload', result)
+                            score = result.get('score', 0.0)
+                            vector = result.get('vector', None)
+                        else:
+                            payload = result.payload
+                            score = result.score
+                            vector = getattr(result, 'vector', None)
+
+                        # Handle payload as both dict and object
+                        if isinstance(payload, dict):
+                            file_id = payload.get('fileId', '')
+                            file_name = payload.get('fileName', '')
+                            chunk_index = payload.get('chunkIndex', 0)
+                            workspace_id = payload.get('workspaceId', '')
+                            text = payload.get('text', '')
+                            page_number = payload.get('pageNumber')
+                            start_line = payload.get('startLine')
+                            end_line = payload.get('endLine')
+                            total_pages = payload.get('totalPages')
+                            total_lines_on_page = payload.get('totalLinesOnPage')
+                            lines_used = payload.get('linesUsed', [])
+                            original_lines = payload.get('originalLines', [])
+                            page_url = payload.get('pageUrl')
+                            cloudinary_url = payload.get('cloudinaryUrl')
+                            thumbnail_url = payload.get('thumbnailUrl')
+                            embedding_type = payload.get('embeddingType')
+                        else:
+                            file_id = payload.fileId
+                            file_name = payload.fileName
+                            chunk_index = payload.chunkIndex
+                            workspace_id = payload.workspaceId
+                            text = payload.text
+                            page_number = getattr(payload, 'pageNumber', None)
+                            start_line = getattr(payload, 'startLine', None)
+                            end_line = getattr(payload, 'endLine', None)
+                            total_pages = getattr(payload, 'totalPages', None)
+                            total_lines_on_page = getattr(payload, 'totalLinesOnPage', None)
+                            lines_used = getattr(payload, 'linesUsed', [])
+                            original_lines = getattr(payload, 'originalLines', [])
+                            page_url = getattr(payload, 'pageUrl', None)
+                            cloudinary_url = getattr(payload, 'cloudinaryUrl', None)
+                            thumbnail_url = getattr(payload, 'thumbnailUrl', None)
+                            embedding_type = getattr(payload, 'embeddingType', None)
+
                         metadata = {
-                            'fileId': result.payload.fileId,
-                            'fileName': result.payload.fileName,
-                            'chunkIndex': result.payload.chunkIndex,
-                            'workspaceId': result.payload.workspaceId,
-                            'linesUsed': getattr(result.payload, 'linesUsed', []),
-                            'originalLines': getattr(result.payload, 'originalLines', []),
-                            'pageUrl': getattr(result.payload, 'pageUrl', None),
-                            'cloudinaryUrl': getattr(result.payload, 'cloudinaryUrl', None),
-                            'thumbnailUrl': getattr(result.payload, 'thumbnailUrl', None),
-                            'embeddingType': getattr(result.payload, 'embeddingType', None)
+                            'fileId': file_id,
+                            'fileName': file_name,
+                            'chunkIndex': chunk_index,
+                            'workspaceId': workspace_id,
+                            'linesUsed': lines_used,
+                            'originalLines': original_lines,
+                            'pageUrl': page_url,
+                            'cloudinaryUrl':cloudinary_url,
+                            'thumbnailUrl': thumbnail_url,
+                            'embeddingType': embedding_type
                         }
 
                         # Add page and line numbers only if they exist (PDF content)
-                        if hasattr(result.payload, 'pageNumber') and result.payload.pageNumber is not None:
-                            metadata['pageNumber'] = result.payload.pageNumber
-                            metadata['totalPages'] = getattr(result.payload, 'totalPages', None)
-                            metadata['totalLinesOnPage'] = getattr(result.payload, 'totalLinesOnPage', None)
-                        
-                        if hasattr(result.payload, 'startLine') and result.payload.startLine is not None:
-                            metadata['startLine'] = result.payload.startLine
-                            metadata['endLine'] = getattr(result.payload, 'endLine', None)
+                        if page_number is not None:
+                            metadata['pageNumber'] = page_number
+                            metadata['totalPages'] = total_pages
+                            metadata['totalLinesOnPage'] = total_lines_on_page
+
+                        if start_line is not None:
+                            metadata['startLine'] = start_line
+                            metadata['endLine'] = end_line
 
                         processed_results.append({
-                            'text': result.payload.text,
-                            'score': result.score,
-                            'fileId': result.payload.fileId,
-                            'vector': getattr(result, 'vector', None),  # Store for MMR if available
+                            'text': text,
+                            'score': score,
+                            'fileId': file_id,
+                            'vector': vector,  # Store for MMR if available
                             'metadata': metadata
                         })
 
@@ -217,14 +262,14 @@ class SearchService:
 
         # Step 2: Apply MMR for diversity and document representation
         selected_chunks = self.apply_mmr(all_candidates, query_embedding, total_limit, chunks_per_doc)
-        
+
         print(f'🎯 Final selection: {len(selected_chunks)} chunks from workspace')
         distribution = {}
         for chunk in selected_chunks:
             file_name = chunk['metadata']['fileName']
             distribution[file_name] = distribution.get(file_name, 0) + 1
         print(f'📊 Final chunks distribution: {distribution}')
-        
+
         return selected_chunks
 
     async def search_single_file_chunks(self, query: str, file_ids: Optional[List[str]], 
@@ -259,7 +304,7 @@ class SearchService:
             )
         except Exception as filter_error:
             print(f'⚠️ Search with filter failed, trying without filters: {filter_error}')
-            
+
             if 'Index required' in str(filter_error):
                 print('🔄 Retrying search without filters...')
                 search_result = await self.vector_database_service.search_similar_chunks(
@@ -303,7 +348,7 @@ class SearchService:
                 metadata['pageNumber'] = result.payload.pageNumber
                 metadata['totalPages'] = getattr(result.payload, 'totalPages', None)
                 metadata['totalLinesOnPage'] = getattr(result.payload, 'totalLinesOnPage', None)
-            
+
             if hasattr(result.payload, 'startLine') and result.payload.startLine is not None:
                 metadata['startLine'] = result.payload.startLine
                 metadata['endLine'] = getattr(result.payload, 'endLine', None)
@@ -338,16 +383,16 @@ class SearchService:
 
         # First, ensure minimum representation per document
         unique_file_ids = list(set(c['fileId'] for c in candidates))
-        
+
         for file_id in unique_file_ids:
             doc_candidates = [c for c in candidates if c['fileId'] == file_id]
             needed = min(min_per_doc, len(doc_candidates))
-            
+
             for i in range(needed):
                 if len(selected) < total_limit:
                     selected.append(doc_candidates[i])
                     doc_counts[file_id] = doc_counts.get(file_id, 0) + 1
-                    
+
                     # Remove from remaining
                     remaining = [r for r in remaining 
                                if not (r['fileId'] == doc_candidates[i]['fileId'] and 
@@ -381,7 +426,7 @@ class SearchService:
             if best_candidate:
                 selected.append(best_candidate)
                 doc_counts[best_candidate['fileId']] = doc_counts.get(best_candidate['fileId'], 0) + 1
-                
+
                 remaining = [r for r in remaining 
                            if not (r['fileId'] == best_candidate['fileId'] and 
                                   r['metadata']['chunkIndex'] == best_candidate['metadata']['chunkIndex'])]
@@ -402,8 +447,8 @@ class SearchService:
 
         words1 = set(text1.lower().split())
         words2 = set(text2.lower().split())
-        
+
         intersection = words1.intersection(words2)
         union = words1.union(words2)
-        
+
         return len(intersection) / len(union) if len(union) > 0 else 0.0
