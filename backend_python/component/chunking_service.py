@@ -1531,12 +1531,31 @@ class ChunkingService:
             chunks.extend(page_chunks)
             global_chunk_index += len(page_chunks)
 
-        print(f"📄 Created {len(chunks)} chunks using enhanced unit-based approach")
+        # Log chunking statistics
+        if chunks:
+            chunk_sizes = [len(chunk.get('text', '')) for chunk in chunks]
+            table_chunks = [chunk for chunk in chunks if chunk.get('metadata', {}).get('has_table_content')]
+            text_chunks = [chunk for chunk in chunks if not chunk.get('metadata', {}).get('has_table_content')]
+            
+            print(f"📄 Created {len(chunks)} chunks using enhanced unit-based approach")
+            print(f"   Overall: min={min(chunk_sizes)}, max={max(chunk_sizes)}, avg={sum(chunk_sizes)//len(chunk_sizes)}")
+            
+            if text_chunks:
+                text_sizes = [len(chunk.get('text', '')) for chunk in text_chunks]
+                oversized_text = [s for s in text_sizes if s > self.chunk_size]
+                print(f"   Text chunks ({len(text_chunks)}): min={min(text_sizes)}, max={max(text_sizes)}, avg={sum(text_sizes)//len(text_sizes)}")
+                if oversized_text:
+                    print(f"   ⚠️ {len(oversized_text)} text chunks exceed limit: {oversized_text}")
+            
+            if table_chunks:
+                table_sizes = [len(chunk.get('text', '')) for chunk in table_chunks]
+                print(f"   Table chunks ({len(table_chunks)}): min={min(table_sizes)}, max={max(table_sizes)}, avg={sum(table_sizes)//len(table_sizes)}")
+        
         return chunks
 
     def _create_units_based_chunks(self, units: List[StructuredUnit], page_number: Optional[int], 
                                    metadata: Dict, start_index: int) -> List[Dict]:
-        """Create chunks based on structured units with enhanced heading-table association"""
+        """Create chunks based on structured units with strict size control"""
         chunks = []
         chunk_index = start_index
         current_chunk = ''
@@ -1560,22 +1579,18 @@ class ChunkingService:
                 # Calculate total size of table group
                 table_group_text = '\n'.join(u.text for u in table_group)
                 
-                # Check if adding this table group would exceed chunk size
-                if (len(current_chunk) + len(table_group_text) > self.chunk_size and 
-                    current_chunk.strip()):
-                    
-                    # Create chunk with current content
+                # For tables, we allow exceeding chunk size but still try to be reasonable
+                # If current chunk has non-table content and adding table would exceed limit
+                if current_chunk.strip() and len(current_chunk) + len(table_group_text) > self.chunk_size:
+                    # Create chunk with current content first
                     chunk_text = current_chunk.strip()
                     chunks.append(self._create_semantic_chunk(
                         chunk_text, metadata, chunk_index, page_number, current_units
                     ))
                     chunk_index += 1
 
-                    # Calculate controlled overlap
-                    overlap_text = self._get_controlled_overlap(chunk_text, 70, 110)
-                    
-                    # Start new chunk with overlap + table group
-                    current_chunk = f"{overlap_text}\n{table_group_text}" if overlap_text else table_group_text
+                    # Start new chunk with just the table group
+                    current_chunk = table_group_text
                     current_units = table_group.copy()
                 else:
                     # Add table group to current chunk
@@ -1591,21 +1606,12 @@ class ChunkingService:
             
             # Check if this is a regular table row without header (standalone table)
             elif unit.type == 'table_row':
-                # Look for consecutive table rows to group them
-                table_group = [unit]
-                j = i + 1
+                # For standalone table rows, be more conservative
+                unit_text = unit.text
                 
-                # Collect consecutive table rows
-                while j < len(units) and units[j].type == 'table_row':
-                    table_group.append(units[j])
-                    j += 1
-                
-                # Calculate total size of table group
-                table_group_text = '\n'.join(u.text for u in table_group)
-                
-                # Try to keep table rows together in same chunk
-                if (len(current_chunk) + len(table_group_text) > self.chunk_size and 
-                    current_chunk.strip() and len(table_group) > 1):
+                # If adding this table row would exceed chunk size significantly
+                if (current_chunk.strip() and 
+                    len(current_chunk) + len(unit_text) > self.chunk_size * 1.2):  # Allow 20% overflow for tables
                     
                     # Create chunk with current content
                     chunk_text = current_chunk.strip()
@@ -1614,40 +1620,66 @@ class ChunkingService:
                     ))
                     chunk_index += 1
 
-                    # Start new chunk with table group
-                    current_chunk = table_group_text
-                    current_units = table_group.copy()
+                    # Start new chunk with this table row
+                    current_chunk = unit_text
+                    current_units = [unit]
                 else:
-                    # Add table group to current chunk
+                    # Add table row to current chunk
                     if current_chunk:
-                        current_chunk += f'\n{table_group_text}'
+                        current_chunk += f'\n{unit_text}'
                     else:
-                        current_chunk = table_group_text
-                    current_units.extend(table_group)
+                        current_chunk = unit_text
+                    current_units.append(unit)
                 
-                # Skip the processed table rows
-                i = j
+                i += 1
                 continue
             
-            # Handle regular units (headers, paragraphs, bullets)
+            # Handle regular units (headers, paragraphs, bullets) - STRICT SIZE CONTROL
             else:
                 unit_text = unit.text
 
-                # Check if adding this unit would exceed chunk size
-                if len(current_chunk) + len(unit_text) > self.chunk_size and current_chunk.strip():
-                    # Create chunk with current content
-                    chunk_text = current_chunk.strip()
-                    chunks.append(self._create_semantic_chunk(
-                        chunk_text, metadata, chunk_index, page_number, current_units
-                    ))
-                    chunk_index += 1
+                # For regular text, be very strict about chunk size
+                potential_chunk_size = len(current_chunk) + len(unit_text) + 1  # +1 for newline
+                
+                if potential_chunk_size > self.chunk_size and current_chunk.strip():
+                    # If the current unit alone is larger than chunk size, we need to split it
+                    if len(unit_text) > self.chunk_size:
+                        # First, finalize current chunk if it has content
+                        if current_chunk.strip():
+                            chunk_text = current_chunk.strip()
+                            chunks.append(self._create_semantic_chunk(
+                                chunk_text, metadata, chunk_index, page_number, current_units
+                            ))
+                            chunk_index += 1
+                        
+                        # Split the large unit into smaller chunks
+                        unit_chunks = self._split_large_unit(unit, self.chunk_size)
+                        for unit_chunk_text in unit_chunks:
+                            chunks.append(self._create_semantic_chunk(
+                                unit_chunk_text, metadata, chunk_index, page_number, [unit]
+                            ))
+                            chunk_index += 1
+                        
+                        # Reset current chunk
+                        current_chunk = ''
+                        current_units = []
+                    else:
+                        # Create chunk with current content
+                        chunk_text = current_chunk.strip()
+                        chunks.append(self._create_semantic_chunk(
+                            chunk_text, metadata, chunk_index, page_number, current_units
+                        ))
+                        chunk_index += 1
 
-                    # Calculate controlled overlap
-                    overlap_text = self._get_controlled_overlap(chunk_text, 70, 110)
-                    
-                    # Start new chunk with overlap + current unit
-                    current_chunk = f"{overlap_text}\n{unit_text}" if overlap_text else unit_text
-                    current_units = [unit]
+                        # Calculate controlled overlap for regular text
+                        overlap_text = self._get_controlled_overlap(chunk_text, 50, 80)  # Smaller overlap for strict sizing
+                        
+                        # Start new chunk with overlap + current unit
+                        if overlap_text and len(overlap_text) + len(unit_text) <= self.chunk_size:
+                            current_chunk = f"{overlap_text}\n{unit_text}"
+                        else:
+                            current_chunk = unit_text
+                        current_units = [unit]
                 else:
                     # Add unit to current chunk
                     if current_chunk:
@@ -1658,26 +1690,128 @@ class ChunkingService:
             
             i += 1
 
-        # Add final chunk if it has content
+        # Add final chunk if it has content and within reasonable size
         if current_chunk.strip():
-            chunks.append(self._create_semantic_chunk(
-                current_chunk.strip(), metadata, chunk_index, page_number, current_units
-            ))
+            # If final chunk is too large and contains multiple units, try to split
+            if len(current_chunk) > self.chunk_size * 1.5 and len(current_units) > 1:
+                # Try to split into smaller chunks
+                self._split_large_final_chunk(current_chunk, current_units, metadata, 
+                                            chunk_index, page_number, chunks)
+            else:
+                chunks.append(self._create_semantic_chunk(
+                    current_chunk.strip(), metadata, chunk_index, page_number, current_units
+                ))
 
         return chunks
+
+    def _split_large_unit(self, unit: StructuredUnit, max_size: int) -> List[str]:
+        """Split a large unit into smaller chunks while preserving meaning"""
+        text = unit.text
+        if len(text) <= max_size:
+            return [text]
+        
+        chunks = []
+        current_pos = 0
+        
+        while current_pos < len(text):
+            # Calculate chunk end position
+            chunk_end = min(current_pos + max_size, len(text))
+            
+            # If not at end, try to break at sentence or word boundary
+            if chunk_end < len(text):
+                # Look for good break points
+                search_start = max(current_pos + int(max_size * 0.7), current_pos)
+                search_text = text[search_start:chunk_end + 50]
+                
+                break_points = [
+                    search_text.rfind('. '),
+                    search_text.rfind('! '),
+                    search_text.rfind('? '),
+                    search_text.rfind('\n'),
+                    search_text.rfind('; '),
+                    search_text.rfind(', '),
+                    search_text.rfind(' ')
+                ]
+
+                for break_point in break_points:
+                    if break_point > 0:
+                        chunk_end = search_start + break_point + 1
+                        break
+            
+            # Extract chunk text
+            chunk_text = text[current_pos:chunk_end].strip()
+            if chunk_text:
+                chunks.append(chunk_text)
+            
+            # Move to next position with small overlap
+            overlap = min(50, len(chunk_text) // 4)
+            current_pos = max(chunk_end - overlap, current_pos + 1)
+            
+            # Safety check
+            if current_pos >= len(text):
+                break
+        
+        return chunks
+    
+    def _split_large_final_chunk(self, chunk_text: str, units: List[StructuredUnit], 
+                                metadata: Dict, start_index: int, page_number: Optional[int], 
+                                chunks: List[Dict]):
+        """Split a large final chunk into smaller ones"""
+        # Try to split by units first
+        units_by_size = []
+        current_text = ''
+        current_group = []
+        
+        for unit in units:
+            if len(current_text) + len(unit.text) > self.chunk_size and current_group:
+                units_by_size.append((current_text.strip(), current_group))
+                current_text = unit.text
+                current_group = [unit]
+            else:
+                if current_text:
+                    current_text += f'\n{unit.text}'
+                else:
+                    current_text = unit.text
+                current_group.append(unit)
+        
+        # Add final group
+        if current_group:
+            units_by_size.append((current_text.strip(), current_group))
+        
+        # Create chunks from groups
+        chunk_index = start_index
+        for group_text, group_units in units_by_size:
+            if len(group_text) > self.chunk_size * 1.5:
+                # Still too large, split by character limit
+                sub_chunks = self._split_large_unit(group_units[0], self.chunk_size)
+                for sub_chunk in sub_chunks:
+                    chunks.append(self._create_semantic_chunk(
+                        sub_chunk, metadata, chunk_index, page_number, [group_units[0]]
+                    ))
+                    chunk_index += 1
+            else:
+                chunks.append(self._create_semantic_chunk(
+                    group_text, metadata, chunk_index, page_number, group_units
+                ))
+                chunk_index += 1
 
     def _get_controlled_overlap(self, chunk_text: str, min_overlap: int = 70, max_overlap: int = 110) -> str:
         """Get controlled overlap text with specified character range"""
         if not chunk_text or len(chunk_text) < min_overlap:
-            return chunk_text  # Return full text if shorter than minimum
+            return ''  # No overlap if text is too short
+
+        # For very large chunks, reduce overlap to maintain size limits
+        if len(chunk_text) > self.chunk_size:
+            max_overlap = min(max_overlap, self.chunk_size // 4)  # Max 25% of chunk size
+            min_overlap = min(min_overlap, max_overlap)
 
         # Try to find good break points within the overlap range
         start_pos = max(0, len(chunk_text) - max_overlap)
         end_pos = len(chunk_text) - min_overlap
 
         if start_pos >= end_pos:
-            # Fallback: take last max_overlap characters
-            return chunk_text[-max_overlap:]
+            # Fallback: take last min_overlap characters
+            return chunk_text[-min_overlap:] if len(chunk_text) > min_overlap else ''
 
         # Look for good break points in descending order of preference
         search_text = chunk_text[start_pos:]
@@ -1698,9 +1832,14 @@ class ChunkingService:
                 if min_overlap <= len(overlap_text) <= max_overlap:
                     return overlap_text
 
-        # Fallback: ensure we stay within range
+        # Fallback: ensure we stay within range and size limits
         fallback_overlap = chunk_text[-min(max_overlap, len(chunk_text)):]
-        return fallback_overlap if len(fallback_overlap) >= min_overlap else chunk_text[-min_overlap:]
+        
+        # If fallback would still be too large, reduce it
+        if len(fallback_overlap) > self.chunk_size // 3:  # Max 33% of chunk size
+            fallback_overlap = fallback_overlap[-self.chunk_size // 3:]
+        
+        return fallback_overlap if len(fallback_overlap) >= min_overlap else ''
 
     def _create_semantic_chunk(self, text: str, metadata: Dict, chunk_index: int, 
                               page_number: Optional[int], semantic_units: List[StructuredUnit]) -> Dict:
@@ -1708,6 +1847,16 @@ class ChunkingService:
         unit_types = [u.type for u in semantic_units]
         line_numbers = [u.start_line for u in semantic_units if u.start_line]
         reading_orders = [getattr(u, 'reading_order', 0) for u in semantic_units]
+
+        # Check chunk size and log if oversized for non-table content
+        chunk_size = len(text)
+        has_table_content = any(t in ['table_row', 'table_header'] for t in unit_types)
+        
+        if chunk_size > self.chunk_size and not has_table_content:
+            print(f"⚠️ Oversized non-table chunk created: {chunk_size} chars (limit: {self.chunk_size})")
+            print(f"   Unit types: {unit_types}")
+        elif chunk_size > self.chunk_size * 2:  # Very large chunks even for tables
+            print(f"⚠️ Very large chunk created: {chunk_size} chars, types: {unit_types}")
 
         # Analyze numeric content across the entire chunk
         chunk_normalized = self._normalize_currency_and_numbers(text)
