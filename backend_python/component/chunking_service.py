@@ -239,6 +239,7 @@ class ChunkingService:
             page_text = '\n'.join(unit.text for unit in structured_units)
             page_text = self._merge_soft_hyphens(page_text)
             page_text = self._normalize_text_spacing(page_text)
+            page_text = self._post_process_extracted_text(page_text)
 
             return PageData(
                 page_number=page_number,
@@ -345,29 +346,60 @@ class ChunkingService:
         # Sort items by X coordinate
         items.sort(key=lambda item: item.x)
         
-        # Build text with intelligent spacing
+        # Build text with intelligent spacing and character detection
         text_parts = []
         for i, item in enumerate(items):
             # Only add non-whitespace text items
             if item.text.strip():
-                text_parts.append(item.text.strip())
+                item_text = item.text.strip()
+                text_parts.append(item_text)
                 
                 # Add space if there's a significant gap to next item
                 if i < len(items) - 1:
                     next_item = items[i + 1]
                     gap = next_item.x - (item.x + item.width)
                     
-                    # More conservative gap threshold - only add space for significant gaps
-                    # Use character width as baseline (typically font_size * 0.6)
-                    char_width = max(2, item.font_size * 0.6) if item.font_size > 0 else 4
-                    gap_threshold = char_width * 0.8  # 80% of character width
+                    # Detect character-level extraction (single characters with small gaps)
+                    is_single_char = len(item_text) == 1 and item_text.isalnum()
+                    next_is_single_char = len(next_item.text.strip()) == 1 and next_item.text.strip().isalnum()
                     
-                    # Only add single space for significant gaps, avoid multiple spaces
+                    # Use adaptive gap threshold based on content type
+                    if item.font_size > 0:
+                        char_width = item.font_size * 0.6
+                        # For single characters, use smaller threshold to avoid unwanted spaces
+                        if is_single_char and next_is_single_char:
+                            gap_threshold = char_width * 1.5  # Larger threshold for single chars
+                        else:
+                            gap_threshold = char_width * 0.8  # Normal threshold
+                    else:
+                        # Fallback when font size not available
+                        if is_single_char and next_is_single_char:
+                            gap_threshold = 8  # Larger threshold for single chars
+                        else:
+                            gap_threshold = 4  # Normal threshold
+                    
+                    # Only add space for significant gaps, but be careful with single characters
                     if gap > gap_threshold and next_item.text.strip():
                         text_parts.append(' ')
 
         # Join and clean up the text
         line_text = ''.join(text_parts)
+        
+        # Apply immediate character spacing fix if detected
+        # Check if line contains excessive single character "words"
+        words = line_text.split()
+        if len(words) > 3:  # Only check if there are enough words
+            single_char_count = sum(1 for word in words if len(word) == 1 and word.isalnum())
+            if single_char_count / len(words) > 0.5:  # More than 50% single characters
+                # Likely character-spaced text, apply aggressive joining
+                result_chars = []
+                for word in words:
+                    if len(word) == 1 and word.isalnum():
+                        result_chars.append(word)
+                    else:
+                        if result_chars:
+                            line_text = line_text.replace(' '.join(result_chars), ''.join(result_chars))
+                            result_chars = []
         
         # Remove excessive whitespace and normalize spacing
         line_text = ' '.join(line_text.split())
@@ -999,10 +1031,11 @@ class ChunkingService:
             structured_units = self._build_simple_units_from_lines(lines)
             clean_text = self._merge_soft_hyphens(page_text)
             normalized_text = self._normalize_text_spacing(clean_text)
+            processed_text = self._post_process_extracted_text(normalized_text)
 
             return PageData(
                 page_number=page_number,
-                text=normalized_text,
+                text=processed_text,
                 lines=lines,
                 structured_units=structured_units,
                 columns=1,
@@ -1243,12 +1276,69 @@ class ChunkingService:
         if not text:
             return text
             
-        # Fix excessive character spacing (e.g., "H e l l o" -> "Hello")
-        # Look for patterns where single characters are separated by spaces
-        text = re.sub(r'\b([a-zA-Z])\s+(?=[a-zA-Z]\s+[a-zA-Z])', r'\1', text)
+        # Step 1: Handle severe character-level spacing (most aggressive first)
+        # Pattern: "S u p p l i e r" -> "Supplier"
+        # This handles cases where EVERY character is separated by spaces
+        def fix_character_spacing(text_input):
+            lines = text_input.split('\n')
+            fixed_lines = []
+            
+            for line in lines:
+                # Check if line has severe character spacing
+                # Count single character "words" vs normal words
+                words = line.split()
+                if not words:
+                    fixed_lines.append(line)
+                    continue
+                
+                single_char_count = sum(1 for word in words if len(word) == 1 and word.isalnum())
+                total_words = len(words)
+                
+                # If more than 70% are single characters, likely character-spaced
+                if total_words > 0 and (single_char_count / total_words) > 0.7:
+                    # Aggressive joining of single characters
+                    result = []
+                    i = 0
+                    current_word = ""
+                    
+                    while i < len(words):
+                        word = words[i]
+                        
+                        # If it's a single alphanumeric character, collect it
+                        if len(word) == 1 and word.isalnum():
+                            current_word += word
+                        else:
+                            # End current word if we have one
+                            if current_word:
+                                result.append(current_word)
+                                current_word = ""
+                            
+                            # Add the non-single-character word
+                            if word.strip():  # Only add non-empty words
+                                result.append(word)
+                        
+                        i += 1
+                    
+                    # Don't forget the last word
+                    if current_word:
+                        result.append(current_word)
+                    
+                    fixed_lines.append(' '.join(result))
+                else:
+                    # Normal processing for lines without severe character spacing
+                    fixed_lines.append(line)
+            
+            return '\n'.join(fixed_lines)
         
-        # More aggressive fix for character-level spacing
-        # Replace patterns like "W h i l e" with "While"
+        # Apply aggressive character spacing fix
+        text = fix_character_spacing(text)
+        
+        # Step 2: Handle moderate character spacing patterns
+        # Pattern: "S u p p l i e r   I n f o" -> "Supplier Info"
+        text = re.sub(r'\b([a-zA-Z])\s+([a-zA-Z])\s+([a-zA-Z])', r'\1\2\3', text)
+        
+        # Step 3: More targeted character spacing fixes
+        # Look for sequences of single characters separated by spaces
         words = text.split()
         normalized_words = []
         
@@ -1282,11 +1372,113 @@ class ChunkingService:
         # Join words back and clean up spacing
         result = ' '.join(normalized_words)
         
-        # Final cleanup: remove multiple spaces and normalize line breaks
+        # Step 4: Clean up common spacing issues
+        # Fix number spacing (e.g., "2 5 6 3 4" -> "25634")
+        result = re.sub(r'\b(\d)\s+(?=\d)', r'\1', result)
+        
+        # Fix punctuation spacing
+        result = re.sub(r'\s+([,.;:!?])', r'\1', result)
+        
+        # Step 5: Final cleanup
+        # Remove multiple spaces and normalize line breaks
         result = re.sub(r'\s+', ' ', result)
         result = re.sub(r'\n\s*\n', '\n\n', result)
         
+        # Remove leading/trailing spaces from each line
+        lines = result.split('\n')
+        cleaned_lines = [line.strip() for line in lines]
+        result = '\n'.join(cleaned_lines)
+        
         return result.strip()
+
+    def _post_process_extracted_text(self, text: str) -> str:
+        """Post-process extracted text to fix common OCR and extraction issues"""
+        if not text:
+            return text
+        
+        # Split into lines for processing
+        lines = text.split('\n')
+        processed_lines = []
+        
+        for line in lines:
+            if not line.strip():
+                processed_lines.append(line)
+                continue
+            
+            # Check for character-spaced content
+            processed_line = self._fix_character_spacing_line(line)
+            
+            # Fix common OCR artifacts
+            processed_line = self._fix_ocr_artifacts(processed_line)
+            
+            processed_lines.append(processed_line)
+        
+        return '\n'.join(processed_lines)
+    
+    def _fix_character_spacing_line(self, line: str) -> str:
+        """Fix character spacing in a single line"""
+        if not line:
+            return line
+        
+        # Split into tokens
+        tokens = line.split()
+        if len(tokens) < 3:
+            return line
+        
+        # Check if line is severely character-spaced
+        single_char_tokens = [t for t in tokens if len(t) == 1 and (t.isalnum() or t in '.,;:')]
+        char_ratio = len(single_char_tokens) / len(tokens)
+        
+        if char_ratio > 0.6:  # More than 60% single characters
+            # Reconstruct the line by joining consecutive single characters
+            result = []
+            current_word = ""
+            
+            for token in tokens:
+                if len(token) == 1 and token.isalnum():
+                    current_word += token
+                else:
+                    if current_word:
+                        result.append(current_word)
+                        current_word = ""
+                    if token.strip():
+                        result.append(token)
+            
+            # Don't forget the last word
+            if current_word:
+                result.append(current_word)
+            
+            return ' '.join(result)
+        
+        return line
+    
+    def _fix_ocr_artifacts(self, text: str) -> str:
+        """Fix common OCR artifacts and extraction issues"""
+        if not text:
+            return text
+        
+        # Fix spaced numbers (e.g., "1 2 3 4 5" -> "12345")
+        text = re.sub(r'\b(\d)\s+(\d)', r'\1\2', text)
+        text = re.sub(r'\b(\d)\s+(\d)', r'\1\2', text)  # Run twice for longer sequences
+        
+        # Fix spaced punctuation
+        text = re.sub(r'\s+([.,;:!?])', r'\1', text)
+        text = re.sub(r'([.,;:!?])\s+', r'\1 ', text)
+        
+        # Fix common letter substitutions from OCR
+        ocr_fixes = {
+            r'\b0\b': 'O',  # Zero to O in words
+            r'\b1\b': 'I',  # One to I in words (context dependent)
+            r'\s+': ' ',    # Multiple spaces to single space
+        }
+        
+        for pattern, replacement in ocr_fixes.items():
+            text = re.sub(pattern, replacement, text)
+        
+        # Fix spacing around colons (common in invoice/document text)
+        text = re.sub(r'\s*:\s*', ': ', text)
+        
+        return text.strip()
 
     def _build_simple_units_from_lines(self, lines: List[str]) -> List[StructuredUnit]:
         """Simplified unit building for fallback"""
