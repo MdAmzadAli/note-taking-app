@@ -3,6 +3,7 @@ import os
 import asyncio
 from typing import Dict, List, Any, Optional, Union
 import pdfplumber
+from collections import defaultdict
 
 # Import all necessary utilities from chunkingUtils
 from ..utils.chunkingUtils import (
@@ -491,13 +492,29 @@ class ChunkingServiceNew:
 
         return sorted_regions
 
-    async def _extract_json_table_content_enhanced(self, region: LayoutRegion, start_order: int, recent_headings: List[StructuredUnit]) -> List[StructuredUnit]:
+    async def _extract_json_table_content_enhanced(self, region: LayoutRegion, start_order: int, recent_headings: List[StructuredUnit], all_regions: List[LayoutRegion] = None, region_idx: int = 0) -> List[StructuredUnit]:
         """Extract JSON table content with enhanced context"""
         table_units = []
         current_order = start_order
 
         # Find associated headings
         associated_headings = self._find_associated_headings(region, recent_headings, 150)
+
+        # If no headings found and all_regions provided, extract surrounding context
+        if not associated_headings and all_regions and region_idx is not None:
+            print(f"   No direct headings found, extracting surrounding context...")
+            surrounding_context = self._extract_surrounding_context(region, all_regions, region_idx, word_limit=50)
+            if surrounding_context:
+                print(f"   ✅ Extracted surrounding context: '{surrounding_context[:100]}...'")
+                # Create a synthetic heading from context
+                context_unit = StructuredUnit(
+                    type='table_context',
+                    text=surrounding_context,
+                    lines=[surrounding_context],
+                    bbox=region.bbox,
+                    reading_order=current_order
+                )
+                associated_headings = [context_unit]
 
         # Add associated headings first
         for heading in associated_headings:
@@ -981,3 +998,47 @@ class ChunkingServiceNew:
     def _create_semantic_chunk(self, chunk_text: str, metadata: Dict, chunk_index: int, page_number: Optional[int], units: List[StructuredUnit]) -> Dict:
         """Use chunkingUtils for semantic chunk creation"""
         return create_semantic_chunk(self, chunk_text, metadata, chunk_index, page_number, units)
+
+    def _extract_surrounding_context(self, table_region: LayoutRegion, all_regions: List[LayoutRegion], region_idx: int, word_limit: int = 50) -> str:
+        """Extract context from regions surrounding the table"""
+        context_parts = []
+        table_bbox = table_region.bbox
+
+        print(f"   Extracting context around table at index {region_idx}")
+
+        # Check regions before the table (up to 2 regions back)
+        for i in range(max(0, region_idx - 2), region_idx):
+            region = all_regions[i]
+            if region.region_type == 'text':
+                # Extract text from region
+                region_text = self._extract_text_from_region(region)
+                if region_text and len(region_text.split()) <= word_limit:
+                    context_parts.append(region_text)
+                    print(f"     Added context before: '{region_text[:50]}...'")
+
+        # Check regions after the table (up to 2 regions ahead)
+        for i in range(region_idx + 1, min(len(all_regions), region_idx + 3)):
+            region = all_regions[i]
+            if region.region_type == 'text':
+                # Extract text from region
+                region_text = self._extract_text_from_region(region)
+                if region_text and len(region_text.split()) <= word_limit:
+                    context_parts.append(region_text)
+                    print(f"     Added context after: '{region_text[:50]}...'")
+
+        return ' '.join(context_parts) if context_parts else ""
+
+    def _extract_text_from_region(self, region: LayoutRegion) -> str:
+        """Extract text content from a text region"""
+        if not region.text_items:
+            return ""
+
+        # Sort text items by position and extract text
+        sorted_items = sorted(region.text_items, key=lambda item: (item.y, item.x))
+        text_parts = []
+
+        for item in sorted_items:
+            if item.text.strip():
+                text_parts.append(item.text.strip())
+
+        return ' '.join(text_parts)
