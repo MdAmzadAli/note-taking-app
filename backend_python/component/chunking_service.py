@@ -422,7 +422,21 @@ class ChunkingService:
                     
                     for i, table in enumerate(lattice_tables):
                         if table.accuracy > 50:  # Only use tables with reasonable accuracy
-                            table_data = table.df.values.tolist()
+                            # LOG RAW CAMELOT DATA - EXACT EXTRACTION
+                            print(f"\n" + "="*60)
+                            print(f"🔍 RAW CAMELOT LATTICE EXTRACTION - Table {i+1}")
+                            print(f"="*60)
+                            print(f"Accuracy: {table.accuracy}%")
+                            print(f"DataFrame shape: {table.df.shape}")
+                            print(f"Raw DataFrame content:")
+                            print(table.df)
+                            print(f"\nRaw values (as list):")
+                            raw_table_data = table.df.values.tolist()
+                            for row_idx, row in enumerate(raw_table_data):
+                                print(f"  Row {row_idx}: {row}")
+                            print(f"="*60)
+                            
+                            table_data = raw_table_data
                             structured_table = self._convert_table_to_json(table_data)
                             structured_table["table_metadata"]["extraction_source"] = "camelot_lattice"
                             structured_table["table_metadata"]["accuracy"] = table.accuracy
@@ -472,7 +486,21 @@ class ChunkingService:
                         
                         for i, table in enumerate(stream_tables):
                             if table.accuracy > 30:  # Lower threshold for stream mode
-                                table_data = table.df.values.tolist()
+                                # LOG RAW CAMELOT DATA - EXACT EXTRACTION
+                                print(f"\n" + "="*60)
+                                print(f"🔍 RAW CAMELOT STREAM EXTRACTION - Table {i+1}")
+                                print(f"="*60)
+                                print(f"Accuracy: {table.accuracy}%")
+                                print(f"DataFrame shape: {table.df.shape}")
+                                print(f"Raw DataFrame content:")
+                                print(table.df)
+                                print(f"\nRaw values (as list):")
+                                raw_table_data = table.df.values.tolist()
+                                for row_idx, row in enumerate(raw_table_data):
+                                    print(f"  Row {row_idx}: {row}")
+                                print(f"="*60)
+                                
+                                table_data = raw_table_data
                                 structured_table = self._convert_table_to_json(table_data)
                                 structured_table["table_metadata"]["extraction_source"] = "camelot_stream"
                                 structured_table["table_metadata"]["accuracy"] = table.accuracy
