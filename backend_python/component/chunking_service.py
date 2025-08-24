@@ -8,6 +8,8 @@ import pdfplumber
 from dataclasses import dataclass, field
 import numpy as np
 from collections import defaultdict
+import camelot
+import pandas as pd
 
 # given the code
 @dataclass
@@ -150,7 +152,7 @@ class ChunkingService:
         self.chunk_overlap = chunk_overlap
 
     async def extract_text_from_pdf(self, file_path: str) -> PDFData:
-        """Enhanced PDF text extraction with 2-step layout analysis"""
+        """Enhanced PDF text extraction with pdfplumber + camelot integration"""
         try:
             if not file_path or not isinstance(file_path, str):
                 raise ValueError('Invalid file path provided')
@@ -163,21 +165,22 @@ class ChunkingService:
             if file_size > max_size:
                 print(f"⚠️ Large PDF file: {file_size / 1024 / 1024:.1f}MB")
 
-            print('📄 Starting enhanced layout-aware PDF extraction...')
+            print('📄 Starting enhanced PDF extraction with camelot integration...')
 
             pages = []
             full_text = ''
+            self.current_file_path = file_path  # Store for camelot access
 
             with pdfplumber.open(file_path) as pdf:
                 total_pages = len(pdf.pages)
                 print(f"📄 PDF loaded: {total_pages} pages")
 
                 for page_num, page in enumerate(pdf.pages, 1):
-                    page_data = await self._extract_page_with_enhanced_layout(page, page_num)
+                    page_data = await self._extract_page_with_enhanced_layout(page, page_num, file_path)
                     pages.append(page_data)
                     full_text += page_data.text + '\n\n'
 
-            print(f"📄 Enhanced layout extraction completed: {len(pages)} pages processed")
+            print(f"📄 Enhanced extraction completed: {len(pages)} pages processed")
             clean_full_text = self._merge_soft_hyphens(full_text.strip())
 
             return PDFData(
@@ -187,14 +190,289 @@ class ChunkingService:
             )
 
         except Exception as error:
-            print(f'❌ Enhanced layout extraction failed: {error}')
+            print(f'❌ Enhanced extraction failed: {error}')
             print('📄 Falling back to basic PDF extraction...')
             return await self._fallback_extraction(file_path)
 
-    async def _extract_page_with_enhanced_layout(self, page, page_number: int) -> PageData:
-        """2-Step enhanced page extraction: 1) Layout analysis, 2) Reading-order extraction"""
+    def _convert_table_to_json(self, table_data: List[List[str]]) -> Dict[str, Any]:
+        """Convert extracted table data to structured JSON format"""
+        if not table_data or len(table_data) == 0:
+            return {"error": "Empty table data"}
+        
         try:
-            print(f"📄 Page {page_number}: Starting 2-step layout analysis...")
+            # Clean the table data
+            cleaned_data = []
+            for row in table_data:
+                if row and any(cell and str(cell).strip() for cell in row):  # Skip empty rows
+                    cleaned_row = [str(cell).strip() if cell else "" for cell in row]
+                    cleaned_data.append(cleaned_row)
+            
+            if not cleaned_data:
+                return {"error": "No valid data after cleaning"}
+            
+            # Determine if first row is header
+            first_row = cleaned_data[0]
+            has_header = self._is_likely_header_row(first_row, cleaned_data[1:] if len(cleaned_data) > 1 else [])
+            
+            if has_header and len(cleaned_data) > 1:
+                headers = [self._clean_header(header) for header in first_row]
+                data_rows = cleaned_data[1:]
+            else:
+                # Generate column names
+                max_cols = max(len(row) for row in cleaned_data) if cleaned_data else 0
+                headers = [f"column_{i+1}" for i in range(max_cols)]
+                data_rows = cleaned_data
+            
+            # Convert to structured JSON
+            structured_table = {
+                "table_metadata": {
+                    "total_rows": len(data_rows),
+                    "total_columns": len(headers),
+                    "has_header": has_header,
+                    "extraction_source": "pdfplumber"
+                },
+                "headers": headers,
+                "data": []
+            }
+            
+            # Process data rows
+            for row_idx, row in enumerate(data_rows):
+                row_dict = {}
+                for col_idx, header in enumerate(headers):
+                    cell_value = row[col_idx] if col_idx < len(row) else ""
+                    
+                    # Try to parse as number if possible
+                    parsed_value = self._parse_cell_value(cell_value)
+                    row_dict[header] = parsed_value
+                
+                structured_table["data"].append({
+                    "row_index": row_idx,
+                    "values": row_dict
+                })
+            
+            # Add summary statistics
+            structured_table["summary"] = self._generate_table_summary(structured_table["data"], headers)
+            
+            return structured_table
+            
+        except Exception as e:
+            return {"error": f"Failed to convert table to JSON: {str(e)}"}
+
+    def _is_likely_header_row(self, first_row: List[str], data_rows: List[List[str]]) -> bool:
+        """Determine if the first row is likely a header"""
+        if not first_row or not data_rows:
+            return False
+        
+        # Check if first row has more text and fewer numbers than data rows
+        first_row_numeric_count = sum(1 for cell in first_row if self._is_numeric_string(cell))
+        first_row_text_count = sum(1 for cell in first_row if cell and not self._is_numeric_string(cell))
+        
+        if len(data_rows) > 0:
+            avg_numeric_in_data = np.mean([
+                sum(1 for cell in row if self._is_numeric_string(cell)) 
+                for row in data_rows[:3]  # Check first 3 data rows
+            ])
+            
+            # Header likely if first row has more text and data rows have more numbers
+            return first_row_text_count > first_row_numeric_count and avg_numeric_in_data > first_row_numeric_count
+        
+        return first_row_text_count > first_row_numeric_count
+
+    def _clean_header(self, header: str) -> str:
+        """Clean and normalize header names"""
+        if not header:
+            return "unnamed_column"
+        
+        # Remove special characters and normalize
+        cleaned = re.sub(r'[^\w\s]', '', str(header).strip())
+        cleaned = re.sub(r'\s+', '_', cleaned).lower()
+        
+        return cleaned if cleaned else "unnamed_column"
+
+    def _parse_cell_value(self, cell_value: str) -> Union[str, float, int, Dict]:
+        """Parse cell value and return appropriate type with metadata"""
+        if not cell_value or not str(cell_value).strip():
+            return {"value": "", "type": "empty"}
+        
+        cell_str = str(cell_value).strip()
+        
+        # Try to parse as currency/number using existing logic
+        normalized = self._normalize_currency_and_numbers(cell_str)
+        
+        if normalized.numbers:
+            # Return the primary number with metadata
+            primary_number = normalized.numbers[0]
+            return {
+                "value": primary_number.value,
+                "type": "currency" if primary_number.currency else "percentage" if primary_number.is_percentage else "number",
+                "original_text": cell_str,
+                "currency": primary_number.currency,
+                "is_negative": primary_number.is_negative,
+                "is_percentage": primary_number.is_percentage
+            }
+        
+        # Check if it's a date-like string
+        if self._is_date_like(cell_str):
+            return {"value": cell_str, "type": "date", "original_text": cell_str}
+        
+        # Return as text
+        return {"value": cell_str, "type": "text"}
+
+    def _is_numeric_string(self, value: str) -> bool:
+        """Check if string represents a number"""
+        if not value:
+            return False
+        normalized = self._normalize_currency_and_numbers(str(value).strip())
+        return len(normalized.numbers) > 0
+
+    def _is_date_like(self, value: str) -> bool:
+        """Basic check for date-like patterns"""
+        if not value:
+            return False
+        
+        date_patterns = [
+            r'\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}',  # MM/DD/YYYY or MM-DD-YYYY
+            r'\d{4}[/\-]\d{1,2}[/\-]\d{1,2}',    # YYYY/MM/DD or YYYY-MM-DD
+            r'\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)',  # DD Month
+            r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}'   # Month DD
+        ]
+        
+        value_str = str(value).strip()
+        return any(re.search(pattern, value_str, re.IGNORECASE) for pattern in date_patterns)
+
+    def _generate_table_summary(self, data_rows: List[Dict], headers: List[str]) -> Dict[str, Any]:
+        """Generate summary statistics for the table"""
+        summary = {
+            "numeric_columns": [],
+            "text_columns": [],
+            "currency_columns": [],
+            "date_columns": [],
+            "total_numeric_values": 0,
+            "currencies_found": set()
+        }
+        
+        for header in headers:
+            column_types = []
+            numeric_count = 0
+            
+            for row in data_rows:
+                if header in row["values"]:
+                    cell_data = row["values"][header]
+                    if isinstance(cell_data, dict):
+                        cell_type = cell_data.get("type", "text")
+                        column_types.append(cell_type)
+                        
+                        if cell_type in ["number", "currency", "percentage"]:
+                            numeric_count += 1
+                            summary["total_numeric_values"] += 1
+                            
+                        if cell_type == "currency" and cell_data.get("currency"):
+                            summary["currencies_found"].add(cell_data["currency"])
+            
+            # Classify column based on dominant type
+            if column_types:
+                dominant_type = max(set(column_types), key=column_types.count)
+                
+                if dominant_type in ["number", "percentage"] or numeric_count > len(column_types) * 0.5:
+                    summary["numeric_columns"].append(header)
+                elif dominant_type == "currency":
+                    summary["currency_columns"].append(header)
+                elif dominant_type == "date":
+                    summary["date_columns"].append(header)
+                else:
+                    summary["text_columns"].append(header)
+        
+        summary["currencies_found"] = list(summary["currencies_found"])
+        return summary
+
+    async def _extract_tables_with_camelot(self, file_path: str, page_number: int) -> List[Dict[str, Any]]:
+        """Extract tables using camelot with both lattice and stream modes"""
+        extracted_tables = []
+        
+        try:
+            # Try lattice mode first (better for ruled tables)
+            try:
+                print(f"🔍 Camelot lattice extraction for page {page_number}")
+                lattice_tables = camelot.read_table(
+                    file_path, 
+                    pages=str(page_number), 
+                    flavor='lattice',
+                    strip_text='\n'
+                )
+                
+                for i, table in enumerate(lattice_tables):
+                    if table.accuracy > 50:  # Only use tables with reasonable accuracy
+                        table_data = table.df.values.tolist()
+                        structured_table = self._convert_table_to_json(table_data)
+                        structured_table["table_metadata"]["extraction_source"] = "camelot_lattice"
+                        structured_table["table_metadata"]["accuracy"] = table.accuracy
+                        structured_table["table_metadata"]["table_index"] = i
+                        
+                        extracted_tables.append({
+                            "json_data": structured_table,
+                            "bbox": self._camelot_bbox_to_layout_bbox(table._bbox),
+                            "accuracy": table.accuracy,
+                            "source": "camelot_lattice"
+                        })
+                        
+                print(f"✅ Camelot lattice extracted {len(lattice_tables)} tables")
+                
+            except Exception as lattice_error:
+                print(f"⚠️ Camelot lattice failed: {lattice_error}")
+
+            # Try stream mode if lattice didn't find good tables
+            if len(extracted_tables) == 0:
+                try:
+                    print(f"🔍 Camelot stream extraction for page {page_number}")
+                    stream_tables = camelot.read_table(
+                        file_path, 
+                        pages=str(page_number), 
+                        flavor='stream',
+                        strip_text='\n'
+                    )
+                    
+                    for i, table in enumerate(stream_tables):
+                        if table.accuracy > 30:  # Lower threshold for stream mode
+                            table_data = table.df.values.tolist()
+                            structured_table = self._convert_table_to_json(table_data)
+                            structured_table["table_metadata"]["extraction_source"] = "camelot_stream"
+                            structured_table["table_metadata"]["accuracy"] = table.accuracy
+                            structured_table["table_metadata"]["table_index"] = i
+                            
+                            extracted_tables.append({
+                                "json_data": structured_table,
+                                "bbox": self._camelot_bbox_to_layout_bbox(table._bbox) if hasattr(table, '_bbox') else None,
+                                "accuracy": table.accuracy,
+                                "source": "camelot_stream"
+                            })
+                            
+                    print(f"✅ Camelot stream extracted {len(stream_tables)} tables")
+                    
+                except Exception as stream_error:
+                    print(f"⚠️ Camelot stream failed: {stream_error}")
+        
+        except Exception as e:
+            print(f"❌ Camelot extraction failed: {e}")
+        
+        return extracted_tables
+
+    def _camelot_bbox_to_layout_bbox(self, camelot_bbox) -> BoundingBox:
+        """Convert camelot bbox to our BoundingBox format"""
+        if camelot_bbox is None:
+            return None
+        
+        # Camelot bbox is typically (x1, y1, x2, y2)
+        return BoundingBox(
+            x_min=float(camelot_bbox[0]),
+            y_min=float(camelot_bbox[1]),
+            x_max=float(camelot_bbox[2]),
+            y_max=float(camelot_bbox[3])
+        )
+
+    async def _extract_page_with_enhanced_layout(self, page, page_number: int, file_path: str = None) -> PageData:
+        """3-Step enhanced page extraction: 1) Layout analysis, 2) Camelot table extraction, 3) Reading-order extraction"""
+        try:
+            print(f"📄 Page {page_number}: Starting 3-step enhanced extraction...")
             
             # Get characters with position information
             chars = page.chars
@@ -227,19 +505,22 @@ class ChunkingService:
 
             print(f"📄 Page {page_number}: Extracted {len(text_items)} text items")
 
-            # STEP 1: Analyze page layout
-            page_layout = await self._analyze_page_layout(text_items, page)
+            # STEP 1: Analyze page layout with enhanced table detection
+            page_layout = await self._analyze_page_layout_with_camelot(text_items, page, page_number, file_path)
             print(f"📄 Page {page_number}: Layout type: {page_layout.layout_type}, Regions: {len(page_layout.regions)}")
 
-            # STEP 2: Extract content in reading order
-            structured_units = await self._extract_content_in_reading_order(page_layout, text_items)
+            # STEP 2: Extract content in reading order with JSON table data
+            structured_units = await self._extract_content_in_reading_order_with_json(page_layout, text_items)
             print(f"📄 Page {page_number}: Extracted {len(structured_units)} units in reading order")
 
-            # Generate text from structured units (already in reading order)
-            page_text = '\n'.join(unit.text for unit in structured_units)
+            # Generate text from structured units (with JSON table handling)
+            page_text = self._generate_page_text_with_json_tables(structured_units)
             page_text = self._merge_soft_hyphens(page_text)
             page_text = self._normalize_text_spacing(page_text)
             page_text = self._post_process_extracted_text(page_text)
+
+            # Check for table content
+            has_table = any(unit.type in ['table_row', 'table_json'] for unit in structured_units)
 
             return PageData(
                 page_number=page_number,
@@ -247,13 +528,366 @@ class ChunkingService:
                 lines=[unit.text for unit in structured_units],
                 structured_units=structured_units,
                 columns=len(page_layout.columns),
-                has_table=any(unit.type == 'table_row' for unit in structured_units),
+                has_table=has_table,
                 layout=page_layout
             )
 
         except Exception as error:
             print(f"❌ Enhanced layout extraction failed for page {page_number}: {error}")
             return await self._fallback_page_extraction(page, page_number)
+
+    async def _analyze_page_layout_with_camelot(self, text_items: List[TextItem], page, page_number: int, file_path: str = None) -> PageLayout:
+        """Enhanced layout analysis with camelot integration"""
+        if not text_items:
+            return PageLayout(
+                regions=[],
+                columns=[],
+                page_bbox=BoundingBox(0, 0, 1000, 1000),
+                layout_type='empty'
+            )
+
+        # Get page dimensions
+        page_bbox = BoundingBox(
+            x_min=0,
+            y_min=0,
+            x_max=page.width,
+            y_max=page.height
+        )
+
+        # Group text items into lines for analysis
+        lines = self._group_items_into_lines(text_items)
+        
+        # Detect columns using improved algorithm
+        columns = self._detect_columns_enhanced(lines, page_bbox)
+        
+        # Enhanced table detection with camelot
+        regions = await self._detect_regions_with_camelot(lines, columns, page_bbox, page, page_number, file_path)
+        
+        # Classify layout type
+        layout_type = self._classify_layout_type(regions, columns)
+        
+        return PageLayout(
+            regions=regions,
+            columns=columns,
+            page_bbox=page_bbox,
+            layout_type=layout_type
+        )
+
+    async def _detect_regions_with_camelot(self, lines: List[Line], columns: List[Column], page_bbox: BoundingBox, page, page_number: int, file_path: str = None) -> List[LayoutRegion]:
+        """Enhanced table detection: pdfplumber + camelot with JSON storage"""
+        regions = []
+        detected_tables = []
+        
+        # Step 1: Try pdfplumber table detection (bounding box detection)
+        try:
+            tables = page.find_tables()
+            pdfplumber_tables = []
+            
+            for table in tables:
+                if table.bbox:
+                    table_bbox = BoundingBox(
+                        x_min=table.bbox[0],
+                        y_min=table.bbox[1],
+                        x_max=table.bbox[2],
+                        y_max=table.bbox[3]
+                    )
+                    pdfplumber_tables.append({
+                        'bbox': table_bbox,
+                        'table_obj': table,
+                        'source': 'pdfplumber'
+                    })
+            
+            print(f"🔍 pdfplumber detected {len(pdfplumber_tables)} table regions")
+            detected_tables.extend(pdfplumber_tables)
+            
+        except Exception as e:
+            print(f"⚠️ pdfplumber table detection failed: {e}")
+
+        # Step 2: Try camelot for more accurate table extraction
+        camelot_tables = []
+        if file_path and detected_tables:
+            try:
+                camelot_tables = await self._extract_tables_with_camelot(file_path, page_number)
+                print(f"🔍 Camelot extracted {len(camelot_tables)} tables with JSON data")
+                
+            except Exception as e:
+                print(f"⚠️ Camelot table extraction failed: {e}")
+
+        # Step 3: Create enhanced table regions with JSON data
+        table_bboxes = []
+        
+        # Process pdfplumber tables
+        for table_info in detected_tables:
+            table_bbox = table_info['bbox']
+            table_bboxes.append(table_bbox)
+            
+            # Find lines that belong to this table
+            table_lines = [
+                line for line in lines 
+                if self._line_intersects_bbox(line, table_bbox, overlap_threshold=0.5)
+            ]
+            
+            # Create enhanced table region with JSON capability
+            table_region = LayoutRegion(
+                bbox=table_bbox,
+                region_type='table',
+                confidence=0.9,
+                text_items=[item for line in table_lines for item in line.items]
+            )
+            
+            # Add table extraction metadata
+            table_region.table_source = table_info['source']
+            table_region.has_json_data = False
+            table_region.table_json = None
+            
+            # Try to extract structured data from pdfplumber table
+            if table_info['source'] == 'pdfplumber' and 'table_obj' in table_info:
+                try:
+                    table_data = table_info['table_obj'].extract()
+                    if table_data:
+                        # Convert to structured JSON
+                        structured_table = self._convert_table_to_json(table_data)
+                        table_region.table_json = structured_table
+                        table_region.has_json_data = True
+                        print(f"✅ Extracted {len(table_data)} rows as JSON from pdfplumber")
+                except Exception as e:
+                    print(f"⚠️ Failed to extract JSON from pdfplumber table: {e}")
+            
+            regions.append(table_region)
+
+        # Process camelot tables (higher priority due to better accuracy)
+        for camelot_table in camelot_tables:
+            if camelot_table.get('bbox'):
+                table_bbox = camelot_table['bbox']
+                
+                # Check if this overlaps with existing pdfplumber tables
+                overlaps_existing = any(
+                    self._bboxes_overlap(table_bbox, existing_bbox, 0.5) 
+                    for existing_bbox in table_bboxes
+                )
+                
+                if not overlaps_existing:
+                    table_bboxes.append(table_bbox)
+                    
+                    # Create enhanced table region with camelot JSON
+                    table_region = LayoutRegion(
+                        bbox=table_bbox,
+                        region_type='table_json',  # Special type for JSON tables
+                        confidence=camelot_table['accuracy'] / 100.0,
+                        text_items=[]  # Will be filled from JSON
+                    )
+                    
+                    table_region.table_source = camelot_table['source']
+                    table_region.has_json_data = True
+                    table_region.table_json = camelot_table['json_data']
+                    table_region.extraction_accuracy = camelot_table['accuracy']
+                    
+                    regions.append(table_region)
+                    print(f"✅ Added camelot table with {camelot_table['accuracy']:.1f}% accuracy")
+
+        # Step 4: Detect text regions (areas not covered by tables)
+        text_lines = []
+        for line in lines:
+            is_in_table = False
+            for table_bbox in table_bboxes:
+                if self._line_intersects_bbox(line, table_bbox, overlap_threshold=0.3):
+                    is_in_table = True
+                    break
+            
+            if not is_in_table:
+                text_lines.append(line)
+
+        # Step 5: Group text lines into regions
+        if text_lines:
+            text_regions = self._group_text_lines_into_regions(text_lines, columns)
+            regions.extend(text_regions)
+
+        # Step 6: Default text region if no regions detected
+        if not regions:
+            all_items = [item for line in lines for item in line.items]
+            if all_items:
+                min_x = min(item.x for item in all_items)
+                max_x = max(item.x + item.width for item in all_items)
+                min_y = min(item.y for item in all_items)
+                max_y = max(item.y + item.height for item in all_items)
+                
+                regions.append(LayoutRegion(
+                    bbox=BoundingBox(min_x, min_y, max_x, max_y),
+                    region_type='text',
+                    confidence=0.8,
+                    text_items=all_items
+                ))
+
+        return regions
+
+    def _bboxes_overlap(self, bbox1: BoundingBox, bbox2: BoundingBox, threshold: float = 0.5) -> bool:
+        """Check if two bounding boxes overlap significantly"""
+        # Calculate intersection
+        intersection_x = max(0, min(bbox1.x_max, bbox2.x_max) - max(bbox1.x_min, bbox2.x_min))
+        intersection_y = max(0, min(bbox1.y_max, bbox2.y_max) - max(bbox1.y_min, bbox2.y_min))
+        
+        if intersection_x <= 0 or intersection_y <= 0:
+            return False
+        
+        intersection_area = intersection_x * intersection_y
+        bbox1_area = bbox1.area
+        bbox2_area = bbox2.area
+        
+        if bbox1_area == 0 or bbox2_area == 0:
+            return False
+        
+        # Check if intersection is significant for either bbox
+        overlap_ratio1 = intersection_area / bbox1_area
+        overlap_ratio2 = intersection_area / bbox2_area
+        
+        return overlap_ratio1 >= threshold or overlap_ratio2 >= threshold
+
+    async def _extract_content_in_reading_order_with_json(self, layout: PageLayout, text_items: List[TextItem]) -> List[StructuredUnit]:
+        """Extract content in reading order with JSON table handling"""
+        if not layout.regions:
+            return []
+
+        # Sort regions by reading order
+        sorted_regions = self._sort_regions_by_reading_order(layout.regions)
+        
+        structured_units = []
+        reading_order = 0
+        
+        # Track recent headings for table association
+        recent_headings = []
+        max_heading_distance = 100  # pixels
+        
+        for region_idx, region in enumerate(sorted_regions):
+            if region.region_type == 'table_json':
+                # Handle JSON table regions
+                json_units = await self._extract_json_table_content(region, reading_order, recent_headings)
+                structured_units.extend(json_units)
+                reading_order += len(json_units)
+                
+            elif region.region_type == 'table':
+                # Handle regular table regions  
+                associated_headings = self._find_associated_headings(region, recent_headings, max_heading_distance)
+                table_units = await self._extract_table_content_with_headings(
+                    region, reading_order, associated_headings
+                )
+                structured_units.extend(table_units)
+                reading_order += len(table_units)
+                
+                # Clear used headings
+                for heading in associated_headings:
+                    if heading in recent_headings:
+                        recent_headings.remove(heading)
+                
+            elif region.region_type == 'text':
+                # Handle text regions
+                text_units = await self._extract_text_content(region, reading_order)
+                
+                # Track headings for future table association
+                for unit in text_units:
+                    if unit.type == 'header':
+                        unit.region_bbox = region.bbox
+                        recent_headings.append(unit)
+                        recent_headings = recent_headings[-3:]  # Keep last 3 headings
+                
+                structured_units.extend(text_units)
+                reading_order += len(text_units)
+        
+        return structured_units
+
+    async def _extract_json_table_content(self, region: LayoutRegion, start_order: int, recent_headings: List[StructuredUnit]) -> List[StructuredUnit]:
+        """Extract content from JSON table regions"""
+        json_units = []
+        current_order = start_order
+        
+        # Add associated headings first
+        associated_headings = self._find_associated_headings(region, recent_headings, 100)
+        for heading in associated_headings:
+            heading_unit = StructuredUnit(
+                type='table_header',
+                text=heading.text,
+                lines=heading.lines,
+                bbox=heading.bbox,
+                reading_order=current_order,
+                associated_table_region=region.bbox
+            )
+            json_units.append(heading_unit)
+            current_order += 1
+        
+        # Create JSON table unit
+        if hasattr(region, 'table_json') and region.table_json:
+            table_json = region.table_json
+            
+            # Create a special JSON table unit
+            json_unit = StructuredUnit(
+                type='table_json',
+                text=json.dumps(table_json, indent=2),  # JSON as text fallback
+                lines=[json.dumps(table_json, indent=2)],
+                bbox=region.bbox,
+                reading_order=current_order,
+                associated_headings=[h.text for h in associated_headings]
+            )
+            
+            # Add special JSON metadata
+            json_unit.table_json = table_json
+            json_unit.extraction_source = getattr(region, 'table_source', 'unknown')
+            json_unit.extraction_accuracy = getattr(region, 'extraction_accuracy', 0)
+            json_unit.has_structured_data = True
+            
+            json_units.append(json_unit)
+            
+        return json_units
+
+    def _generate_page_text_with_json_tables(self, structured_units: List[StructuredUnit]) -> str:
+        """Generate page text handling JSON table units specially"""
+        text_parts = []
+        
+        for unit in structured_units:
+            if unit.type == 'table_json' and hasattr(unit, 'table_json'):
+                # For JSON tables, create a readable summary instead of raw JSON
+                table_summary = self._create_table_summary_text(unit.table_json)
+                text_parts.append(table_summary)
+            else:
+                text_parts.append(unit.text)
+        
+        return '\n'.join(text_parts)
+
+    def _create_table_summary_text(self, table_json: Dict[str, Any]) -> str:
+        """Create a readable text summary of JSON table data"""
+        if not table_json or 'table_metadata' not in table_json:
+            return "Table data (JSON format)"
+        
+        metadata = table_json['table_metadata']
+        headers = table_json.get('headers', [])
+        data_rows = table_json.get('data', [])
+        
+        summary_parts = [
+            f"Table: {metadata.get('total_rows', 0)} rows x {metadata.get('total_columns', 0)} columns"
+        ]
+        
+        if headers:
+            summary_parts.append(f"Headers: {', '.join(headers[:5])}{'...' if len(headers) > 5 else ''}")
+        
+        # Add a few sample rows for text search
+        if data_rows:
+            summary_parts.append("Sample data:")
+            for i, row_data in enumerate(data_rows[:3]):
+                row_values = row_data.get('values', {})
+                row_text = []
+                for header in headers[:3]:
+                    if header in row_values:
+                        cell_data = row_values[header]
+                        if isinstance(cell_data, dict):
+                            value = cell_data.get('value', '')
+                            if cell_data.get('currency'):
+                                value = f"{cell_data['currency']} {value}"
+                        else:
+                            value = str(cell_data)
+                        row_text.append(str(value))
+                
+                if row_text:
+                    summary_parts.append(f"  Row {i+1}: {' | '.join(row_text)}")
+        
+        return '\n'.join(summary_parts)
 
     async def _analyze_page_layout(self, text_items: List[TextItem], page) -> PageLayout:
         """STEP 1: Comprehensive layout analysis with region detection"""
@@ -521,13 +1155,14 @@ class ChunkingService:
         return peaks
 
     async def _detect_regions(self, lines: List[Line], columns: List[Column], page_bbox: BoundingBox, page) -> List[LayoutRegion]:
-        """Detect text vs table regions with high accuracy"""
+        """Enhanced table detection: pdfplumber + camelot with JSON storage"""
         regions = []
+        detected_tables = []
         
-        # Try to detect tables using pdfplumber's table detection
+        # Step 1: Try pdfplumber table detection (bounding box detection)
         try:
             tables = page.find_tables()
-            table_bboxes = []
+            pdfplumber_tables = []
             
             for table in tables:
                 if table.bbox:
@@ -537,28 +1172,95 @@ class ChunkingService:
                         x_max=table.bbox[2],
                         y_max=table.bbox[3]
                     )
-                    table_bboxes.append(table_bbox)
-                    
-                    # Find lines that belong to this table
-                    table_lines = [
-                        line for line in lines 
-                        if self._line_intersects_bbox(line, table_bbox, overlap_threshold=0.5)
-                    ]
-                    
-                    regions.append(LayoutRegion(
-                        bbox=table_bbox,
-                        region_type='table',
-                        confidence=0.9,
-                        text_items=[item for line in table_lines for item in line.items]
-                    ))
+                    pdfplumber_tables.append({
+                        'bbox': table_bbox,
+                        'table_obj': table,
+                        'source': 'pdfplumber'
+                    })
             
-            print(f"🔍 Detected {len(table_bboxes)} table regions using pdfplumber")
+            print(f"🔍 pdfplumber detected {len(pdfplumber_tables)} table regions")
+            detected_tables.extend(pdfplumber_tables)
             
         except Exception as e:
-            print(f"⚠️ Table detection failed: {e}")
-            table_bboxes = []
+            print(f"⚠️ pdfplumber table detection failed: {e}")
 
-        # Detect text regions (areas not covered by tables)
+        # Step 2: Try camelot for more accurate table extraction (if we found potential tables)
+        camelot_tables = []
+        if detected_tables:
+            try:
+                # Get the current page from the PDF file path
+                # We need to extract this from the page object context
+                page_num = getattr(page, 'page_number', 1)
+                
+                # Try camelot lattice mode (for ruled/bordered tables)
+                try:
+                    # Note: We'll need the file path - we'll add this as a parameter
+                    # For now, we'll store camelot results when available
+                    camelot_lattice_tables = []
+                    print(f"🔍 Attempting camelot lattice extraction for page {page_num}")
+                    # camelot_lattice_tables = camelot.read_table(file_path, pages=str(page_num), flavor='lattice')
+                    
+                except Exception as lattice_error:
+                    print(f"⚠️ Camelot lattice mode failed: {lattice_error}")
+                    camelot_lattice_tables = []
+
+                # Try camelot stream mode (for tables without borders)  
+                try:
+                    camelot_stream_tables = []
+                    print(f"🔍 Attempting camelot stream extraction for page {page_num}")
+                    # camelot_stream_tables = camelot.read_table(file_path, pages=str(page_num), flavor='stream')
+                    
+                except Exception as stream_error:
+                    print(f"⚠️ Camelot stream mode failed: {stream_error}")
+                    camelot_stream_tables = []
+
+                camelot_tables = camelot_lattice_tables + camelot_stream_tables
+                print(f"🔍 Camelot extracted {len(camelot_tables)} tables")
+                
+            except Exception as e:
+                print(f"⚠️ Camelot table extraction failed: {e}")
+
+        # Step 3: Create enhanced table regions with JSON data
+        table_bboxes = []
+        for table_info in detected_tables:
+            table_bbox = table_info['bbox']
+            table_bboxes.append(table_bbox)
+            
+            # Find lines that belong to this table
+            table_lines = [
+                line for line in lines 
+                if self._line_intersects_bbox(line, table_bbox, overlap_threshold=0.5)
+            ]
+            
+            # Create enhanced table region with JSON capability
+            table_region = LayoutRegion(
+                bbox=table_bbox,
+                region_type='table',
+                confidence=0.9,
+                text_items=[item for line in table_lines for item in line.items]
+            )
+            
+            # Add table extraction metadata
+            table_region.table_source = table_info['source']
+            table_region.has_json_data = False
+            table_region.table_json = None
+            
+            # Try to extract structured data from pdfplumber table
+            if table_info['source'] == 'pdfplumber' and 'table_obj' in table_info:
+                try:
+                    table_data = table_info['table_obj'].extract()
+                    if table_data:
+                        # Convert to structured JSON
+                        structured_table = self._convert_table_to_json(table_data)
+                        table_region.table_json = structured_table
+                        table_region.has_json_data = True
+                        print(f"✅ Extracted {len(table_data)} rows as JSON from pdfplumber")
+                except Exception as e:
+                    print(f"⚠️ Failed to extract JSON from pdfplumber table: {e}")
+            
+            regions.append(table_region)
+
+        # Step 4: Detect text regions (areas not covered by tables)
         text_lines = []
         for line in lines:
             is_in_table = False
@@ -570,12 +1272,12 @@ class ChunkingService:
             if not is_in_table:
                 text_lines.append(line)
 
-        # Group text lines into regions by column and proximity
+        # Step 5: Group text lines into regions by column and proximity
         if text_lines:
             text_regions = self._group_text_lines_into_regions(text_lines, columns)
             regions.extend(text_regions)
 
-        # If no regions detected, create a default text region
+        # Step 6: If no regions detected, create a default text region
         if not regions:
             all_items = [item for line in lines for item in line.items]
             if all_items:
@@ -2167,13 +2869,15 @@ class ChunkingService:
         # Analyze numeric content across the entire chunk
         chunk_normalized = self._normalize_currency_and_numbers(text)
 
-        # Enhanced table analysis with heading associations
+        # Enhanced table analysis with JSON support and heading associations
         table_rows = [u for u in semantic_units if u.type == 'table_row']
         table_headers = [u for u in semantic_units if u.type == 'table_header']
+        json_tables = [u for u in semantic_units if u.type == 'table_json']
         
         # Extract heading-table associations
         heading_table_associations = []
         table_context_headings = []
+        json_table_data = []
         
         for unit in semantic_units:
             if unit.type == 'table_row' and hasattr(unit, 'associated_headings'):
@@ -2182,8 +2886,15 @@ class ChunkingService:
                 heading_table_associations.append({
                     'heading_text': unit.text,
                     'reading_order': unit.reading_order,
-                    'has_associated_table': any(u.type == 'table_row' for u in semantic_units 
+                    'has_associated_table': any(u.type in ['table_row', 'table_json'] for u in semantic_units 
                                               if u.reading_order > unit.reading_order)
+                })
+            elif unit.type == 'table_json' and hasattr(unit, 'table_json'):
+                json_table_data.append({
+                    'table_data': unit.table_json,
+                    'extraction_source': getattr(unit, 'extraction_source', 'unknown'),
+                    'accuracy': getattr(unit, 'extraction_accuracy', 0),
+                    'reading_order': unit.reading_order
                 })
 
         numeric_metadata = {
@@ -2192,6 +2903,7 @@ class ChunkingService:
             'has_negative_values': chunk_normalized.has_negative,
             'table_rows_count': len(table_rows),
             'table_headers_count': len(table_headers),
+            'json_tables_count': len(json_tables),
             'total_numeric_columns': sum(
                 row.numeric_metadata.get('numeric_columns', 0) for row in table_rows
                 if hasattr(row, 'numeric_metadata') and row.numeric_metadata
@@ -2200,7 +2912,11 @@ class ChunkingService:
             # Enhanced heading-table association metadata
             'has_heading_table_pairs': len(heading_table_associations) > 0,
             'heading_table_associations': heading_table_associations,
-            'table_context_headings': list(set(table_context_headings))
+            'table_context_headings': list(set(table_context_headings)),
+            # JSON table metadata
+            'has_json_tables': len(json_table_data) > 0,
+            'json_tables_data': json_table_data,
+            'total_structured_tables': len(json_table_data)
         }
 
         # Collect all primary values from table rows
@@ -2229,7 +2945,8 @@ class ChunkingService:
             'unit_count': len(semantic_units),
             'strategy': 'enhanced_layout_aware_semantic_with_heading_table_association',
             'has_structured_content': any(t in ['bullet', 'table_row', 'header', 'table_header'] for t in unit_types),
-            'has_table_content': 'table_row' in unit_types or 'table_header' in unit_types,
+            'has_table_content': any(t in ['table_row', 'table_header', 'table_json'] for t in unit_types),
+            'has_json_tables': 'table_json' in unit_types,
             'has_contextualized_tables': len(table_context_headings) > 0 or len(heading_table_associations) > 0,
             'table_columns': [len(u.columns) for u in semantic_units if u.type == 'table_row' and hasattr(u, 'columns') and u.columns],
             # Enhanced numeric metadata
@@ -2255,10 +2972,20 @@ class ChunkingService:
             chunk_metadata['start_line'] = min(line_numbers) if line_numbers else 1
             chunk_metadata['end_line'] = max(line_numbers) if line_numbers else 1
 
-        return {
+        # Create unified output schema
+        chunk_data = {
             'text': text,
             'metadata': chunk_metadata
         }
+        
+        # Add JSON tables as separate field for structured access
+        if json_table_data:
+            chunk_data['structured_tables'] = json_table_data
+            chunk_data['content_type'] = 'mixed'  # Contains both text and structured data
+        else:
+            chunk_data['content_type'] = 'text'
+            
+        return chunk_data
 
     def _calculate_chunk_coherence_score(self, semantic_units: List[StructuredUnit], 
                                        heading_table_associations: List[Dict]) -> float:
