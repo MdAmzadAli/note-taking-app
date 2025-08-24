@@ -1,4 +1,3 @@
-
 import os
 import re
 import json
@@ -33,23 +32,23 @@ class BoundingBox:
     y_min: float
     x_max: float
     y_max: float
-    
+
     @property
     def width(self) -> float:
         return self.x_max - self.x_min
-    
+
     @property
     def height(self) -> float:
         return self.y_max - self.y_min
-    
+
     @property
     def area(self) -> float:
         return self.width * self.height
-    
+
     @property
     def center_x(self) -> float:
         return (self.x_min + self.x_max) / 2
-    
+
     @property
     def center_y(self) -> float:
         return (self.y_min + self.y_max) / 2
@@ -186,7 +185,12 @@ class ChunkingService:
                     full_text += page_data.text + '\n\n'
 
             print(f"📄 Enhanced extraction completed: {len(pages)} pages processed")
+
+            # Text processing methods now use utilities
             clean_full_text = self._merge_soft_hyphens(full_text.strip())
+            clean_full_text = self._normalize_text_spacing(clean_full_text)
+            clean_full_text = self._post_process_extracted_text(clean_full_text)
+
 
             return PDFData(
                 full_text=clean_full_text,
@@ -199,33 +203,33 @@ class ChunkingService:
             print('📄 Falling back to basic PDF extraction...')
             return await self._fallback_extraction(file_path)
 
- 
 
 
-    
+
+
 
     async def _extract_tables_with_camelot(self, file_path: str, page_number: int) -> List[Dict[str, Any]]:
         """Extract tables using camelot with both lattice and stream modes"""
         extracted_tables = []
-        
+
         if camelot is None:
             print(f"⚠️ Camelot not available - skipping table extraction for page {page_number}")
             return extracted_tables
-        
+
         try:
             # Try lattice mode first (better for ruled tables)
             try:
                 print(f"🔍 Camelot lattice extraction for page {page_number}")
-                
+
                 # Check if camelot can handle the PDF format properly
                 import tempfile
                 import shutil
-                
+
                 # Create a temporary copy to avoid file locking issues
                 with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
                     shutil.copy2(file_path, temp_file.name)
                     temp_pdf_path = temp_file.name
-                
+
                 try:
                     lattice_tables = camelot.read_pdf(
                         temp_pdf_path, 
@@ -233,7 +237,7 @@ class ChunkingService:
                         flavor='lattice',
                         strip_text='\n'
                     )
-                    
+
                     for i, table in enumerate(lattice_tables):
                         if table.accuracy > 50:  # Only use tables with reasonable accuracy
                             # LOG RAW CAMELOT DATA - EXACT EXTRACTION
@@ -249,22 +253,22 @@ class ChunkingService:
                             for row_idx, row in enumerate(raw_table_data):
                                 print(f"  Row {row_idx}: {row}")
                             print(f"="*60)
-                            
+
                             table_data = raw_table_data
                             structured_table = self._convert_table_to_json(table_data)
                             structured_table["table_metadata"]["extraction_source"] = "camelot_lattice"
                             structured_table["table_metadata"]["accuracy"] = table.accuracy
                             structured_table["table_metadata"]["table_index"] = i
-                            
+
                             extracted_tables.append({
                                 "json_data": structured_table,
                                 "bbox": self._camelot_bbox_to_layout_bbox(getattr(table, '_bbox', None)),
                                 "accuracy": table.accuracy,
                                 "source": "camelot_lattice"
                             })
-                            
+
                     print(f"✅ Camelot lattice extracted {len(lattice_tables)} tables")
-                    
+
                 finally:
                     # Clean up temporary file
                     try:
@@ -272,7 +276,7 @@ class ChunkingService:
                         os.unlink(temp_pdf_path)
                     except:
                         pass
-                        
+
             except Exception as lattice_error:
                 error_msg = str(lattice_error)
                 if "PdfFileReader is deprecated" in error_msg or "PyPDF2" in error_msg:
@@ -284,12 +288,12 @@ class ChunkingService:
             if len(extracted_tables) == 0:
                 try:
                     print(f"🔍 Camelot stream extraction for page {page_number}")
-                    
+
                     # Create a temporary copy to avoid file locking issues
                     with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
                         shutil.copy2(file_path, temp_file.name)
                         temp_pdf_path = temp_file.name
-                    
+
                     try:
                         stream_tables = camelot.read_pdf(
                             temp_pdf_path, 
@@ -297,7 +301,7 @@ class ChunkingService:
                             flavor='stream',
                             strip_text='\n'
                         )
-                        
+
                         for i, table in enumerate(stream_tables):
                             if table.accuracy > 30:  # Lower threshold for stream mode
                                 # LOG RAW CAMELOT DATA - EXACT EXTRACTION
@@ -313,22 +317,22 @@ class ChunkingService:
                                 for row_idx, row in enumerate(raw_table_data):
                                     print(f"  Row {row_idx}: {row}")
                                 print(f"="*60)
-                                
+
                                 table_data = raw_table_data
                                 structured_table = self._convert_table_to_json(table_data)
                                 structured_table["table_metadata"]["extraction_source"] = "camelot_stream"
                                 structured_table["table_metadata"]["accuracy"] = table.accuracy
                                 structured_table["table_metadata"]["table_index"] = i
-                                
+
                                 extracted_tables.append({
                                     "json_data": structured_table,
                                     "bbox": self._camelot_bbox_to_layout_bbox(getattr(table, '_bbox', None)),
                                     "accuracy": table.accuracy,
                                     "source": "camelot_stream"
                                 })
-                                
+
                         print(f"✅ Camelot stream extracted {len(stream_tables)} tables")
-                        
+
                     finally:
                         # Clean up temporary file
                         try:
@@ -336,24 +340,24 @@ class ChunkingService:
                             os.unlink(temp_pdf_path)
                         except:
                             pass
-                    
+
                 except Exception as stream_error:
                     error_msg = str(stream_error)
                     if "PdfFileReader is deprecated" in error_msg or "PyPDF2" in error_msg:
                         print(f"⚠️ Camelot stream failed due to PyPDF2 compatibility issue - falling back to pdfplumber only")
                     else:
                         print(f"⚠️ Camelot stream failed: {stream_error}")
-        
+
         except Exception as e:
             print(f"❌ Camelot extraction failed: {e}")
-        
+
         return extracted_tables
 
     def _camelot_bbox_to_layout_bbox(self, camelot_bbox) -> BoundingBox:
         """Convert camelot bbox to our BoundingBox format"""
         if camelot_bbox is None:
             return None
-        
+
         # Camelot bbox is typically (x1, y1, x2, y2)
         return BoundingBox(
             x_min=float(camelot_bbox[0]),
@@ -366,10 +370,10 @@ class ChunkingService:
         """3-Step enhanced page extraction: 1) Layout analysis, 2) Camelot table extraction, 3) Reading-order extraction"""
         try:
             print(f"📄 Page {page_number}: Starting 3-step enhanced extraction...")
-            
+
             # Get characters with position information
             chars = page.chars
-            
+
             if not chars:
                 return PageData(
                     page_number=page_number,
@@ -408,9 +412,12 @@ class ChunkingService:
 
             # Generate text from structured units (with JSON table handling)
             page_text = self._generate_page_text_with_json_tables(structured_units)
+            
+            # Text processing methods now use utilities
             page_text = self._merge_soft_hyphens(page_text)
             page_text = self._normalize_text_spacing(page_text)
             page_text = self._post_process_extracted_text(page_text)
+
 
             # Check for table content
             has_table = any(unit.type in ['table_row', 'table_json'] for unit in structured_units)
@@ -449,16 +456,16 @@ class ChunkingService:
 
         # Group text items into lines for analysis
         lines = self._group_items_into_lines(text_items)
-        
+
         # Detect columns using improved algorithm
         columns = self._detect_columns_enhanced(lines, page_bbox)
-        
+
         # Enhanced table detection with camelot
         regions = await self._detect_regions_with_camelot(lines, columns, page_bbox, page, page_number, file_path)
-        
+
         # Classify layout type
         layout_type = self._classify_layout_type(regions, columns)
-        
+
         return PageLayout(
             regions=regions,
             columns=columns,
@@ -470,26 +477,26 @@ class ChunkingService:
         """Enhanced table detection with sophisticated layout analysis and targeted camelot extraction"""
         regions = []
         detected_tables = []
-        
+
         print(f"📐 Starting enhanced layout analysis for page {page_number}")
-        
+
         # Step 1: Enhanced Visual Structure Detection
         visual_structures = self._detect_visual_structures(page, page_bbox)
         print(f"🔍 Detected {len(visual_structures['bordered_regions'])} bordered regions")
-        
+
         # Step 2: Advanced Multi-Column Layout Analysis  
         layout_analysis = self._analyze_multi_column_layout(lines, columns, page_bbox)
         print(f"📊 Layout analysis: {layout_analysis['layout_type']}, {len(layout_analysis['text_columns'])} text columns")
-        
+
         # Step 3: Content-Based Table Detection (prevents multi-column text confusion)
         table_candidates = self._detect_table_candidates_by_content(lines, layout_analysis)
         print(f"🎯 Found {len(table_candidates)} table candidates by content analysis")
-        
+
         # Step 4: Try pdfplumber table detection with enhanced filtering
         try:
             tables = page.find_tables()
             pdfplumber_tables = []
-            
+
             for table in tables:
                 if table.bbox:
                     table_bbox = BoundingBox(
@@ -498,7 +505,7 @@ class ChunkingService:
                         x_max=table.bbox[2],
                         y_max=table.bbox[3]
                     )
-                    
+
                     # Validate this is actually a table, not multi-column text
                     if self._validate_table_vs_multicolumn(table_bbox, layout_analysis, lines):
                         pdfplumber_tables.append({
@@ -507,10 +514,10 @@ class ChunkingService:
                             'source': 'pdfplumber',
                             'confidence': 0.8
                         })
-            
+
             print(f"🔍 pdfplumber detected {len(pdfplumber_tables)} validated table regions")
             detected_tables.extend(pdfplumber_tables)
-            
+
         except Exception as e:
             print(f"⚠️ pdfplumber table detection failed: {e}")
 
@@ -520,13 +527,13 @@ class ChunkingService:
             try:
                 # Get targeted table areas from visual structures and candidates
                 table_areas = self._get_targeted_table_areas(visual_structures, table_candidates, detected_tables)
-                
+
                 # Extract with camelot using targeted approach
                 camelot_tables = await self._extract_tables_with_targeted_camelot(
                     file_path, page_number, table_areas, layout_analysis
                 )
                 print(f"🔍 Targeted camelot extracted {len(camelot_tables)} tables with JSON data")
-                
+
             except Exception as e:
                 print(f"⚠️ Camelot table extraction failed: {e}")
         elif detected_tables:
@@ -549,19 +556,19 @@ class ChunkingService:
 
         # Step 6: Region deduplication and consolidation
         all_table_regions = self._consolidate_table_regions(detected_tables, camelot_tables, visual_structures)
-        
+
         # Step 7: Create final regions with enhanced metadata
         table_bboxes = []
         for region_info in all_table_regions:
             table_bbox = region_info['bbox']
             table_bboxes.append(table_bbox)
-            
+
             # Find lines that belong to this table
             table_lines = [
                 line for line in lines 
                 if self._line_intersects_bbox(line, table_bbox, overlap_threshold=0.5)
             ]
-            
+
             # Create enhanced table region
             table_region = LayoutRegion(
                 bbox=table_bbox,
@@ -569,14 +576,14 @@ class ChunkingService:
                 confidence=region_info.get('confidence', 0.9),
                 text_items=[item for line in table_lines for item in line.items]
             )
-            
+
             # Add comprehensive metadata
             table_region.table_source = region_info.get('source', 'unknown')
             table_region.has_json_data = region_info.get('has_json_data', False)
             table_region.table_json = region_info.get('table_json', None)
             table_region.extraction_accuracy = region_info.get('accuracy', 0)
             table_region.visual_structure = region_info.get('visual_structure', None)
-            
+
             regions.append(table_region)
             print(f"✅ Added {region_info['source']} table with {region_info.get('accuracy', 0):.1f}% accuracy")
 
@@ -588,7 +595,7 @@ class ChunkingService:
                 if self._line_intersects_bbox(line, table_bbox, overlap_threshold=0.3):
                     is_in_table = True
                     break
-            
+
             if not is_in_table:
                 text_lines.append(line)
 
@@ -605,7 +612,7 @@ class ChunkingService:
                 max_x = max(item.x + item.width for item in all_items)
                 min_y = min(item.y for item in all_items)
                 max_y = max(item.y + item.height for item in all_items)
-                
+
                 regions.append(LayoutRegion(
                     bbox=BoundingBox(min_x, min_y, max_x, max_y),
                     region_type='text',
@@ -624,15 +631,15 @@ class ChunkingService:
             'vertical_lines': [],
             'rectangular_regions': []
         }
-        
+
         try:
             # Extract visual elements
             drawings = getattr(page, 'drawings', [])
             rects = getattr(page, 'rects', [])
             lines = getattr(page, 'lines', [])
-            
+
             print(f"🔍 Visual elements found: {len(drawings)} drawings, {len(rects)} rects, {len(lines)} lines")
-            
+
             # Process rectangles (potential table borders)
             for rect in rects:
                 if rect.get('width', 0) > 50 and rect.get('height', 0) > 20:  # Minimum table size
@@ -647,43 +654,43 @@ class ChunkingService:
                         'type': 'rectangle',
                         'confidence': 0.9
                     })
-            
+
             # Process lines to detect table grids
             h_lines = [l for l in lines if abs(l.get('y0', 0) - l.get('y1', 0)) < 2]  # Horizontal
             v_lines = [l for l in lines if abs(l.get('x0', 0) - l.get('x1', 0)) < 2]  # Vertical
-            
+
             visual_structures['horizontal_lines'] = h_lines
             visual_structures['vertical_lines'] = v_lines
-            
+
             # Detect grid-like structures from intersecting lines
             grid_regions = self._detect_grid_structures(h_lines, v_lines, page_bbox)
             visual_structures['bordered_regions'].extend(grid_regions)
-            
+
             print(f"📐 Found {len(visual_structures['bordered_regions'])} potential table structures")
-            
+
         except Exception as e:
             print(f"⚠️ Visual structure detection failed: {e}")
-        
+
         return visual_structures
-    
+
     def _detect_grid_structures(self, h_lines: List, v_lines: List, page_bbox: BoundingBox) -> List[Dict]:
         """Detect table-like grid structures from intersecting lines"""
         grid_regions = []
-        
+
         if len(h_lines) < 2 or len(v_lines) < 2:
             return grid_regions
-        
+
         try:
             # Group nearby horizontal lines
             h_groups = self._group_nearby_lines(h_lines, axis='horizontal')
             v_groups = self._group_nearby_lines(v_lines, axis='vertical')
-            
+
             # Find intersecting line groups that form rectangular grids
             for h_group in h_groups:
                 for v_group in v_groups:
                     # Check if lines intersect to form a grid
                     intersection_grid = self._check_line_intersections(h_group, v_group)
-                    
+
                     if intersection_grid and len(intersection_grid['cells']) >= 4:  # At least 2x2 grid
                         bbox = BoundingBox(
                             x_min=min(l['x0'] for l in v_group),
@@ -691,24 +698,24 @@ class ChunkingService:
                             x_max=max(l['x1'] for l in v_group),
                             y_max=max(l['y1'] for l in h_group)
                         )
-                        
+
                         grid_regions.append({
                             'bbox': bbox,
                             'type': 'grid',
                             'confidence': 0.95,
                             'cells': intersection_grid['cells']
                         })
-        
+
         except Exception as e:
             print(f"⚠️ Grid structure detection failed: {e}")
-        
+
         return grid_regions
-    
+
     def _group_nearby_lines(self, lines: List, axis: str, tolerance: float = 10) -> List[List]:
         """Group lines that are close to each other"""
         if not lines:
             return []
-        
+
         # Sort lines by position
         if axis == 'horizontal':
             sorted_lines = sorted(lines, key=lambda l: l.get('y0', 0))
@@ -716,10 +723,10 @@ class ChunkingService:
         else:
             sorted_lines = sorted(lines, key=lambda l: l.get('x0', 0))
             pos_key = 'x0'
-        
+
         groups = []
         current_group = [sorted_lines[0]]
-        
+
         for line in sorted_lines[1:]:
             if abs(line.get(pos_key, 0) - current_group[-1].get(pos_key, 0)) <= tolerance:
                 current_group.append(line)
@@ -727,17 +734,17 @@ class ChunkingService:
                 if len(current_group) >= 2:  # Only keep groups with multiple lines
                     groups.append(current_group)
                 current_group = [line]
-        
+
         if len(current_group) >= 2:
             groups.append(current_group)
-        
+
         return groups
-    
+
     def _check_line_intersections(self, h_lines: List, v_lines: List) -> Dict:
         """Check if horizontal and vertical lines intersect to form a grid"""
         intersections = []
         cells = []
-        
+
         for h_line in h_lines:
             for v_line in v_lines:
                 # Check if lines actually intersect
@@ -745,18 +752,18 @@ class ChunkingService:
                 h_y = h_line.get('y0', 0)
                 v_x = v_line.get('x0', 0)
                 v_y0, v_y1 = v_line.get('y0', 0), v_line.get('y1', 0)
-                
+
                 # Check intersection
                 if (min(h_x0, h_x1) <= v_x <= max(h_x0, h_x1) and 
                     min(v_y0, v_y1) <= h_y <= max(v_y0, v_y1)):
                     intersections.append((v_x, h_y))
-        
+
         # Form cells from intersections
         if len(intersections) >= 4:
             # Sort intersections to form grid cells
             x_coords = sorted(set(x for x, y in intersections))
             y_coords = sorted(set(y for x, y in intersections))
-            
+
             for i in range(len(x_coords) - 1):
                 for j in range(len(y_coords) - 1):
                     cells.append({
@@ -765,12 +772,12 @@ class ChunkingService:
                         'x1': x_coords[i + 1],
                         'y1': y_coords[j + 1]
                     })
-        
+
         return {
             'intersections': intersections,
             'cells': cells
         }
-    
+
     def _analyze_multi_column_layout(self, lines: List[Line], columns: List[Column], page_bbox: BoundingBox) -> Dict:
         """Advanced multi-column layout analysis"""
         layout_analysis = {
@@ -780,21 +787,21 @@ class ChunkingService:
             'reading_flow': 'top_to_bottom',
             'column_boundaries': []
         }
-        
+
         try:
             if len(columns) <= 1:
                 layout_analysis['layout_type'] = 'single_column'
                 layout_analysis['text_columns'] = [{'x_min': page_bbox.x_min, 'x_max': page_bbox.x_max, 'type': 'text'}]
                 return layout_analysis
-            
+
             # Analyze column characteristics
             for i, col in enumerate(columns):
                 col_lines = [line for line in lines if col.min_x <= line.min_x < col.max_x]
-                
+
                 # Determine column content type
                 text_density = self._calculate_text_density(col_lines)
                 table_indicators = self._count_table_indicators_in_column(col_lines)
-                
+
                 column_info = {
                     'index': i,
                     'x_min': col.min_x,
@@ -804,49 +811,49 @@ class ChunkingService:
                     'table_indicators': table_indicators,
                     'type': 'table' if table_indicators > text_density * 0.3 else 'text'
                 }
-                
+
                 layout_analysis['text_columns'].append(column_info)
-                
+
                 # Calculate gaps
                 if i > 0:
                     gap = col.min_x - columns[i-1].max_x
                     layout_analysis['column_gaps'].append(gap)
-            
+
             # Determine layout type
             text_columns = [c for c in layout_analysis['text_columns'] if c['type'] == 'text']
             table_columns = [c for c in layout_analysis['text_columns'] if c['type'] == 'table']
-            
+
             if len(text_columns) > 1:
                 layout_analysis['layout_type'] = 'multi_column_text'
             elif len(table_columns) > 0 and len(text_columns) > 0:
                 layout_analysis['layout_type'] = 'mixed_content'
             elif len(table_columns) > 1:
                 layout_analysis['layout_type'] = 'multi_table'
-            
+
             print(f"📊 Column analysis: {len(text_columns)} text, {len(table_columns)} table columns")
-            
+
         except Exception as e:
             print(f"⚠️ Multi-column analysis failed: {e}")
-        
+
         return layout_analysis
-    
+
     def _calculate_text_density(self, lines: List[Line]) -> float:
         """Calculate text density in a column"""
         if not lines:
             return 0.0
-        
+
         total_chars = sum(len(line.text) for line in lines)
         total_lines = len(lines)
-        
+
         return total_chars / max(total_lines, 1)
-    
+
     def _count_table_indicators_in_column(self, lines: List[Line]) -> int:
         """Count table-like patterns in a column"""
         indicators = 0
-        
+
         for line in lines:
             text = line.text.strip()
-            
+
             # Look for table indicators
             if re.search(r'\d+\.\d+', text):  # Numbers with decimals
                 indicators += 1
@@ -856,52 +863,52 @@ class ChunkingService:
                 indicators += 1
             if re.search(r'\b(total|sum|amount|qty|quantity)\b', text.lower()):  # Table keywords
                 indicators += 1
-        
+
         return indicators
-    
+
     def _detect_table_candidates_by_content(self, lines: List[Line], layout_analysis: Dict) -> List[Dict]:
         """Detect table candidates based on content patterns"""
         candidates = []
-        
+
         try:
             # Group lines by Y proximity for row detection
             rows = self._group_lines_into_rows(lines)
-            
+
             for row_group in rows:
                 if len(row_group) < 2:  # Need at least 2 lines for a row
                     continue
-                
+
                 # Analyze row content
                 row_analysis = self._analyze_row_content(row_group)
-                
+
                 if row_analysis['is_table_like']:
                     # Calculate bounding box
                     min_x = min(line.min_x for line in row_group)
                     max_x = max(line.max_x for line in row_group)
                     min_y = min(line.y for line in row_group)
                     max_y = max(line.y for line in row_group)
-                    
+
                     candidates.append({
                         'bbox': BoundingBox(min_x, min_y, max_x, max_y),
                         'confidence': row_analysis['confidence'],
                         'type': 'content_based',
                         'indicators': row_analysis['indicators']
                     })
-        
+
         except Exception as e:
             print(f"⚠️ Content-based table detection failed: {e}")
-        
+
         return candidates
-    
+
     def _group_lines_into_rows(self, lines: List[Line], y_tolerance: float = 5) -> List[List[Line]]:
         """Group lines into potential table rows"""
         if not lines:
             return []
-        
+
         sorted_lines = sorted(lines, key=lambda l: l.y)
         rows = []
         current_row = [sorted_lines[0]]
-        
+
         for line in sorted_lines[1:]:
             if abs(line.y - current_row[0].y) <= y_tolerance:
                 current_row.append(line)
@@ -909,42 +916,42 @@ class ChunkingService:
                 if len(current_row) >= 2:
                     rows.append(current_row)
                 current_row = [line]
-        
+
         if len(current_row) >= 2:
             rows.append(current_row)
-        
+
         return rows
-    
+
     def _analyze_row_content(self, row_lines: List[Line]) -> Dict:
         """Analyze if a row looks like table content"""
         indicators = 0
         confidence = 0.0
-        
+
         # Sort by x position
         sorted_lines = sorted(row_lines, key=lambda l: l.min_x)
-        
+
         # Check for table-like patterns
         numeric_count = 0
         short_text_count = 0
         total_items = len(sorted_lines)
-        
+
         for line in sorted_lines:
             text = line.text.strip()
-            
+
             # Numeric content
             if re.search(r'\d', text):
                 numeric_count += 1
                 indicators += 1
-            
+
             # Short, concise text (typical in tables)
             if len(text.split()) <= 3:
                 short_text_count += 1
                 indicators += 1
-            
+
             # Currency or percentage
             if re.search(r'[\$€£¥%]', text):
                 indicators += 2
-            
+
             # Aligned positioning (regular spacing)
             if len(sorted_lines) >= 3:
                 # Check if spacing is regular
@@ -952,15 +959,15 @@ class ChunkingService:
                            for i in range(len(sorted_lines)-1)]
                 if spacings and max(spacings) - min(spacings) < 20:  # Regular spacing
                     indicators += 1
-        
+
         # Calculate confidence
         if total_items > 0:
             numeric_ratio = numeric_count / total_items
             short_text_ratio = short_text_count / total_items
             confidence = (numeric_ratio * 0.6 + short_text_ratio * 0.4) * min(indicators / total_items, 1.0)
-        
+
         is_table_like = confidence > 0.5 and indicators >= 2
-        
+
         return {
             'is_table_like': is_table_like,
             'confidence': confidence,
@@ -968,68 +975,68 @@ class ChunkingService:
             'numeric_ratio': numeric_count / max(total_items, 1),
             'short_text_ratio': short_text_count / max(total_items, 1)
         }
-    
+
     def _validate_table_vs_multicolumn(self, table_bbox: BoundingBox, layout_analysis: Dict, lines: List[Line]) -> bool:
         """Validate if a detected table is actually a table vs multi-column text"""
-        
+
         # Get lines within the table bbox
         table_lines = [
             line for line in lines 
             if self._line_intersects_bbox(line, table_bbox, overlap_threshold=0.5)
         ]
-        
+
         if not table_lines:
             return False
-        
+
         # Check if this spans multiple text columns (likely multi-column text)
         text_columns = layout_analysis.get('text_columns', [])
         text_column_count = sum(1 for col in text_columns 
                                if col['type'] == 'text' and 
                                col['x_min'] < table_bbox.x_max and col['x_max'] > table_bbox.x_min)
-        
+
         if text_column_count > 1:
             # Likely multi-column text, not a table
             print(f"📰 Rejecting table candidate - spans {text_column_count} text columns (multi-column text)")
             return False
-        
+
         # Additional content validation
         row_groups = self._group_lines_into_rows(table_lines)
         table_like_rows = sum(1 for row in row_groups if self._analyze_row_content(row)['is_table_like'])
-        
+
         table_ratio = table_like_rows / max(len(row_groups), 1)
-        
+
         is_valid_table = table_ratio > 0.3  # At least 30% of rows should look table-like
-        
+
         if not is_valid_table:
             print(f"📝 Rejecting table candidate - only {table_ratio:.1%} table-like content")
-        
+
         return is_valid_table
-    
+
     def _get_targeted_table_areas(self, visual_structures: Dict, table_candidates: List[Dict], detected_tables: List[Dict]) -> List[Tuple[float, float, float, float]]:
         """Get specific areas to target for camelot extraction"""
         areas = []
-        
+
         # Add visual structure areas
         for region in visual_structures['bordered_regions']:
             bbox = region['bbox']
             areas.append((bbox.x_min, bbox.y_min, bbox.x_max, bbox.y_max))
-        
+
         # Add content-based candidates
         for candidate in table_candidates:
             bbox = candidate['bbox']
             areas.append((bbox.x_min, bbox.y_min, bbox.x_max, bbox.y_max))
-        
+
         # Add pdfplumber detected areas
         for table_info in detected_tables:
             bbox = table_info['bbox']
             areas.append((bbox.x_min, bbox.y_min, bbox.x_max, bbox.y_max))
-        
+
         return areas
-    
+
     def _consolidate_table_regions(self, detected_tables: List[Dict], camelot_tables: List[Dict], visual_structures: Dict) -> List[Dict]:
         """Consolidate and deduplicate table regions from multiple sources"""
         all_regions = []
-        
+
         # Add pdfplumber tables
         for table_info in detected_tables:
             all_regions.append({
@@ -1041,7 +1048,7 @@ class ChunkingService:
                 'table_json': None,
                 'accuracy': 85.0
             })
-        
+
         # Add camelot tables
         for camelot_table in camelot_tables:
             if camelot_table.get('bbox'):
@@ -1051,7 +1058,7 @@ class ChunkingService:
                     self._bboxes_overlap(bbox, region['bbox'], 0.5) 
                     for region in all_regions
                 )
-                
+
                 if not overlaps_existing:
                     all_regions.append({
                         'bbox': bbox,
@@ -1062,7 +1069,7 @@ class ChunkingService:
                         'table_json': camelot_table['json_data'],
                         'accuracy': camelot_table['accuracy']
                     })
-        
+
         # Add visual structure regions (if not covered by other methods)
         for vs_region in visual_structures['bordered_regions']:
             bbox = vs_region['bbox']
@@ -1070,7 +1077,7 @@ class ChunkingService:
                 self._bboxes_overlap(bbox, region['bbox'], 0.3) 
                 for region in all_regions
             )
-            
+
             if not overlaps_existing:
                 all_regions.append({
                     'bbox': bbox,
@@ -1082,44 +1089,44 @@ class ChunkingService:
                     'accuracy': vs_region['confidence'] * 100,
                     'visual_structure': vs_region
                 })
-        
+
         print(f"🔗 Consolidated {len(all_regions)} table regions from multiple sources")
         return all_regions
-    
+
     def _group_text_lines_into_regions_enhanced(self, text_lines: List[Line], layout_analysis: Dict) -> List[LayoutRegion]:
         """Enhanced text region grouping with multi-column awareness"""
         regions = []
-        
+
         # Group by columns first
         text_columns = layout_analysis.get('text_columns', [])
-        
+
         for col_info in text_columns:
             if col_info['type'] != 'text':
                 continue
-                
+
             column_lines = [
                 line for line in text_lines 
                 if col_info['x_min'] <= line.min_x < col_info['x_max']
             ]
-            
+
             if not column_lines:
                 continue
-            
+
             # Group lines by Y proximity within column
             column_lines.sort(key=lambda l: l.y)
             current_group = [column_lines[0]]
-            
+
             for line in column_lines[1:]:
                 prev_line = current_group[-1]
                 y_gap = abs(line.y - prev_line.y)
-                
+
                 # Adaptive gap threshold based on font size
-                gap_threshold = 30
+                gap_threshold = 30  # pixels
                 if hasattr(prev_line, 'items') and prev_line.items:
                     avg_font_size = np.mean([item.font_size for item in prev_line.items if item.font_size > 0])
                     if avg_font_size > 0:
                         gap_threshold = avg_font_size * 2
-                
+
                 if y_gap <= gap_threshold:
                     current_group.append(line)
                 else:
@@ -1129,37 +1136,37 @@ class ChunkingService:
                         if region:
                             regions.append(region)
                     current_group = [line]
-            
+
             # Add final group
             if current_group:
                 region = self._create_text_region(current_group, col_info['index'])
                 if region:
                     regions.append(region)
-        
+
         return regions
 
     async def _extract_tables_with_targeted_camelot(self, file_path: str, page_number: int, table_areas: List[Tuple], layout_analysis: Dict) -> List[Dict[str, Any]]:
         """Enhanced camelot extraction with targeted areas and layout awareness"""
         extracted_tables = []
-        
+
         if camelot is None:
             print(f"⚠️ Camelot not available - skipping targeted extraction for page {page_number}")
             return extracted_tables
-        
+
         try:
             import tempfile
             import shutil
-            
+
             # Create temporary file
             with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
                 shutil.copy2(file_path, temp_file.name)
                 temp_pdf_path = temp_file.name
-            
+
             try:
                 # Try lattice mode with targeted areas (for bordered tables)
                 if table_areas:
                     print(f"🎯 Trying camelot lattice with {len(table_areas)} targeted areas")
-                    
+
                     for i, area in enumerate(table_areas):
                         try:
                             lattice_tables = camelot.read_pdf(
@@ -1169,17 +1176,17 @@ class ChunkingService:
                                 table_areas=[f"{area[0]},{area[1]},{area[2]},{area[3]}"],
                                 strip_text='\n'
                             )
-                            
+
                             for j, table in enumerate(lattice_tables):
                                 if table.accuracy > 40:  # Lower threshold for targeted extraction
                                     print(f"✅ Lattice area {i+1} extracted table with {table.accuracy:.1f}% accuracy")
-                                    
+
                                     table_data = table.df.values.tolist()
                                     structured_table = self._convert_table_to_json(table_data)
                                     structured_table["table_metadata"]["extraction_source"] = "camelot_lattice_targeted"
                                     structured_table["table_metadata"]["accuracy"] = table.accuracy
                                     structured_table["table_metadata"]["table_index"] = len(extracted_tables)
-                                    
+
                                     extracted_tables.append({
                                         "json_data": structured_table,
                                         "bbox": self._camelot_bbox_to_layout_bbox(getattr(table, '_bbox', None)) or 
@@ -1187,15 +1194,15 @@ class ChunkingService:
                                         "accuracy": table.accuracy,
                                         "source": "camelot_lattice_targeted"
                                     })
-                        
+
                         except Exception as area_error:
                             print(f"⚠️ Lattice area {i+1} failed: {area_error}")
                             continue
-                
+
                 # Try lattice mode without areas (full page) if no targeted results
                 if len(extracted_tables) == 0:
                     print(f"🔍 Trying camelot lattice full page for page {page_number}")
-                    
+
                     try:
                         lattice_tables = camelot.read_pdf(
                             temp_pdf_path, 
@@ -1203,32 +1210,32 @@ class ChunkingService:
                             flavor='lattice',
                             strip_text='\n'
                         )
-                        
+
                         for i, table in enumerate(lattice_tables):
                             if table.accuracy > 50:
                                 print(f"✅ Full page lattice extracted table with {table.accuracy:.1f}% accuracy")
-                                
+
                                 table_data = table.df.values.tolist()
                                 structured_table = self._convert_table_to_json(table_data)
                                 structured_table["table_metadata"]["extraction_source"] = "camelot_lattice"
                                 structured_table["table_metadata"]["accuracy"] = table.accuracy
                                 structured_table["table_metadata"]["table_index"] = len(extracted_tables)
-                                
+
                                 extracted_tables.append({
                                     "json_data": structured_table,
                                     "bbox": self._camelot_bbox_to_layout_bbox(getattr(table, '_bbox', None)),
                                     "accuracy": table.accuracy,
                                     "source": "camelot_lattice"
                                 })
-                    
+
                     except Exception as lattice_error:
                         print(f"⚠️ Full page lattice failed: {lattice_error}")
-                
+
                 # Try stream mode only if layout suggests it won't confuse multi-column text
                 layout_type = layout_analysis.get('layout_type', 'single_column')
                 if len(extracted_tables) == 0 and layout_type not in ['multi_column_text']:
                     print(f"🔍 Trying camelot stream for page {page_number} (layout: {layout_type})")
-                    
+
                     try:
                         stream_tables = camelot.read_pdf(
                             temp_pdf_path, 
@@ -1236,19 +1243,19 @@ class ChunkingService:
                             flavor='stream',
                             strip_text='\n'
                         )
-                        
+
                         for i, table in enumerate(stream_tables):
                             if table.accuracy > 30:
                                 # Validate this isn't multi-column text
                                 if self._validate_stream_table_vs_multicolumn(table, layout_analysis):
                                     print(f"✅ Stream extracted validated table with {table.accuracy:.1f}% accuracy")
-                                    
+
                                     table_data = table.df.values.tolist()
                                     structured_table = self._convert_table_to_json(table_data)
                                     structured_table["table_metadata"]["extraction_source"] = "camelot_stream_validated"
                                     structured_table["table_metadata"]["accuracy"] = table.accuracy
                                     structured_table["table_metadata"]["table_index"] = len(extracted_tables)
-                                    
+
                                     extracted_tables.append({
                                         "json_data": structured_table,
                                         "bbox": self._camelot_bbox_to_layout_bbox(getattr(table, '_bbox', None)),
@@ -1257,10 +1264,10 @@ class ChunkingService:
                                     })
                                 else:
                                     print(f"❌ Stream table rejected - likely multi-column text")
-                    
+
                     except Exception as stream_error:
                         print(f"⚠️ Stream extraction failed: {stream_error}")
-                
+
             finally:
                 # Clean up temporary file
                 try:
@@ -1268,35 +1275,35 @@ class ChunkingService:
                     os.unlink(temp_pdf_path)
                 except:
                     pass
-        
+
         except Exception as e:
             print(f"❌ Targeted camelot extraction failed: {e}")
-        
+
         print(f"🎯 Targeted camelot extraction complete: {len(extracted_tables)} tables")
         return extracted_tables
-    
-   
-    
+
+
+
     def _bboxes_overlap(self, bbox1: BoundingBox, bbox2: BoundingBox, threshold: float = 0.5) -> bool:
         """Check if two bounding boxes overlap significantly"""
         # Calculate intersection
         intersection_x = max(0, min(bbox1.x_max, bbox2.x_max) - max(bbox1.x_min, bbox2.x_min))
         intersection_y = max(0, min(bbox1.y_max, bbox2.y_max) - max(bbox1.y_min, bbox2.y_min))
-        
+
         if intersection_x <= 0 or intersection_y <= 0:
             return False
-        
+
         intersection_area = intersection_x * intersection_y
         bbox1_area = bbox1.area
         bbox2_area = bbox2.area
-        
+
         if bbox1_area == 0 or bbox2_area == 0:
             return False
-        
+
         # Check if intersection is significant for either bbox
         overlap_ratio1 = intersection_area / bbox1_area
         overlap_ratio2 = intersection_area / bbox2_area
-        
+
         return overlap_ratio1 >= threshold or overlap_ratio2 >= threshold
 
     async def _extract_content_in_reading_order_with_json(self, layout: PageLayout, text_items: List[TextItem]) -> List[StructuredUnit]:
@@ -1306,26 +1313,26 @@ class ChunkingService:
 
         # Sort regions by reading order
         sorted_regions = self._sort_regions_by_reading_order(layout.regions)
-        
+
         structured_units = []
         reading_order = 0
-        
+
         # Track recent headings for table association with enhanced window
         recent_headings = []
         max_heading_distance = 150  # Increased distance for better coverage
-        
+
         print(f"📄 Processing {len(sorted_regions)} regions in reading order")
-        
+
         for region_idx, region in enumerate(sorted_regions):
             print(f"\n🔍 Region {region_idx + 1}/{len(sorted_regions)}: {region.region_type}")
-            
+
             if region.region_type == 'table_json':
                 print(f"   Processing JSON table region")
                 # Handle JSON table regions with enhanced context
                 json_units = await self._extract_json_table_content_enhanced(region, reading_order, recent_headings, sorted_regions, region_idx)
                 structured_units.extend(json_units)
                 reading_order += len(json_units)
-                
+
             elif region.region_type == 'table':
                 print(f"   Processing regular table region")
                 # Handle regular table regions with enhanced context
@@ -1334,12 +1341,12 @@ class ChunkingService:
                 )
                 structured_units.extend(table_units)
                 reading_order += len(table_units)
-                
+
             elif region.region_type == 'text':
                 print(f"   Processing text region")
                 # Handle text regions
                 text_units = await self._extract_text_content(region, reading_order)
-                
+
                 # Track headings for future table association with enhanced storage
                 for unit in text_units:
                     if unit.type == 'header':
@@ -1352,25 +1359,25 @@ class ChunkingService:
                         unit.is_potential_table_context = True
                         recent_headings.append(unit)
                         print(f"      📝 Stored potential table context: '{unit.text[:50]}...'")
-                
+
                 # Keep more headings and context for better table association
                 recent_headings = recent_headings[-6:]  # Keep last 6 items (headings + context)
-                
+
                 structured_units.extend(text_units)
                 reading_order += len(text_units)
-        
+
         return structured_units
 
     async def _extract_json_table_content_enhanced(self, region: LayoutRegion, start_order: int, recent_headings: List[StructuredUnit], all_regions: List[LayoutRegion], region_idx: int) -> List[StructuredUnit]:
         """Extract content from JSON table regions with enhanced context extraction"""
         json_units = []
         current_order = start_order
-        
+
         print(f"🔢 Extracting JSON table content (region {region_idx + 1})")
-        
+
         # Enhanced heading association with fallback context extraction
         associated_headings = self._find_associated_headings(region, recent_headings, 150)
-        
+
         # If no headings found, extract context from surrounding regions
         if not associated_headings:
             print(f"   No direct headings found, extracting surrounding context...")
@@ -1402,25 +1409,25 @@ class ChunkingService:
                 )
                 json_units.append(heading_unit)
                 current_order += 1
-        
+
         # Create JSON table unit with detailed logging
         if hasattr(region, 'table_json') and region.table_json:
             table_json = region.table_json
-            
+
             # Log table data details
             print(f"📊 TABLE DATA DETAILS:")
             print(f"   Source: {getattr(region, 'table_source', 'unknown')}")
             print(f"   Accuracy: {getattr(region, 'extraction_accuracy', 0):.1f}%")
-            
+
             if 'table_metadata' in table_json:
                 metadata = table_json['table_metadata']
                 print(f"   Dimensions: {metadata.get('total_rows', 0)} rows × {metadata.get('total_columns', 0)} columns")
                 print(f"   Has header: {metadata.get('has_header', False)}")
-            
+
             if 'headers' in table_json:
                 headers = table_json['headers']
                 print(f"   Headers: {headers[:5]}{'...' if len(headers) > 5 else ''}")
-            
+
             if 'data' in table_json:
                 data_rows = table_json['data']
                 print(f"   Sample data (first 3 rows):")
@@ -1437,10 +1444,10 @@ class ChunkingService:
                                 value = str(cell_data)
                             row_preview.append(f"{header}: {value}")
                         print(f"     Row {i+1}: {' | '.join(row_preview)}")
-            
+
             # Create readable summary for search
             table_summary = self._create_table_summary_text(table_json)
-            
+
             json_unit = StructuredUnit(
                 type='table_json',
                 text=table_summary,  # Use readable summary instead of raw JSON
@@ -1449,25 +1456,25 @@ class ChunkingService:
                 reading_order=current_order,
                 associated_headings=[h.text for h in associated_headings] if associated_headings else [surrounding_context] if 'surrounding_context' in locals() else []
             )
-            
+
             # Add special JSON metadata
             json_unit.table_json = table_json
             json_unit.extraction_source = getattr(region, 'table_source', 'unknown')
             json_unit.extraction_accuracy = getattr(region, 'extraction_accuracy', 0)
             json_unit.has_structured_data = True
-            
+
             json_units.append(json_unit)
             print(f"   ✅ Created JSON table unit with {len(table_summary)} chars")
-            
+
         return json_units
 
     def _extract_surrounding_context(self, table_region: LayoutRegion, all_regions: List[LayoutRegion], region_idx: int, word_limit: int = 50) -> str:
         """Extract context from regions surrounding the table"""
         context_parts = []
         table_bbox = table_region.bbox
-        
+
         print(f"   Extracting context around table at index {region_idx}")
-        
+
         # Check regions before the table (up to 2 regions back)
         for i in range(max(0, region_idx - 2), region_idx):
             region = all_regions[i]
@@ -1477,7 +1484,7 @@ class ChunkingService:
                 if region_text and len(region_text.split()) <= word_limit:
                     context_parts.append(region_text)
                     print(f"     Added context before: '{region_text[:50]}...'")
-        
+
         # Check regions after the table (up to 2 regions ahead)
         for i in range(region_idx + 1, min(len(all_regions), region_idx + 3)):
             region = all_regions[i]
@@ -1487,45 +1494,45 @@ class ChunkingService:
                 if region_text and len(region_text.split()) <= word_limit:
                     context_parts.append(region_text)
                     print(f"     Added context after: '{region_text[:50]}...'")
-        
+
         return ' '.join(context_parts) if context_parts else ""
-    
+
     def _extract_text_from_region(self, region: LayoutRegion) -> str:
         """Extract text content from a text region"""
         if not region.text_items:
             return ""
-        
+
         # Sort text items by position and extract text
         sorted_items = sorted(region.text_items, key=lambda item: (item.y, item.x))
         text_parts = []
-        
+
         for item in sorted_items:
             if item.text.strip():
                 text_parts.append(item.text.strip())
-        
+
         return ' '.join(text_parts)
 
     async def _extract_table_content_with_enhanced_context(self, region: LayoutRegion, start_order: int, recent_headings: List[StructuredUnit], all_regions: List[LayoutRegion], region_idx: int) -> List[StructuredUnit]:
         """Extract table content with enhanced context detection"""
         print(f"📊 Extracting regular table content (region {region_idx + 1})")
-        
+
         # Use enhanced heading association
         associated_headings = self._find_associated_headings(region, recent_headings, 150)
-        
+
         # If no headings found, extract surrounding context
         if not associated_headings:
             print(f"   No direct headings found, extracting surrounding context...")
             surrounding_context = self._extract_surrounding_context(region, all_regions, region_idx, word_limit=50)
             if surrounding_context:
                 print(f"   ✅ Extracted surrounding context: '{surrounding_context[:100]}...'")
-        
+
         # Process with existing logic but enhanced headings
         return await self._extract_table_content_with_headings(region, start_order, associated_headings)
 
     def _generate_page_text_with_json_tables(self, structured_units: List[StructuredUnit]) -> str:
         """Generate page text handling JSON table units specially"""
         text_parts = []
-        
+
         for unit in structured_units:
             if unit.type == 'table_json' and hasattr(unit, 'table_json'):
                 # For JSON tables, create a readable summary instead of raw JSON
@@ -1533,10 +1540,10 @@ class ChunkingService:
                 text_parts.append(table_summary)
             else:
                 text_parts.append(unit.text)
-        
+
         return '\n'.join(text_parts)
 
-   
+
     async def _analyze_page_layout(self, text_items: List[TextItem], page) -> PageLayout:
         """STEP 1: Comprehensive layout analysis with region detection"""
         if not text_items:
@@ -1557,16 +1564,16 @@ class ChunkingService:
 
         # Group text items into lines for analysis
         lines = self._group_items_into_lines(text_items)
-        
+
         # Detect columns using improved algorithm
         columns = self._detect_columns_enhanced(lines, page_bbox)
-        
+
         # Detect text vs table regions
         regions = await self._detect_regions(lines, columns, page_bbox, page)
-        
+
         # Classify layout type
         layout_type = self._classify_layout_type(regions, columns)
-        
+
         return PageLayout(
             regions=regions,
             columns=columns,
@@ -1585,24 +1592,24 @@ class ChunkingService:
         lines = []
         current_line_items = [text_items[0]]
         current_y = text_items[0].y
-        
+
         # Adaptive Y tolerance based on font size
         base_tolerance = 5
-        
+
         for item in text_items[1:]:
             # Calculate adaptive tolerance based on font sizes
             avg_font_size = np.mean([i.font_size for i in current_line_items + [item] if i.font_size > 0])
             y_tolerance = max(base_tolerance, avg_font_size * 0.3) if avg_font_size > 0 else base_tolerance
-            
+
             y_diff = abs(item.y - current_y)
-            
+
             if y_diff <= y_tolerance:
                 # Same line
                 current_line_items.append(item)
             else:
                 # Create line from current items
                 lines.append(self._create_line_from_items(current_line_items))
-                
+
                 # Start new line
                 current_line_items = [item]
                 current_y = item.y
@@ -1624,10 +1631,10 @@ class ChunkingService:
                 items=[],
                 bbox=BoundingBox(0, 0, 0, 0)
             )
-        
+
         # Sort items by X coordinate
         items.sort(key=lambda item: item.x)
-        
+
         # Build text with intelligent spacing and character detection
         text_parts = []
         for i, item in enumerate(items):
@@ -1635,16 +1642,16 @@ class ChunkingService:
             if item.text.strip():
                 item_text = item.text.strip()
                 text_parts.append(item_text)
-                
+
                 # Add space if there's a significant gap to next item
                 if i < len(items) - 1:
                     next_item = items[i + 1]
                     gap = next_item.x - (item.x + item.width)
-                    
+
                     # Detect character-level extraction (single characters with small gaps)
                     is_single_char = len(item_text) == 1 and item_text.isalnum()
                     next_is_single_char = len(next_item.text.strip()) == 1 and next_item.text.strip().isalnum()
-                    
+
                     # Use adaptive gap threshold based on content type
                     if item.font_size > 0:
                         char_width = item.font_size * 0.6
@@ -1659,14 +1666,14 @@ class ChunkingService:
                             gap_threshold = 8  # Larger threshold for single chars
                         else:
                             gap_threshold = 4  # Normal threshold
-                    
+
                     # Only add space for significant gaps, but be careful with single characters
                     if gap > gap_threshold and next_item.text.strip():
                         text_parts.append(' ')
 
         # Join and clean up the text
         line_text = ''.join(text_parts)
-        
+
         # Apply immediate character spacing fix if detected
         # Check if line contains excessive single character "words"
         words = line_text.split()
@@ -1682,19 +1689,19 @@ class ChunkingService:
                         if result_chars:
                             line_text = line_text.replace(' '.join(result_chars), ''.join(result_chars))
                             result_chars = []
-        
+
         # Remove excessive whitespace and normalize spacing
         line_text = ' '.join(line_text.split())
         line_text = line_text.strip()
-        
+
         # Calculate bounding box
         min_x = min(item.x for item in items)
         max_x = max(item.x + item.width for item in items)
         min_y = min(item.y for item in items)
         max_y = max(item.y + item.height for item in items)
-        
+
         bbox = BoundingBox(min_x, min_y, max_x, max_y)
-        
+
         return Line(
             text=line_text,
             y=np.mean([item.y for item in items]),
@@ -1717,7 +1724,7 @@ class ChunkingService:
         # Collect X positions for clustering, filtering out None values
         x_starts = [line.min_x for line in lines if hasattr(line, 'min_x') and line.min_x is not None]
         x_ends = [line.max_x for line in lines if hasattr(line, 'max_x') and line.max_x is not None]
-        
+
         if not x_starts or not x_ends:
             return [Column(
                 min_x=page_bbox.x_min,
@@ -1725,10 +1732,10 @@ class ChunkingService:
                 count=len(lines),
                 bbox=page_bbox
             )]
-        
+
         # Use density-based clustering for column detection
         columns = self._cluster_columns(x_starts, x_ends, page_bbox)
-        
+
         return columns
 
     def _cluster_columns(self, x_starts: List[float], x_ends: List[float], page_bbox: BoundingBox) -> List[Column]:
@@ -1745,18 +1752,18 @@ class ChunkingService:
         page_width = page_bbox.width
         bin_width = page_width / 50  # 50 bins across page width
         bins = np.arange(page_bbox.x_min, page_bbox.x_max + bin_width, bin_width)
-        
+
         # Count occurrences in each bin
         hist_starts, _ = np.histogram(x_starts, bins=bins)
         hist_ends, _ = np.histogram(x_ends, bins=bins)
-        
+
         # Find peaks in the histogram (potential column boundaries)
         start_peaks = self._find_peaks(hist_starts, min_height=len(x_starts) * 0.05)
         end_peaks = self._find_peaks(hist_ends, min_height=len(x_ends) * 0.05)
-        
+
         # Create columns based on peaks
         columns = []
-        
+
         if len(start_peaks) <= 1:
             # Single column
             columns.append(Column(
@@ -1769,16 +1776,16 @@ class ChunkingService:
             # Multiple columns
             for i, start_peak in enumerate(start_peaks):
                 start_x = bins[start_peak]
-                
+
                 # Find corresponding end boundary
                 if i < len(start_peaks) - 1:
                     end_x = bins[start_peaks[i + 1]] - bin_width
                 else:
                     end_x = page_bbox.x_max
-                
+
                 # Count lines in this column
                 count = sum(1 for x in x_starts if start_x <= x < end_x)
-                
+
                 if count > 0:
                     columns.append(Column(
                         min_x=start_x,
@@ -1806,12 +1813,12 @@ class ChunkingService:
         """Enhanced table detection: pdfplumber + camelot with JSON storage"""
         regions = []
         detected_tables = []
-        
+
         # Step 1: Try pdfplumber table detection (bounding box detection)
         try:
             tables = page.find_tables()
             pdfplumber_tables = []
-            
+
             for table in tables:
                 if table.bbox:
                     table_bbox = BoundingBox(
@@ -1825,10 +1832,10 @@ class ChunkingService:
                         'table_obj': table,
                         'source': 'pdfplumber'
                     })
-            
+
             print(f"🔍 pdfplumber detected {len(pdfplumber_tables)} table regions")
             detected_tables.extend(pdfplumber_tables)
-            
+
         except Exception as e:
             print(f"⚠️ pdfplumber table detection failed: {e}")
 
@@ -1839,7 +1846,7 @@ class ChunkingService:
                 # Get the current page from the PDF file path
                 # We need to extract this from the page object context
                 page_num = getattr(page, 'page_number', 1)
-                
+
                 # Try camelot lattice mode (for ruled/bordered tables)
                 try:
                     # Note: We'll need the file path - we'll add this as a parameter
@@ -1847,7 +1854,7 @@ class ChunkingService:
                     camelot_lattice_tables = []
                     print(f"🔍 Attempting camelot lattice extraction for page {page_num}")
                     # camelot_lattice_tables = camelot.read_table(file_path, pages=str(page_num), flavor='lattice')
-                    
+
                 except Exception as lattice_error:
                     print(f"⚠️ Camelot lattice mode failed: {lattice_error}")
                     camelot_lattice_tables = []
@@ -1857,14 +1864,14 @@ class ChunkingService:
                     camelot_stream_tables = []
                     print(f"🔍 Attempting camelot stream extraction for page {page_num}")
                     # camelot_stream_tables = camelot.read_table(file_path, pages=str(page_num), flavor='stream')
-                    
+
                 except Exception as stream_error:
                     print(f"⚠️ Camelot stream mode failed: {stream_error}")
                     camelot_stream_tables = []
 
                 camelot_tables = camelot_lattice_tables + camelot_stream_tables
                 print(f"🔍 Camelot extracted {len(camelot_tables)} tables")
-                
+
             except Exception as e:
                 print(f"⚠️ Camelot table extraction failed: {e}")
 
@@ -1873,13 +1880,13 @@ class ChunkingService:
         for table_info in detected_tables:
             table_bbox = table_info['bbox']
             table_bboxes.append(table_bbox)
-            
+
             # Find lines that belong to this table
             table_lines = [
                 line for line in lines 
                 if self._line_intersects_bbox(line, table_bbox, overlap_threshold=0.5)
             ]
-            
+
             # Create enhanced table region with JSON capability
             table_region = LayoutRegion(
                 bbox=table_bbox,
@@ -1887,12 +1894,12 @@ class ChunkingService:
                 confidence=0.9,
                 text_items=[item for line in table_lines for item in line.items]
             )
-            
+
             # Add table extraction metadata
             table_region.table_source = table_info['source']
             table_region.has_json_data = False
             table_region.table_json = None
-            
+
             # Try to extract structured data from pdfplumber table
             if table_info['source'] == 'pdfplumber' and 'table_obj' in table_info:
                 try:
@@ -1905,7 +1912,7 @@ class ChunkingService:
                         print(f"✅ Extracted {len(table_data)} rows as JSON from pdfplumber")
                 except Exception as e:
                     print(f"⚠️ Failed to extract JSON from pdfplumber table: {e}")
-            
+
             regions.append(table_region)
 
         # Step 4: Detect text regions (areas not covered by tables)
@@ -1916,7 +1923,7 @@ class ChunkingService:
                 if self._line_intersects_bbox(line, table_bbox, overlap_threshold=0.3):
                     is_in_table = True
                     break
-            
+
             if not is_in_table:
                 text_lines.append(line)
 
@@ -1933,7 +1940,7 @@ class ChunkingService:
                 max_x = max(item.x + item.width for item in all_items)
                 min_y = min(item.y for item in all_items)
                 max_y = max(item.y + item.height for item in all_items)
-                
+
                 regions.append(LayoutRegion(
                     bbox=BoundingBox(min_x, min_y, max_x, max_y),
                     region_type='text',
@@ -1947,50 +1954,50 @@ class ChunkingService:
         """Check if line intersects with bounding box"""
         if not line.bbox:
             return False
-            
+
         # Calculate intersection
         intersection_x = max(0, min(line.bbox.x_max, bbox.x_max) - max(line.bbox.x_min, bbox.x_min))
         intersection_y = max(0, min(line.bbox.y_max, bbox.y_max) - max(line.bbox.y_min, bbox.y_min))
-        
+
         if intersection_x <= 0 or intersection_y <= 0:
             return False
-        
+
         intersection_area = intersection_x * intersection_y
         line_area = line.bbox.area
-        
+
         if line_area == 0:
             return False
-        
+
         overlap_ratio = intersection_area / line_area
         return overlap_ratio >= overlap_threshold
 
     def _group_text_lines_into_regions(self, text_lines: List[Line], columns: List[Column]) -> List[LayoutRegion]:
         """Group text lines into coherent regions"""
         regions = []
-        
+
         # Group lines by column
         for col_idx, column in enumerate(columns):
             column_lines = [
                 line for line in text_lines 
                 if column.min_x <= line.min_x < column.max_x
             ]
-            
+
             if not column_lines:
                 continue
-            
+
             # Group lines by Y proximity within column
             column_lines.sort(key=lambda l: l.y)
-            
+
             current_group = [column_lines[0]]
-            
+
             for line in column_lines[1:]:
                 # Check Y gap between lines
                 prev_line = current_group[-1]
                 y_gap = abs(line.y - prev_line.y)
-                
+
                 # Adaptive gap threshold
                 gap_threshold = 30  # pixels
-                
+
                 if y_gap <= gap_threshold:
                     current_group.append(line)
                 else:
@@ -1998,27 +2005,27 @@ class ChunkingService:
                     if current_group:
                         regions.append(self._create_text_region(current_group, col_idx))
                     current_group = [line]
-            
+
             # Add final group
             if current_group:
                 regions.append(self._create_text_region(current_group, col_idx))
-        
+
         return regions
 
     def _create_text_region(self, lines: List[Line], column_index: int) -> LayoutRegion:
         """Create text region from grouped lines"""
         all_items = [item for line in lines for item in line.items]
-        
+
         if not all_items:
             return None
-        
+
         min_x = min(item.x for item in all_items)
         max_x = max(item.x + item.width for item in all_items)
         min_y = min(item.y for item in all_items)
         max_y = max(item.y + item.height for item in all_items)
-        
+
         bbox = BoundingBox(min_x, min_y, max_x, max_y)
-        
+
         return LayoutRegion(
             bbox=bbox,
             region_type='text',
@@ -2031,10 +2038,10 @@ class ChunkingService:
         """Classify the overall layout type"""
         if not regions:
             return 'empty'
-        
+
         has_table = any(r.region_type == 'table' for r in regions)
         has_text = any(r.region_type == 'text' for r in regions)
-        
+
         if len(columns) == 1:
             if has_table and has_text:
                 return 'single_column_mixed'
@@ -2057,113 +2064,113 @@ class ChunkingService:
 
         # Sort regions by reading order (left-to-right, top-to-bottom)
         sorted_regions = self._sort_regions_by_reading_order(layout.regions)
-        
+
         structured_units = []
         reading_order = 0
-        
+
         # Track recent headings for table association
         recent_headings = []
         max_heading_distance = 100  # pixels
-        
+
         for region_idx, region in enumerate(sorted_regions):
             if region.region_type == 'table':
                 # Find associated headings for this table
                 associated_headings = self._find_associated_headings(region, recent_headings, max_heading_distance)
-                
+
                 # Extract table content with associated headings
                 table_units = await self._extract_table_content_with_headings(
                     region, reading_order, associated_headings
                 )
                 structured_units.extend(table_units)
                 reading_order += len(table_units)
-                
+
                 # Clear used headings
                 for heading in associated_headings:
                     if heading in recent_headings:
                         recent_headings.remove(heading)
-                
+
             elif region.region_type == 'text':
                 # Extract text content
                 text_units = await self._extract_text_content(region, reading_order)
-                
+
                 # Track headings for future table association
                 for unit in text_units:
                     if unit.type == 'header':
                         unit.region_bbox = region.bbox  # Store region info for distance calculation
                         recent_headings.append(unit)
-                        
+
                         # Keep only recent headings (within reasonable distance)
                         recent_headings = [h for h in recent_headings[-3:]]  # Keep last 3 headings
-                
+
                 structured_units.extend(text_units)
                 reading_order += len(text_units)
-        
+
         return structured_units
 
     def _sort_regions_by_reading_order(self, regions: List[LayoutRegion]) -> List[LayoutRegion]:
         """Sort regions by natural reading order (left-to-right, top-to-bottom)"""
         # Primary sort: Y position (top to bottom)
         # Secondary sort: X position (left to right)
-        
+
         def reading_order_key(region):
             # Use center points for sorting
             y_center = region.bbox.center_y
             x_center = region.bbox.center_x
-            
+
             # Group by approximate Y bands (to handle side-by-side content)
             y_band = int(y_center / 50) * 50  # 50-pixel bands
-            
+
             return (y_band, x_center)
-        
+
         sorted_regions = sorted(regions, key=reading_order_key)
-        
+
         # Assign reading order
         for i, region in enumerate(sorted_regions):
             region.reading_order = i
-        
+
         return sorted_regions
 
     def _find_associated_headings(self, table_region: LayoutRegion, recent_headings: List[StructuredUnit], 
                                   max_distance: float) -> List[StructuredUnit]:
         """Find headings that should be associated with this table - enhanced for robust context extraction"""
         associated_headings = []
-        
+
         print(f"🔍 Finding headings for table at position y={table_region.bbox.y_min}-{table_region.bbox.y_max}")
         print(f"   Available recent headings: {len(recent_headings)}")
-        
+
         for i, heading in enumerate(recent_headings):
             if not hasattr(heading, 'region_bbox') or not heading.region_bbox:
                 continue
-                
+
             # Calculate distance between heading and table
             heading_bbox = heading.region_bbox
             table_bbox = table_region.bbox
-            
+
             # Check if heading is above the table and within reasonable distance
             vertical_distance_above = table_bbox.y_min - heading_bbox.y_max
             # Also check if heading is below the table (for cases where heading comes after)
             vertical_distance_below = heading_bbox.y_min - table_bbox.y_max
             horizontal_overlap = min(heading_bbox.x_max, table_bbox.x_max) - max(heading_bbox.x_min, table_bbox.x_min)
-            
+
             print(f"   Heading {i+1}: '{heading.text[:50]}...'")
             print(f"      Position: y={heading_bbox.y_min}-{heading_bbox.y_max}")
             print(f"      Distance above table: {vertical_distance_above:.1f}px")
             print(f"      Distance below table: {vertical_distance_below:.1f}px")
             print(f"      Horizontal overlap: {horizontal_overlap:.1f}px")
-            
+
             # Enhanced association logic: check both above and below table
             is_above_table = (0 <= vertical_distance_above <= max_distance)
             is_below_table = (0 <= vertical_distance_below <= max_distance)
             has_horizontal_overlap = (horizontal_overlap > 0 and 
                                     horizontal_overlap >= min(heading_bbox.width, table_bbox.width) * 0.2)  # Reduced to 20%
-            
+
             if (is_above_table or is_below_table) and has_horizontal_overlap:
                 associated_headings.append(heading)
                 position = "above" if is_above_table else "below"
                 print(f"      ✅ Associated heading ({position} table): '{heading.text}'")
             else:
                 print(f"      ❌ Not associated - distance or overlap insufficient")
-        
+
         print(f"   Final associated headings: {len(associated_headings)}")
         return associated_headings
 
@@ -2172,7 +2179,7 @@ class ChunkingService:
         """Extract table content with associated headings included"""
         table_units = []
         current_order = start_order
-        
+
         # Add associated headings first
         for heading in associated_headings:
             heading_unit = StructuredUnit(
@@ -2185,25 +2192,25 @@ class ChunkingService:
             )
             table_units.append(heading_unit)
             current_order += 1
-        
+
         # Group items into table rows
         items_by_y = defaultdict(list)
-        
+
         for item in region.text_items:
             # Round Y coordinate to group into rows
             y_key = round(item.y, 1)
             items_by_y[y_key].append(item)
-        
+
         # Sort rows by Y coordinate
         sorted_rows = sorted(items_by_y.items(), key=lambda x: x[0])
-        
+
         for row_idx, (y_coord, row_items) in enumerate(sorted_rows):
             # Sort items in row by X coordinate
             row_items.sort(key=lambda item: item.x)
-            
+
             # Build row text
             row_text = ' '.join(item.text for item in row_items)
-            
+
             if row_text.strip():
                 # Create table row unit
                 unit = StructuredUnit(
@@ -2221,35 +2228,35 @@ class ChunkingService:
                     reading_order=current_order,
                     associated_headings=[h.text for h in associated_headings]  # Store heading texts
                 )
-                
+
                 # Extract table columns
                 unit.columns = self._extract_table_columns_from_items(row_items)
                 unit.numeric_metadata = self._analyze_row_numeric_content(row_text)
-                
+
                 table_units.append(unit)
                 current_order += 1
-        
+
         return table_units
 
     async def _extract_table_content(self, region: LayoutRegion, start_order: int) -> List[StructuredUnit]:
         """Extract table content while preserving structure (fallback method)"""
         return await self._extract_table_content_with_headings(region, start_order, [])
-        
+
     # Legacy method for backward compatibility
 
     async def _extract_text_content(self, region: LayoutRegion, start_order: int) -> List[StructuredUnit]:
         """Extract text content with proper structure detection"""
         # Group items into lines
         lines = self._group_items_into_lines(region.text_items)
-        
+
         # Build structured units from lines
         text_units = []
         current_paragraph = []
         unit_order = start_order
-        
+
         for line_idx, line in enumerate(lines):
             next_line = lines[line_idx + 1] if line_idx + 1 < len(lines) else None
-            
+
             # Detect different content types
             if self._is_header(line.text):
                 # End current paragraph
@@ -2257,7 +2264,7 @@ class ChunkingService:
                     text_units.append(self._create_paragraph_unit(current_paragraph, unit_order))
                     unit_order += 1
                     current_paragraph = []
-                
+
                 # Add header unit
                 text_units.append(StructuredUnit(
                     type='header',
@@ -2267,14 +2274,14 @@ class ChunkingService:
                     reading_order=unit_order
                 ))
                 unit_order += 1
-                
+
             elif self._is_bullet_point(line.text):
                 # End current paragraph
                 if current_paragraph:
                     text_units.append(self._create_paragraph_unit(current_paragraph, unit_order))
                     unit_order += 1
                     current_paragraph = []
-                
+
                 # Add bullet unit
                 text_units.append(StructuredUnit(
                     type='bullet',
@@ -2284,28 +2291,28 @@ class ChunkingService:
                     reading_order=unit_order
                 ))
                 unit_order += 1
-                
+
             else:
                 # Regular text - add to paragraph
                 current_paragraph.append(line)
-                
+
                 # Check if paragraph should end
                 if not next_line or self._should_end_paragraph(line, next_line):
                     if current_paragraph:
                         text_units.append(self._create_paragraph_unit(current_paragraph, unit_order))
                         unit_order += 1
                         current_paragraph = []
-        
+
         # Add final paragraph
         if current_paragraph:
             text_units.append(self._create_paragraph_unit(current_paragraph, unit_order))
-        
+
         return text_units
 
     def _create_paragraph_unit(self, lines: List[Line], reading_order: int) -> StructuredUnit:
         """Create paragraph unit from lines"""
         paragraph_text = ' '.join(line.text for line in lines)
-        
+
         # Calculate bounding box
         if lines:
             min_x = min(line.bbox.x_min for line in lines if line.bbox)
@@ -2315,7 +2322,7 @@ class ChunkingService:
             bbox = BoundingBox(min_x, min_y, max_x, max_y)
         else:
             bbox = None
-        
+
         return StructuredUnit(
             type='paragraph',
             text=paragraph_text,
@@ -2324,13 +2331,13 @@ class ChunkingService:
             reading_order=reading_order
         )
 
-  
-    
+
+
     async def _fallback_page_extraction(self, page, page_number: int) -> PageData:
         """Fallback extraction when enhanced layout fails"""
         try:
             page_text = page.extract_text() or ""
-            
+
             if not page_text.strip():
                 return PageData(
                     page_number=page_number,
@@ -2343,9 +2350,12 @@ class ChunkingService:
 
             lines = [line.strip() for line in page_text.split('\n') if line.strip()]
             structured_units = self._build_simple_units_from_lines(lines)
+            
+            # Text processing methods now use utilities
             clean_text = self._merge_soft_hyphens(page_text)
             normalized_text = self._normalize_text_spacing(clean_text)
             processed_text = self._post_process_extracted_text(normalized_text)
+
 
             return PageData(
                 page_number=page_number,
@@ -2358,7 +2368,8 @@ class ChunkingService:
 
         except Exception as error:
             print(f"❌ Fallback extraction failed for page {page_number}: {error}")
-            
+
+            # Final fallback - return minimal structure
             return PageData(
                 page_number=page_number,
                 text="Text extraction failed",
@@ -2408,7 +2419,7 @@ class ChunkingService:
             # Ensure we have exactly 6 groups, pad with None if needed
             while len(groups) < 6:
                 groups = groups + (None,)
-            
+
             currency_symbol, currency_code_before, number_part, multiplier, percentage, currency_code_after = groups[:6]
 
             # Skip if number_part is too short or doesn't contain digits
@@ -2582,217 +2593,29 @@ class ChunkingService:
         return False
 
     def _merge_soft_hyphens(self, text: str) -> str:
-        """Merges soft hyphens at line ends"""
-        return re.sub(r'-\s*\n(?=\w)', '', text)
-    
+        """Remove soft hyphens and rejoin split words"""
+        from .text_processing import merge_soft_hyphens
+        return merge_soft_hyphens(text)
+
     def _normalize_text_spacing(self, text: str) -> str:
-        """Normalize text spacing to fix character-level spacing issues"""
-        if not text:
-            return text
-            
-        # Step 1: Handle severe character-level spacing (most aggressive first)
-        # Pattern: "S u p p l i e r" -> "Supplier"
-        # This handles cases where EVERY character is separated by spaces
-        def fix_character_spacing(text_input):
-            lines = text_input.split('\n')
-            fixed_lines = []
-            
-            for line in lines:
-                # Check if line has severe character spacing
-                # Count single character "words" vs normal words
-                words = line.split()
-                if not words:
-                    fixed_lines.append(line)
-                    continue
-                
-                single_char_count = sum(1 for word in words if len(word) == 1 and word.isalnum())
-                total_words = len(words)
-                
-                # If more than 70% are single characters, likely character-spaced
-                if total_words > 0 and (single_char_count / total_words) > 0.7:
-                    # Aggressive joining of single characters
-                    result = []
-                    i = 0
-                    current_word = ""
-                    
-                    while i < len(words):
-                        word = words[i]
-                        
-                        # If it's a single alphanumeric character, collect it
-                        if len(word) == 1 and word.isalnum():
-                            current_word += word
-                        else:
-                            # End current word if we have one
-                            if current_word:
-                                result.append(current_word)
-                                current_word = ""
-                            
-                            # Add the non-single-character word
-                            if word.strip():  # Only add non-empty words
-                                result.append(word)
-                        
-                        i += 1
-                    
-                    # Don't forget the last word
-                    if current_word:
-                        result.append(current_word)
-                    
-                    fixed_lines.append(' '.join(result))
-                else:
-                    # Normal processing for lines without severe character spacing
-                    fixed_lines.append(line)
-            
-            return '\n'.join(fixed_lines)
-        
-        # Apply aggressive character spacing fix
-        text = fix_character_spacing(text)
-        
-        # Step 2: Handle moderate character spacing patterns
-        # Pattern: "S u p p l i e r   I n f o" -> "Supplier Info"
-        text = re.sub(r'\b([a-zA-Z])\s+([a-zA-Z])\s+([a-zA-Z])', r'\1\2\3', text)
-        
-        # Step 3: More targeted character spacing fixes
-        # Look for sequences of single characters separated by spaces
-        words = text.split()
-        normalized_words = []
-        
-        i = 0
-        while i < len(words):
-            current_word = words[i]
-            
-            # Check if this looks like character-spaced text
-            if (len(current_word) == 1 and current_word.isalpha() and 
-                i + 1 < len(words) and len(words[i + 1]) == 1 and words[i + 1].isalpha()):
-                
-                # Collect consecutive single characters
-                char_sequence = [current_word]
-                j = i + 1
-                while (j < len(words) and len(words[j]) == 1 and 
-                       (words[j].isalpha() or words[j].isdigit())):
-                    char_sequence.append(words[j])
-                    j += 1
-                
-                # If we found a sequence of single characters, join them
-                if len(char_sequence) > 2:
-                    normalized_words.append(''.join(char_sequence))
-                    i = j
-                else:
-                    normalized_words.append(current_word)
-                    i += 1
-            else:
-                normalized_words.append(current_word)
-                i += 1
-        
-        # Join words back and clean up spacing
-        result = ' '.join(normalized_words)
-        
-        # Step 4: Clean up common spacing issues
-        # Fix number spacing (e.g., "2 5 6 3 4" -> "25634")
-        result = re.sub(r'\b(\d)\s+(?=\d)', r'\1', result)
-        
-        # Fix punctuation spacing
-        result = re.sub(r'\s+([,.;:!?])', r'\1', result)
-        
-        # Step 5: Final cleanup
-        # Remove multiple spaces and normalize line breaks
-        result = re.sub(r'\s+', ' ', result)
-        result = re.sub(r'\n\s*\n', '\n\n', result)
-        
-        # Remove leading/trailing spaces from each line
-        lines = result.split('\n')
-        cleaned_lines = [line.strip() for line in lines]
-        result = '\n'.join(cleaned_lines)
-        
-        return result.strip()
+        """Normalize spacing in text"""
+        from .text_processing import normalize_text_spacing
+        return normalize_text_spacing(text)
 
     def _post_process_extracted_text(self, text: str) -> str:
-        """Post-process extracted text to fix common OCR and extraction issues"""
-        if not text:
-            return text
-        
-        # Split into lines for processing
-        lines = text.split('\n')
-        processed_lines = []
-        
-        for line in lines:
-            if not line.strip():
-                processed_lines.append(line)
-                continue
-            
-            # Check for character-spaced content
-            processed_line = self._fix_character_spacing_line(line)
-            
-            # Fix common OCR artifacts
-            processed_line = self._fix_ocr_artifacts(processed_line)
-            
-            processed_lines.append(processed_line)
-        
-        return '\n'.join(processed_lines)
-    
-    def _fix_character_spacing_line(self, line: str) -> str:
-        """Fix character spacing in a single line"""
-        if not line:
-            return line
-        
-        # Split into tokens
-        tokens = line.split()
-        if len(tokens) < 3:
-            return line
-        
-        # Check if line is severely character-spaced
-        single_char_tokens = [t for t in tokens if len(t) == 1 and (t.isalnum() or t in '.,;:')]
-        char_ratio = len(single_char_tokens) / len(tokens)
-        
-        if char_ratio > 0.6:  # More than 60% single characters
-            # Reconstruct the line by joining consecutive single characters
-            result = []
-            current_word = ""
-            
-            for token in tokens:
-                if len(token) == 1 and token.isalnum():
-                    current_word += token
-                else:
-                    if current_word:
-                        result.append(current_word)
-                        current_word = ""
-                    if token.strip():
-                        result.append(token)
-            
-            # Don't forget the last word
-            if current_word:
-                result.append(current_word)
-            
-            return ' '.join(result)
-        
-        return line
-    
+        """Apply final post-processing to extracted text"""
+        from .text_processing import post_process_extracted_text
+        return post_process_extracted_text(text)
+
+    def _fix_character_spacing_line(self, text: str) -> str:
+        """Fix character spacing issues in text"""
+        from .text_processing import fix_character_spacing_line
+        return fix_character_spacing_line(text)
+
     def _fix_ocr_artifacts(self, text: str) -> str:
-        """Fix common OCR artifacts and extraction issues"""
-        if not text:
-            return text
-        
-        # Fix spaced numbers (e.g., "1 2 3 4 5" -> "12345")
-        text = re.sub(r'\b(\d)\s+(\d)', r'\1\2', text)
-        text = re.sub(r'\b(\d)\s+(\d)', r'\1\2', text)  # Run twice for longer sequences
-        
-        # Fix spaced punctuation
-        text = re.sub(r'\s+([.,;:!?])', r'\1', text)
-        text = re.sub(r'([.,;:!?])\s+', r'\1 ', text)
-        
-        # Fix common letter substitutions from OCR
-        ocr_fixes = {
-            r'\b0\b': 'O',  # Zero to O in words
-            r'\b1\b': 'I',  # One to I in words (context dependent)
-            r'\s+': ' ',    # Multiple spaces to single space
-        }
-        
-        for pattern, replacement in ocr_fixes.items():
-            text = re.sub(pattern, replacement, text)
-        
-        # Fix spacing around colons (common in invoice/document text)
-        text = re.sub(r'\s*:\s*', ': ', text)
-        
-        return text.strip()
+        """Fix common OCR artifacts"""
+        from .text_processing import fix_ocr_artifacts
+        return fix_ocr_artifacts(text)
 
     def _build_simple_units_from_lines(self, lines: List[str]) -> List[StructuredUnit]:
         """Simplified unit building for fallback"""
@@ -2862,7 +2685,7 @@ class ChunkingService:
                             text=' '.join(current_paragraph),
                             lines=list(current_paragraph),
                             start_line=paragraph_start_index,
-                            end_line=i + 1
+                            end_line=len(lines)
                         ))
                         current_paragraph = []
                         paragraph_start_index = None
@@ -3122,21 +2945,21 @@ class ChunkingService:
             chunk_sizes = [len(chunk.get('text', '')) for chunk in chunks]
             table_chunks = [chunk for chunk in chunks if chunk.get('metadata', {}).get('has_table_content')]
             text_chunks = [chunk for chunk in chunks if not chunk.get('metadata', {}).get('has_table_content')]
-            
+
             print(f"📄 Created {len(chunks)} chunks using enhanced unit-based approach")
             print(f"   Overall: min={min(chunk_sizes)}, max={max(chunk_sizes)}, avg={sum(chunk_sizes)//len(chunk_sizes)}")
-            
+
             if text_chunks:
                 text_sizes = [len(chunk.get('text', '')) for chunk in text_chunks]
                 oversized_text = [s for s in text_sizes if s > self.chunk_size]
-                print(f"   Text chunks ({len(text_chunks)}): min={min(text_sizes)}, max={max(text_sizes)}, avg={sum(text_sizes)//len(text_sizes)}")
+                print(f"   Text chunks ({len(text_chunks)}): min={min(text_sizes)}, max={max(text_sizes)}, avg={sum(text_sizes)//len(text_chunks)}")
                 if oversized_text:
                     print(f"   ⚠️ {len(oversized_text)} text chunks exceed limit: {oversized_text}")
-            
+
             if table_chunks:
                 table_sizes = [len(chunk.get('text', '')) for chunk in table_chunks]
-                print(f"   Table chunks ({len(table_chunks)}): min={min(table_sizes)}, max={max(table_sizes)}, avg={sum(table_sizes)//len(table_sizes)}")
-        
+                print(f"   Table chunks ({len(table_chunks)}): min={min(table_sizes)}, max={max(table_sizes)}, avg={sum(table_sizes)//len(table_chunks)}")
+
         # Enhanced table extraction logging (show up to 6 chunks)
         table_chunks = [chunk for chunk in chunks if chunk.get('metadata', {}).get('has_table_content')]
         if table_chunks:
@@ -3145,77 +2968,68 @@ class ChunkingService:
             print(f"="*80)
             print(f"Total table chunks: {len(table_chunks)}")
             print(f"Showing detailed analysis for first {min(6, len(table_chunks))} table chunks:")
-            
+
             for i, chunk in enumerate(table_chunks[:6]):
                 metadata = chunk.get('metadata', {})
                 numeric_metadata = metadata.get('numeric_metadata', {})
-                
+
                 print(f"\n" + "-"*60)
                 print(f"🔢 TABLE CHUNK {i+1}/{len(table_chunks)}")
                 print(f"-"*60)
                 print(f"Size: {len(chunk.get('text', ''))} characters")
                 print(f"Semantic types: {metadata.get('semantic_types', [])}")
-                
+
                 # Determine if JSON or text format
                 has_json_tables = metadata.get('has_json_tables', False)
                 has_structured_tables = 'structured_tables' in chunk and len(chunk.get('structured_tables', [])) > 0
-                
+
                 if has_json_tables or has_structured_tables:
                     print(f"Storage format: JSON structured data")
                 else:
                     print(f"Storage format: Plain text")
-                
+
                 # Enhanced table structure details with context
                 context_headings = numeric_metadata.get('table_context_headings', [])
                 if context_headings:
                     print(f"Table context: {', '.join(context_headings[:2])}")
-                
+
                 print(f"Table structure:")
                 print(f"  • Rows: {numeric_metadata.get('table_rows_count', 0)}")
                 print(f"  • Headers: {numeric_metadata.get('table_headers_count', 0)}")
                 print(f"  • JSON tables: {numeric_metadata.get('json_tables_count', 0)}")
                 print(f"  • Structured tables: {numeric_metadata.get('total_structured_tables', 0)}")
-                
+
                 # Financial data analysis
                 print(f"Financial data:")
                 print(f"  • Numbers found: {numeric_metadata.get('total_numbers', 0)}")
                 print(f"  • Currencies: {numeric_metadata.get('currencies', [])}")
                 print(f"  • Has negative values: {numeric_metadata.get('has_negative_values', False)}")
-                
+
                 # Enhanced table data display
                 self._display_enhanced_table_structure(chunk, i+1)
-                
+
                 # JSON table data details
                 if has_structured_tables:
                     structured_tables = chunk.get('structured_tables', [])
                     print(f"📋 STRUCTURED JSON TABLE DATA:")
                     for j, json_table in enumerate(structured_tables[:2]):
                         table_data = json_table.get('table_data', {})
-                        print(f"  🔸 Table {j+1}:")
-                        print(f"    • Source: {json_table.get('extraction_source', 'unknown')}")
-                        print(f"    • Accuracy: {json_table.get('accuracy', 0):.1f}%")
-                        if 'table_metadata' in table_data:
-                            tm = table_data['table_metadata']
-                            print(f"    • Dimensions: {tm.get('total_rows', 0)}×{tm.get('total_columns', 0)}")
-                            print(f"    • Has header: {tm.get('has_header', False)}")
-                            
-                        # Display actual table data structure
                         self._display_json_table_data(table_data, j+1)
-                
+
                 else:
                     # Show text-based table structure 
                     print(f"📋 TEXT-BASED TABLE STRUCTURE:")
                     self._display_text_table_structure(chunk, i+1)
-            
+
             print(f"\n" + "="*80)
             print(f"📈 TABLE EXTRACTION SUMMARY")
             print(f"="*80)
-            
+
             # Overall statistics
             total_json_tables = sum(chunk.get('metadata', {}).get('numeric_metadata', {}).get('json_tables_count', 0) for chunk in table_chunks)
             total_regular_tables = sum(chunk.get('metadata', {}).get('numeric_metadata', {}).get('table_rows_count', 0) for chunk in table_chunks)
             contextualized_chunks = sum(1 for chunk in table_chunks if chunk.get('metadata', {}).get('has_contextualized_tables', False))
-            
+
             print(f"Total JSON tables extracted: {total_json_tables}")
             print(f"Total regular table rows: {total_regular_tables}")
             print(f"Chunks with context: {contextualized_chunks}/{len(table_chunks)} ({100*contextualized_chunks/len(table_chunks):.1f}%)")
@@ -3235,21 +3049,21 @@ class ChunkingService:
         i = 0
         while i < len(units):
             unit = units[i]
-            
+
             # Check if this is a table header followed by table rows
             if unit.type == 'table_header':
                 # Find all related table content
                 table_group = [unit]
                 j = i + 1
-                
+
                 # Collect all table rows that follow this header
                 while j < len(units) and units[j].type == 'table_row':
                     table_group.append(units[j])
                     j += 1
-                
+
                 # Calculate total size of table group
                 table_group_text = '\n'.join(u.text for u in table_group)
-                
+
                 # For tables, we allow exceeding chunk size but still try to be reasonable
                 # If current chunk has non-table content and adding table would exceed limit
                 if current_chunk.strip() and len(current_chunk) + len(table_group_text) > self.chunk_size:
@@ -3270,20 +3084,20 @@ class ChunkingService:
                     else:
                         current_chunk = table_group_text
                     current_units.extend(table_group)
-                
+
                 # Skip the processed table rows
                 i = j
                 continue
-            
+
             # Check if this is a regular table row without header (standalone table)
             elif unit.type == 'table_row':
                 # For standalone table rows, be more conservative
                 unit_text = unit.text
-                
+
                 # If adding this table row would exceed chunk size significantly
                 if (current_chunk.strip() and 
                     len(current_chunk) + len(unit_text) > self.chunk_size * 1.2):  # Allow 20% overflow for tables
-                    
+
                     # Create chunk with current content
                     chunk_text = current_chunk.strip()
                     chunks.append(self._create_semantic_chunk(
@@ -3301,17 +3115,17 @@ class ChunkingService:
                     else:
                         current_chunk = unit_text
                     current_units.append(unit)
-                
+
                 i += 1
                 continue
-            
+
             # Handle regular units (headers, paragraphs, bullets) - STRICT SIZE CONTROL
             else:
                 unit_text = unit.text
 
                 # For regular text, be very strict about chunk size
                 potential_chunk_size = len(current_chunk) + len(unit_text) + 1  # +1 for newline
-                
+
                 if potential_chunk_size > self.chunk_size and current_chunk.strip():
                     # If the current unit alone is larger than chunk size, we need to split it
                     if len(unit_text) > self.chunk_size:
@@ -3322,7 +3136,7 @@ class ChunkingService:
                                 chunk_text, metadata, chunk_index, page_number, current_units
                             ))
                             chunk_index += 1
-                        
+
                         # Split the large unit into smaller chunks
                         unit_chunks = self._split_large_unit(unit, self.chunk_size)
                         for unit_chunk_text in unit_chunks:
@@ -3330,7 +3144,7 @@ class ChunkingService:
                                 unit_chunk_text, metadata, chunk_index, page_number, [unit]
                             ))
                             chunk_index += 1
-                        
+
                         # Reset current chunk
                         current_chunk = ''
                         current_units = []
@@ -3344,7 +3158,7 @@ class ChunkingService:
 
                         # Calculate controlled overlap for regular text
                         overlap_text = self._get_controlled_overlap(chunk_text, 50, 80)  # Smaller overlap for strict sizing
-                        
+
                         # Start new chunk with overlap + current unit
                         if overlap_text and len(overlap_text) + len(unit_text) <= self.chunk_size:
                             current_chunk = f"{overlap_text}\n{unit_text}"
@@ -3358,7 +3172,7 @@ class ChunkingService:
                     else:
                         current_chunk = unit_text
                     current_units.append(unit)
-            
+
             i += 1
 
         # Add final chunk if it has content and within reasonable size
@@ -3380,20 +3194,20 @@ class ChunkingService:
         text = unit.text
         if len(text) <= max_size:
             return [text]
-        
+
         chunks = []
         current_pos = 0
-        
+
         while current_pos < len(text):
             # Calculate chunk end position
             chunk_end = min(current_pos + max_size, len(text))
-            
+
             # If not at end, try to break at sentence or word boundary
             if chunk_end < len(text):
                 # Look for good break points
                 search_start = max(current_pos + int(max_size * 0.7), current_pos)
                 search_text = text[search_start:chunk_end + 50]
-                
+
                 break_points = [
                     search_text.rfind('. '),
                     search_text.rfind('! '),
@@ -3408,22 +3222,22 @@ class ChunkingService:
                     if break_point > 0:
                         chunk_end = search_start + break_point + 1
                         break
-            
+
             # Extract chunk text
             chunk_text = text[current_pos:chunk_end].strip()
             if chunk_text:
                 chunks.append(chunk_text)
-            
+
             # Move to next position with small overlap
             overlap = min(50, len(chunk_text) // 4)
             current_pos = max(chunk_end - overlap, current_pos + 1)
-            
-            # Safety check
+
+            # Safety check to prevent infinite loops
             if current_pos >= len(text):
                 break
-        
+
         return chunks
-    
+
     def _split_large_final_chunk(self, chunk_text: str, units: List[StructuredUnit], 
                                 metadata: Dict, start_index: int, page_number: Optional[int], 
                                 chunks: List[Dict]):
@@ -3432,7 +3246,7 @@ class ChunkingService:
         units_by_size = []
         current_text = ''
         current_group = []
-        
+
         for unit in units:
             if len(current_text) + len(unit.text) > self.chunk_size and current_group:
                 units_by_size.append((current_text.strip(), current_group))
@@ -3444,11 +3258,11 @@ class ChunkingService:
                 else:
                     current_text = unit.text
                 current_group.append(unit)
-        
+
         # Add final group
         if current_group:
             units_by_size.append((current_text.strip(), current_group))
-        
+
         # Create chunks from groups
         chunk_index = start_index
         for group_text, group_units in units_by_size:
@@ -3505,11 +3319,11 @@ class ChunkingService:
 
         # Fallback: ensure we stay within range and size limits
         fallback_overlap = chunk_text[-min(max_overlap, len(chunk_text)):]
-        
+
         # If fallback would still be too large, reduce it
         if len(fallback_overlap) > self.chunk_size // 3:  # Max 33% of chunk size
             fallback_overlap = fallback_overlap[-self.chunk_size // 3:]
-        
+
         return fallback_overlap if len(fallback_overlap) >= min_overlap else ''
 
     def _create_semantic_chunk(self, text: str, metadata: Dict, chunk_index: int, 
@@ -3522,7 +3336,7 @@ class ChunkingService:
         # Check chunk size and log if oversized for non-table content
         chunk_size = len(text)
         has_table_content = any(t in ['table_row', 'table_header'] for t in unit_types)
-        
+
         if chunk_size > self.chunk_size and not has_table_content:
             print(f"⚠️ Oversized non-table chunk created: {chunk_size} chars (limit: {self.chunk_size})")
             print(f"   Unit types: {unit_types}")
@@ -3536,12 +3350,12 @@ class ChunkingService:
         table_rows = [u for u in semantic_units if u.type == 'table_row']
         table_headers = [u for u in semantic_units if u.type == 'table_header']
         json_tables = [u for u in semantic_units if u.type == 'table_json']
-        
+
         # Extract heading-table associations
         heading_table_associations = []
         table_context_headings = []
         json_table_data = []
-        
+
         for unit in semantic_units:
             if unit.type == 'table_row' and hasattr(unit, 'associated_headings'):
                 table_context_headings.extend(unit.associated_headings)
@@ -3640,14 +3454,14 @@ class ChunkingService:
             'text': text,
             'metadata': chunk_metadata
         }
-        
+
         # Add JSON tables as separate field for structured access
         if json_table_data:
             chunk_data['structured_tables'] = json_table_data
             chunk_data['content_type'] = 'mixed'  # Contains both text and structured data
         else:
             chunk_data['content_type'] = 'text'
-            
+
         return chunk_data
 
     def _calculate_chunk_coherence_score(self, semantic_units: List[StructuredUnit], 
@@ -3655,30 +3469,30 @@ class ChunkingService:
         """Calculate a coherence score for the chunk based on heading-table associations"""
         if not semantic_units:
             return 0.0
-            
+
         # Base score
         coherence_score = 0.5
-        
+
         # Bonus for having heading-table pairs
         if heading_table_associations:
             coherence_score += 0.3
-        
+
         # Bonus for proper reading order
         reading_orders = [getattr(u, 'reading_order', 0) for u in semantic_units]
         if reading_orders == sorted(reading_orders):
             coherence_score += 0.2
-            
+
         # Bonus for table content with context
         table_units = [u for u in semantic_units if u.type in ['table_row', 'table_header']]
         if table_units and any(hasattr(u, 'associated_headings') for u in table_units):
             coherence_score += 0.1
-            
+
         return min(1.0, coherence_score)
 
     def _display_enhanced_table_structure(self, chunk: Dict, table_num: int):
         """Display enhanced table structure with proper formatting"""
         structured_tables = chunk.get('structured_tables', [])
-        
+
         if structured_tables:
             print(f"📊 TABLE {table_num} - STRUCTURED DATA FORMAT:")
             for i, table_data in enumerate(structured_tables[:1]):  # Show first table
@@ -3693,27 +3507,27 @@ class ChunkingService:
         if not table_data or 'headers' not in table_data:
             print(f"    ⚠️ No structured table data available")
             return
-            
+
         headers = table_data.get('headers', [])
         data_rows = table_data.get('data', [])
         metadata = table_data.get('table_metadata', {})
-        
+
         print(f"    📋 Table {table_index} Structure:")
         print(f"       Dimensions: {metadata.get('total_rows', 0)} rows × {metadata.get('total_columns', 0)} columns")
         print(f"       Extraction source: {metadata.get('extraction_source', 'unknown')}")
-        
+
         if headers:
             print(f"    🏷️ Column Headers:")
             for j, header in enumerate(headers[:6]):  # Show max 6 headers
                 print(f"       {j+1}. {header}")
             if len(headers) > 6:
                 print(f"       ... ({len(headers) - 6} more columns)")
-        
+
         if data_rows:
             print(f"    📊 Sample Data (first 3 rows):")
             print(f"       " + " | ".join([f"{h[:12]:<12}" for h in headers[:4]]))
             print(f"       " + "-" * min(60, len(headers) * 15))
-            
+
             for row_idx, row_data in enumerate(data_rows[:3]):
                 if 'values' in row_data:
                     row_values = []
@@ -3731,9 +3545,9 @@ class ChunkingService:
                             row_values.append(f"{value[:12]:<12}")
                         else:
                             row_values.append(f"{'N/A':<12}")
-                    
+
                     print(f"       " + " | ".join(row_values))
-            
+
             if len(data_rows) > 3:
                 print(f"       ... ({len(data_rows) - 3} more rows)")
 
@@ -3741,14 +3555,14 @@ class ChunkingService:
         """Display text-based table structure analysis"""
         chunk_text = chunk.get('text', '')
         lines = chunk_text.split('\n')
-        
+
         # Analyze text for potential table structure
         numeric_lines = []
         non_empty_lines = [line.strip() for line in lines if line.strip()]
-        
+
         print(f"    📝 Text Analysis:")
         print(f"       Total lines: {len(non_empty_lines)}")
-        
+
         # Try to detect column structure in text
         potential_columns = []
         for line in non_empty_lines[:5]:  # Analyze first 5 lines
@@ -3756,11 +3570,11 @@ class ChunkingService:
             columns = [col.strip() for col in re.split(r'\s{2,}|\t', line) if col.strip()]
             if len(columns) > 1:
                 potential_columns.append(columns)
-        
+
         if potential_columns:
             max_cols = max(len(cols) for cols in potential_columns)
             print(f"       Detected column structure: ~{max_cols} columns per row")
-            
+
             # Show sample rows as table-like structure
             print(f"    📊 Detected Structure (first 3 rows):")
             for i, cols in enumerate(potential_columns[:3]):
@@ -3800,7 +3614,7 @@ class ChunkingService:
         """Alternative chunking strategy selector"""
         if metadata is None:
             metadata = {}
-        
+
         if strategy == 'fixed_size':
             return self._split_by_fixed_size_advanced(pdf_data.full_text, metadata)
         elif strategy in ['semantic', 'layout_aware_semantic']:
@@ -3813,7 +3627,7 @@ class ChunkingService:
         """Safe fixed-size chunking with proper step calculation and blank line preservation"""
         if metadata is None:
             metadata = {}
-        
+
         chunks = []
         current_position = 0
         chunk_index = 0
@@ -3830,13 +3644,15 @@ class ChunkingService:
                 # Look for good break points in descending order of preference
                 search_start = max(current_position + int(self.chunk_size * 0.3), current_position)
                 search_text = preserved_text[search_start:chunk_end + 100]
-                
+
                 break_points = [
                     search_text.rfind('\n\n__PARAGRAPH_BREAK__\n\n'),
                     search_text.rfind('. '),
                     search_text.rfind('! '),
                     search_text.rfind('? '),
                     search_text.rfind('\n'),
+                    search_text.rfind('; '),
+                    search_text.rfind(', '),
                     search_text.rfind(' ')
                 ]
 
@@ -3918,19 +3734,19 @@ class ChunkingService:
 
         print('🧪 Testing Currency/Number Normalization:')
         results = []
-        
+
         for i, test in enumerate(tests):
             try:
                 result = self._normalize_currency_and_numbers(test)
                 results.append(result)
-                
+
                 print(f'Input: "{test}" → Numbers: {len(result.numbers)}, Currencies: [{", ".join(result.currencies)}]')
                 for j, num in enumerate(result.numbers):
                     currency_str = f'{num.currency} ' if num.currency else ''
                     percentage_str = '%' if num.is_percentage else ''
                     negative_str = '(negative)' if num.is_negative else ''
                     print(f'  Number {j + 1}: {currency_str}{num.value}{percentage_str} {negative_str}')
-                    
+
             except Exception as error:
                 print(f'❌ Test {i + 1} failed for "{test}": {error}')
                 results.append(NormalizedData(
@@ -3979,7 +3795,7 @@ class ChunkingService:
             if hasattr(page, 'layout') and page.layout:
                 analysis['has_enhanced_layout'] = True
                 analysis['layout_types'].append(page.layout.layout_type)
-                
+
                 # Check for reading order preservation
                 if any(hasattr(unit, 'reading_order') for unit in page.structured_units):
                     analysis['reading_order_preserved'] = True
@@ -4032,7 +3848,7 @@ class ChunkingService:
             metadata = chunk.get('metadata', {})
             semantic_types = metadata.get('semantic_types', [])
             chunk_types.extend(semantic_types)
-            
+
             if metadata.get('has_structured_content', False):
                 has_structured = True
             if metadata.get('has_table_content', False):
@@ -4043,16 +3859,16 @@ class ChunkingService:
                 has_contextualized_tables = True
             if metadata.get('maintains_reading_order', False):
                 reading_order_preserved = True
-            
+
             # Track pages spanned
             page_num = metadata.get('page_number')
             if page_num is not None:
                 pages_spanned.add(page_num)
-            
+
             # Get strategy from first chunk
             if metadata.get('strategy'):
                 strategy = metadata['strategy']
-            
+
             # Track unit types
             for unit_type in semantic_types:
                 unit_types_distribution[unit_type] = unit_types_distribution.get(unit_type, 0) + 1
