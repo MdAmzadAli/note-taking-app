@@ -74,10 +74,6 @@ from .service_config import (
     analyze_pdf_structure
 )
 
-# from .visual_structure_detection import (
-#     detect_visual_structures,
-#     bboxes_overlap
-# )
 
 from .column_detection import (
     detect_columns_enhanced
