@@ -1,6 +1,21 @@
 
 # ChunkingUtils package - Modular PDF processing utilities
 
+from .text_items import (
+    TextItem,
+    BoundingBox
+)
+
+from .page_structures import (
+    Line,
+    Column,
+    LayoutRegion,
+    StructuredUnit,
+    PageLayout,
+    PageData,
+    PDFData
+)
+
 from .content_detection import (
     is_header,
     is_bullet_point,
@@ -53,17 +68,38 @@ from .visual_structure_detection import (
     group_nearby_lines,
     check_line_intersections,
     find_peaks,
-    bboxes_overlap,
-    BoundingBox
+    bboxes_overlap
 )
 
 from .line_grouping import (
     group_items_into_lines,
     create_line_from_items,
     group_lines_into_rows,
-    line_intersects_bbox,
-    TextItem,
-    Line
+    line_intersects_bbox
+)
+
+from .pdf_extraction import (
+    extract_text_from_pdf,
+    extract_page_with_enhanced_layout,
+    fallback_page_extraction,
+    fallback_extraction,
+    build_simple_units_from_lines
+)
+
+from .semantic_chunking import (
+    split_into_chunks,
+    create_units_based_chunks,
+    split_large_unit,
+    split_large_final_chunk,
+    get_controlled_overlap,
+    create_semantic_chunk,
+    calculate_chunk_coherence_score
+)
+
+from .pdf_processing import (
+    process_pdf,
+    process_text_content,
+    create_simple_text_units
 )
 
 from .column_detection import (
