@@ -1,0 +1,229 @@
+
+import re
+from typing import List, Dict, Any, Optional
+
+def is_header(line: str) -> bool:
+    """Check if line is a header"""
+    text = line
+
+    # Basic length and content checks
+    if len(text) > 80 or len(text) < 3:
+        return False
+
+    # Pattern 1: All caps with colon (strong header indicator)
+    all_caps_with_colon = re.match(r'^[A-Z\s]+:\s*$', text) and len(text) < 60
+    if all_caps_with_colon:
+        return True
+
+    # Pattern 2: Numbered headers (1. Title, Section 1, etc.)
+    numbered_header = re.match(r'^(\d+\.|\d+\s+|Section\s+\d+|Chapter\s+\d+)\s*[A-Z]', text)
+    if numbered_header:
+        return True
+
+    # Pattern 3: Title case with colon and reasonable length
+    title_case_with_colon = re.match(r'^[A-Z][a-z]+(\s+[A-Z][a-z]+)*:\s*$', text) and len(text) < 60
+    if title_case_with_colon:
+        return True
+
+    # Pattern 4: All caps but require additional context checks
+    all_caps = re.match(r'^[A-Z\s]+$', text) and len(text) < 50
+    if all_caps:
+        # Additional checks to reduce false positives
+
+        # Reject if it looks like an acronym (too short, no spaces)
+        if len(text) < 8 and not re.search(r'\s', text):
+            return False
+
+        # Reject common false positives
+        false_positives = re.match(r'^(USD|EUR|GBP|INR|CAD|AUD|CHF|CNY|JPY|YES|NO|TRUE|FALSE|NULL|TOTAL|SUM|AVG|MAX|MIN|COUNT|ID|NAME|DATE|TIME|TYPE|STATUS)$', text.strip())
+        if false_positives:
+            return False
+
+        # For plain text, be more restrictive - require at least one space (multi-word)
+        return re.search(r'\s', text) and len(text.split()) >= 2
+
+    return False
+
+def is_bullet_point(line: str) -> bool:
+    """Check if line is a bullet point"""
+    return bool(re.match(r'^[\u2022\u2023\u25E6\u2043\u2219•·‣⁃▪▫‧∙∘‰◦⦾⦿]', line) or
+                re.match(r'^[-*+]\s', line) or
+                re.match(r'^\d+[\.\)]\s', line) or
+                re.match(r'^[a-zA-Z][\.\)]\s', line))
+
+def is_date_like(value: str) -> bool:
+    """Basic check for date-like patterns"""
+    if not value:
+        return False
+    
+    date_patterns = [
+        r'\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}',  # MM/DD/YYYY or MM-DD-YYYY
+        r'\d{4}[/\-]\d{1,2}[/\-]\d{1,2}',    # YYYY/MM/DD or YYYY-MM-DD
+        r'\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)',  # DD Month
+        r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}'   # Month DD
+    ]
+    
+    value_str = str(value).strip()
+    return any(re.search(pattern, value_str, re.IGNORECASE) for pattern in date_patterns)
+
+def analyze_row_content(row_lines: List) -> Dict:
+    """Analyze if a row looks like table content"""
+    indicators = 0
+    confidence = 0.0
+    
+    # Sort by x position
+    sorted_lines = sorted(row_lines, key=lambda l: l.min_x)
+    
+    # Check for table-like patterns
+    numeric_count = 0
+    short_text_count = 0
+    total_items = len(sorted_lines)
+    
+    for line in sorted_lines:
+        text = line.text.strip()
+        
+        # Numeric content
+        if re.search(r'\d', text):
+            numeric_count += 1
+            indicators += 1
+        
+        # Short, concise text (typical in tables)
+        if len(text.split()) <= 3:
+            short_text_count += 1
+            indicators += 1
+        
+        # Currency or percentage
+        if re.search(r'[\$€£¥%]', text):
+            indicators += 2
+        
+        # Aligned positioning (regular spacing)
+        if len(sorted_lines) >= 3:
+            # Check if spacing is regular
+            spacings = [sorted_lines[i+1].min_x - sorted_lines[i].max_x 
+                       for i in range(len(sorted_lines)-1)]
+            if spacings and max(spacings) - min(spacings) < 20:  # Regular spacing
+                indicators += 1
+    
+    # Calculate confidence
+    if total_items > 0:
+        numeric_ratio = numeric_count / total_items
+        short_text_ratio = short_text_count / total_items
+        confidence = (numeric_ratio * 0.6 + short_text_ratio * 0.4) * min(indicators / total_items, 1.0)
+    
+    is_table_like = confidence > 0.5 and indicators >= 2
+    
+    return {
+        'is_table_like': is_table_like,
+        'confidence': confidence,
+        'indicators': indicators,
+        'numeric_ratio': numeric_count / max(total_items, 1),
+        'short_text_ratio': short_text_count / max(total_items, 1)
+    }
+
+def calculate_text_density(lines: List) -> float:
+    """Calculate text density in a column"""
+    if not lines:
+        return 0.0
+    
+    total_chars = sum(len(line.text) for line in lines)
+    total_lines = len(lines)
+    
+    return total_chars / max(total_lines, 1)
+
+def count_table_indicators_in_column(lines: List) -> int:
+    """Count table-like patterns in a column"""
+    indicators = 0
+    
+    for line in lines:
+        text = line.text.strip()
+        
+        # Look for table indicators
+        if re.search(r'\d+\.\d+', text):  # Numbers with decimals
+            indicators += 1
+        if re.search(r'\$\d+', text):  # Currency
+            indicators += 1
+        if len(text.split()) <= 3 and any(char.isdigit() for char in text):  # Short numeric text
+            indicators += 1
+        if re.search(r'\b(total|sum|amount|qty|quantity)\b', text.lower()):  # Table keywords
+            indicators += 1
+    
+    return indicators
+
+def validate_table_vs_multicolumn(table_bbox, layout_analysis: Dict, lines: List) -> bool:
+    """Validate if a detected table is actually a table vs multi-column text"""
+    
+    # Get lines within the table bbox
+    table_lines = [
+        line for line in lines 
+        if line_intersects_bbox(line, table_bbox, overlap_threshold=0.5)
+    ]
+    
+    if not table_lines:
+        return False
+    
+    # Check if this spans multiple text columns (likely multi-column text)
+    text_columns = layout_analysis.get('text_columns', [])
+    text_column_count = sum(1 for col in text_columns 
+                           if col['type'] == 'text' and 
+                           col['x_min'] < table_bbox.x_max and col['x_max'] > table_bbox.x_min)
+    
+    if text_column_count > 1:
+        # Likely multi-column text, not a table
+        print(f"📰 Rejecting table candidate - spans {text_column_count} text columns (multi-column text)")
+        return False
+    
+    # Additional content validation
+    row_groups = group_lines_into_rows(table_lines)
+    table_like_rows = sum(1 for row in row_groups if analyze_row_content(row)['is_table_like'])
+    
+    table_ratio = table_like_rows / max(len(row_groups), 1)
+    
+    is_valid_table = table_ratio > 0.3  # At least 30% of rows should look table-like
+    
+    if not is_valid_table:
+        print(f"📝 Rejecting table candidate - only {table_ratio:.1%} table-like content")
+    
+    return is_valid_table
+
+def group_lines_into_rows(lines: List, y_tolerance: float = 5) -> List[List]:
+    """Group lines into potential table rows"""
+    if not lines:
+        return []
+    
+    sorted_lines = sorted(lines, key=lambda l: l.y)
+    rows = []
+    current_row = [sorted_lines[0]]
+    
+    for line in sorted_lines[1:]:
+        if abs(line.y - current_row[0].y) <= y_tolerance:
+            current_row.append(line)
+        else:
+            if len(current_row) >= 2:
+                rows.append(current_row)
+            current_row = [line]
+    
+    if len(current_row) >= 2:
+        rows.append(current_row)
+    
+    return rows
+
+def line_intersects_bbox(line, bbox, overlap_threshold: float = 0.5) -> bool:
+    """Check if line intersects with bounding box"""
+    if not line.bbox:
+        return False
+        
+    # Calculate intersection
+    intersection_x = max(0, min(line.bbox.x_max, bbox.x_max) - max(line.bbox.x_min, bbox.x_min))
+    intersection_y = max(0, min(line.bbox.y_max, bbox.y_max) - max(line.bbox.y_min, bbox.y_min))
+    
+    if intersection_x <= 0 or intersection_y <= 0:
+        return False
+    
+    intersection_area = intersection_x * intersection_y
+    line_area = line.bbox.area
+    
+    if line_area == 0:
+        return False
+    
+    overlap_ratio = intersection_area / line_area
+    return overlap_ratio >= overlap_threshold
