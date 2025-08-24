@@ -412,7 +412,7 @@ class ChunkingService:
 
             # Generate text from structured units (with JSON table handling)
             page_text = self._generate_page_text_with_json_tables(structured_units)
-            
+
             # Text processing methods now use utilities
             page_text = self._merge_soft_hyphens(page_text)
             page_text = self._normalize_text_spacing(page_text)
@@ -1368,106 +1368,6 @@ class ChunkingService:
 
         return structured_units
 
-    async def _extract_json_table_content_enhanced(self, region: LayoutRegion, start_order: int, recent_headings: List[StructuredUnit], all_regions: List[LayoutRegion], region_idx: int) -> List[StructuredUnit]:
-        """Extract content from JSON table regions with enhanced context extraction"""
-        json_units = []
-        current_order = start_order
-
-        print(f"🔢 Extracting JSON table content (region {region_idx + 1})")
-
-        # Enhanced heading association with fallback context extraction
-        associated_headings = self._find_associated_headings(region, recent_headings, 150)
-
-        # If no headings found, extract context from surrounding regions
-        if not associated_headings:
-            print(f"   No direct headings found, extracting surrounding context...")
-            surrounding_context = self._extract_surrounding_context(region, all_regions, region_idx, word_limit=50)
-            if surrounding_context:
-                print(f"   ✅ Extracted surrounding context: '{surrounding_context[:100]}...'")
-                # Create synthetic heading from context
-                context_unit = StructuredUnit(
-                    type='table_context',
-                    text=surrounding_context,
-                    lines=[surrounding_context],
-                    bbox=region.bbox,
-                    reading_order=current_order,
-                    associated_table_region=region.bbox
-                )
-                json_units.append(context_unit)
-                current_order += 1
-        else:
-            # Add associated headings
-            print(f"   Adding {len(associated_headings)} associated headings")
-            for heading in associated_headings:
-                heading_unit = StructuredUnit(
-                    type='table_header',
-                    text=heading.text,
-                    lines=heading.lines,
-                    bbox=heading.bbox,
-                    reading_order=current_order,
-                    associated_table_region=region.bbox
-                )
-                json_units.append(heading_unit)
-                current_order += 1
-
-        # Create JSON table unit with detailed logging
-        if hasattr(region, 'table_json') and region.table_json:
-            table_json = region.table_json
-
-            # Log table data details
-            print(f"📊 TABLE DATA DETAILS:")
-            print(f"   Source: {getattr(region, 'table_source', 'unknown')}")
-            print(f"   Accuracy: {getattr(region, 'extraction_accuracy', 0):.1f}%")
-
-            if 'table_metadata' in table_json:
-                metadata = table_json['table_metadata']
-                print(f"   Dimensions: {metadata.get('total_rows', 0)} rows × {metadata.get('total_columns', 0)} columns")
-                print(f"   Has header: {metadata.get('has_header', False)}")
-
-            if 'headers' in table_json:
-                headers = table_json['headers']
-                print(f"   Headers: {headers[:5]}{'...' if len(headers) > 5 else ''}")
-
-            if 'data' in table_json:
-                data_rows = table_json['data']
-                print(f"   Sample data (first 3 rows):")
-                for i, row in enumerate(data_rows[:3]):
-                    if 'values' in row:
-                        row_preview = []
-                        for header in list(row['values'].keys())[:3]:
-                            cell_data = row['values'][header]
-                            if isinstance(cell_data, dict):
-                                value = cell_data.get('value', '')
-                                if cell_data.get('currency'):
-                                    value = f"{cell_data['currency']} {value}"
-                            else:
-                                value = str(cell_data)
-                            row_preview.append(f"{header}: {value}")
-                        print(f"     Row {i+1}: {' | '.join(row_preview)}")
-
-            # Create readable summary for search
-            table_summary = self._create_table_summary_text(table_json)
-
-            json_unit = StructuredUnit(
-                type='table_json',
-                text=table_summary,  # Use readable summary instead of raw JSON
-                lines=[table_summary],
-                bbox=region.bbox,
-                reading_order=current_order,
-                associated_headings=[h.text for h in associated_headings] if associated_headings else [surrounding_context] if 'surrounding_context' in locals() else []
-            )
-
-            # Add special JSON metadata
-            json_unit.table_json = table_json
-            json_unit.extraction_source = getattr(region, 'table_source', 'unknown')
-            json_unit.extraction_accuracy = getattr(region, 'extraction_accuracy', 0)
-            json_unit.has_structured_data = True
-
-            json_units.append(json_unit)
-            print(f"   ✅ Created JSON table unit with {len(table_summary)} chars")
-
-        return json_units
-
     def _extract_surrounding_context(self, table_region: LayoutRegion, all_regions: List[LayoutRegion], region_idx: int, word_limit: int = 50) -> str:
         """Extract context from regions surrounding the table"""
         context_parts = []
@@ -2350,7 +2250,7 @@ class ChunkingService:
 
             lines = [line.strip() for line in page_text.split('\n') if line.strip()]
             structured_units = self._build_simple_units_from_lines(lines)
-            
+
             # Text processing methods now use utilities
             clean_text = self._merge_soft_hyphens(page_text)
             normalized_text = self._normalize_text_spacing(clean_text)
@@ -3489,107 +3389,20 @@ class ChunkingService:
 
         return min(1.0, coherence_score)
 
-    def _display_enhanced_table_structure(self, chunk: Dict, table_num: int):
-        """Display enhanced table structure with proper formatting"""
-        structured_tables = chunk.get('structured_tables', [])
+    def _display_enhanced_table_structure(self, chunk: Dict, chunk_index: int):
+        """Display enhanced table structure information"""
+        from .utils.chunkingUtils.display_utilities import display_enhanced_table_structure
+        return display_enhanced_table_structure(chunk, chunk_index)
 
-        if structured_tables:
-            print(f"📊 TABLE {table_num} - STRUCTURED DATA FORMAT:")
-            for i, table_data in enumerate(structured_tables[:1]):  # Show first table
-                json_table = table_data.get('table_data', {})
-                self._display_json_table_data(json_table, i+1)
-        else:
-            print(f"📊 TABLE {table_num} - TEXT FORMAT:")
-            self._display_text_table_structure(chunk, table_num)
+    def _display_json_table_data(self, table_data, table_index):
+        """Display JSON table data details"""
+        from .utils.chunkingUtils.display_utilities import display_json_table_data
+        return display_json_table_data(table_data, table_index)
 
-    def _display_json_table_data(self, table_data: Dict, table_index: int):
-        """Display JSON table data in a structured format"""
-        if not table_data or 'headers' not in table_data:
-            print(f"    ⚠️ No structured table data available")
-            return
-
-        headers = table_data.get('headers', [])
-        data_rows = table_data.get('data', [])
-        metadata = table_data.get('table_metadata', {})
-
-        print(f"    📋 Table {table_index} Structure:")
-        print(f"       Dimensions: {metadata.get('total_rows', 0)} rows × {metadata.get('total_columns', 0)} columns")
-        print(f"       Extraction source: {metadata.get('extraction_source', 'unknown')}")
-
-        if headers:
-            print(f"    🏷️ Column Headers:")
-            for j, header in enumerate(headers[:6]):  # Show max 6 headers
-                print(f"       {j+1}. {header}")
-            if len(headers) > 6:
-                print(f"       ... ({len(headers) - 6} more columns)")
-
-        if data_rows:
-            print(f"    📊 Sample Data (first 3 rows):")
-            print(f"       " + " | ".join([f"{h[:12]:<12}" for h in headers[:4]]))
-            print(f"       " + "-" * min(60, len(headers) * 15))
-
-            for row_idx, row_data in enumerate(data_rows[:3]):
-                if 'values' in row_data:
-                    row_values = []
-                    for header in headers[:4]:  # Show max 4 columns
-                        if header in row_data['values']:
-                            cell_data = row_data['values'][header]
-                            if isinstance(cell_data, dict):
-                                value = str(cell_data.get('value', ''))
-                                if cell_data.get('currency'):
-                                    value = f"{cell_data['currency']} {value}"
-                                elif cell_data.get('is_percentage'):
-                                    value = f"{value}%"
-                            else:
-                                value = str(cell_data)
-                            row_values.append(f"{value[:12]:<12}")
-                        else:
-                            row_values.append(f"{'N/A':<12}")
-
-                    print(f"       " + " | ".join(row_values))
-
-            if len(data_rows) > 3:
-                print(f"       ... ({len(data_rows) - 3} more rows)")
-
-    def _display_text_table_structure(self, chunk: Dict, table_num: int):
-        """Display text-based table structure analysis"""
-        chunk_text = chunk.get('text', '')
-        lines = chunk_text.split('\n')
-
-        # Analyze text for potential table structure
-        numeric_lines = []
-        non_empty_lines = [line.strip() for line in lines if line.strip()]
-
-        print(f"    📝 Text Analysis:")
-        print(f"       Total lines: {len(non_empty_lines)}")
-
-        # Try to detect column structure in text
-        potential_columns = []
-        for line in non_empty_lines[:5]:  # Analyze first 5 lines
-            # Split by multiple spaces or tabs to find potential columns
-            columns = [col.strip() for col in re.split(r'\s{2,}|\t', line) if col.strip()]
-            if len(columns) > 1:
-                potential_columns.append(columns)
-
-        if potential_columns:
-            max_cols = max(len(cols) for cols in potential_columns)
-            print(f"       Detected column structure: ~{max_cols} columns per row")
-
-            # Show sample rows as table-like structure
-            print(f"    📊 Detected Structure (first 3 rows):")
-            for i, cols in enumerate(potential_columns[:3]):
-                col_preview = []
-                for j, col in enumerate(cols[:4]):  # Show max 4 columns
-                    col_preview.append(f"{col[:15]:<15}")
-                print(f"       Row {i+1}: " + " | ".join(col_preview))
-                if len(cols) > 4:
-                    print(f"              ... ({len(cols) - 4} more columns)")
-        else:
-            print(f"       No clear column structure detected")
-            print(f"    📄 Raw Content Preview:")
-            for i, line in enumerate(non_empty_lines[:3]):
-                preview = line[:70] + "..." if len(line) > 70 else line
-                print(f"       {i+1}. {preview}")
+    def _display_text_table_structure(self, chunk, chunk_index):
+        """Display text-based table structure"""
+        from .utils.chunkingUtils.display_utilities import display_text_table_structure
+        return display_text_table_structure(chunk, chunk_index)
 
     # Configuration methods
     def set_chunk_size(self, size: int):

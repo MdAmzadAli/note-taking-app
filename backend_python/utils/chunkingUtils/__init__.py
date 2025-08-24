@@ -162,6 +162,11 @@ from .service_config import (
     ChunkingConfig, get_chunking_stats, analyze_pdf_structure
 )
 
+from .display_utilities import (
+    display_enhanced_table_structure, display_json_table_data,
+    display_text_table_structure
+)
+
 __all__ = [
     # Content detection
     'is_header', 'is_bullet_point', 'analyze_row_content', 'calculate_text_density',
@@ -220,5 +225,8 @@ __all__ = [
     'process_pdf', 'process_text_content', 'create_simple_text_units',
 
     # Service configuration
-    'ChunkingConfig', 'get_chunking_stats', 'analyze_pdf_structure'
+    'ChunkingConfig', 'get_chunking_stats', 'analyze_pdf_structure',
+
+    # Display utilities
+    'display_enhanced_table_structure', 'display_json_table_data', 'display_text_table_structure'
 ]

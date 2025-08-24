@@ -1,5 +1,29 @@
 
-from typing import Dict, List, Any, Optional
+<old_str>class ChunkingConfig:
+    """Configuration management for chunking service"""
+    
+    def __init__(self, chunk_size: int = 800, chunk_overlap: int = 75):
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+    
+    def set_chunk_size(self, size: int):
+        """Update chunk size"""
+        self.chunk_size = size
+        print(f"📏 Chunk size updated to: {size}")
+    
+    def set_chunk_overlap(self, overlap: int):
+        """Update chunk overlap"""
+        self.chunk_overlap = overlap
+        print(f"🔄 Chunk overlap updated to: {overlap}")
+    
+    def get_config(self) -> Dict:
+        """Get current configuration"""
+        return {
+            'chunk_size': self.chunk_size,
+            'chunk_overlap': self.chunk_overlap,
+            'strategy': 'enhanced_layout_aware_semantic'
+   </old_str>
+<new_str>from typing import Dict, List, Any
 
 class ChunkingConfig:
     """Configuration management for chunking service"""
@@ -27,95 +51,75 @@ class ChunkingConfig:
         }
 
 def get_chunking_stats(chunks: List[Dict]) -> Dict[str, Any]:
-    """Calculate statistics for chunks"""
+    """Get processing statistics for chunks"""
     if not chunks:
         return {
             'total_chunks': 0,
+            'total_characters': 0,
             'average_chunk_size': 0,
             'min_chunk_size': 0,
             'max_chunk_size': 0,
-            'chunk_size_distribution': {},
-            'pages_spanned': 0,
-            'strategy': 'enhanced_layout_aware_semantic',
-            'structured_content_chunks': 0,
-            'table_content_chunks': 0,
-            'unit_types_distribution': {}
+            'table_chunks': 0,
+            'text_chunks': 0
         }
-
-    chunk_sizes = [len(chunk['text']) for chunk in chunks]
-    pages_spanned = set()
-    structured_content_chunks = 0
-    table_content_chunks = 0
-    unit_types_distribution = {}
-
-    for chunk in chunks:
-        # Track pages
-        if 'metadata' in chunk and 'page_number' in chunk['metadata']:
-            pages_spanned.add(chunk['metadata']['page_number'])
-        
-        # Count structured content
-        metadata = chunk.get('metadata', {})
-        if metadata.get('has_structured_content', False):
-            structured_content_chunks += 1
-        if metadata.get('has_table_content', False):
-            table_content_chunks += 1
-        
-        # Track unit types
-        semantic_types = metadata.get('semantic_types', [])
-        for unit_type in semantic_types:
-            unit_types_distribution[unit_type] = unit_types_distribution.get(unit_type, 0) + 1
-
-    # Size distribution
-    chunk_size_distribution = {}
-    for size in chunk_sizes:
-        bucket = (size // 100) * 100  # 100-char buckets
-        chunk_size_distribution[bucket] = chunk_size_distribution.get(bucket, 0) + 1
-
+    
+    chunk_sizes = [len(chunk.get('text', '')) for chunk in chunks]
+    table_chunks = [c for c in chunks if c.get('metadata', {}).get('has_table_content', False)]
+    text_chunks = [c for c in chunks if not c.get('metadata', {}).get('has_table_content', False)]
+    
     return {
         'total_chunks': len(chunks),
-        'average_chunk_size': sum(chunk_sizes) / len(chunk_sizes),
-        'min_chunk_size': min(chunk_sizes),
-        'max_chunk_size': max(chunk_sizes),
-        'chunk_size_distribution': chunk_size_distribution,
-        'pages_spanned': len(pages_spanned),
-        'strategy': 'enhanced_layout_aware_semantic',
-        'structured_content_chunks': structured_content_chunks,
-        'table_content_chunks': table_content_chunks,
-        'unit_types_distribution': unit_types_distribution
-    }
-
-def analyze_pdf_structure(pdf_data) -> Dict[str, Any]:
-    """Analyze PDF structure"""
-    if not pdf_data or not hasattr(pdf_data, 'pages'):
-        return {
-            'total_pages': 0,
-            'pages_with_tables': 0,
-            'pages_with_multiple_columns': 0,
-            'layout_types': [],
-            'average_units_per_page': 0,
-            'content_distribution': {}
+        'total_characters': sum(chunk_sizes),
+        'average_chunk_size': sum(chunk_sizes) // len(chunks) if chunks else 0,
+        'min_chunk_size': min(chunk_sizes) if chunk_sizes else 0,
+        'max_chunk_size': max(chunk_sizes) if chunk_sizes else 0,
+        'table_chunks': len(table_chunks),
+        'text_chunks': len(text_chunks),
+        'chunk_size_distribution': {
+            'small_chunks': len([s for s in chunk_sizes if s < 400]),
+            'medium_chunks': len([s for s in chunk_sizes if 400 <= s <= 800]),
+            'large_chunks': len([s for s in chunk_sizes if s > 800])
         }
-
-    pages = pdf_data.pages
-    pages_with_tables = sum(1 for p in pages if p.has_table)
-    pages_with_multiple_columns = sum(1 for p in pages if p.columns > 1)
-    layout_types = [p.layout.layout_type for p in pages if p.layout]
-    
-    total_units = sum(len(p.structured_units) for p in pages)
-    average_units_per_page = total_units / len(pages) if pages else 0
-
-    # Content distribution
-    content_distribution = {}
-    for page in pages:
-        for unit in page.structured_units:
-            unit_type = unit.type
-            content_distribution[unit_type] = content_distribution.get(unit_type, 0) + 1
-
-    return {
-        'total_pages': len(pages),
-        'pages_with_tables': pages_with_tables,
-        'pages_with_multiple_columns': pages_with_multiple_columns,
-        'layout_types': layout_types,
-        'average_units_per_page': average_units_per_page,
-        'content_distribution': content_distribution
     }
+
+def analyze_pdf_structure(pdf_data: Dict) -> Dict[str, Any]:
+    """Analyze PDF structure from processed data"""
+    if not pdf_data or 'pages' not in pdf_data:
+        return {'error': 'Invalid PDF data structure'}
+    
+    pages = pdf_data.get('pages', [])
+    
+    structure_analysis = {
+        'total_pages': len(pages),
+        'pages_with_tables': 0,
+        'total_structured_units': 0,
+        'layout_types': {},
+        'column_distribution': {},
+        'unit_types': {}
+    }
+    
+    for page in pages:
+        # Count tables
+        if page.get('has_table', False):
+            structure_analysis['pages_with_tables'] += 1
+        
+        # Count structured units
+        units = page.get('structured_units', [])
+        structure_analysis['total_structured_units'] += len(units)
+        
+        # Analyze unit types
+        for unit in units:
+            unit_type = unit.get('type', 'unknown')
+            structure_analysis['unit_types'][unit_type] = structure_analysis['unit_types'].get(unit_type, 0) + 1
+        
+        # Analyze layout
+        layout = page.get('layout')
+        if layout:
+            layout_type = layout.get('layout_type', 'unknown')
+            structure_analysis['layout_types'][layout_type] = structure_analysis['layout_types'].get(layout_type, 0) + 1
+        
+        # Analyze columns
+        columns = page.get('columns', 1)
+        structure_analysis['column_distribution'][str(columns)] = structure_analysis['column_distribution'].get(str(columns), 0) + 1
+    
+    return structure_analysis</old_str>

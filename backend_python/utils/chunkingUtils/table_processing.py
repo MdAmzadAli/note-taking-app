@@ -312,3 +312,42 @@ def analyze_row_numeric_content(row_text: str) -> Dict:
             for num in normalized.numbers
         ]
     }
+
+def validate_stream_table_vs_multicolumn(table, layout_analysis: Dict) -> bool:
+    """Validate if a stream table is actually a table vs multi-column text"""
+    
+    # Check table dimensions
+    df = table.df
+    rows, cols = df.shape
+    
+    # Multi-column text typically has many rows, few columns
+    if rows > 10 and cols <= 2:
+        print(f"📰 Suspicious: {rows}x{cols} table might be multi-column text")
+        
+        # Check content patterns
+        text_like_content = 0
+        total_cells = rows * cols
+        
+        for _, row in df.iterrows():
+            for cell in row:
+                if isinstance(cell, str) and len(cell.split()) > 5:  # Long text
+                    text_like_content += 1
+        
+        text_ratio = text_like_content / max(total_cells, 1)
+        
+        if text_ratio > 0.7:  # More than 70% long text
+            return False
+    
+    # Check if content has table-like structure
+    numeric_cells = 0
+    total_cells = rows * cols
+    
+    for _, row in df.iterrows():
+        for cell in row:
+            if isinstance(cell, str) and re.search(r'\d', cell):
+                numeric_cells += 1
+    
+    numeric_ratio = numeric_cells / max(total_cells, 1)
+    
+    # Valid table should have some numeric content
+    return numeric_ratio > 0.2
