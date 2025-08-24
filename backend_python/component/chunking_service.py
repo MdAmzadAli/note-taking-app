@@ -402,63 +402,105 @@ class ChunkingService:
             # Try lattice mode first (better for ruled tables)
             try:
                 print(f"🔍 Camelot lattice extraction for page {page_number}")
-                lattice_tables = camelot.read_pdf(
-                    file_path, 
-                    pages=str(page_number), 
-                    flavor='lattice',
-                    strip_text='\n'
-                )
                 
-                for i, table in enumerate(lattice_tables):
-                    if table.accuracy > 50:  # Only use tables with reasonable accuracy
-                        table_data = table.df.values.tolist()
-                        structured_table = self._convert_table_to_json(table_data)
-                        structured_table["table_metadata"]["extraction_source"] = "camelot_lattice"
-                        structured_table["table_metadata"]["accuracy"] = table.accuracy
-                        structured_table["table_metadata"]["table_index"] = i
-                        
-                        extracted_tables.append({
-                            "json_data": structured_table,
-                            "bbox": self._camelot_bbox_to_layout_bbox(table._bbox),
-                            "accuracy": table.accuracy,
-                            "source": "camelot_lattice"
-                        })
-                        
-                print(f"✅ Camelot lattice extracted {len(lattice_tables)} tables")
+                # Check if camelot can handle the PDF format properly
+                import tempfile
+                import shutil
                 
-            except Exception as lattice_error:
-                print(f"⚠️ Camelot lattice failed: {lattice_error}")
-
-            # Try stream mode if lattice didn't find good tables
-            if len(extracted_tables) == 0:
+                # Create a temporary copy to avoid file locking issues
+                with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
+                    shutil.copy2(file_path, temp_file.name)
+                    temp_pdf_path = temp_file.name
+                
                 try:
-                    print(f"🔍 Camelot stream extraction for page {page_number}")
-                    stream_tables = camelot.read_pdf(
-                        file_path, 
+                    lattice_tables = camelot.read_pdf(
+                        temp_pdf_path, 
                         pages=str(page_number), 
-                        flavor='stream',
+                        flavor='lattice',
                         strip_text='\n'
                     )
                     
-                    for i, table in enumerate(stream_tables):
-                        if table.accuracy > 30:  # Lower threshold for stream mode
+                    for i, table in enumerate(lattice_tables):
+                        if table.accuracy > 50:  # Only use tables with reasonable accuracy
                             table_data = table.df.values.tolist()
                             structured_table = self._convert_table_to_json(table_data)
-                            structured_table["table_metadata"]["extraction_source"] = "camelot_stream"
+                            structured_table["table_metadata"]["extraction_source"] = "camelot_lattice"
                             structured_table["table_metadata"]["accuracy"] = table.accuracy
                             structured_table["table_metadata"]["table_index"] = i
                             
                             extracted_tables.append({
                                 "json_data": structured_table,
-                                "bbox": self._camelot_bbox_to_layout_bbox(table._bbox) if hasattr(table, '_bbox') else None,
+                                "bbox": self._camelot_bbox_to_layout_bbox(getattr(table, '_bbox', None)),
                                 "accuracy": table.accuracy,
-                                "source": "camelot_stream"
+                                "source": "camelot_lattice"
                             })
                             
-                    print(f"✅ Camelot stream extracted {len(stream_tables)} tables")
+                    print(f"✅ Camelot lattice extracted {len(lattice_tables)} tables")
+                    
+                finally:
+                    # Clean up temporary file
+                    try:
+                        import os
+                        os.unlink(temp_pdf_path)
+                    except:
+                        pass
+                        
+            except Exception as lattice_error:
+                error_msg = str(lattice_error)
+                if "PdfFileReader is deprecated" in error_msg or "PyPDF2" in error_msg:
+                    print(f"⚠️ Camelot lattice failed due to PyPDF2 compatibility issue - skipping camelot extraction")
+                else:
+                    print(f"⚠️ Camelot lattice failed: {lattice_error}")
+
+            # Try stream mode if lattice didn't find good tables
+            if len(extracted_tables) == 0:
+                try:
+                    print(f"🔍 Camelot stream extraction for page {page_number}")
+                    
+                    # Create a temporary copy to avoid file locking issues
+                    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
+                        shutil.copy2(file_path, temp_file.name)
+                        temp_pdf_path = temp_file.name
+                    
+                    try:
+                        stream_tables = camelot.read_pdf(
+                            temp_pdf_path, 
+                            pages=str(page_number), 
+                            flavor='stream',
+                            strip_text='\n'
+                        )
+                        
+                        for i, table in enumerate(stream_tables):
+                            if table.accuracy > 30:  # Lower threshold for stream mode
+                                table_data = table.df.values.tolist()
+                                structured_table = self._convert_table_to_json(table_data)
+                                structured_table["table_metadata"]["extraction_source"] = "camelot_stream"
+                                structured_table["table_metadata"]["accuracy"] = table.accuracy
+                                structured_table["table_metadata"]["table_index"] = i
+                                
+                                extracted_tables.append({
+                                    "json_data": structured_table,
+                                    "bbox": self._camelot_bbox_to_layout_bbox(getattr(table, '_bbox', None)),
+                                    "accuracy": table.accuracy,
+                                    "source": "camelot_stream"
+                                })
+                                
+                        print(f"✅ Camelot stream extracted {len(stream_tables)} tables")
+                        
+                    finally:
+                        # Clean up temporary file
+                        try:
+                            import os
+                            os.unlink(temp_pdf_path)
+                        except:
+                            pass
                     
                 except Exception as stream_error:
-                    print(f"⚠️ Camelot stream failed: {stream_error}")
+                    error_msg = str(stream_error)
+                    if "PdfFileReader is deprecated" in error_msg or "PyPDF2" in error_msg:
+                        print(f"⚠️ Camelot stream failed due to PyPDF2 compatibility issue - falling back to pdfplumber only")
+                    else:
+                        print(f"⚠️ Camelot stream failed: {stream_error}")
         
         except Exception as e:
             print(f"❌ Camelot extraction failed: {e}")
