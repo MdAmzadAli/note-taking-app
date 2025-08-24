@@ -6,7 +6,7 @@ import pdfplumber
 from collections import defaultdict
 
 # Import all necessary utilities from chunkingUtils
-from ..utils.chunkingUtils import (
+from utils.chunkingUtils import (
     # Data structures
     TextItem, BoundingBox, LayoutRegion, StructuredUnit, PageLayout, PageData, PDFData,
     NumberData, NormalizedData,
@@ -61,7 +61,7 @@ except ImportError:
     camelot = None
 
 
-class ChunkingServiceNew:
+class ChunkingService:
     """
     New chunking service that leverages chunkingUtils for all operations.
     This service provides the same functionality as the original but with 
