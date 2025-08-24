@@ -8,7 +8,11 @@ import pdfplumber
 from dataclasses import dataclass, field
 import numpy as np
 from collections import defaultdict
-import camelot
+try:
+    import camelot
+except ImportError:
+    print("⚠️ Camelot not available - table extraction will use pdfplumber only")
+    camelot = None
 import pandas as pd
 
 # given the code
@@ -390,11 +394,15 @@ class ChunkingService:
         """Extract tables using camelot with both lattice and stream modes"""
         extracted_tables = []
         
+        if camelot is None:
+            print(f"⚠️ Camelot not available - skipping table extraction for page {page_number}")
+            return extracted_tables
+        
         try:
             # Try lattice mode first (better for ruled tables)
             try:
                 print(f"🔍 Camelot lattice extraction for page {page_number}")
-                lattice_tables = camelot.read_table(
+                lattice_tables = camelot.read_pdf(
                     file_path, 
                     pages=str(page_number), 
                     flavor='lattice',
@@ -425,7 +433,7 @@ class ChunkingService:
             if len(extracted_tables) == 0:
                 try:
                     print(f"🔍 Camelot stream extraction for page {page_number}")
-                    stream_tables = camelot.read_table(
+                    stream_tables = camelot.read_pdf(
                         file_path, 
                         pages=str(page_number), 
                         flavor='stream',
