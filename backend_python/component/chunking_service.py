@@ -255,6 +255,7 @@ class ChunkingService:
         print(f"📐 Starting enhanced layout analysis for page {page_number} using chunkingUtils")
 
         # Use chunkingUtils for visual structure detection
+        from utils.chunkingUtils.content_detection import detect_visual_structures
         visual_structures = detect_visual_structures(page, page_bbox)
         print(f"🔍 Detected {len(visual_structures['bordered_regions'])} bordered regions")
 

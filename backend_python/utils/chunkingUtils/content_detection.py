@@ -459,3 +459,50 @@ def build_simple_units_from_lines(lines: List[str]) -> List:
         ))
 
     return units
+
+def detect_visual_structures(page, page_bbox) -> Dict:
+    """Detect visual structures like borders, lines, and rectangular regions"""
+    visual_structures = {
+        'bordered_regions': [],
+        'horizontal_lines': [],
+        'vertical_lines': [],
+        'rectangular_regions': []
+    }
+
+    try:
+        # Extract visual elements
+        drawings = getattr(page, 'drawings', [])
+        rects = getattr(page, 'rects', [])
+        lines = getattr(page, 'lines', [])
+
+        print(f"🔍 Visual elements found: {len(drawings)} drawings, {len(rects)} rects, {len(lines)} lines")
+
+        # Process rectangles (potential table borders)
+        for rect in rects:
+            if rect.get('width', 0) > 50 and rect.get('height', 0) > 20:  # Minimum table size
+                from .page_structures import BoundingBox
+                bbox = BoundingBox(
+                    x_min=rect['x0'],
+                    y_min=rect['y0'], 
+                    x_max=rect['x1'],
+                    y_max=rect['y1']
+                )
+                visual_structures['bordered_regions'].append({
+                    'bbox': bbox,
+                    'type': 'rectangle',
+                    'confidence': 0.9
+                })
+
+        # Process lines to detect table grids
+        h_lines = [l for l in lines if abs(l.get('y0', 0) - l.get('y1', 0)) < 2]  # Horizontal
+        v_lines = [l for l in lines if abs(l.get('x0', 0) - l.get('x1', 0)) < 2]  # Vertical
+
+        visual_structures['horizontal_lines'] = h_lines
+        visual_structures['vertical_lines'] = v_lines
+
+        print(f"📐 Found {len(visual_structures['bordered_regions'])} potential table structures")
+
+    except Exception as e:
+        print(f"⚠️ Visual structure detection failed: {e}")
+
+    return visual_structures
