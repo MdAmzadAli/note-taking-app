@@ -743,7 +743,7 @@ class ChunkingService:
         return overlap_ratio1 >= threshold or overlap_ratio2 >= threshold
 
     async def _extract_content_in_reading_order_with_json(self, layout: PageLayout, text_items: List[TextItem]) -> List[StructuredUnit]:
-        """Extract content in reading order with JSON table handling"""
+        """Extract content in reading order with JSON table handling and enhanced context extraction"""
         if not layout.regions:
             return []
 
@@ -753,78 +753,144 @@ class ChunkingService:
         structured_units = []
         reading_order = 0
         
-        # Track recent headings for table association
+        # Track recent headings for table association with enhanced window
         recent_headings = []
-        max_heading_distance = 100  # pixels
+        max_heading_distance = 150  # Increased distance for better coverage
+        
+        print(f"📄 Processing {len(sorted_regions)} regions in reading order")
         
         for region_idx, region in enumerate(sorted_regions):
+            print(f"\n🔍 Region {region_idx + 1}/{len(sorted_regions)}: {region.region_type}")
+            
             if region.region_type == 'table_json':
-                # Handle JSON table regions
-                json_units = await self._extract_json_table_content(region, reading_order, recent_headings)
+                print(f"   Processing JSON table region")
+                # Handle JSON table regions with enhanced context
+                json_units = await self._extract_json_table_content_enhanced(region, reading_order, recent_headings, sorted_regions, region_idx)
                 structured_units.extend(json_units)
                 reading_order += len(json_units)
                 
             elif region.region_type == 'table':
-                # Handle regular table regions  
-                associated_headings = self._find_associated_headings(region, recent_headings, max_heading_distance)
-                table_units = await self._extract_table_content_with_headings(
-                    region, reading_order, associated_headings
+                print(f"   Processing regular table region")
+                # Handle regular table regions with enhanced context
+                table_units = await self._extract_table_content_with_enhanced_context(
+                    region, reading_order, recent_headings, sorted_regions, region_idx
                 )
                 structured_units.extend(table_units)
                 reading_order += len(table_units)
                 
-                # Clear used headings
-                for heading in associated_headings:
-                    if heading in recent_headings:
-                        recent_headings.remove(heading)
-                
             elif region.region_type == 'text':
+                print(f"   Processing text region")
                 # Handle text regions
                 text_units = await self._extract_text_content(region, reading_order)
                 
-                # Track headings for future table association
+                # Track headings for future table association with enhanced storage
                 for unit in text_units:
                     if unit.type == 'header':
                         unit.region_bbox = region.bbox
                         recent_headings.append(unit)
-                        recent_headings = recent_headings[-3:]  # Keep last 3 headings
+                        print(f"      📋 Stored heading for context: '{unit.text[:50]}...'")
+                    elif unit.type == 'paragraph' and len(unit.text) < 100:
+                        # Store short paragraphs as potential table context
+                        unit.region_bbox = region.bbox
+                        unit.is_potential_table_context = True
+                        recent_headings.append(unit)
+                        print(f"      📝 Stored potential table context: '{unit.text[:50]}...'")
+                
+                # Keep more headings and context for better table association
+                recent_headings = recent_headings[-6:]  # Keep last 6 items (headings + context)
                 
                 structured_units.extend(text_units)
                 reading_order += len(text_units)
         
         return structured_units
 
-    async def _extract_json_table_content(self, region: LayoutRegion, start_order: int, recent_headings: List[StructuredUnit]) -> List[StructuredUnit]:
-        """Extract content from JSON table regions"""
+    async def _extract_json_table_content_enhanced(self, region: LayoutRegion, start_order: int, recent_headings: List[StructuredUnit], all_regions: List[LayoutRegion], region_idx: int) -> List[StructuredUnit]:
+        """Extract content from JSON table regions with enhanced context extraction"""
         json_units = []
         current_order = start_order
         
-        # Add associated headings first
-        associated_headings = self._find_associated_headings(region, recent_headings, 100)
-        for heading in associated_headings:
-            heading_unit = StructuredUnit(
-                type='table_header',
-                text=heading.text,
-                lines=heading.lines,
-                bbox=heading.bbox,
-                reading_order=current_order,
-                associated_table_region=region.bbox
-            )
-            json_units.append(heading_unit)
-            current_order += 1
+        print(f"🔢 Extracting JSON table content (region {region_idx + 1})")
         
-        # Create JSON table unit
+        # Enhanced heading association with fallback context extraction
+        associated_headings = self._find_associated_headings(region, recent_headings, 150)
+        
+        # If no headings found, extract context from surrounding regions
+        if not associated_headings:
+            print(f"   No direct headings found, extracting surrounding context...")
+            surrounding_context = self._extract_surrounding_context(region, all_regions, region_idx, word_limit=50)
+            if surrounding_context:
+                print(f"   ✅ Extracted surrounding context: '{surrounding_context[:100]}...'")
+                # Create synthetic heading from context
+                context_unit = StructuredUnit(
+                    type='table_context',
+                    text=surrounding_context,
+                    lines=[surrounding_context],
+                    bbox=region.bbox,
+                    reading_order=current_order,
+                    associated_table_region=region.bbox
+                )
+                json_units.append(context_unit)
+                current_order += 1
+        else:
+            # Add associated headings
+            print(f"   Adding {len(associated_headings)} associated headings")
+            for heading in associated_headings:
+                heading_unit = StructuredUnit(
+                    type='table_header',
+                    text=heading.text,
+                    lines=heading.lines,
+                    bbox=heading.bbox,
+                    reading_order=current_order,
+                    associated_table_region=region.bbox
+                )
+                json_units.append(heading_unit)
+                current_order += 1
+        
+        # Create JSON table unit with detailed logging
         if hasattr(region, 'table_json') and region.table_json:
             table_json = region.table_json
             
-            # Create a special JSON table unit
+            # Log table data details
+            print(f"📊 TABLE DATA DETAILS:")
+            print(f"   Source: {getattr(region, 'table_source', 'unknown')}")
+            print(f"   Accuracy: {getattr(region, 'extraction_accuracy', 0):.1f}%")
+            
+            if 'table_metadata' in table_json:
+                metadata = table_json['table_metadata']
+                print(f"   Dimensions: {metadata.get('total_rows', 0)} rows × {metadata.get('total_columns', 0)} columns")
+                print(f"   Has header: {metadata.get('has_header', False)}")
+            
+            if 'headers' in table_json:
+                headers = table_json['headers']
+                print(f"   Headers: {headers[:5]}{'...' if len(headers) > 5 else ''}")
+            
+            if 'data' in table_json:
+                data_rows = table_json['data']
+                print(f"   Sample data (first 3 rows):")
+                for i, row in enumerate(data_rows[:3]):
+                    if 'values' in row:
+                        row_preview = []
+                        for header in list(row['values'].keys())[:3]:
+                            cell_data = row['values'][header]
+                            if isinstance(cell_data, dict):
+                                value = cell_data.get('value', '')
+                                if cell_data.get('currency'):
+                                    value = f"{cell_data['currency']} {value}"
+                            else:
+                                value = str(cell_data)
+                            row_preview.append(f"{header}: {value}")
+                        print(f"     Row {i+1}: {' | '.join(row_preview)}")
+            
+            # Create readable summary for search
+            table_summary = self._create_table_summary_text(table_json)
+            
             json_unit = StructuredUnit(
                 type='table_json',
-                text=json.dumps(table_json, indent=2),  # JSON as text fallback
-                lines=[json.dumps(table_json, indent=2)],
+                text=table_summary,  # Use readable summary instead of raw JSON
+                lines=[table_summary],
                 bbox=region.bbox,
                 reading_order=current_order,
-                associated_headings=[h.text for h in associated_headings]
+                associated_headings=[h.text for h in associated_headings] if associated_headings else [surrounding_context] if 'surrounding_context' in locals() else []
             )
             
             # Add special JSON metadata
@@ -834,8 +900,70 @@ class ChunkingService:
             json_unit.has_structured_data = True
             
             json_units.append(json_unit)
+            print(f"   ✅ Created JSON table unit with {len(table_summary)} chars")
             
         return json_units
+
+    def _extract_surrounding_context(self, table_region: LayoutRegion, all_regions: List[LayoutRegion], region_idx: int, word_limit: int = 50) -> str:
+        """Extract context from regions surrounding the table"""
+        context_parts = []
+        table_bbox = table_region.bbox
+        
+        print(f"   Extracting context around table at index {region_idx}")
+        
+        # Check regions before the table (up to 2 regions back)
+        for i in range(max(0, region_idx - 2), region_idx):
+            region = all_regions[i]
+            if region.region_type == 'text':
+                # Extract text from region
+                region_text = self._extract_text_from_region(region)
+                if region_text and len(region_text.split()) <= word_limit:
+                    context_parts.append(region_text)
+                    print(f"     Added context before: '{region_text[:50]}...'")
+        
+        # Check regions after the table (up to 2 regions ahead)
+        for i in range(region_idx + 1, min(len(all_regions), region_idx + 3)):
+            region = all_regions[i]
+            if region.region_type == 'text':
+                # Extract text from region
+                region_text = self._extract_text_from_region(region)
+                if region_text and len(region_text.split()) <= word_limit:
+                    context_parts.append(region_text)
+                    print(f"     Added context after: '{region_text[:50]}...'")
+        
+        return ' '.join(context_parts) if context_parts else ""
+    
+    def _extract_text_from_region(self, region: LayoutRegion) -> str:
+        """Extract text content from a text region"""
+        if not region.text_items:
+            return ""
+        
+        # Sort text items by position and extract text
+        sorted_items = sorted(region.text_items, key=lambda item: (item.y, item.x))
+        text_parts = []
+        
+        for item in sorted_items:
+            if item.text.strip():
+                text_parts.append(item.text.strip())
+        
+        return ' '.join(text_parts)
+
+    async def _extract_table_content_with_enhanced_context(self, region: LayoutRegion, start_order: int, recent_headings: List[StructuredUnit], all_regions: List[LayoutRegion], region_idx: int) -> List[StructuredUnit]:
+        """Extract table content with enhanced context detection"""
+        print(f"📊 Extracting regular table content (region {region_idx + 1})")
+        
+        # Use enhanced heading association
+        associated_headings = self._find_associated_headings(region, recent_headings, 150)
+        
+        # If no headings found, extract surrounding context
+        if not associated_headings:
+            print(f"   No direct headings found, extracting surrounding context...")
+            surrounding_context = self._extract_surrounding_context(region, all_regions, region_idx, word_limit=50)
+            if surrounding_context:
+                print(f"   ✅ Extracted surrounding context: '{surrounding_context[:100]}...'")
+        
+        # Process with existing logic but enhanced headings
+        return await self._extract_table_content_with_headings(region, start_order, associated_headings)
 
     def _generate_page_text_with_json_tables(self, structured_units: List[StructuredUnit]) -> str:
         """Generate page text handling JSON table units specially"""
@@ -852,7 +980,7 @@ class ChunkingService:
         return '\n'.join(text_parts)
 
     def _create_table_summary_text(self, table_json: Dict[str, Any]) -> str:
-        """Create a readable text summary of JSON table data"""
+        """Create a readable text summary of JSON table data with enhanced searchability"""
         if not table_json or 'table_metadata' not in table_json:
             return "Table data (JSON format)"
         
@@ -861,33 +989,64 @@ class ChunkingService:
         data_rows = table_json.get('data', [])
         
         summary_parts = [
-            f"Table: {metadata.get('total_rows', 0)} rows x {metadata.get('total_columns', 0)} columns"
+            f"Table: {metadata.get('total_rows', 0)} rows x {metadata.get('total_columns', 0)} columns",
+            f"Source: {metadata.get('extraction_source', 'unknown')}"
         ]
         
         if headers:
-            summary_parts.append(f"Headers: {', '.join(headers[:5])}{'...' if len(headers) > 5 else ''}")
+            summary_parts.append(f"Column Headers: {', '.join(headers)}")
         
-        # Add a few sample rows for text search
+        # Add comprehensive sample data for better searchability
         if data_rows:
-            summary_parts.append("Sample data:")
-            for i, row_data in enumerate(data_rows[:3]):
+            summary_parts.append("Table Data:")
+            
+            # Add more rows for better search coverage
+            rows_to_show = min(5, len(data_rows))
+            for i, row_data in enumerate(data_rows[:rows_to_show]):
                 row_values = row_data.get('values', {})
                 row_text = []
-                for header in headers[:3]:
+                
+                for header in headers:
                     if header in row_values:
                         cell_data = row_values[header]
                         if isinstance(cell_data, dict):
                             value = cell_data.get('value', '')
+                            cell_type = cell_data.get('type', 'text')
+                            
+                            # Format based on type for better readability
                             if cell_data.get('currency'):
                                 value = f"{cell_data['currency']} {value}"
+                            elif cell_data.get('is_percentage'):
+                                value = f"{value}%"
+                            elif cell_type == 'date':
+                                value = cell_data.get('original_text', value)
                         else:
                             value = str(cell_data)
-                        row_text.append(str(value))
+                        
+                        # Clean up the value
+                        value_str = str(value).strip()
+                        if value_str:
+                            row_text.append(f"{header}: {value_str}")
                 
                 if row_text:
                     summary_parts.append(f"  Row {i+1}: {' | '.join(row_text)}")
+            
+            # Add summary statistics if available
+            if 'summary' in table_json:
+                summary_stats = table_json['summary']
+                if summary_stats.get('currencies_found'):
+                    summary_parts.append(f"Currencies: {', '.join(summary_stats['currencies_found'])}")
+                if summary_stats.get('numeric_columns'):
+                    summary_parts.append(f"Numeric columns: {', '.join(summary_stats['numeric_columns'])}")
         
-        return '\n'.join(summary_parts)
+        result = '\n'.join(summary_parts)
+        
+        print(f"📝 Created table summary ({len(result)} chars):")
+        print(f"   Headers: {len(headers)} columns")
+        print(f"   Data rows: {len(data_rows)} rows")
+        print(f"   Summary length: {len(result)} characters")
+        
+        return result
 
     async def _analyze_page_layout(self, text_items: List[TextItem], page) -> PageLayout:
         """STEP 1: Comprehensive layout analysis with region detection"""
@@ -1477,10 +1636,13 @@ class ChunkingService:
 
     def _find_associated_headings(self, table_region: LayoutRegion, recent_headings: List[StructuredUnit], 
                                   max_distance: float) -> List[StructuredUnit]:
-        """Find headings that should be associated with this table"""
+        """Find headings that should be associated with this table - enhanced for robust context extraction"""
         associated_headings = []
         
-        for heading in recent_headings:
+        print(f"🔍 Finding headings for table at position y={table_region.bbox.y_min}-{table_region.bbox.y_max}")
+        print(f"   Available recent headings: {len(recent_headings)}")
+        
+        for i, heading in enumerate(recent_headings):
             if not hasattr(heading, 'region_bbox') or not heading.region_bbox:
                 continue
                 
@@ -1489,15 +1651,31 @@ class ChunkingService:
             table_bbox = table_region.bbox
             
             # Check if heading is above the table and within reasonable distance
-            vertical_distance = table_bbox.y_min - heading_bbox.y_max
+            vertical_distance_above = table_bbox.y_min - heading_bbox.y_max
+            # Also check if heading is below the table (for cases where heading comes after)
+            vertical_distance_below = heading_bbox.y_min - table_bbox.y_max
             horizontal_overlap = min(heading_bbox.x_max, table_bbox.x_max) - max(heading_bbox.x_min, table_bbox.x_min)
             
-            # Associate if heading is above table, within distance, and has some horizontal overlap
-            if (0 <= vertical_distance <= max_distance and 
-                horizontal_overlap > 0 and
-                horizontal_overlap >= min(heading_bbox.width, table_bbox.width) * 0.3):  # 30% overlap
+            print(f"   Heading {i+1}: '{heading.text[:50]}...'")
+            print(f"      Position: y={heading_bbox.y_min}-{heading_bbox.y_max}")
+            print(f"      Distance above table: {vertical_distance_above:.1f}px")
+            print(f"      Distance below table: {vertical_distance_below:.1f}px")
+            print(f"      Horizontal overlap: {horizontal_overlap:.1f}px")
+            
+            # Enhanced association logic: check both above and below table
+            is_above_table = (0 <= vertical_distance_above <= max_distance)
+            is_below_table = (0 <= vertical_distance_below <= max_distance)
+            has_horizontal_overlap = (horizontal_overlap > 0 and 
+                                    horizontal_overlap >= min(heading_bbox.width, table_bbox.width) * 0.2)  # Reduced to 20%
+            
+            if (is_above_table or is_below_table) and has_horizontal_overlap:
                 associated_headings.append(heading)
+                position = "above" if is_above_table else "below"
+                print(f"      ✅ Associated heading ({position} table): '{heading.text}'")
+            else:
+                print(f"      ❌ Not associated - distance or overlap insufficient")
         
+        print(f"   Final associated headings: {len(associated_headings)}")
         return associated_headings
 
     async def _extract_table_content_with_headings(self, region: LayoutRegion, start_order: int, 
@@ -2525,39 +2703,109 @@ class ChunkingService:
                 table_sizes = [len(chunk.get('text', '')) for chunk in table_chunks]
                 print(f"   Table chunks ({len(table_chunks)}): min={min(table_sizes)}, max={max(table_sizes)}, avg={sum(table_sizes)//len(table_sizes)}")
         
-        # Log table chunks specifically (max 4 chunks)
+        # Enhanced table extraction logging (show up to 6 chunks)
         table_chunks = [chunk for chunk in chunks if chunk.get('metadata', {}).get('has_table_content')]
         if table_chunks:
-            print(f"📊 TABLE DATA EXTRACTION ANALYSIS:")
-            print(f"   Total table chunks: {len(table_chunks)}")
-            print(f"   Showing first {min(4, len(table_chunks))} table chunks:")
+            print(f"\n" + "="*80)
+            print(f"📊 DETAILED TABLE DATA EXTRACTION ANALYSIS")
+            print(f"="*80)
+            print(f"Total table chunks: {len(table_chunks)}")
+            print(f"Showing detailed analysis for first {min(6, len(table_chunks))} table chunks:")
             
-            for i, chunk in enumerate(table_chunks[:4]):
+            for i, chunk in enumerate(table_chunks[:6]):
                 metadata = chunk.get('metadata', {})
                 numeric_metadata = metadata.get('numeric_metadata', {})
                 
-                print(f"\n   🔢 TABLE CHUNK {i+1}:")
-                print(f"      Size: {len(chunk.get('text', ''))} chars")
-                print(f"      Semantic types: {metadata.get('semantic_types', [])}")
-                print(f"      Table rows: {numeric_metadata.get('table_rows_count', 0)}")
-                print(f"      Table headers: {numeric_metadata.get('table_headers_count', 0)}")
-                print(f"      Numbers found: {numeric_metadata.get('total_numbers', 0)}")
-                print(f"      Currencies: {numeric_metadata.get('currencies', [])}")
-                print(f"      Has contextualized tables: {metadata.get('has_contextualized_tables', False)}")
+                print(f"\n" + "-"*60)
+                print(f"🔢 TABLE CHUNK {i+1}/{len(table_chunks)}")
+                print(f"-"*60)
+                print(f"Size: {len(chunk.get('text', ''))} characters")
+                print(f"Semantic types: {metadata.get('semantic_types', [])}")
+                print(f"Content types: {'JSON tables' if metadata.get('has_json_tables') else 'Regular tables'}")
                 
-                # Show associated headings
+                # Table structure details
+                print(f"Table structure:")
+                print(f"  • Rows: {numeric_metadata.get('table_rows_count', 0)}")
+                print(f"  • Headers: {numeric_metadata.get('table_headers_count', 0)}")
+                print(f"  • JSON tables: {numeric_metadata.get('json_tables_count', 0)}")
+                print(f"  • Structured tables: {numeric_metadata.get('total_structured_tables', 0)}")
+                
+                # Financial data analysis
+                print(f"Financial data:")
+                print(f"  • Numbers found: {numeric_metadata.get('total_numbers', 0)}")
+                print(f"  • Currencies: {numeric_metadata.get('currencies', [])}")
+                print(f"  • Has negative values: {numeric_metadata.get('has_negative_values', False)}")
+                
+                # Context and headings
+                print(f"Context extraction:")
                 table_context_headings = numeric_metadata.get('table_context_headings', [])
+                heading_associations = numeric_metadata.get('heading_table_associations', [])
+                
+                print(f"  • Contextualized: {metadata.get('has_contextualized_tables', False)}")
+                print(f"  • Context headings: {len(table_context_headings)}")
                 if table_context_headings:
-                    print(f"      Associated headings: {table_context_headings}")
+                    for j, heading in enumerate(table_context_headings[:3]):
+                        print(f"    {j+1}. '{heading[:60]}{'...' if len(heading) > 60 else ''}'")
                 
-                # Show first 300 chars of text
-                text_preview = chunk.get('text', '')[:300]
-                print(f"      Text preview: {text_preview}...")
+                print(f"  • Heading associations: {len(heading_associations)}")
+                if heading_associations:
+                    for j, assoc in enumerate(heading_associations[:2]):
+                        print(f"    {j+1}. '{assoc.get('heading_text', '')[:50]}{'...' if len(assoc.get('heading_text', '')) > 50 else ''}'")
                 
-                # Show table columns info if available
+                # JSON table data details
+                if numeric_metadata.get('has_json_tables'):
+                    json_tables = numeric_metadata.get('json_tables_data', [])
+                    print(f"JSON table details:")
+                    for j, json_table in enumerate(json_tables[:2]):
+                        table_data = json_table.get('table_data', {})
+                        print(f"  Table {j+1}:")
+                        print(f"    • Source: {json_table.get('extraction_source', 'unknown')}")
+                        print(f"    • Accuracy: {json_table.get('accuracy', 0):.1f}%")
+                        if 'table_metadata' in table_data:
+                            tm = table_data['table_metadata']
+                            print(f"    • Dimensions: {tm.get('total_rows', 0)}×{tm.get('total_columns', 0)}")
+                            print(f"    • Has header: {tm.get('has_header', False)}")
+                
+                # Table columns structure
                 table_columns = metadata.get('table_columns', [])
                 if table_columns:
-                    print(f"      Table structure: {len(table_columns)} columns per row")
+                    avg_columns = sum(table_columns) / len(table_columns)
+                    print(f"  • Average columns per row: {avg_columns:.1f}")
+                    print(f"  • Column distribution: {table_columns[:5]}{'...' if len(table_columns) > 5 else ''}")
+                
+                # Text preview with structure indicators
+                chunk_text = chunk.get('text', '')
+                lines = chunk_text.split('\n')
+                print(f"Content preview ({len(lines)} lines):")
+                
+                # Show first few lines with line numbers
+                for line_idx, line in enumerate(lines[:8]):
+                    line_preview = line.strip()[:80]
+                    if line_preview:
+                        print(f"  {line_idx+1:2d}: {line_preview}{'...' if len(line.strip()) > 80 else ''}")
+                
+                if len(lines) > 8:
+                    print(f"  ... ({len(lines) - 8} more lines)")
+                
+                # Structured data access
+                if 'structured_tables' in chunk:
+                    structured = chunk['structured_tables']
+                    print(f"Structured data: {len(structured)} table(s) with direct JSON access")
+            
+            print(f"\n" + "="*80)
+            print(f"📈 TABLE EXTRACTION SUMMARY")
+            print(f"="*80)
+            
+            # Overall statistics
+            total_json_tables = sum(chunk.get('metadata', {}).get('numeric_metadata', {}).get('json_tables_count', 0) for chunk in table_chunks)
+            total_regular_tables = sum(chunk.get('metadata', {}).get('numeric_metadata', {}).get('table_rows_count', 0) for chunk in table_chunks)
+            contextualized_chunks = sum(1 for chunk in table_chunks if chunk.get('metadata', {}).get('has_contextualized_tables', False))
+            
+            print(f"Total JSON tables extracted: {total_json_tables}")
+            print(f"Total regular table rows: {total_regular_tables}")
+            print(f"Chunks with context: {contextualized_chunks}/{len(table_chunks)} ({100*contextualized_chunks/len(table_chunks):.1f}%)")
+            print(f"Average chunk size: {sum(len(chunk.get('text', '')) for chunk in table_chunks) // len(table_chunks)} chars")
+            print("="*80)
 
         return chunks
 
