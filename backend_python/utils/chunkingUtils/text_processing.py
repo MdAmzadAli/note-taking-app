@@ -238,6 +238,51 @@ def fix_ocr_artifacts(text: str) -> str:
 
     return ' '.join(fixed_words)
 
+def fix_character_spacing(text: str) -> str:
+    """Fix character spacing issues in text"""
+    if not text:
+        return text
+
+    # Check if line has excessive single character words
+    words = text.split()
+    if len(words) < 5:
+        return text
+
+    single_char_words = [w for w in words if len(w) == 1 and w.isalnum()]
+    single_char_ratio = len(single_char_words) / len(words)
+
+    if single_char_ratio > 0.4:  # More than 40% single characters
+        # Try to merge consecutive single characters
+        result_words = []
+        i = 0
+        while i < len(words):
+            word = words[i]
+            if len(word) == 1 and word.isalnum():
+                # Collect consecutive single characters
+                char_sequence = [word]
+                j = i + 1
+                while (j < len(words) and
+                       len(words[j]) == 1 and
+                       words[j].isalnum()):
+                    char_sequence.append(words[j])
+                    j += 1
+
+                # Merge if we have multiple consecutive single chars
+                if len(char_sequence) > 1:
+                    merged_word = ''.join(char_sequence)
+                    result_words.append(merged_word)
+                    i = j
+                else:
+                    result_words.append(word)
+                    i += 1
+            else:
+                result_words.append(word)
+                i += 1
+
+        return ' '.join(result_words)
+
+    return text
+
 def normalize_unicode_text(text: str) -> str:
     """Normalize unicode characters in text"""
     if not text:
