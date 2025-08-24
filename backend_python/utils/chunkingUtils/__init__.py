@@ -33,7 +33,6 @@ from .layout_analysis import (
     detect_regions,
     group_text_lines_into_regions,
     detect_layout_regions,
-    classify_layout_type,
     group_by_columns,
     detect_reading_order,
     analyze_spacing_patterns

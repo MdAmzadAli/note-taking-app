@@ -316,3 +316,324 @@ def create_text_region(lines: List, column_index: int):
         text_items=all_items,
         column_index=column_index
     )
+
+def analyze_multi_column_layout(lines: List, columns: List, page_bbox: BoundingBox) -> Dict:
+    """Advanced multi-column layout analysis"""
+    layout_analysis = {
+        'layout_type': 'single_column',
+        'text_columns': [],
+        'column_gaps': [],
+        'reading_flow': 'top_to_bottom',
+        'column_boundaries': []
+    }
+
+    try:
+        if len(columns) <= 1:
+            layout_analysis['layout_type'] = 'single_column'
+            layout_analysis['text_columns'] = [{'x_min': page_bbox.x_min, 'x_max': page_bbox.x_max, 'type': 'text'}]
+            return layout_analysis
+
+        # Analyze column characteristics
+        for i, col in enumerate(columns):
+            col_lines = [line for line in lines if col.min_x <= line.min_x < col.max_x]
+
+            # Determine column content type
+            text_density = calculate_text_density(col_lines)
+            table_indicators = count_table_indicators_in_column(col_lines)
+
+            column_info = {
+                'index': i,
+                'x_min': col.min_x,
+                'x_max': col.max_x,
+                'width': col.max_x - col.min_x,
+                'text_density': text_density,
+                'table_indicators': table_indicators,
+                'type': 'table' if table_indicators > text_density * 0.3 else 'text'
+            }
+
+            layout_analysis['text_columns'].append(column_info)
+
+            # Calculate gaps
+            if i > 0:
+                gap = col.min_x - columns[i-1].max_x
+                layout_analysis['column_gaps'].append(gap)
+
+        # Determine layout type
+        text_columns = [c for c in layout_analysis['text_columns'] if c['type'] == 'text']
+        table_columns = [c for c in layout_analysis['text_columns'] if c['type'] == 'table']
+
+        if len(text_columns) > 1:
+            layout_analysis['layout_type'] = 'multi_column_text'
+        elif len(table_columns) > 0 and len(text_columns) > 0:
+            layout_analysis['layout_type'] = 'mixed_content'
+        elif len(table_columns) > 1:
+            layout_analysis['layout_type'] = 'multi_table'
+
+        print(f"📊 Column analysis: {len(text_columns)} text, {len(table_columns)} table columns")
+
+    except Exception as e:
+        print(f"⚠️ Multi-column analysis failed: {e}")
+
+    return layout_analysis
+
+def calculate_text_density(lines: List) -> float:
+    """Calculate text density in a column"""
+    if not lines:
+        return 0.0
+
+    total_chars = sum(len(line.text) for line in lines)
+    total_lines = len(lines)
+
+    return total_chars / max(total_lines, 1)
+
+def count_table_indicators_in_column(lines: List) -> int:
+    """Count table-like patterns in a column"""
+    indicators = 0
+
+    for line in lines:
+        text = line.text.strip()
+
+        # Look for table indicators
+        if re.search(r'\d+\.\d+', text):  # Numbers with decimals
+            indicators += 1
+        if re.search(r'\$\d+', text):  # Currency
+            indicators += 1
+        if len(text.split()) <= 3 and any(char.isdigit() for char in text):  # Short numeric text
+            indicators += 1
+        if re.search(r'\b(total|sum|amount|qty|quantity)\b', text.lower()):  # Table keywords
+            indicators += 1
+
+    return indicators
+
+def analyze_page_layout(text_items: List, page) -> Dict:
+    """STEP 1: Comprehensive layout analysis with region detection"""
+    from .page_structures import PageLayout, LayoutRegion
+    from .column_detection import detect_columns_enhanced
+    from .line_grouping import group_items_into_lines
+    
+    if not text_items:
+        return PageLayout(
+            regions=[],
+            columns=[],
+            page_bbox=BoundingBox(0, 0, 1000, 1000),
+            layout_type='empty'
+        )
+
+    # Get page dimensions
+    page_bbox = BoundingBox(
+        x_min=0,
+        y_min=0,
+        x_max=page.width,
+        y_max=page.height
+    )
+
+    # Group text items into lines for analysis
+    lines = group_items_into_lines(text_items)
+
+    # Detect columns using improved algorithm
+    columns = detect_columns_enhanced(lines, page_bbox)
+
+    # Detect text vs table regions
+    regions = detect_regions(lines, columns, page_bbox, page)
+
+    # Classify layout type
+    from .layout_structures import classify_layout_type
+    layout_type = classify_layout_type(regions, columns)
+
+    return PageLayout(
+        regions=regions,
+        columns=columns,
+        page_bbox=page_bbox,
+        layout_type=layout_type
+    )
+
+def detect_regions(lines: List, columns: List, page_bbox: BoundingBox, page) -> List:
+    """Enhanced table detection: pdfplumber + camelot with JSON storage"""
+    from .page_structures import LayoutRegion
+    
+    regions = []
+    detected_tables = []
+
+    # Step 1: Try pdfplumber table detection (bounding box detection)
+    try:
+        tables = page.find_tables()
+        pdfplumber_tables = []
+
+        for table in tables:
+            if table.bbox:
+                table_bbox = BoundingBox(
+                    x_min=table.bbox[0],
+                    y_min=table.bbox[1],
+                    x_max=table.bbox[2],
+                    y_max=table.bbox[3]
+                )
+                pdfplumber_tables.append({
+                    'bbox': table_bbox,
+                    'table_obj': table,
+                    'source': 'pdfplumber'
+                })
+
+        print(f"🔍 pdfplumber detected {len(pdfplumber_tables)} table regions")
+        detected_tables.extend(pdfplumber_tables)
+
+    except Exception as e:
+        print(f"⚠️ pdfplumber table detection failed: {e}")
+
+    # Step 2: Create enhanced table regions with JSON data
+    table_bboxes = []
+    for table_info in detected_tables:
+        table_bbox = table_info['bbox']
+        table_bboxes.append(table_bbox)
+
+        # Find lines that belong to this table
+        table_lines = [
+            line for line in lines 
+            if line_intersects_bbox(line, table_bbox, overlap_threshold=0.5)
+        ]
+
+        # Create enhanced table region with JSON capability
+        table_region = LayoutRegion(
+            bbox=table_bbox,
+            region_type='table',
+            confidence=0.9,
+            text_items=[item for line in table_lines for item in line.items]
+        )
+
+        # Add table extraction metadata
+        table_region.table_source = table_info['source']
+        table_region.has_json_data = False
+        table_region.table_json = None
+
+        # Try to extract structured data from pdfplumber table
+        if table_info['source'] == 'pdfplumber' and 'table_obj' in table_info:
+            try:
+                table_data = table_info['table_obj'].extract()
+                if table_data:
+                    # Convert to structured JSON
+                    from .table_processing import convert_table_to_json
+                    structured_table = convert_table_to_json(table_data)
+                    table_region.table_json = structured_table
+                    table_region.has_json_data = True
+                    print(f"✅ Extracted {len(table_data)} rows as JSON from pdfplumber")
+            except Exception as e:
+                print(f"⚠️ Failed to extract JSON from pdfplumber table: {e}")
+
+        regions.append(table_region)
+
+    # Step 3: Detect text regions (areas not covered by tables)
+    text_lines = []
+    for line in lines:
+        is_in_table = False
+        for table_bbox in table_bboxes:
+            if line_intersects_bbox(line, table_bbox, overlap_threshold=0.3):
+                is_in_table = True
+                break
+
+        if not is_in_table:
+            text_lines.append(line)
+
+    # Step 4: Group text lines into regions by column and proximity
+    if text_lines:
+        text_regions = group_text_lines_into_regions(text_lines, columns)
+        regions.extend(text_regions)
+
+    # Step 5: If no regions detected, create a default text region
+    if not regions:
+        all_items = [item for line in lines for item in line.items]
+        if all_items:
+            min_x = min(item.x for item in all_items)
+            max_x = max(item.x + item.width for item in all_items)
+            min_y = min(item.y for item in all_items)
+            max_y = max(item.y + item.height for item in all_items)
+
+            regions.append(LayoutRegion(
+                bbox=BoundingBox(min_x, min_y, max_x, max_y),
+                region_type='text',
+                confidence=0.8,
+                text_items=all_items
+            ))
+
+    return regions
+
+def line_intersects_bbox(line, bbox: BoundingBox, overlap_threshold: float = 0.5) -> bool:
+    """Check if line intersects with bounding box"""
+    if not line.bbox:
+        return False
+
+    # Calculate intersection
+    intersection_x = max(0, min(line.bbox.x_max, bbox.x_max) - max(line.bbox.x_min, bbox.x_min))
+    intersection_y = max(0, min(line.bbox.y_max, bbox.y_max) - max(line.bbox.y_min, bbox.y_min))
+
+    if intersection_x <= 0 or intersection_y <= 0:
+        return False
+
+    intersection_area = intersection_x * intersection_y
+    line_area = line.bbox.area
+
+    if line_area == 0:
+        return False
+
+    overlap_ratio = intersection_area / line_area
+    return overlap_ratio >= overlap_threshold
+
+def detect_layout_regions(lines: List, columns: List, page_bbox: BoundingBox) -> List:
+    """Detect layout regions without table extraction (simplified version)"""
+    from .page_structures import LayoutRegion
+    
+    regions = []
+    
+    # Group text lines into regions by column and proximity
+    if lines:
+        text_regions = group_text_lines_into_regions(lines, columns)
+        regions.extend(text_regions)
+
+    # If no regions detected, create a default text region
+    if not regions:
+        all_items = [item for line in lines for item in line.items]
+        if all_items:
+            min_x = min(item.x for item in all_items)
+            max_x = max(item.x + item.width for item in all_items)
+            min_y = min(item.y for item in all_items)
+            max_y = max(item.y + item.height for item in all_items)
+
+            regions.append(LayoutRegion(
+                bbox=BoundingBox(min_x, min_y, max_x, max_y),
+                region_type='text',
+                confidence=0.8,
+                text_items=all_items
+            ))
+
+    return regions
+
+def group_by_columns(items: List, columns: List) -> Dict:
+    """Group items by their column positions"""
+    column_groups = {}
+    
+    for col_idx, column in enumerate(columns):
+        column_items = [
+            item for item in items 
+            if column.min_x <= item.x < column.max_x
+        ]
+        column_groups[col_idx] = column_items
+    
+    return column_groups
+
+def detect_reading_order(regions: List) -> List:
+    """Sort regions by natural reading order (left-to-right, top-to-bottom)"""
+    def reading_order_key(region):
+        # Use center points for sorting
+        y_center = region.bbox.center_y
+        x_center = region.bbox.center_x
+
+        # Group by approximate Y bands (to handle side-by-side content)
+        y_band = int(y_center / 50) * 50  # 50-pixel bands
+
+        return (y_band, x_center)
+
+    sorted_regions = sorted(regions, key=reading_order_key)
+
+    # Assign reading order
+    for i, region in enumerate(sorted_regions):
+        region.reading_order = i
+
+    return sorted_regions
