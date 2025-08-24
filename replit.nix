@@ -10,5 +10,6 @@
     pkgs.libuuid
     pkgs.pkg-config
     pkgs.pixman
+    pkgs.ghostscript
   ];
 }
