@@ -284,3 +284,4 @@ def bboxes_overlap(bbox1: BoundingBox, bbox2: BoundingBox, threshold: float = 0.
     overlap_ratio2 = intersection_area / bbox2_area
 
     return overlap_ratio1 >= threshold or overlap_ratio2 >= threshold
+    
