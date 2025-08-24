@@ -1,0 +1,48 @@
+✅ CSVService imported successfully
+✅ FileService imported successfully
+🔧 RAG Service: Starting component imports...
+❌ RAG: Failed to import ChunkingService: attempted relative import beyond top-level package
+🔧 Embedding Service ENV: Loading environment variables from: /home/runner/workspace/backend_python/.env
+🔧 Embedding Service ENV: Environment variables after loading:
+   GEMINI_EMBEDDING_API_KEY: ✅ Set (********)
+   GEMINI_CHAT_API_KEY: ✅ Set (********)
+✅ RAG: EmbeddingService imported successfully
+✅ RAG: VectorDatabaseService imported successfully
+✅ RAG: SearchService imported successfully
+✅ RAG: AnswerGenerationService imported successfully
+❌ RAG: Failed to import DocumentIndexingService: attempted relative import beyond top-level package
+❌ RAG: Failed to import UnifiedChunkingService: attempted relative import beyond top-level package
+🔧 RAG Service: All component imports completed
+🔧 RAG Service ENV: Loading environment variables from: /home/runner/workspace/backend_python/.env
+🔧 RAG Service ENV: Environment variables after loading:
+   QDRANT_URL: ✅ Set (https://88400bcb-09a0-4ddb-a90d-78abcb266b4c.us-west-1-0.aws.cloud.qdrant.io:6333)
+   QDRANT_API_KEY: ✅ Set (********)
+   GEMINI_EMBEDDING_API_KEY: ✅ Set (********)
+   GEMINI_CHAT_API_KEY: ✅ Set (********)
+🔧 RAG Service: Starting initialization...
+❌ RAG: Failed to initialize ChunkingService: name 'ChunkingService' is not defined
+❌ RAG: Failed to initialize UnifiedChunkingService: name 'UnifiedChunkingService' is not defined
+✅ RAG: EmbeddingService component initialized
+✅ RAG: VectorDatabaseService component initialized
+✅ RAG: SearchService component initialized
+✅ RAG: AnswerGenerationService component initialized
+❌ RAG: Failed to initialize DocumentIndexingService: name 'DocumentIndexingService' is not defined
+🔧 RAG Service: Component initialization completed
+✅ RAGService imported successfully
+✅ URLDownloadService imported successfully
+✅ WebpageTextExtractorService imported successfully
+🔧 All imports completed
+🌐 CORS check for origin
+🔧 Initializing backend services...
+✅ CSVService initialized successfully
+✅ FileService initialized successfully
+🔧 RAG Service: Starting initialization...
+❌ RAG: Failed to initialize ChunkingService: name 'ChunkingService' is not defined
+❌ RAG: Failed to initialize UnifiedChunkingService: name 'UnifiedChunkingService' is not defined
+✅ RAG: EmbeddingService component initialized
+✅ RAG: VectorDatabaseService component initialized
+✅ RAG: SearchService component initialized
+✅ RAG: AnswerGenerationService component initialized
+❌ RAG: Failed to initialize DocumentIndexingService: name 'DocumentIndexingService' is not defined
+🔧 RAG Service: Component initialization completed
+✅ RAGService created successfully
