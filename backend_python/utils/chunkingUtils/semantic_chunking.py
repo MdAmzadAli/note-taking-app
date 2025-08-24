@@ -401,3 +401,175 @@ def calculate_chunk_coherence_score(semantic_units: List[StructuredUnit],
         coherence_score += 0.1
         
     return min(1.0, coherence_score)
+from typing import Dict, List, Any, Optional
+from .page_structures import PDFData, PageData, StructuredUnit
+from .number_parsing import normalize_currency_and_numbers
+
+def split_into_chunks(chunking_service, pdf_data: PDFData, metadata: Optional[Dict] = None) -> List[Dict]:
+    """Split text into semantic chunks with unit-based overlap (preserving reading order)"""
+    if metadata is None:
+        metadata = {}
+
+    chunks = []
+    global_chunk_index = 0
+
+    # Process each page using structured units (already in reading order)
+    for page_data in pdf_data.pages:
+        page_number = page_data.page_number
+        structured_units = page_data.structured_units or []
+
+        # Sort units by reading order to ensure proper sequence
+        structured_units.sort(key=lambda unit: unit.reading_order if hasattr(unit, 'reading_order') else 0)
+
+        # Create chunks using unit-based approach
+        page_chunks = create_units_based_chunks(
+            chunking_service, structured_units, page_number, metadata, global_chunk_index
+        )
+        chunks.extend(page_chunks)
+        global_chunk_index += len(page_chunks)
+
+    return chunks
+
+def create_units_based_chunks(chunking_service, units: List[StructuredUnit], page_number: Optional[int], 
+                             metadata: Dict, start_index: int) -> List[Dict]:
+    """Create chunks based on structured units with strict size control"""
+    chunks = []
+    chunk_index = start_index
+    current_chunk = ''
+    current_units = []
+
+    i = 0
+    while i < len(units):
+        unit = units[i]
+
+        # Check if this is a table header followed by table rows
+        if unit.type == 'table_header':
+            # Find all related table content
+            table_group = [unit]
+            j = i + 1
+
+            # Collect all table rows that follow this header
+            while j < len(units) and units[j].type == 'table_row':
+                table_group.append(units[j])
+                j += 1
+
+            # Calculate total size of table group
+            table_group_text = '\n'.join(u.text for u in table_group)
+
+            # For tables, we allow exceeding chunk size but still try to be reasonable
+            if current_chunk.strip() and len(current_chunk) + len(table_group_text) > chunking_service.chunk_size:
+                # Create chunk with current content first
+                chunk_text = current_chunk.strip()
+                chunks.append(create_semantic_chunk(
+                    chunking_service, chunk_text, metadata, chunk_index, page_number, current_units
+                ))
+                chunk_index += 1
+
+                # Start new chunk with just the table group
+                current_chunk = table_group_text
+                current_units = table_group.copy()
+            else:
+                # Add table group to current chunk
+                if current_chunk:
+                    current_chunk += f'\n{table_group_text}'
+                else:
+                    current_chunk = table_group_text
+                current_units.extend(table_group)
+
+            # Skip the processed table rows
+            i = j
+            continue
+
+        # Handle regular units (headers, paragraphs, bullets) - STRICT SIZE CONTROL
+        else:
+            unit_text = unit.text
+            potential_chunk_size = len(current_chunk) + len(unit_text) + 1
+
+            if potential_chunk_size > chunking_service.chunk_size and current_chunk.strip():
+                # Create chunk with current content
+                chunk_text = current_chunk.strip()
+                chunks.append(create_semantic_chunk(
+                    chunking_service, chunk_text, metadata, chunk_index, page_number, current_units
+                ))
+                chunk_index += 1
+
+                # Start new chunk with current unit
+                current_chunk = unit_text
+                current_units = [unit]
+            else:
+                # Add unit to current chunk
+                if current_chunk:
+                    current_chunk += f'\n{unit_text}'
+                else:
+                    current_chunk = unit_text
+                current_units.append(unit)
+
+        i += 1
+
+    # Add final chunk if it has content
+    if current_chunk.strip():
+        chunks.append(create_semantic_chunk(
+            chunking_service, current_chunk.strip(), metadata, chunk_index, page_number, current_units
+        ))
+
+    return chunks
+
+def create_semantic_chunk(chunking_service, text: str, metadata: Dict, chunk_index: int, 
+                         page_number: Optional[int], semantic_units: List[StructuredUnit]) -> Dict:
+    """Create a semantic chunk object with enhanced metadata (reading order preserved)"""
+    unit_types = [u.type for u in semantic_units]
+    line_numbers = [u.start_line for u in semantic_units if u.start_line]
+    reading_orders = [getattr(u, 'reading_order', 0) for u in semantic_units]
+
+    # Analyze numeric content across the entire chunk
+    chunk_normalized = normalize_currency_and_numbers(text)
+
+    # Enhanced table analysis
+    table_rows = [u for u in semantic_units if u.type == 'table_row']
+    table_headers = [u for u in semantic_units if u.type == 'table_header']
+    json_tables = [u for u in semantic_units if u.type == 'table_json']
+
+    # Check chunk size and log if oversized for non-table content
+    chunk_size = len(text)
+    has_table_content = any(t in ['table_row', 'table_header'] for t in unit_types)
+
+    numeric_metadata = {
+        'total_numbers': len(chunk_normalized.numbers),
+        'currencies': list(set(chunk_normalized.currencies)),
+        'has_negative_values': chunk_normalized.has_negative,
+        'table_rows_count': len(table_rows),
+        'table_headers_count': len(table_headers),
+        'json_tables_count': len(json_tables)
+    }
+
+    # Determine content type for conditional metadata
+    content_type = metadata.get('content_type', 'pdf')
+    is_pdf_content = content_type == 'pdf'
+
+    chunk_metadata = {
+        **metadata,
+        'chunk_index': chunk_index,
+        'chunk_size': len(text),
+        'semantic_types': list(set(unit_types)),
+        'unit_count': len(semantic_units),
+        'strategy': 'enhanced_layout_aware_semantic',
+        'has_structured_content': any(t in ['bullet', 'table_row', 'header', 'table_header'] for t in unit_types),
+        'has_table_content': any(t in ['table_row', 'table_header', 'table_json'] for t in unit_types),
+        'has_json_tables': 'table_json' in unit_types,
+        'numeric_metadata': numeric_metadata,
+        'has_financial_data': len(numeric_metadata['currencies']) > 0,
+        'has_negative_values': numeric_metadata['has_negative_values'],
+        'reading_order_range': [min(reading_orders), max(reading_orders)] if reading_orders else [0, 0],
+        'maintains_reading_order': True,
+    }
+
+    # Add page and line numbers only for PDF content
+    if is_pdf_content:
+        chunk_metadata['page_number'] = page_number
+        chunk_metadata['start_line'] = min(line_numbers) if line_numbers else 1
+        chunk_metadata['end_line'] = max(line_numbers) if line_numbers else 1
+
+    return {
+        'text': text,
+        'metadata': chunk_metadata
+    }

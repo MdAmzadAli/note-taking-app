@@ -215,3 +215,52 @@ def bboxes_overlap(bbox1: BoundingBox, bbox2: BoundingBox, threshold: float = 0.
     overlap_ratio2 = intersection_area / bbox2_area
     
     return overlap_ratio1 >= threshold or overlap_ratio2 >= threshold
+from typing import List, Optional
+from .page_structures import LayoutRegion, Column, Line
+from .text_items import BoundingBox
+from .layout_structures import create_text_region
+
+def group_text_lines_into_regions(text_lines: List[Line], columns: List[Column]) -> List[LayoutRegion]:
+    """Group text lines into coherent regions"""
+    regions = []
+
+    # Group lines by column
+    for col_idx, column in enumerate(columns):
+        column_lines = [
+            line for line in text_lines 
+            if column.min_x <= line.min_x < column.max_x
+        ]
+
+        if not column_lines:
+            continue
+
+        # Group lines by Y proximity within column
+        column_lines.sort(key=lambda l: l.y)
+
+        current_group = [column_lines[0]]
+
+        for line in column_lines[1:]:
+            # Check Y gap between lines
+            prev_line = current_group[-1]
+            y_gap = abs(line.y - prev_line.y)
+
+            # Adaptive gap threshold
+            gap_threshold = 30  # pixels
+
+            if y_gap <= gap_threshold:
+                current_group.append(line)
+            else:
+                # Create region from current group
+                if current_group:
+                    region = create_text_region(current_group, col_idx)
+                    if region:
+                        regions.append(region)
+                current_group = [line]
+
+        # Add final group
+        if current_group:
+            region = create_text_region(current_group, col_idx)
+            if region:
+                regions.append(region)
+
+    return regions
