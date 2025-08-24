@@ -204,7 +204,9 @@ from .pdf_processing import (
 )
 
 from .service_config import (
-    ChunkingConfig, get_chunking_stats, analyze_pdf_structure
+    ChunkingConfig,
+    get_chunking_stats,
+    analyze_pdf_structure
 )
 
 from .display_utilities import (
