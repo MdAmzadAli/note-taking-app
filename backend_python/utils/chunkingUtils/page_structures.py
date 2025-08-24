@@ -1,10 +1,10 @@
-
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any, Optional
 from .text_items import BoundingBox, TextItem
 
 @dataclass
 class Line:
+    """Represents a line of text with spatial information"""
     text: str
     y: float
     min_x: float
