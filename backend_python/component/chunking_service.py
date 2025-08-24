@@ -653,11 +653,25 @@ class ChunkingService:
         )
 
     async def _detect_regions_with_camelot(self, lines: List[Line], columns: List[Column], page_bbox: BoundingBox, page, page_number: int, file_path: str = None) -> List[LayoutRegion]:
-        """Enhanced table detection: pdfplumber + camelot with JSON storage"""
+        """Enhanced table detection with sophisticated layout analysis and targeted camelot extraction"""
         regions = []
         detected_tables = []
         
-        # Step 1: Try pdfplumber table detection (bounding box detection)
+        print(f"📐 Starting enhanced layout analysis for page {page_number}")
+        
+        # Step 1: Enhanced Visual Structure Detection
+        visual_structures = self._detect_visual_structures(page, page_bbox)
+        print(f"🔍 Detected {len(visual_structures['bordered_regions'])} bordered regions")
+        
+        # Step 2: Advanced Multi-Column Layout Analysis  
+        layout_analysis = self._analyze_multi_column_layout(lines, columns, page_bbox)
+        print(f"📊 Layout analysis: {layout_analysis['layout_type']}, {len(layout_analysis['text_columns'])} text columns")
+        
+        # Step 3: Content-Based Table Detection (prevents multi-column text confusion)
+        table_candidates = self._detect_table_candidates_by_content(lines, layout_analysis)
+        print(f"🎯 Found {len(table_candidates)} table candidates by content analysis")
+        
+        # Step 4: Try pdfplumber table detection with enhanced filtering
         try:
             tables = page.find_tables()
             pdfplumber_tables = []
@@ -670,29 +684,39 @@ class ChunkingService:
                         x_max=table.bbox[2],
                         y_max=table.bbox[3]
                     )
-                    pdfplumber_tables.append({
-                        'bbox': table_bbox,
-                        'table_obj': table,
-                        'source': 'pdfplumber'
-                    })
+                    
+                    # Validate this is actually a table, not multi-column text
+                    if self._validate_table_vs_multicolumn(table_bbox, layout_analysis, lines):
+                        pdfplumber_tables.append({
+                            'bbox': table_bbox,
+                            'table_obj': table,
+                            'source': 'pdfplumber',
+                            'confidence': 0.8
+                        })
             
-            print(f"🔍 pdfplumber detected {len(pdfplumber_tables)} table regions")
+            print(f"🔍 pdfplumber detected {len(pdfplumber_tables)} validated table regions")
             detected_tables.extend(pdfplumber_tables)
             
         except Exception as e:
             print(f"⚠️ pdfplumber table detection failed: {e}")
 
-        # Step 2: Try camelot for more accurate table extraction
+        # Step 5: Enhanced camelot extraction with targeted areas
         camelot_tables = []
         if file_path:
             try:
-                camelot_tables = await self._extract_tables_with_camelot(file_path, page_number)
-                print(f"🔍 Camelot extracted {len(camelot_tables)} tables with JSON data")
+                # Get targeted table areas from visual structures and candidates
+                table_areas = self._get_targeted_table_areas(visual_structures, table_candidates, detected_tables)
+                
+                # Extract with camelot using targeted approach
+                camelot_tables = await self._extract_tables_with_targeted_camelot(
+                    file_path, page_number, table_areas, layout_analysis
+                )
+                print(f"🔍 Targeted camelot extracted {len(camelot_tables)} tables with JSON data")
                 
             except Exception as e:
                 print(f"⚠️ Camelot table extraction failed: {e}")
         elif detected_tables:
-            # Try to convert pdfplumber tables to JSON format when no file path available
+            # Convert pdfplumber tables to JSON format when no file path available
             print(f"🔄 Converting pdfplumber tables to JSON format...")
             for table_info in detected_tables:
                 if 'table_obj' in table_info:
@@ -703,18 +727,19 @@ class ChunkingService:
                             camelot_tables.append({
                                 "json_data": structured_table,
                                 "bbox": table_info['bbox'],
-                                "accuracy": 85.0,  # Assume good accuracy for pdfplumber
+                                "accuracy": 85.0,
                                 "source": "pdfplumber_converted"
                             })
                     except Exception as e:
                         print(f"⚠️ Failed to convert pdfplumber table to JSON: {e}")
 
-        # Step 3: Create enhanced table regions with JSON data
-        table_bboxes = []
+        # Step 6: Region deduplication and consolidation
+        all_table_regions = self._consolidate_table_regions(detected_tables, camelot_tables, visual_structures)
         
-        # Process pdfplumber tables
-        for table_info in detected_tables:
-            table_bbox = table_info['bbox']
+        # Step 7: Create final regions with enhanced metadata
+        table_bboxes = []
+        for region_info in all_table_regions:
+            table_bbox = region_info['bbox']
             table_bboxes.append(table_bbox)
             
             # Find lines that belong to this table
@@ -723,65 +748,25 @@ class ChunkingService:
                 if self._line_intersects_bbox(line, table_bbox, overlap_threshold=0.5)
             ]
             
-            # Create enhanced table region with JSON capability
+            # Create enhanced table region
             table_region = LayoutRegion(
                 bbox=table_bbox,
-                region_type='table',
-                confidence=0.9,
+                region_type=region_info.get('region_type', 'table'),
+                confidence=region_info.get('confidence', 0.9),
                 text_items=[item for line in table_lines for item in line.items]
             )
             
-            # Add table extraction metadata
-            table_region.table_source = table_info['source']
-            table_region.has_json_data = False
-            table_region.table_json = None
-            
-            # Try to extract structured data from pdfplumber table
-            if table_info['source'] == 'pdfplumber' and 'table_obj' in table_info:
-                try:
-                    table_data = table_info['table_obj'].extract()
-                    if table_data:
-                        # Convert to structured JSON
-                        structured_table = self._convert_table_to_json(table_data)
-                        table_region.table_json = structured_table
-                        table_region.has_json_data = True
-                        print(f"✅ Extracted {len(table_data)} rows as JSON from pdfplumber")
-                except Exception as e:
-                    print(f"⚠️ Failed to extract JSON from pdfplumber table: {e}")
+            # Add comprehensive metadata
+            table_region.table_source = region_info.get('source', 'unknown')
+            table_region.has_json_data = region_info.get('has_json_data', False)
+            table_region.table_json = region_info.get('table_json', None)
+            table_region.extraction_accuracy = region_info.get('accuracy', 0)
+            table_region.visual_structure = region_info.get('visual_structure', None)
             
             regions.append(table_region)
+            print(f"✅ Added {region_info['source']} table with {region_info.get('accuracy', 0):.1f}% accuracy")
 
-        # Process camelot tables (higher priority due to better accuracy)
-        for camelot_table in camelot_tables:
-            if camelot_table.get('bbox'):
-                table_bbox = camelot_table['bbox']
-                
-                # Check if this overlaps with existing pdfplumber tables
-                overlaps_existing = any(
-                    self._bboxes_overlap(table_bbox, existing_bbox, 0.5) 
-                    for existing_bbox in table_bboxes
-                )
-                
-                if not overlaps_existing:
-                    table_bboxes.append(table_bbox)
-                    
-                    # Create enhanced table region with camelot JSON
-                    table_region = LayoutRegion(
-                        bbox=table_bbox,
-                        region_type='table_json',  # Special type for JSON tables
-                        confidence=camelot_table['accuracy'] / 100.0,
-                        text_items=[]  # Will be filled from JSON
-                    )
-                    
-                    table_region.table_source = camelot_table['source']
-                    table_region.has_json_data = True
-                    table_region.table_json = camelot_table['json_data']
-                    table_region.extraction_accuracy = camelot_table['accuracy']
-                    
-                    regions.append(table_region)
-                    print(f"✅ Added camelot table with {camelot_table['accuracy']:.1f}% accuracy")
-
-        # Step 4: Detect text regions (areas not covered by tables)
+        # Step 8: Create text regions (enhanced to avoid table areas)
         text_lines = []
         for line in lines:
             is_in_table = False
@@ -793,12 +778,12 @@ class ChunkingService:
             if not is_in_table:
                 text_lines.append(line)
 
-        # Step 5: Group text lines into regions
+        # Group text lines into regions with multi-column awareness
         if text_lines:
-            text_regions = self._group_text_lines_into_regions(text_lines, columns)
+            text_regions = self._group_text_lines_into_regions_enhanced(text_lines, layout_analysis)
             regions.extend(text_regions)
 
-        # Step 6: Default text region if no regions detected
+        # Default fallback
         if not regions:
             all_items = [item for line in lines for item in line.items]
             if all_items:
@@ -814,8 +799,707 @@ class ChunkingService:
                     text_items=all_items
                 ))
 
+        print(f"📐 Layout analysis complete: {len(regions)} regions ({len([r for r in regions if 'table' in r.region_type])} tables)")
         return regions
 
+    def _detect_visual_structures(self, page, page_bbox: BoundingBox) -> Dict:
+        """Detect visual structures like borders, lines, and rectangular regions"""
+        visual_structures = {
+            'bordered_regions': [],
+            'horizontal_lines': [],
+            'vertical_lines': [],
+            'rectangular_regions': []
+        }
+        
+        try:
+            # Extract visual elements
+            drawings = getattr(page, 'drawings', [])
+            rects = getattr(page, 'rects', [])
+            lines = getattr(page, 'lines', [])
+            
+            print(f"🔍 Visual elements found: {len(drawings)} drawings, {len(rects)} rects, {len(lines)} lines")
+            
+            # Process rectangles (potential table borders)
+            for rect in rects:
+                if rect.get('width', 0) > 50 and rect.get('height', 0) > 20:  # Minimum table size
+                    bbox = BoundingBox(
+                        x_min=rect['x0'],
+                        y_min=rect['y0'], 
+                        x_max=rect['x1'],
+                        y_max=rect['y1']
+                    )
+                    visual_structures['bordered_regions'].append({
+                        'bbox': bbox,
+                        'type': 'rectangle',
+                        'confidence': 0.9
+                    })
+            
+            # Process lines to detect table grids
+            h_lines = [l for l in lines if abs(l.get('y0', 0) - l.get('y1', 0)) < 2]  # Horizontal
+            v_lines = [l for l in lines if abs(l.get('x0', 0) - l.get('x1', 0)) < 2]  # Vertical
+            
+            visual_structures['horizontal_lines'] = h_lines
+            visual_structures['vertical_lines'] = v_lines
+            
+            # Detect grid-like structures from intersecting lines
+            grid_regions = self._detect_grid_structures(h_lines, v_lines, page_bbox)
+            visual_structures['bordered_regions'].extend(grid_regions)
+            
+            print(f"📐 Found {len(visual_structures['bordered_regions'])} potential table structures")
+            
+        except Exception as e:
+            print(f"⚠️ Visual structure detection failed: {e}")
+        
+        return visual_structures
+    
+    def _detect_grid_structures(self, h_lines: List, v_lines: List, page_bbox: BoundingBox) -> List[Dict]:
+        """Detect table-like grid structures from intersecting lines"""
+        grid_regions = []
+        
+        if len(h_lines) < 2 or len(v_lines) < 2:
+            return grid_regions
+        
+        try:
+            # Group nearby horizontal lines
+            h_groups = self._group_nearby_lines(h_lines, axis='horizontal')
+            v_groups = self._group_nearby_lines(v_lines, axis='vertical')
+            
+            # Find intersecting line groups that form rectangular grids
+            for h_group in h_groups:
+                for v_group in v_groups:
+                    # Check if lines intersect to form a grid
+                    intersection_grid = self._check_line_intersections(h_group, v_group)
+                    
+                    if intersection_grid and len(intersection_grid['cells']) >= 4:  # At least 2x2 grid
+                        bbox = BoundingBox(
+                            x_min=min(l['x0'] for l in v_group),
+                            y_min=min(l['y0'] for l in h_group),
+                            x_max=max(l['x1'] for l in v_group),
+                            y_max=max(l['y1'] for l in h_group)
+                        )
+                        
+                        grid_regions.append({
+                            'bbox': bbox,
+                            'type': 'grid',
+                            'confidence': 0.95,
+                            'cells': intersection_grid['cells']
+                        })
+        
+        except Exception as e:
+            print(f"⚠️ Grid structure detection failed: {e}")
+        
+        return grid_regions
+    
+    def _group_nearby_lines(self, lines: List, axis: str, tolerance: float = 10) -> List[List]:
+        """Group lines that are close to each other"""
+        if not lines:
+            return []
+        
+        # Sort lines by position
+        if axis == 'horizontal':
+            sorted_lines = sorted(lines, key=lambda l: l.get('y0', 0))
+            pos_key = 'y0'
+        else:
+            sorted_lines = sorted(lines, key=lambda l: l.get('x0', 0))
+            pos_key = 'x0'
+        
+        groups = []
+        current_group = [sorted_lines[0]]
+        
+        for line in sorted_lines[1:]:
+            if abs(line.get(pos_key, 0) - current_group[-1].get(pos_key, 0)) <= tolerance:
+                current_group.append(line)
+            else:
+                if len(current_group) >= 2:  # Only keep groups with multiple lines
+                    groups.append(current_group)
+                current_group = [line]
+        
+        if len(current_group) >= 2:
+            groups.append(current_group)
+        
+        return groups
+    
+    def _check_line_intersections(self, h_lines: List, v_lines: List) -> Dict:
+        """Check if horizontal and vertical lines intersect to form a grid"""
+        intersections = []
+        cells = []
+        
+        for h_line in h_lines:
+            for v_line in v_lines:
+                # Check if lines actually intersect
+                h_x0, h_x1 = h_line.get('x0', 0), h_line.get('x1', 0)
+                h_y = h_line.get('y0', 0)
+                v_x = v_line.get('x0', 0)
+                v_y0, v_y1 = v_line.get('y0', 0), v_line.get('y1', 0)
+                
+                # Check intersection
+                if (min(h_x0, h_x1) <= v_x <= max(h_x0, h_x1) and 
+                    min(v_y0, v_y1) <= h_y <= max(v_y0, v_y1)):
+                    intersections.append((v_x, h_y))
+        
+        # Form cells from intersections
+        if len(intersections) >= 4:
+            # Sort intersections to form grid cells
+            x_coords = sorted(set(x for x, y in intersections))
+            y_coords = sorted(set(y for x, y in intersections))
+            
+            for i in range(len(x_coords) - 1):
+                for j in range(len(y_coords) - 1):
+                    cells.append({
+                        'x0': x_coords[i],
+                        'y0': y_coords[j],
+                        'x1': x_coords[i + 1],
+                        'y1': y_coords[j + 1]
+                    })
+        
+        return {
+            'intersections': intersections,
+            'cells': cells
+        }
+    
+    def _analyze_multi_column_layout(self, lines: List[Line], columns: List[Column], page_bbox: BoundingBox) -> Dict:
+        """Advanced multi-column layout analysis"""
+        layout_analysis = {
+            'layout_type': 'single_column',
+            'text_columns': [],
+            'column_gaps': [],
+            'reading_flow': 'top_to_bottom',
+            'column_boundaries': []
+        }
+        
+        try:
+            if len(columns) <= 1:
+                layout_analysis['layout_type'] = 'single_column'
+                layout_analysis['text_columns'] = [{'x_min': page_bbox.x_min, 'x_max': page_bbox.x_max, 'type': 'text'}]
+                return layout_analysis
+            
+            # Analyze column characteristics
+            for i, col in enumerate(columns):
+                col_lines = [line for line in lines if col.min_x <= line.min_x < col.max_x]
+                
+                # Determine column content type
+                text_density = self._calculate_text_density(col_lines)
+                table_indicators = self._count_table_indicators_in_column(col_lines)
+                
+                column_info = {
+                    'index': i,
+                    'x_min': col.min_x,
+                    'x_max': col.max_x,
+                    'width': col.max_x - col.min_x,
+                    'text_density': text_density,
+                    'table_indicators': table_indicators,
+                    'type': 'table' if table_indicators > text_density * 0.3 else 'text'
+                }
+                
+                layout_analysis['text_columns'].append(column_info)
+                
+                # Calculate gaps
+                if i > 0:
+                    gap = col.min_x - columns[i-1].max_x
+                    layout_analysis['column_gaps'].append(gap)
+            
+            # Determine layout type
+            text_columns = [c for c in layout_analysis['text_columns'] if c['type'] == 'text']
+            table_columns = [c for c in layout_analysis['text_columns'] if c['type'] == 'table']
+            
+            if len(text_columns) > 1:
+                layout_analysis['layout_type'] = 'multi_column_text'
+            elif len(table_columns) > 0 and len(text_columns) > 0:
+                layout_analysis['layout_type'] = 'mixed_content'
+            elif len(table_columns) > 1:
+                layout_analysis['layout_type'] = 'multi_table'
+            
+            print(f"📊 Column analysis: {len(text_columns)} text, {len(table_columns)} table columns")
+            
+        except Exception as e:
+            print(f"⚠️ Multi-column analysis failed: {e}")
+        
+        return layout_analysis
+    
+    def _calculate_text_density(self, lines: List[Line]) -> float:
+        """Calculate text density in a column"""
+        if not lines:
+            return 0.0
+        
+        total_chars = sum(len(line.text) for line in lines)
+        total_lines = len(lines)
+        
+        return total_chars / max(total_lines, 1)
+    
+    def _count_table_indicators_in_column(self, lines: List[Line]) -> int:
+        """Count table-like patterns in a column"""
+        indicators = 0
+        
+        for line in lines:
+            text = line.text.strip()
+            
+            # Look for table indicators
+            if re.search(r'\d+\.\d+', text):  # Numbers with decimals
+                indicators += 1
+            if re.search(r'\$\d+', text):  # Currency
+                indicators += 1
+            if len(text.split()) <= 3 and any(char.isdigit() for char in text):  # Short numeric text
+                indicators += 1
+            if re.search(r'\b(total|sum|amount|qty|quantity)\b', text.lower()):  # Table keywords
+                indicators += 1
+        
+        return indicators
+    
+    def _detect_table_candidates_by_content(self, lines: List[Line], layout_analysis: Dict) -> List[Dict]:
+        """Detect table candidates based on content patterns"""
+        candidates = []
+        
+        try:
+            # Group lines by Y proximity for row detection
+            rows = self._group_lines_into_rows(lines)
+            
+            for row_group in rows:
+                if len(row_group) < 2:  # Need at least 2 lines for a row
+                    continue
+                
+                # Analyze row content
+                row_analysis = self._analyze_row_content(row_group)
+                
+                if row_analysis['is_table_like']:
+                    # Calculate bounding box
+                    min_x = min(line.min_x for line in row_group)
+                    max_x = max(line.max_x for line in row_group)
+                    min_y = min(line.y for line in row_group)
+                    max_y = max(line.y for line in row_group)
+                    
+                    candidates.append({
+                        'bbox': BoundingBox(min_x, min_y, max_x, max_y),
+                        'confidence': row_analysis['confidence'],
+                        'type': 'content_based',
+                        'indicators': row_analysis['indicators']
+                    })
+        
+        except Exception as e:
+            print(f"⚠️ Content-based table detection failed: {e}")
+        
+        return candidates
+    
+    def _group_lines_into_rows(self, lines: List[Line], y_tolerance: float = 5) -> List[List[Line]]:
+        """Group lines into potential table rows"""
+        if not lines:
+            return []
+        
+        sorted_lines = sorted(lines, key=lambda l: l.y)
+        rows = []
+        current_row = [sorted_lines[0]]
+        
+        for line in sorted_lines[1:]:
+            if abs(line.y - current_row[0].y) <= y_tolerance:
+                current_row.append(line)
+            else:
+                if len(current_row) >= 2:
+                    rows.append(current_row)
+                current_row = [line]
+        
+        if len(current_row) >= 2:
+            rows.append(current_row)
+        
+        return rows
+    
+    def _analyze_row_content(self, row_lines: List[Line]) -> Dict:
+        """Analyze if a row looks like table content"""
+        indicators = 0
+        confidence = 0.0
+        
+        # Sort by x position
+        sorted_lines = sorted(row_lines, key=lambda l: l.min_x)
+        
+        # Check for table-like patterns
+        numeric_count = 0
+        short_text_count = 0
+        total_items = len(sorted_lines)
+        
+        for line in sorted_lines:
+            text = line.text.strip()
+            
+            # Numeric content
+            if re.search(r'\d', text):
+                numeric_count += 1
+                indicators += 1
+            
+            # Short, concise text (typical in tables)
+            if len(text.split()) <= 3:
+                short_text_count += 1
+                indicators += 1
+            
+            # Currency or percentage
+            if re.search(r'[\$€£¥%]', text):
+                indicators += 2
+            
+            # Aligned positioning (regular spacing)
+            if len(sorted_lines) >= 3:
+                # Check if spacing is regular
+                spacings = [sorted_lines[i+1].min_x - sorted_lines[i].max_x 
+                           for i in range(len(sorted_lines)-1)]
+                if spacings and max(spacings) - min(spacings) < 20:  # Regular spacing
+                    indicators += 1
+        
+        # Calculate confidence
+        if total_items > 0:
+            numeric_ratio = numeric_count / total_items
+            short_text_ratio = short_text_count / total_items
+            confidence = (numeric_ratio * 0.6 + short_text_ratio * 0.4) * min(indicators / total_items, 1.0)
+        
+        is_table_like = confidence > 0.5 and indicators >= 2
+        
+        return {
+            'is_table_like': is_table_like,
+            'confidence': confidence,
+            'indicators': indicators,
+            'numeric_ratio': numeric_count / max(total_items, 1),
+            'short_text_ratio': short_text_count / max(total_items, 1)
+        }
+    
+    def _validate_table_vs_multicolumn(self, table_bbox: BoundingBox, layout_analysis: Dict, lines: List[Line]) -> bool:
+        """Validate if a detected table is actually a table vs multi-column text"""
+        
+        # Get lines within the table bbox
+        table_lines = [
+            line for line in lines 
+            if self._line_intersects_bbox(line, table_bbox, overlap_threshold=0.5)
+        ]
+        
+        if not table_lines:
+            return False
+        
+        # Check if this spans multiple text columns (likely multi-column text)
+        text_columns = layout_analysis.get('text_columns', [])
+        text_column_count = sum(1 for col in text_columns 
+                               if col['type'] == 'text' and 
+                               col['x_min'] < table_bbox.x_max and col['x_max'] > table_bbox.x_min)
+        
+        if text_column_count > 1:
+            # Likely multi-column text, not a table
+            print(f"📰 Rejecting table candidate - spans {text_column_count} text columns (multi-column text)")
+            return False
+        
+        # Additional content validation
+        row_groups = self._group_lines_into_rows(table_lines)
+        table_like_rows = sum(1 for row in row_groups if self._analyze_row_content(row)['is_table_like'])
+        
+        table_ratio = table_like_rows / max(len(row_groups), 1)
+        
+        is_valid_table = table_ratio > 0.3  # At least 30% of rows should look table-like
+        
+        if not is_valid_table:
+            print(f"📝 Rejecting table candidate - only {table_ratio:.1%} table-like content")
+        
+        return is_valid_table
+    
+    def _get_targeted_table_areas(self, visual_structures: Dict, table_candidates: List[Dict], detected_tables: List[Dict]) -> List[Tuple[float, float, float, float]]:
+        """Get specific areas to target for camelot extraction"""
+        areas = []
+        
+        # Add visual structure areas
+        for region in visual_structures['bordered_regions']:
+            bbox = region['bbox']
+            areas.append((bbox.x_min, bbox.y_min, bbox.x_max, bbox.y_max))
+        
+        # Add content-based candidates
+        for candidate in table_candidates:
+            bbox = candidate['bbox']
+            areas.append((bbox.x_min, bbox.y_min, bbox.x_max, bbox.y_max))
+        
+        # Add pdfplumber detected areas
+        for table_info in detected_tables:
+            bbox = table_info['bbox']
+            areas.append((bbox.x_min, bbox.y_min, bbox.x_max, bbox.y_max))
+        
+        return areas
+    
+    def _consolidate_table_regions(self, detected_tables: List[Dict], camelot_tables: List[Dict], visual_structures: Dict) -> List[Dict]:
+        """Consolidate and deduplicate table regions from multiple sources"""
+        all_regions = []
+        
+        # Add pdfplumber tables
+        for table_info in detected_tables:
+            all_regions.append({
+                'bbox': table_info['bbox'],
+                'source': table_info['source'],
+                'confidence': table_info.get('confidence', 0.8),
+                'region_type': 'table',
+                'has_json_data': 'table_obj' in table_info,
+                'table_json': None,
+                'accuracy': 85.0
+            })
+        
+        # Add camelot tables
+        for camelot_table in camelot_tables:
+            if camelot_table.get('bbox'):
+                # Check for overlaps with existing regions
+                bbox = camelot_table['bbox']
+                overlaps_existing = any(
+                    self._bboxes_overlap(bbox, region['bbox'], 0.5) 
+                    for region in all_regions
+                )
+                
+                if not overlaps_existing:
+                    all_regions.append({
+                        'bbox': bbox,
+                        'source': camelot_table['source'],
+                        'confidence': camelot_table['accuracy'] / 100.0,
+                        'region_type': 'table_json',
+                        'has_json_data': True,
+                        'table_json': camelot_table['json_data'],
+                        'accuracy': camelot_table['accuracy']
+                    })
+        
+        # Add visual structure regions (if not covered by other methods)
+        for vs_region in visual_structures['bordered_regions']:
+            bbox = vs_region['bbox']
+            overlaps_existing = any(
+                self._bboxes_overlap(bbox, region['bbox'], 0.3) 
+                for region in all_regions
+            )
+            
+            if not overlaps_existing:
+                all_regions.append({
+                    'bbox': bbox,
+                    'source': 'visual_structure',
+                    'confidence': vs_region['confidence'],
+                    'region_type': 'table',
+                    'has_json_data': False,
+                    'table_json': None,
+                    'accuracy': vs_region['confidence'] * 100,
+                    'visual_structure': vs_region
+                })
+        
+        print(f"🔗 Consolidated {len(all_regions)} table regions from multiple sources")
+        return all_regions
+    
+    def _group_text_lines_into_regions_enhanced(self, text_lines: List[Line], layout_analysis: Dict) -> List[LayoutRegion]:
+        """Enhanced text region grouping with multi-column awareness"""
+        regions = []
+        
+        # Group by columns first
+        text_columns = layout_analysis.get('text_columns', [])
+        
+        for col_info in text_columns:
+            if col_info['type'] != 'text':
+                continue
+                
+            column_lines = [
+                line for line in text_lines 
+                if col_info['x_min'] <= line.min_x < col_info['x_max']
+            ]
+            
+            if not column_lines:
+                continue
+            
+            # Group lines by Y proximity within column
+            column_lines.sort(key=lambda l: l.y)
+            current_group = [column_lines[0]]
+            
+            for line in column_lines[1:]:
+                prev_line = current_group[-1]
+                y_gap = abs(line.y - prev_line.y)
+                
+                # Adaptive gap threshold based on font size
+                gap_threshold = 30
+                if hasattr(prev_line, 'items') and prev_line.items:
+                    avg_font_size = np.mean([item.font_size for item in prev_line.items if item.font_size > 0])
+                    if avg_font_size > 0:
+                        gap_threshold = avg_font_size * 2
+                
+                if y_gap <= gap_threshold:
+                    current_group.append(line)
+                else:
+                    # Create region from current group
+                    if current_group:
+                        region = self._create_text_region(current_group, col_info['index'])
+                        if region:
+                            regions.append(region)
+                    current_group = [line]
+            
+            # Add final group
+            if current_group:
+                region = self._create_text_region(current_group, col_info['index'])
+                if region:
+                    regions.append(region)
+        
+        return regions
+
+    async def _extract_tables_with_targeted_camelot(self, file_path: str, page_number: int, table_areas: List[Tuple], layout_analysis: Dict) -> List[Dict[str, Any]]:
+        """Enhanced camelot extraction with targeted areas and layout awareness"""
+        extracted_tables = []
+        
+        if camelot is None:
+            print(f"⚠️ Camelot not available - skipping targeted extraction for page {page_number}")
+            return extracted_tables
+        
+        try:
+            import tempfile
+            import shutil
+            
+            # Create temporary file
+            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
+                shutil.copy2(file_path, temp_file.name)
+                temp_pdf_path = temp_file.name
+            
+            try:
+                # Try lattice mode with targeted areas (for bordered tables)
+                if table_areas:
+                    print(f"🎯 Trying camelot lattice with {len(table_areas)} targeted areas")
+                    
+                    for i, area in enumerate(table_areas):
+                        try:
+                            lattice_tables = camelot.read_pdf(
+                                temp_pdf_path,
+                                pages=str(page_number),
+                                flavor='lattice',
+                                table_areas=[f"{area[0]},{area[1]},{area[2]},{area[3]}"],
+                                strip_text='\n'
+                            )
+                            
+                            for j, table in enumerate(lattice_tables):
+                                if table.accuracy > 40:  # Lower threshold for targeted extraction
+                                    print(f"✅ Lattice area {i+1} extracted table with {table.accuracy:.1f}% accuracy")
+                                    
+                                    table_data = table.df.values.tolist()
+                                    structured_table = self._convert_table_to_json(table_data)
+                                    structured_table["table_metadata"]["extraction_source"] = "camelot_lattice_targeted"
+                                    structured_table["table_metadata"]["accuracy"] = table.accuracy
+                                    structured_table["table_metadata"]["table_index"] = len(extracted_tables)
+                                    
+                                    extracted_tables.append({
+                                        "json_data": structured_table,
+                                        "bbox": self._camelot_bbox_to_layout_bbox(getattr(table, '_bbox', None)) or 
+                                               BoundingBox(area[0], area[1], area[2], area[3]),
+                                        "accuracy": table.accuracy,
+                                        "source": "camelot_lattice_targeted"
+                                    })
+                        
+                        except Exception as area_error:
+                            print(f"⚠️ Lattice area {i+1} failed: {area_error}")
+                            continue
+                
+                # Try lattice mode without areas (full page) if no targeted results
+                if len(extracted_tables) == 0:
+                    print(f"🔍 Trying camelot lattice full page for page {page_number}")
+                    
+                    try:
+                        lattice_tables = camelot.read_pdf(
+                            temp_pdf_path, 
+                            pages=str(page_number), 
+                            flavor='lattice',
+                            strip_text='\n'
+                        )
+                        
+                        for i, table in enumerate(lattice_tables):
+                            if table.accuracy > 50:
+                                print(f"✅ Full page lattice extracted table with {table.accuracy:.1f}% accuracy")
+                                
+                                table_data = table.df.values.tolist()
+                                structured_table = self._convert_table_to_json(table_data)
+                                structured_table["table_metadata"]["extraction_source"] = "camelot_lattice"
+                                structured_table["table_metadata"]["accuracy"] = table.accuracy
+                                structured_table["table_metadata"]["table_index"] = len(extracted_tables)
+                                
+                                extracted_tables.append({
+                                    "json_data": structured_table,
+                                    "bbox": self._camelot_bbox_to_layout_bbox(getattr(table, '_bbox', None)),
+                                    "accuracy": table.accuracy,
+                                    "source": "camelot_lattice"
+                                })
+                    
+                    except Exception as lattice_error:
+                        print(f"⚠️ Full page lattice failed: {lattice_error}")
+                
+                # Try stream mode only if layout suggests it won't confuse multi-column text
+                layout_type = layout_analysis.get('layout_type', 'single_column')
+                if len(extracted_tables) == 0 and layout_type not in ['multi_column_text']:
+                    print(f"🔍 Trying camelot stream for page {page_number} (layout: {layout_type})")
+                    
+                    try:
+                        stream_tables = camelot.read_pdf(
+                            temp_pdf_path, 
+                            pages=str(page_number), 
+                            flavor='stream',
+                            strip_text='\n'
+                        )
+                        
+                        for i, table in enumerate(stream_tables):
+                            if table.accuracy > 30:
+                                # Validate this isn't multi-column text
+                                if self._validate_stream_table_vs_multicolumn(table, layout_analysis):
+                                    print(f"✅ Stream extracted validated table with {table.accuracy:.1f}% accuracy")
+                                    
+                                    table_data = table.df.values.tolist()
+                                    structured_table = self._convert_table_to_json(table_data)
+                                    structured_table["table_metadata"]["extraction_source"] = "camelot_stream_validated"
+                                    structured_table["table_metadata"]["accuracy"] = table.accuracy
+                                    structured_table["table_metadata"]["table_index"] = len(extracted_tables)
+                                    
+                                    extracted_tables.append({
+                                        "json_data": structured_table,
+                                        "bbox": self._camelot_bbox_to_layout_bbox(getattr(table, '_bbox', None)),
+                                        "accuracy": table.accuracy,
+                                        "source": "camelot_stream_validated"
+                                    })
+                                else:
+                                    print(f"❌ Stream table rejected - likely multi-column text")
+                    
+                    except Exception as stream_error:
+                        print(f"⚠️ Stream extraction failed: {stream_error}")
+                
+            finally:
+                # Clean up temporary file
+                try:
+                    import os
+                    os.unlink(temp_pdf_path)
+                except:
+                    pass
+        
+        except Exception as e:
+            print(f"❌ Targeted camelot extraction failed: {e}")
+        
+        print(f"🎯 Targeted camelot extraction complete: {len(extracted_tables)} tables")
+        return extracted_tables
+    
+    def _validate_stream_table_vs_multicolumn(self, table, layout_analysis: Dict) -> bool:
+        """Validate if a stream table is actually a table vs multi-column text"""
+        
+        # Check table dimensions
+        df = table.df
+        rows, cols = df.shape
+        
+        # Multi-column text typically has many rows, few columns
+        if rows > 10 and cols <= 2:
+            print(f"📰 Suspicious: {rows}x{cols} table might be multi-column text")
+            
+            # Check content patterns
+            text_like_content = 0
+            total_cells = rows * cols
+            
+            for _, row in df.iterrows():
+                for cell in row:
+                    if isinstance(cell, str) and len(cell.split()) > 5:  # Long text
+                        text_like_content += 1
+            
+            text_ratio = text_like_content / max(total_cells, 1)
+            
+            if text_ratio > 0.7:  # More than 70% long text
+                return False
+        
+        # Check if content has table-like structure
+        numeric_cells = 0
+        total_cells = rows * cols
+        
+        for _, row in df.iterrows():
+            for cell in row:
+                if isinstance(cell, str) and re.search(r'\d', cell):
+                    numeric_cells += 1
+        
+        numeric_ratio = numeric_cells / max(total_cells, 1)
+        
+        # Valid table should have some numeric content
+        return numeric_ratio > 0.2
+    
     def _bboxes_overlap(self, bbox1: BoundingBox, bbox2: BoundingBox, threshold: float = 0.5) -> bool:
         """Check if two bounding boxes overlap significantly"""
         # Calculate intersection
