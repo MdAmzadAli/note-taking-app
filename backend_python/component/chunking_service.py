@@ -1,4 +1,3 @@
-
 import os
 import asyncio
 from typing import Dict, List, Any, Optional, Union
@@ -10,45 +9,45 @@ from utils.chunkingUtils import (
     # Data structures
     TextItem, BoundingBox, LayoutRegion, StructuredUnit, PageLayout, PageData, PDFData,
     NumberData, NormalizedData,
-    
+
     # PDF extraction
     extract_text_from_pdf, extract_page_with_enhanced_layout, fallback_page_extraction, fallback_extraction,
-    
+
     # Layout analysis
     analyze_page_layout, detect_regions, group_text_lines_into_regions, classify_layout_type,
-    
+
     # Content detection
     is_header, is_bullet_point, should_end_paragraph,
-    
+
     # Line and column processing
     group_items_into_lines, create_line_from_items, detect_columns_enhanced,
-    
+
     # Visual structure detection
     detect_visual_structures, bboxes_overlap,
-    
+
     # Text processing
     merge_soft_hyphens, normalize_text_spacing, post_process_extracted_text,
     fix_character_spacing_line, fix_ocr_artifacts,
-    
+
     # Table processing
     convert_table_to_json, create_table_summary_text, validate_stream_table_vs_multicolumn,
     extract_table_columns_from_items, analyze_row_numeric_content,
-    
+
     # Number parsing
-    normalize_currency_and_numbers, parse_number_with_locale_detection,
-    
+    normalize_currency_and_numbers, parse_number_with_locale_detection, is_date_like,
+
     # Semantic chunking
     split_into_chunks, create_units_based_chunks, create_semantic_chunk,
-    
+
     # PDF processing
     process_pdf, process_text_content, create_simple_text_units,
-    
+
     # Camelot integration
     extract_tables_with_camelot, CAMELOT_AVAILABLE,
-    
+
     # Display utilities
     display_enhanced_table_structure, display_json_table_data, display_text_table_structure,
-    
+
     # Service configuration
     ChunkingConfig
 )
@@ -67,23 +66,23 @@ class ChunkingService:
     This service provides the same functionality as the original but with 
     modular, reusable utility functions.
     """
-    
+
     def __init__(self, chunk_size: int = 800, chunk_overlap: int = 75):
         self.config = ChunkingConfig(chunk_size, chunk_overlap)
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         print(f"🚀 ChunkingServiceNew initialized with chunk_size={chunk_size}, chunk_overlap={chunk_overlap}")
-    
+
     def set_chunk_size(self, size: int):
         """Update chunk size"""
         self.chunk_size = size
         self.config.set_chunk_size(size)
-    
+
     def set_chunk_overlap(self, overlap: int):
         """Update chunk overlap"""
         self.chunk_overlap = overlap
         self.config.set_chunk_overlap(overlap)
-    
+
     def get_config(self) -> Dict:
         """Get current configuration"""
         return self.config.get_config()
@@ -533,7 +532,7 @@ class ChunkingService:
         # Create JSON table unit
         if hasattr(region, 'table_json') and region.table_json:
             table_summary = create_table_summary_text(region.table_json)
-            
+
             json_unit = StructuredUnit(
                 type='table_json',
                 text=table_summary,
@@ -542,12 +541,12 @@ class ChunkingService:
                 reading_order=current_order,
                 associated_headings=[h.text for h in associated_headings]
             )
-            
+
             # Store the JSON data
             json_unit.table_json = region.table_json
             json_unit.table_source = getattr(region, 'table_source', 'unknown')
             json_unit.extraction_accuracy = getattr(region, 'extraction_accuracy', 0)
-            
+
             table_units.append(json_unit)
 
         return table_units
@@ -640,7 +639,7 @@ class ChunkingService:
         """Extract text content using chunkingUtils"""
         # Use chunkingUtils for line grouping
         lines = group_items_into_lines(region.text_items)
-        
+
         text_units = []
         current_paragraph = []
         unit_order = start_order

@@ -174,6 +174,33 @@ def is_numeric_string(value: str) -> bool:
     normalized = normalize_currency_and_numbers(str(value).strip())
     return len(normalized.numbers) > 0
 
+def is_date_like(text: str) -> bool:
+    """Check if text looks like a date"""
+    import re
+    
+    if not text or not isinstance(text, str):
+        return False
+    
+    text = text.strip()
+    
+    # Common date patterns
+    date_patterns = [
+        r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}',  # MM/DD/YYYY, DD/MM/YYYY, MM-DD-YY
+        r'\d{4}[/-]\d{1,2}[/-]\d{1,2}',    # YYYY/MM/DD, YYYY-MM-DD
+        r'\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}',  # DD Jan YYYY
+        r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}',  # Jan DD, YYYY
+        r'\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{2,4}',  # DD Month YYYY
+        r'(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{2,4}',  # Month DD, YYYY
+        r'\d{8}',  # YYYYMMDD
+        r'\d{6}',  # YYMMDD or DDMMYY
+    ]
+    
+    for pattern in date_patterns:
+        if re.match(pattern, text, re.IGNORECASE):
+            return True
+    
+    return False
+
 def parse_cell_value(cell_value: str) -> Dict[str, Any]:
     """Parse cell value and return appropriate type with metadata"""
     if not cell_value or not str(cell_value).strip():
@@ -197,7 +224,6 @@ def parse_cell_value(cell_value: str) -> Dict[str, Any]:
         }
     
     # Check if it's a date-like string
-    from .content_detection import is_date_like
     if is_date_like(cell_str):
         return {"value": cell_str, "type": "date", "original_text": cell_str}
     
