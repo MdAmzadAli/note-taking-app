@@ -14,4 +14,3 @@ pandas==2.2.3
 aiohttp==3.10.11
 beautifulsoup4==4.12.3
 camelot-py[cv]==0.10.1
-opencv-python==4.8.0.76
