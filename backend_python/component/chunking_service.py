@@ -176,6 +176,7 @@ class ChunkingService:
                 print(f"📄 PDF loaded: {total_pages} pages")
 
                 for page_num, page in enumerate(pdf.pages, 1):
+                    # Ensure file path is available for camelot extraction
                     page_data = await self._extract_page_with_enhanced_layout(page, page_num, file_path)
                     pages.append(page_data)
                     full_text += page_data.text + '\n\n'
@@ -605,13 +606,30 @@ class ChunkingService:
 
         # Step 2: Try camelot for more accurate table extraction
         camelot_tables = []
-        if file_path and detected_tables:
+        if file_path:
             try:
                 camelot_tables = await self._extract_tables_with_camelot(file_path, page_number)
                 print(f"🔍 Camelot extracted {len(camelot_tables)} tables with JSON data")
                 
             except Exception as e:
                 print(f"⚠️ Camelot table extraction failed: {e}")
+        elif detected_tables:
+            # Try to convert pdfplumber tables to JSON format when no file path available
+            print(f"🔄 Converting pdfplumber tables to JSON format...")
+            for table_info in detected_tables:
+                if 'table_obj' in table_info:
+                    try:
+                        table_data = table_info['table_obj'].extract()
+                        if table_data:
+                            structured_table = self._convert_table_to_json(table_data)
+                            camelot_tables.append({
+                                "json_data": structured_table,
+                                "bbox": table_info['bbox'],
+                                "accuracy": 85.0,  # Assume good accuracy for pdfplumber
+                                "source": "pdfplumber_converted"
+                            })
+                    except Exception as e:
+                        print(f"⚠️ Failed to convert pdfplumber table to JSON: {e}")
 
         # Step 3: Create enhanced table regions with JSON data
         table_bboxes = []
@@ -2721,9 +2739,21 @@ class ChunkingService:
                 print(f"-"*60)
                 print(f"Size: {len(chunk.get('text', ''))} characters")
                 print(f"Semantic types: {metadata.get('semantic_types', [])}")
-                print(f"Content types: {'JSON tables' if metadata.get('has_json_tables') else 'Regular tables'}")
                 
-                # Table structure details
+                # Determine if JSON or text format
+                has_json_tables = metadata.get('has_json_tables', False)
+                has_structured_tables = 'structured_tables' in chunk and len(chunk.get('structured_tables', [])) > 0
+                
+                if has_json_tables or has_structured_tables:
+                    print(f"Storage format: JSON structured data")
+                else:
+                    print(f"Storage format: Plain text")
+                
+                # Enhanced table structure details with context
+                context_headings = numeric_metadata.get('table_context_headings', [])
+                if context_headings:
+                    print(f"Table context: {', '.join(context_headings[:2])}")
+                
                 print(f"Table structure:")
                 print(f"  • Rows: {numeric_metadata.get('table_rows_count', 0)}")
                 print(f"  • Headers: {numeric_metadata.get('table_headers_count', 0)}")
@@ -2736,61 +2766,30 @@ class ChunkingService:
                 print(f"  • Currencies: {numeric_metadata.get('currencies', [])}")
                 print(f"  • Has negative values: {numeric_metadata.get('has_negative_values', False)}")
                 
-                # Context and headings
-                print(f"Context extraction:")
-                table_context_headings = numeric_metadata.get('table_context_headings', [])
-                heading_associations = numeric_metadata.get('heading_table_associations', [])
-                
-                print(f"  • Contextualized: {metadata.get('has_contextualized_tables', False)}")
-                print(f"  • Context headings: {len(table_context_headings)}")
-                if table_context_headings:
-                    for j, heading in enumerate(table_context_headings[:3]):
-                        print(f"    {j+1}. '{heading[:60]}{'...' if len(heading) > 60 else ''}'")
-                
-                print(f"  • Heading associations: {len(heading_associations)}")
-                if heading_associations:
-                    for j, assoc in enumerate(heading_associations[:2]):
-                        print(f"    {j+1}. '{assoc.get('heading_text', '')[:50]}{'...' if len(assoc.get('heading_text', '')) > 50 else ''}'")
+                # Enhanced table data display
+                self._display_enhanced_table_structure(chunk, i+1)
                 
                 # JSON table data details
-                if numeric_metadata.get('has_json_tables'):
-                    json_tables = numeric_metadata.get('json_tables_data', [])
-                    print(f"JSON table details:")
-                    for j, json_table in enumerate(json_tables[:2]):
+                if has_structured_tables:
+                    structured_tables = chunk.get('structured_tables', [])
+                    print(f"📋 STRUCTURED JSON TABLE DATA:")
+                    for j, json_table in enumerate(structured_tables[:2]):
                         table_data = json_table.get('table_data', {})
-                        print(f"  Table {j+1}:")
+                        print(f"  🔸 Table {j+1}:")
                         print(f"    • Source: {json_table.get('extraction_source', 'unknown')}")
                         print(f"    • Accuracy: {json_table.get('accuracy', 0):.1f}%")
                         if 'table_metadata' in table_data:
                             tm = table_data['table_metadata']
                             print(f"    • Dimensions: {tm.get('total_rows', 0)}×{tm.get('total_columns', 0)}")
                             print(f"    • Has header: {tm.get('has_header', False)}")
+                            
+                        # Display actual table data structure
+                        self._display_json_table_data(table_data, j+1)
                 
-                # Table columns structure
-                table_columns = metadata.get('table_columns', [])
-                if table_columns:
-                    avg_columns = sum(table_columns) / len(table_columns)
-                    print(f"  • Average columns per row: {avg_columns:.1f}")
-                    print(f"  • Column distribution: {table_columns[:5]}{'...' if len(table_columns) > 5 else ''}")
-                
-                # Text preview with structure indicators
-                chunk_text = chunk.get('text', '')
-                lines = chunk_text.split('\n')
-                print(f"Content preview ({len(lines)} lines):")
-                
-                # Show first few lines with line numbers
-                for line_idx, line in enumerate(lines[:8]):
-                    line_preview = line.strip()[:80]
-                    if line_preview:
-                        print(f"  {line_idx+1:2d}: {line_preview}{'...' if len(line.strip()) > 80 else ''}")
-                
-                if len(lines) > 8:
-                    print(f"  ... ({len(lines) - 8} more lines)")
-                
-                # Structured data access
-                if 'structured_tables' in chunk:
-                    structured = chunk['structured_tables']
-                    print(f"Structured data: {len(structured)} table(s) with direct JSON access")
+                else:
+                    # Show text-based table structure 
+                    print(f"📋 TEXT-BASED TABLE STRUCTURE:")
+                    self._display_text_table_structure(chunk, i+1)
             
             print(f"\n" + "="*80)
             print(f"📈 TABLE EXTRACTION SUMMARY")
@@ -3259,6 +3258,108 @@ class ChunkingService:
             coherence_score += 0.1
             
         return min(1.0, coherence_score)
+
+    def _display_enhanced_table_structure(self, chunk: Dict, table_num: int):
+        """Display enhanced table structure with proper formatting"""
+        structured_tables = chunk.get('structured_tables', [])
+        
+        if structured_tables:
+            print(f"📊 TABLE {table_num} - STRUCTURED DATA FORMAT:")
+            for i, table_data in enumerate(structured_tables[:1]):  # Show first table
+                json_table = table_data.get('table_data', {})
+                self._display_json_table_data(json_table, i+1)
+        else:
+            print(f"📊 TABLE {table_num} - TEXT FORMAT:")
+            self._display_text_table_structure(chunk, table_num)
+
+    def _display_json_table_data(self, table_data: Dict, table_index: int):
+        """Display JSON table data in a structured format"""
+        if not table_data or 'headers' not in table_data:
+            print(f"    ⚠️ No structured table data available")
+            return
+            
+        headers = table_data.get('headers', [])
+        data_rows = table_data.get('data', [])
+        metadata = table_data.get('table_metadata', {})
+        
+        print(f"    📋 Table {table_index} Structure:")
+        print(f"       Dimensions: {metadata.get('total_rows', 0)} rows × {metadata.get('total_columns', 0)} columns")
+        print(f"       Extraction source: {metadata.get('extraction_source', 'unknown')}")
+        
+        if headers:
+            print(f"    🏷️ Column Headers:")
+            for j, header in enumerate(headers[:6]):  # Show max 6 headers
+                print(f"       {j+1}. {header}")
+            if len(headers) > 6:
+                print(f"       ... ({len(headers) - 6} more columns)")
+        
+        if data_rows:
+            print(f"    📊 Sample Data (first 3 rows):")
+            print(f"       " + " | ".join([f"{h[:12]:<12}" for h in headers[:4]]))
+            print(f"       " + "-" * min(60, len(headers) * 15))
+            
+            for row_idx, row_data in enumerate(data_rows[:3]):
+                if 'values' in row_data:
+                    row_values = []
+                    for header in headers[:4]:  # Show max 4 columns
+                        if header in row_data['values']:
+                            cell_data = row_data['values'][header]
+                            if isinstance(cell_data, dict):
+                                value = str(cell_data.get('value', ''))
+                                if cell_data.get('currency'):
+                                    value = f"{cell_data['currency']} {value}"
+                                elif cell_data.get('is_percentage'):
+                                    value = f"{value}%"
+                            else:
+                                value = str(cell_data)
+                            row_values.append(f"{value[:12]:<12}")
+                        else:
+                            row_values.append(f"{'N/A':<12}")
+                    
+                    print(f"       " + " | ".join(row_values))
+            
+            if len(data_rows) > 3:
+                print(f"       ... ({len(data_rows) - 3} more rows)")
+
+    def _display_text_table_structure(self, chunk: Dict, table_num: int):
+        """Display text-based table structure analysis"""
+        chunk_text = chunk.get('text', '')
+        lines = chunk_text.split('\n')
+        
+        # Analyze text for potential table structure
+        numeric_lines = []
+        non_empty_lines = [line.strip() for line in lines if line.strip()]
+        
+        print(f"    📝 Text Analysis:")
+        print(f"       Total lines: {len(non_empty_lines)}")
+        
+        # Try to detect column structure in text
+        potential_columns = []
+        for line in non_empty_lines[:5]:  # Analyze first 5 lines
+            # Split by multiple spaces or tabs to find potential columns
+            columns = [col.strip() for col in re.split(r'\s{2,}|\t', line) if col.strip()]
+            if len(columns) > 1:
+                potential_columns.append(columns)
+        
+        if potential_columns:
+            max_cols = max(len(cols) for cols in potential_columns)
+            print(f"       Detected column structure: ~{max_cols} columns per row")
+            
+            # Show sample rows as table-like structure
+            print(f"    📊 Detected Structure (first 3 rows):")
+            for i, cols in enumerate(potential_columns[:3]):
+                col_preview = []
+                for j, col in enumerate(cols[:4]):  # Show max 4 columns
+                    col_preview.append(f"{col[:15]:<15}")
+                print(f"       Row {i+1}: " + " | ".join(col_preview))
+                if len(cols) > 4:
+                    print(f"              ... ({len(cols) - 4} more columns)")
+        else:
+            print(f"       No clear column structure detected")
+            print(f"    📄 Raw Content Preview:")
+            for i, line in enumerate(non_empty_lines[:3]):
+                preview = line[:70] + "..." if len(line) > 70 else line
+                print(f"       {i+1}. {preview}")
 
     # Configuration methods
     def set_chunk_size(self, size: int):
