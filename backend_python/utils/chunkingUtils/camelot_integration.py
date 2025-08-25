@@ -4,7 +4,7 @@ import shutil
 import os
 from .layout_structures import BoundingBox
 
-# Check if camelot is available
+# Check if camelot is available or not
 try:
     import camelot
     CAMELOT_AVAILABLE = True
