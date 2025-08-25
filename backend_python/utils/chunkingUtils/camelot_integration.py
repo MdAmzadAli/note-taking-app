@@ -85,69 +85,15 @@ def extract_tables_with_camelot(file_path: str, page_number: int) -> List[Dict[s
             else:
                 print(f"⚠️ Camelot lattice failed: {lattice_error}")
 
-        # Try stream mode if lattice didn't find good tables
-        if len(extracted_tables) == 0:
-            try:
-                print(f"🔍 Camelot stream extraction for page {page_number}")
-
-                # Create a temporary copy to avoid file locking issues
-                with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
-                    shutil.copy2(file_path, temp_file.name)
-                    temp_pdf_path = temp_file.name
-
-                try:
-                    stream_tables = camelot.read_pdf(
-                        temp_pdf_path,
-                        pages=str(page_number),
-                        flavor='stream',
-                        strip_text='\n'
-                    )
-
-                    for i, table in enumerate(stream_tables):
-                        if table.accuracy > 30:  # Lower threshold for stream mode
-                            # LOG RAW CAMELOT DATA - EXACT EXTRACTION
-                            print(f"\n" + "="*60)
-                            print(f"🔍 RAW CAMELOT STREAM EXTRACTION - Table {i+1}")
-                            print(f"="*60)
-                            print(f"Accuracy: {table.accuracy}%")
-                            print(f"DataFrame shape: {table.df.shape}")
-                            print(f"Raw DataFrame content:")
-                            print(table.df)
-                            print(f"\nRaw values (as list):")
-                            raw_table_data = table.df.values.tolist()
-                            for row_idx, row in enumerate(raw_table_data):
-                                print(f"  Row {row_idx}: {row}")
-                            print(f"="*60)
-
-                            from .table_processing import convert_table_to_json
-                            table_data = raw_table_data
-                            structured_table = convert_table_to_json(table_data)
-                            structured_table["table_metadata"]["extraction_source"] = "camelot_stream"
-                            structured_table["table_metadata"]["accuracy"] = table.accuracy
-                            structured_table["table_metadata"]["table_index"] = i
-
-                            extracted_tables.append({
-                                "json_data": structured_table,
-                                "bbox": camelot_bbox_to_layout_bbox(getattr(table, '_bbox', None)),
-                                "accuracy": table.accuracy,
-                                "source": "camelot_stream"
-                            })
-
-                    print(f"✅ Camelot stream extracted {len(stream_tables)} tables")
-
-                finally:
-                    # Clean up temporary file
-                    try:
-                        os.unlink(temp_pdf_path)
-                    except:
-                        pass
-
-            except Exception as stream_error:
-                error_msg = str(stream_error)
-                if "PdfFileReader is deprecated" in error_msg or "PyPDF2" in error_msg:
-                    print(f"⚠️ Camelot stream failed due to PyPDF2 compatibility issue - falling back to pdfplumber only")
-                else:
-                    print(f"⚠️ Camelot stream failed: {stream_error}")
+        # DISABLED: Stream mode extraction (only using lattice mode as requested)
+        # if len(extracted_tables) == 0:
+        #     try:
+        #         print(f"🔍 Camelot stream extraction for page {page_number}")
+        #         # ... stream mode code commented out ...
+        #     except Exception as stream_error:
+        #         print(f"⚠️ Camelot stream failed: {stream_error}")
+        
+        print(f"📊 Using only Camelot lattice mode - found {len(extracted_tables)} tables")
 
     except Exception as e:
         print(f"❌ Camelot extraction failed: {e}")
@@ -250,44 +196,13 @@ def extract_tables_with_targeted_camelot(file_path: str, page_number: int, table
                 except Exception as lattice_error:
                     print(f"⚠️ Full page lattice failed: {lattice_error}")
 
-            # Try stream mode only if layout suggests it won't confuse multi-column text
-            layout_type = layout_analysis.get('layout_type', 'single_column')
-            if len(extracted_tables) == 0 and layout_type not in ['multi_column_text']:
-                print(f"🔍 Trying camelot stream for page {page_number} (layout: {layout_type})")
-
-                try:
-                    stream_tables = camelot.read_pdf(
-                        temp_pdf_path,
-                        pages=str(page_number),
-                        flavor='stream',
-                        strip_text='\n'
-                    )
-
-                    for i, table in enumerate(stream_tables):
-                        if table.accuracy > 30:
-                            # Validate this isn't multi-column text
-                            from .table_processing import validate_stream_table_vs_multicolumn
-                            if validate_stream_table_vs_multicolumn(table, layout_analysis):
-                                print(f"✅ Stream extracted validated table with {table.accuracy:.1f}% accuracy")
-
-                                from .table_processing import convert_table_to_json
-                                table_data = table.df.values.tolist()
-                                structured_table = convert_table_to_json(table_data)
-                                structured_table["table_metadata"]["extraction_source"] = "camelot_stream_validated"
-                                structured_table["table_metadata"]["accuracy"] = table.accuracy
-                                structured_table["table_metadata"]["table_index"] = len(extracted_tables)
-
-                                extracted_tables.append({
-                                    "json_data": structured_table,
-                                    "bbox": camelot_bbox_to_layout_bbox(getattr(table, '_bbox', None)),
-                                    "accuracy": table.accuracy,
-                                    "source": "camelot_stream_validated"
-                                })
-                            else:
-                                print(f"❌ Stream table rejected - likely multi-column text")
-
-                except Exception as stream_error:
-                    print(f"⚠️ Stream extraction failed: {stream_error}")
+            # DISABLED: Stream mode extraction (only using lattice mode as requested)
+            # layout_type = layout_analysis.get('layout_type', 'single_column')
+            # if len(extracted_tables) == 0 and layout_type not in ['multi_column_text']:
+            #     print(f"🔍 Trying camelot stream for page {page_number} (layout: {layout_type})")
+            #     # ... stream mode code commented out ...
+            
+            print(f"📊 Targeted extraction using only lattice mode - found {len(extracted_tables)} tables")
 
         finally:
             # Clean up temporary file

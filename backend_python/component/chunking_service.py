@@ -837,7 +837,35 @@ class ChunkingService:
 
     def split_into_chunks(self, pdf_data: PDFData, metadata: Optional[Dict] = None) -> List[Dict]:
         """Split into chunks using chunkingUtils"""
-        return split_into_chunks(self, pdf_data, metadata)
+        chunks = split_into_chunks(self, pdf_data, metadata)
+        
+        # Log the first 3-4 chunks to verify reading order preservation
+        print(f"\n" + "="*80)
+        print(f"📋 CHUNK READING ORDER VERIFICATION")
+        print(f"="*80)
+        print(f"Total chunks created: {len(chunks)}")
+        
+        max_chunks_to_show = min(4, len(chunks))
+        for i in range(max_chunks_to_show):
+            chunk = chunks[i]
+            chunk_text = chunk.get('text', '')
+            chunk_preview = chunk_text[:200] + "..." if len(chunk_text) > 200 else chunk_text
+            
+            print(f"\n📄 CHUNK {i+1}/{len(chunks)}:")
+            print(f"   Size: {len(chunk_text)} characters")
+            print(f"   Page: {chunk.get('page_number', 'N/A')}")
+            print(f"   Type: {chunk.get('type', 'N/A')}")
+            if 'reading_order' in chunk:
+                print(f"   Reading Order: {chunk['reading_order']}")
+            print(f"   Preview: {chunk_preview}")
+            print(f"   {'-'*60}")
+        
+        if len(chunks) > max_chunks_to_show:
+            print(f"\n... and {len(chunks) - max_chunks_to_show} more chunks")
+        
+        print(f"="*80)
+        
+        return chunks
 
     # Analysis and statistics methods using chunkingUtils (delegation)
     def get_chunking_statistics(self, chunks: List[Dict]) -> Dict[str, Any]:
