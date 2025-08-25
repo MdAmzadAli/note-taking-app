@@ -53,7 +53,7 @@ class ChunkingService:
                     page_text = page.extract_text() or ""
 
                     # Clean up the text
-                    page_text = self._clean_text(page_text)
+                    # page_text = self._clean_text(page_text)
 
                     pages.append({
                         'page_number': page_num,
@@ -142,11 +142,11 @@ class ChunkingService:
         print(f"="*80)
         print(f"Total chunks created: {len(chunks)}")
 
-        max_chunks_to_show = min(4, len(chunks))
+        max_chunks_to_show = min(10, len(chunks))
         for i in range(max_chunks_to_show):
             chunk = chunks[i]
             chunk_text = chunk.get('text', '')
-            chunk_preview = chunk_text[:200] + "..." if len(chunk_text) > 200 else chunk_text
+            chunk_preview = chunk_text
 
             print(f"\n📄 CHUNK {i+1}/{len(chunks)}:")
             print(f"   Size: {len(chunk_text)} characters")
