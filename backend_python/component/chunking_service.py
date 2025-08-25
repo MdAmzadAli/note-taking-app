@@ -1,6 +1,6 @@
 import os
 import asyncio
-from typing import Dict, List, Any, Optional, Union
+from typing import Dict, List, Any, Optional, Union, Tuple
 import pdfplumber
 from collections import defaultdict
 
@@ -377,13 +377,14 @@ class ChunkingService:
                     table_bboxes.append(bbox)
 
         # Create text regions using chunkingUtils
-        text_lines = [
+        text_lines_for_regions = [
             line for line in lines 
             if not any(line_intersects_bbox(line, table_bbox, 0.3) for table_bbox in table_bboxes)
         ]
 
-        if text_lines:
-            text_regions = group_text_lines_into_regions(text_lines, columns)
+        if text_lines_for_regions:
+            # Use chunkingUtils to detect layout regions
+            text_regions = self._detect_layout_regions(text_lines_for_regions, columns, page_bbox)
             regions.extend(text_regions)
 
         # Default fallback
@@ -729,7 +730,8 @@ class ChunkingService:
                 )
 
             lines = [line.strip() for line in page_text.split('\n') if line.strip()]
-            structured_units = build_simple_units_from_lines(lines)
+            # Use chunkingUtils to build simple units
+            structured_units = self._build_content_units_from_lines(lines)
 
             # Use chunkingUtils for text processing
             clean_text = merge_soft_hyphens(page_text)
@@ -932,85 +934,186 @@ class ChunkingService:
 
     # Helper methods for targeted camelot extraction
     def _get_targeted_table_areas(self, visual_structures: Dict, table_candidates: List[LayoutRegion], detected_tables: List[Dict]) -> List[Dict]:
-        """Get targeted table areas from visual structures and candidates"""
-        table_areas = []
+        """Get specific areas to target for camelot extraction"""
+        areas = []
+        unique_areas = set()
 
-        # Add areas from visual structures (e.g., bordered regions)
+        # Add visual structure areas
         for region in visual_structures.get('bordered_regions', []):
-            if region['bbox']:
-                table_areas.append({
-                    'x1': region['bbox'][0],
-                    'y1': region['bbox'][1],
-                    'x2': region['bbox'][2],
-                    'y2': region['bbox'][3],
-                    'source': 'visual_structure'
-                })
+            if region['bbox']: # Ensure bbox is not None
+                bbox = region['bbox']
+                area_tuple = (bbox.x_min, bbox.y_min, bbox.x_max, bbox.y_max)
+                if area_tuple not in unique_areas:
+                    areas.append({
+                        'x1': bbox.x_min, 'y1': bbox.y_min, 'x2': bbox.x_max, 'y2': bbox.y_max,
+                        'source': 'visual_structure'
+                    })
+                    unique_areas.add(area_tuple)
 
-        # Add areas from content-based table candidates
+        # Add content-based candidates
         for candidate in table_candidates:
-            if candidate.bbox:
-                table_areas.append({
-                    'x1': candidate.bbox.x_min,
-                    'y1': candidate.bbox.y_min,
-                    'x2': candidate.bbox.x_max,
-                    'y2': candidate.bbox.y_max,
-                    'source': 'content_candidate'
-                })
+            if candidate.bbox: # Ensure bbox is not None
+                bbox = candidate.bbox
+                area_tuple = (bbox.x_min, bbox.y_min, bbox.x_max, bbox.y_max)
+                if area_tuple not in unique_areas:
+                    areas.append({
+                        'x1': bbox.x_min, 'y1': bbox.y_min, 'x2': bbox.x_max, 'y2': bbox.y_max,
+                        'source': 'content_candidate'
+                    })
+                    unique_areas.add(area_tuple)
 
-        # Add areas from pdfplumber detected tables
+        # Add pdfplumber detected areas
         for table_info in detected_tables:
-            if table_info.get('bbox'):
+            if table_info.get('bbox'): # Ensure bbox is not None
                 bbox = table_info['bbox']
-                table_areas.append({
-                    'x1': bbox.x_min,
-                    'y1': bbox.y_min,
-                    'x2': bbox.x_max,
-                    'y2': bbox.y_max,
-                    'source': 'pdfplumber_detected'
-                })
+                area_tuple = (bbox.x_min, bbox.y_min, bbox.x_max, bbox.y_max)
+                if area_tuple not in unique_areas:
+                    areas.append({
+                        'x1': bbox.x_min, 'y1': bbox.y_min, 'x2': bbox.x_max, 'y2': bbox.y_max,
+                        'source': 'pdfplumber_detected'
+                    })
+                    unique_areas.add(area_tuple)
 
-        # Deduplicate areas based on overlap
-        unique_table_areas = []
-        for area in table_areas:
-            is_unique = True
-            for unique_area in unique_table_areas:
-                if bboxes_overlap(
-                    BoundingBox(area['x1'], area['y1'], area['x2'], area['y2']),
-                    BoundingBox(unique_area['x1'], unique_area['y1'], unique_area['x2'], unique_area['y2']),
-                    overlap_threshold=0.5
-                ):
-                    is_unique = False
-                    break
-            if is_unique:
-                unique_table_areas.append(area)
+        print(f"🎯 Identified {len(areas)} unique targeted table areas.")
+        return areas
 
-        print(f"🎯 Identified {len(unique_table_areas)} unique targeted table areas.")
-        return unique_table_areas
+    # Utility methods for content detection
+    def _analyze_row_content(self, row_lines: List) -> Dict:
+        """Analyze if a row looks like table content"""
+        import re
 
-    # Additional utility methods for backward compatibility
-    def _create_semantic_chunk(self, chunk_text: str, metadata: Dict, chunk_index: int, page_number: Optional[int], units: List[StructuredUnit]) -> Dict:
-        """Use chunkingUtils for semantic chunk creation"""
-        return create_semantic_chunk(self, chunk_text, metadata, chunk_index, page_number, units)
+        indicators = 0
+        confidence = 0.0
 
-    def _create_units_based_chunks(self, units: List[StructuredUnit], page_number: Optional[int], metadata: Dict, start_index: int) -> List[Dict]:
-        """Create chunks based on structured units using chunkingUtils"""
-        return create_units_based_chunks(self, units, page_number, metadata, start_index)
+        # Sort by x position
+        sorted_lines = sorted(row_lines, key=lambda l: l.min_x)
 
-    def _split_large_unit(self, unit: StructuredUnit, max_size: int) -> List[str]:
-        """Split large unit using chunkingUtils"""
-        return split_large_unit(unit, max_size)
+        # Check for table-like patterns
+        numeric_count = 0
+        short_text_count = 0
+        total_items = len(sorted_lines)
 
-    def _split_large_final_chunk(self, chunk_text: str, units: List[StructuredUnit], metadata: Dict, start_index: int, page_number: Optional[int], chunks: List[Dict]):
-        """Split large final chunk using chunkingUtils"""
-        return split_large_final_chunk(chunk_text, units, metadata, start_index, page_number, chunks)
+        for line in sorted_lines:
+            text = line.text.strip()
 
-    def _get_controlled_overlap(self, chunk_text: str, min_overlap: int = 70, max_overlap: int = 110) -> str:
-        """Get controlled overlap using chunkingUtils"""
-        return get_controlled_overlap(chunk_text, min_overlap, max_overlap)
+            # Numeric content
+            if re.search(r'\d', text):
+                numeric_count += 1
+                indicators += 1
 
-    def _calculate_chunk_coherence_score(self, semantic_units: List[StructuredUnit], heading_table_associations: List[Dict]) -> float:
-        """Calculate chunk coherence score using chunkingUtils"""
-        return calculate_chunk_coherence_score(semantic_units, heading_table_associations)
+            # Short, concise text (typical in tables)
+            if len(text.split()) <= 3:
+                short_text_count += 1
+                indicators += 1
+
+            # Currency or percentage
+            if re.search(r'[\$€£¥%]', text):
+                indicators += 2
+
+            # Aligned positioning (regular spacing)
+            if len(sorted_lines) >= 3:
+                # Check if spacing is regular
+                spacings = [sorted_lines[i+1].min_x - sorted_lines[i].max_x 
+                           for i in range(len(sorted_lines)-1)]
+                if spacings and max(spacings) - min(spacings) < 20:  # Regular spacing
+                    indicators += 1
+
+        # Calculate confidence
+        if total_items > 0:
+            numeric_ratio = numeric_count / total_items
+            short_text_ratio = short_text_count / total_items
+            confidence = (numeric_ratio * 0.6 + short_text_ratio * 0.4) * min(indicators / total_items, 1.0)
+
+        is_table_like = confidence > 0.5 and indicators >= 2
+
+        return {
+            'is_table_like': is_table_like,
+            'confidence': confidence,
+            'indicators': indicators,
+            'numeric_ratio': numeric_count / max(total_items, 1),
+            'short_text_ratio': short_text_count / max(total_items, 1)
+        }
+
+    def _calculate_text_density(self, lines: List) -> float:
+        """Calculate text density in a column"""
+        if not lines:
+            return 0.0
+
+        total_chars = sum(len(line.text) for line in lines)
+        total_lines = len(lines)
+
+        return total_chars / max(total_lines, 1)
+
+    def _count_table_indicators_in_column(self, lines: List) -> int:
+        """Count table-like patterns in a column"""
+        import re
+        indicators = 0
+
+        for line in lines:
+            text = line.text.strip()
+
+            # Look for table indicators
+            if re.search(r'\d+\.\d+', text):  # Numbers with decimals
+                indicators += 1
+            if re.search(r'\$\d+', text):  # Currency
+                indicators += 1
+            if len(text.split()) <= 3 and any(char.isdigit() for char in text):  # Short numeric text
+                indicators += 1
+            if re.search(r'\b(total|sum|amount|qty|quantity)\b', text.lower()):  # Table keywords
+                indicators += 1
+
+        return indicators
+
+    def _build_content_units_from_lines(self, lines: List[str]) -> List[StructuredUnit]:
+        """Build content units from lines (alias for build_simple_units_from_lines)"""
+        return build_simple_units_from_lines(lines)
+
+    def _detect_layout_regions(self, lines: List, columns: List, page_bbox: BoundingBox) -> List[LayoutRegion]:
+        """Detect layout regions using chunkingUtils"""
+        return detect_layout_regions(lines, columns, page_bbox)
+
+    def _group_by_columns(self, lines: List, columns: List) -> Dict:
+        """Group lines by columns using chunkingUtils"""
+        return group_by_columns(lines, columns)
+
+    def _detect_reading_order(self, regions: List[LayoutRegion]) -> List[LayoutRegion]:
+        """Detect reading order using chunkingUtils"""
+        return detect_reading_order(regions)
+
+    def _analyze_spacing_patterns(self, lines: List) -> Dict:
+        """Analyze spacing patterns using chunkingUtils"""
+        return analyze_spacing_patterns(lines)
+
+    # Utility methods for number parsing
+    def _parse_cell_value(self, value: str):
+        """Parse cell value using chunkingUtils"""
+        return parse_cell_value(value)
+
+    def _is_numeric_string(self, text: str) -> bool:
+        """Check if string is numeric using chunkingUtils"""
+        return is_numeric_string(text)
+
+    def _is_date_like(self, text: str) -> bool:
+        """Check if string is date-like using chunkingUtils"""
+        return is_date_like(text)
+
+    # Utility methods for table processing
+    def _is_likely_header_row(self, row_data: List) -> bool:
+        """Check if row is likely a header using chunkingUtils"""
+        return is_likely_header_row(row_data)
+
+    def _clean_header(self, header: str) -> str:
+        """Clean header text using chunkingUtils"""
+        return clean_header(header)
+
+    def _generate_table_summary(self, table_data: Dict) -> str:
+        """Generate table summary using chunkingUtils"""
+        return generate_table_summary(table_data)
+
+    def _validate_stream_table_vs_multicolumn(self, table, layout_analysis: Dict) -> bool:
+        """Validate stream table vs multicolumn using chunkingUtils"""
+        return validate_stream_table_vs_multicolumn(table, layout_analysis)
+
 
     # Configuration methods
     def set_chunk_size(self, size: int):
