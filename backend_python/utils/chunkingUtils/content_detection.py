@@ -1,122 +1,191 @@
 import re
 from typing import List, Dict, Any, Optional
+from .layout_structures import BoundingBox, LayoutRegion
+from .line_grouping import group_lines_into_rows
 
-def is_header(line: str) -> bool:
-    """Check if line is a header"""
-    text = line
-
-    # Basic length and content checks
-    if len(text) > 80 or len(text) < 3:
+def is_header(text: str) -> bool:
+    """Detect if text is likely a header"""
+    if not text or len(text.strip()) == 0:
         return False
 
-    # Pattern 1: All caps with colon (strong header indicator)
-    all_caps_with_colon = re.match(r'^[A-Z\s]+:\s*$', text) and len(text) < 60
-    if all_caps_with_colon:
+    # Common header patterns
+    header_patterns = [
+        r'^[A-Z][A-Z\s]+$',  # ALL CAPS
+        r'^\d+\.\s*[A-Z]',   # Numbered sections
+        r'^[A-Z][^.]*:$',    # Title with colon
+        r'^(CHAPTER|SECTION|PART)\s+\d+',  # Chapter/Section
+    ]
+
+    text_clean = text.strip()
+
+    # Check patterns
+    for pattern in header_patterns:
+        if re.match(pattern, text_clean):
+            return True
+
+    # Short, title-case text
+    if len(text_clean) < 60 and text_clean.istitle():
         return True
-
-    # Pattern 2: Numbered headers (1. Title, Section 1, etc.)
-    numbered_header = re.match(r'^(\d+\.|\d+\s+|Section\s+\d+|Chapter\s+\d+)\s*[A-Z]', text)
-    if numbered_header:
-        return True
-
-    # Pattern 3: Title case with colon and reasonable length
-    title_case_with_colon = re.match(r'^[A-Z][a-z]+(\s+[A-Z][a-z]+)*:\s*$', text) and len(text) < 60
-    if title_case_with_colon:
-        return True
-
-    # Pattern 4: All caps but require additional context checks
-    all_caps = re.match(r'^[A-Z\s]+$', text) and len(text) < 50
-    if all_caps:
-        # Additional checks to reduce false positives
-
-        # Reject if it looks like an acronym (too short, no spaces)
-        if len(text) < 8 and not re.search(r'\s', text):
-            return False
-
-        # Reject common false positives
-        false_positives = re.match(r'^(USD|EUR|GBP|INR|CAD|AUD|CHF|CNY|JPY|YES|NO|TRUE|FALSE|NULL|TOTAL|SUM|AVG|MAX|MIN|COUNT|ID|NAME|DATE|TIME|TYPE|STATUS)$', text.strip())
-        if false_positives:
-            return False
-
-        # For plain text, be more restrictive - require at least one space (multi-word)
-        return re.search(r'\s', text) and len(text.split()) >= 2
 
     return False
 
-def is_bullet_point(line: str) -> bool:
-    """Check if line is a bullet point"""
-    return bool(re.match(r'^[\u2022\u2023\u25E6\u2043\u2219•·‣⁃▪▫‧∙∘‰◦⦾⦿]', line) or
-                re.match(r'^[-*+]\s', line) or
-                re.match(r'^\d+[\.\)]\s', line) or
-                re.match(r'^[a-zA-Z][\.\)]\s', line))
-
-def is_date_like(value: str) -> bool:
-    """Basic check for date-like patterns"""
-    if not value:
+def is_bullet_point(text: str) -> bool:
+    """Detect if text is a bullet point"""
+    if not text:
         return False
 
-    date_patterns = [
-        r'\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}',  # MM/DD/YYYY or MM-DD-YYYY
-        r'\d{4}[/\-]\d{1,2}[/\-]\d{1,2}',    # YYYY/MM/DD or YYYY-MM-DD
-        r'\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)',  # DD Month
-        r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}'   # Month DD
+    text_clean = text.strip()
+
+    # Common bullet patterns
+    bullet_patterns = [
+        r'^[•·▪▫◦‣⁃]\s+',  # Unicode bullets
+        r'^[-*+]\s+',       # ASCII bullets
+        r'^\d+\.\s+',       # Numbered lists
+        r'^[a-z]\)\s+',     # Lettered lists
+        r'^[IVX]+\.\s+',    # Roman numerals
     ]
 
-    value_str = str(value).strip()
-    return any(re.search(pattern, value_str, re.IGNORECASE) for pattern in date_patterns)
+    for pattern in bullet_patterns:
+        if re.match(pattern, text_clean):
+            return True
+
+    return False
+
+def should_end_paragraph(current_line, next_line) -> bool:
+    """Determine if current line should end a paragraph"""
+    if not current_line or not next_line:
+        return True
+
+    current_text = current_line.text.strip()
+    next_text = next_line.text.strip()
+
+    # End paragraph if current line ends with period
+    if current_text.endswith('.'):
+        return True
+
+    # End paragraph if next line is a header or bullet
+    if is_header(next_text) or is_bullet_point(next_text):
+        return True
+
+    # End paragraph if significant Y gap
+    if hasattr(current_line, 'y') and hasattr(next_line, 'y'):
+        y_gap = abs(next_line.y - current_line.y)
+        if y_gap > 20:  # Significant gap
+            return True
+
+    return False
 
 def analyze_row_content(row_lines: List) -> Dict:
-    """Analyze if a row looks like table content"""
+    """Analyze if a row looks like table content with enhanced multi-column text detection"""
+    import re
+
     indicators = 0
     confidence = 0.0
+    anti_table_indicators = 0
 
     # Sort by x position
-    sorted_lines = sorted(row_lines, key=lambda l: l.min_x)
+    sorted_lines = sorted(row_lines, key=lambda l: l.min_x if hasattr(l, 'min_x') else 0)
 
     # Check for table-like patterns
     numeric_count = 0
     short_text_count = 0
+    long_text_count = 0
     total_items = len(sorted_lines)
 
+    # Enhanced content analysis
     for line in sorted_lines:
         text = line.text.strip()
+        word_count = len(text.split())
 
-        # Numeric content
+        # Numeric content (positive for tables)
         if re.search(r'\d', text):
             numeric_count += 1
             indicators += 1
 
         # Short, concise text (typical in tables)
-        if len(text.split()) <= 3:
+        if word_count <= 3 and len(text) > 0:
             short_text_count += 1
             indicators += 1
 
-        # Currency or percentage
+        # Long text (anti-table indicator)
+        if word_count > 10:
+            long_text_count += 1
+            anti_table_indicators += 2
+
+        # Currency or percentage (strong table indicator)
         if re.search(r'[\$€£¥%]', text):
+            indicators += 3
+
+        # Complete sentences (anti-table indicator)
+        if re.search(r'\b[A-Z][a-z]+.*[.!?]\s*$', text):
+            anti_table_indicators += 2
+
+        # Common text words (anti-table indicator)
+        common_text_words = r'\b(the|and|or|but|in|on|at|to|for|of|with|by)\b'
+        if re.search(common_text_words, text.lower()):
+            anti_table_indicators += 1
+
+        # Paragraph-like text patterns (anti-table indicator)
+        if re.search(r'\b(however|therefore|moreover|furthermore|additionally)\b', text.lower()):
+            anti_table_indicators += 2
+
+    # Enhanced multi-column text detection
+    if total_items >= 2:
+        # Check for balanced text distribution (suggests multi-column text)
+        total_chars = sum(len(line.text) for line in sorted_lines)
+        if total_chars > 100:  # Substantial text
+            char_distribution = [len(line.text) for line in sorted_lines]
+            max_chars = max(char_distribution)
+            min_chars = min(char_distribution)
+
+            # If text is somewhat balanced, likely multi-column text
+            if min_chars > 0 and max_chars / min_chars < 3:
+                anti_table_indicators += 3
+
+        # Check for narrative flow indicators
+        combined_text = ' '.join(line.text for line in sorted_lines)
+        if len(combined_text.split()) > 15:  # Substantial combined text
+            # Look for narrative connectors
+            if re.search(r'\b(and|but|however|therefore|when|while|after|before)\b', combined_text.lower()):
+                anti_table_indicators += 2
+
+    # Aligned positioning check (table indicator)
+    if len(sorted_lines) >= 3:
+        spacings = [sorted_lines[i+1].min_x - sorted_lines[i].max_x 
+                   for i in range(len(sorted_lines)-1)
+                   if hasattr(sorted_lines[i], 'max_x') and hasattr(sorted_lines[i+1], 'min_x')]
+        if spacings and max(spacings) - min(spacings) < 20:  # Regular spacing
             indicators += 2
 
-        # Aligned positioning (regular spacing)
-        if len(sorted_lines) >= 3:
-            # Check if spacing is regular
-            spacings = [sorted_lines[i+1].min_x - sorted_lines[i].max_x 
-                       for i in range(len(sorted_lines)-1)]
-            if spacings and max(spacings) - min(spacings) < 20:  # Regular spacing
-                indicators += 1
-
-    # Calculate confidence
+    # Calculate confidence with anti-table penalty
+    base_confidence = 0.0
     if total_items > 0:
         numeric_ratio = numeric_count / total_items
         short_text_ratio = short_text_count / total_items
-        confidence = (numeric_ratio * 0.6 + short_text_ratio * 0.4) * min(indicators / total_items, 1.0)
+        long_text_ratio = long_text_count / total_items
 
-    is_table_like = confidence > 0.5 and indicators >= 2
+        # Base confidence from table indicators
+        base_confidence = (numeric_ratio * 0.4 + short_text_ratio * 0.3) * min(indicators / max(total_items, 1), 1.0)
+
+        # Apply anti-table penalty
+        anti_table_penalty = min(0.8, anti_table_indicators * 0.1)
+        confidence = max(0.0, base_confidence - anti_table_penalty)
+
+        # Strong anti-table indicators
+        if long_text_ratio > 0.5 or anti_table_indicators > indicators:
+            confidence = max(0.0, confidence - 0.4)
+
+    # Final determination with stricter threshold
+    is_table_like = confidence > 0.6 and indicators >= 2 and anti_table_indicators < indicators
 
     return {
         'is_table_like': is_table_like,
         'confidence': confidence,
         'indicators': indicators,
+        'anti_table_indicators': anti_table_indicators,
         'numeric_ratio': numeric_count / max(total_items, 1),
-        'short_text_ratio': short_text_count / max(total_items, 1)
+        'short_text_ratio': short_text_count / max(total_items, 1),
+        'long_text_ratio': long_text_count / max(total_items, 1)
     }
 
 def calculate_text_density(lines: List) -> float:
@@ -130,194 +199,211 @@ def calculate_text_density(lines: List) -> float:
     return total_chars / max(total_lines, 1)
 
 def count_table_indicators_in_column(lines: List) -> int:
-    """Count table-like patterns in a column"""
+    """Count table-like patterns in a column with enhanced detection"""
+    import re
     indicators = 0
 
     for line in lines:
         text = line.text.strip()
 
-        # Look for table indicators
+        # Strong table indicators
         if re.search(r'\d+\.\d+', text):  # Numbers with decimals
-            indicators += 1
+            indicators += 2
         if re.search(r'\$\d+', text):  # Currency
-            indicators += 1
+            indicators += 2
+        if re.search(r'\b\d+%\b', text):  # Percentages
+            indicators += 2
+
+        # Moderate table indicators
         if len(text.split()) <= 3 and any(char.isdigit() for char in text):  # Short numeric text
             indicators += 1
-        if re.search(r'\b(total|sum|amount|qty|quantity)\b', text.lower()):  # Table keywords
+        if re.search(r'\b(total|sum|amount|qty|quantity|price|cost)\b', text.lower()):  # Table keywords
+            indicators += 1
+
+        # Weak table indicators
+        if re.search(r'\b\d+\b', text) and len(text) < 20:  # Short text with numbers
             indicators += 1
 
     return indicators
 
-def validate_table_vs_multicolumn(table_bbox, layout_analysis: Dict, lines: List) -> bool:
-    """Validate if a detected table is actually a table vs multi-column text"""
+def validate_table_vs_multicolumn(table_bbox: BoundingBox, layout_analysis: Dict, lines: List) -> bool:
+    """Enhanced validation to distinguish tables from multi-column text"""
 
     # Get lines within the table bbox
-    table_lines = [
-        line for line in lines 
-        if line_intersects_bbox(line, table_bbox, overlap_threshold=0.5)
-    ]
+    table_lines = []
+    for line in lines:
+        if (hasattr(line, 'min_x') and hasattr(line, 'max_x') and 
+            hasattr(line, 'y') and table_bbox.x_min <= line.min_x <= table_bbox.x_max and
+            table_bbox.y_min <= line.y <= table_bbox.y_max):
+            table_lines.append(line)
 
     if not table_lines:
         return False
 
-    # Check if this spans multiple text columns (likely multi-column text)
-    text_columns = layout_analysis.get('text_columns', [])
-    text_column_count = sum(1 for col in text_columns 
-                           if col['type'] == 'text' and 
-                           col['x_min'] < table_bbox.x_max and col['x_max'] > table_bbox.x_min)
+    # Check layout analysis context
+    layout_type = layout_analysis.get('layout_type', 'single_column')
 
-    if text_column_count > 1:
-        # Likely multi-column text, not a table
-        print(f"📰 Rejecting table candidate - spans {text_column_count} text columns (multi-column text)")
+    # If definitely multi-column text layout, be more strict
+    if layout_type == 'multi_column_text':
+        confidence_threshold = 0.8  # Higher threshold
+    else:
+        confidence_threshold = 0.6  # Standard threshold
+
+    # Analyze content for table vs text characteristics
+    total_lines = len(table_lines)
+    numeric_lines = 0
+    long_text_lines = 0
+    short_lines = 0
+
+    for line in table_lines:
+        text = line.text.strip()
+        word_count = len(text.split())
+
+        if re.search(r'\d', text):
+            numeric_lines += 1
+
+        if word_count > 8:  # Long text suggests paragraph
+            long_text_lines += 1
+        elif word_count <= 3:  # Short text suggests table cells
+            short_lines += 1
+
+    # Calculate ratios
+    numeric_ratio = numeric_lines / total_lines if total_lines > 0 else 0
+    long_text_ratio = long_text_lines / total_lines if total_lines > 0 else 0
+    short_text_ratio = short_lines / total_lines if total_lines > 0 else 0
+
+    # Anti-table indicators
+    if long_text_ratio > 0.4:  # Too much long text
         return False
 
-    # Additional content validation
-    row_groups = group_lines_into_rows(table_lines)
-    table_like_rows = sum(1 for row in row_groups if analyze_row_content(row)['is_table_like'])
+    # Check for narrative text patterns
+    combined_text = ' '.join(line.text for line in table_lines)
+    narrative_indicators = len(re.findall(r'\b(the|and|or|but|however|therefore|when|while)\b', combined_text.lower()))
 
-    table_ratio = table_like_rows / max(len(row_groups), 1)
+    if narrative_indicators > len(combined_text.split()) * 0.1:  # High narrative word density
+        return False
 
-    is_valid_table = table_ratio > 0.3  # At least 30% of rows should look table-like
+    # Table indicators
+    table_score = 0
+    if numeric_ratio > 0.3:
+        table_score += 30
+    if short_text_ratio > 0.5:
+        table_score += 25
 
-    if not is_valid_table:
-        print(f"📝 Rejecting table candidate - only {table_ratio:.1%} table-like content")
+    # Check for tabular structure (aligned columns)
+    if len(table_lines) >= 3:
+        x_positions = [line.min_x for line in table_lines if hasattr(line, 'min_x')]
+        if len(set(round(x, -1) for x in x_positions)) <= 3:  # Limited alignment positions
+            table_score += 20
 
-    return is_valid_table
+    # Final decision
+    confidence = table_score / 100.0
+    return confidence >= confidence_threshold
 
-def group_lines_into_rows(lines: List, y_tolerance: float = 5) -> List[List]:
-    """Group lines into potential table rows"""
+def detect_table_candidates_by_content(lines: List, layout_analysis: Dict) -> List[LayoutRegion]:
+    """Detect table candidates based on content patterns with multi-column awareness"""
+    candidates = []
+
+    try:
+        # Group lines by Y proximity for row detection
+        rows = group_lines_into_rows(lines)
+
+        # Filter out single-line rows for robustness
+        multi_line_rows = [row for row in rows if len(row) >= 2]
+
+        print(f"🔍 Analyzing {len(multi_line_rows)} multi-line rows for table content")
+
+        for row_group in multi_line_rows:
+            # Analyze row content with enhanced detection
+            row_analysis = analyze_row_content(row_group)
+
+            # Apply stricter threshold for multi-column layouts
+            layout_type = layout_analysis.get('layout_type', 'single_column')
+
+            if layout_type == 'multi_column_text':
+                confidence_threshold = 0.7  # Higher threshold
+            else:
+                confidence_threshold = 0.6  # Standard threshold
+
+            if row_analysis['is_table_like'] and row_analysis['confidence'] >= confidence_threshold:
+                # Calculate bounding box
+                min_x = min(line.min_x for line in row_group if hasattr(line, 'min_x'))
+                max_x = max(line.max_x for line in row_group if hasattr(line, 'max_x'))
+                min_y = min(line.y for line in row_group if hasattr(line, 'y'))
+                max_y = max(line.y for line in row_group if hasattr(line, 'y'))
+
+                candidate_bbox = BoundingBox(min_x, min_y, max_x, max_y)
+
+                # Double-check with layout validation
+                if validate_table_vs_multicolumn(candidate_bbox, layout_analysis, lines):
+                    candidates.append(LayoutRegion(
+                        bbox=candidate_bbox,
+                        region_type='table_candidate',
+                        confidence=row_analysis['confidence'],
+                        text_items=[]
+                    ))
+                    print(f"✅ Table candidate detected with {row_analysis['confidence']:.2f} confidence")
+                else:
+                    print(f"❌ Table candidate rejected by layout validation")
+
+    except Exception as e:
+        print(f"⚠️ Content-based table detection failed: {e}")
+
+    print(f"🎯 Found {len(candidates)} validated table candidates")
+    return candidates
+
+def build_content_units_from_lines(lines: List[str]):
+    """Build content units from text lines"""
+    from .layout_structures import StructuredUnit
+
+    units = []
+    for i, line in enumerate(lines):
+        unit = StructuredUnit(
+            type='paragraph',
+            text=line,
+            lines=[line],
+            start_line=i + 1,
+            end_line=i + 1,
+            reading_order=i
+        )
+        units.append(unit)
+
+    return units
+
+def build_simple_units_from_lines(lines: List[str]):
+    """Alias for build_content_units_from_lines"""
+    return build_content_units_from_lines(lines)
+
+def group_lines_into_rows(lines: List, y_tolerance: float = 5.0) -> List[List]:
+    """Group lines that are on the same Y level into rows"""
     if not lines:
         return []
 
-    sorted_lines = sorted(lines, key=lambda l: l.y)
+    # Sort lines by Y position
+    sorted_lines = sorted([line for line in lines if hasattr(line, 'y')], key=lambda l: l.y)
+
     rows = []
     current_row = [sorted_lines[0]]
 
     for line in sorted_lines[1:]:
-        if abs(line.y - current_row[0].y) <= y_tolerance:
+        # Check if line is on same Y level as current row
+        current_row_y = sum(l.y for l in current_row) / len(current_row)
+
+        if abs(line.y - current_row_y) <= y_tolerance:
             current_row.append(line)
         else:
-            if len(current_row) >= 2:
+            # Start new row
+            if current_row:
                 rows.append(current_row)
             current_row = [line]
 
-    if len(current_row) >= 2:
+    # Add final row
+    if current_row:
         rows.append(current_row)
 
     return rows
 
-def line_intersects_bbox(line, bbox, overlap_threshold: float = 0.5) -> bool:
-    """Check if line intersects with bounding box"""
-    if not line.bbox:
-        return False
-
-    # Calculate intersection
-    intersection_x = max(0, min(line.bbox.x_max, bbox.x_max) - max(line.bbox.x_min, bbox.x_min))
-    intersection_y = max(0, min(line.bbox.y_max, bbox.y_max) - max(line.bbox.y_min, bbox.y_min))
-
-    if intersection_x <= 0 or intersection_y <= 0:
-        return False
-
-    intersection_area = intersection_x * intersection_y
-    line_area = line.bbox.area
-
-    if line_area == 0:
-        return False
-
-    overlap_ratio = intersection_area / line_area
-    return overlap_ratio >= overlap_threshold
-
-def count_word_patterns(text: str) -> Dict[str, int]:
-    """Count specific word patterns that indicate content type"""
-    patterns = {
-        'questions': len(re.findall(r'\?', text)),
-        'statements': len(re.findall(r'\.', text)),
-        'lists': len(re.findall(r'^\s*[-•*]\s+', text, re.MULTILINE)),
-        'numbers': len(re.findall(r'\d+', text)),
-        'caps_words': len(re.findall(r'\b[A-Z]{2,}\b', text))
-    }
-    return patterns
-
-def should_end_paragraph(current_line, next_line) -> bool:
-    """Determine if current paragraph should end based on line characteristics"""
-    if not next_line:
-        return True
-
-    # Check for significant Y gap
-    if hasattr(current_line, 'y') and hasattr(next_line, 'y'):
-        y_gap = abs(next_line.y - current_line.y)
-        if y_gap > 20:  # Significant gap
-            return True
-
-    # Check for formatting changes
-    current_text = current_line.text if hasattr(current_line, 'text') else str(current_line)
-    next_text = next_line.text if hasattr(next_line, 'text') else str(next_line)
-
-    # End paragraph if next line looks like a header
-    if is_header(next_text):
-        return True
-
-    # End paragraph if next line is a bullet point
-    if is_bullet_point(next_text):
-        return True
-
-    # End paragraph if current line ends with sentence-ending punctuation
-    # and next line starts with capital letter or number
-    if (current_text.strip().endswith(('.', '!', '?', ':')) and 
-        next_text.strip() and 
-        (next_text.strip()[0].isupper() or next_text.strip()[0].isdigit())):
-        return True
-
-    return False
-
-def detect_visual_structures(page, page_bbox) -> Dict:
-    """Detect visual structures like borders, lines, and rectangular regions"""
-    visual_structures = {
-        'bordered_regions': [],
-        'horizontal_lines': [],
-        'vertical_lines': [],
-        'rectangular_regions': []
-    }
-
-    try:
-        # Extract visual elements
-        drawings = getattr(page, 'drawings', [])
-        rects = getattr(page, 'rects', [])
-        lines = getattr(page, 'lines', [])
-
-        print(f"🔍 Visual elements found: {len(drawings)} drawings, {len(rects)} rects, {len(lines)} lines")
-
-        # Process rectangles (potential table borders)
-        for rect in rects:
-            if rect.get('width', 0) > 50 and rect.get('height', 0) > 20:  # Minimum table size
-                from .page_structures import BoundingBox
-                bbox = BoundingBox(
-                    x_min=rect['x0'],
-                    y_min=rect['y0'], 
-                    x_max=rect['x1'],
-                    y_max=rect['y1']
-                )
-                visual_structures['bordered_regions'].append({
-                    'bbox': bbox,
-                    'type': 'rectangle',
-                    'confidence': 0.9
-                })
-
-        # Process lines to detect table grids
-        h_lines = [l for l in lines if abs(l.get('y0', 0) - l.get('y1', 0)) < 2]  # Horizontal
-        v_lines = [l for l in lines if abs(l.get('x0', 0) - l.get('x1', 0)) < 2]  # Vertical
-
-        visual_structures['horizontal_lines'] = h_lines
-        visual_structures['vertical_lines'] = v_lines
-
-        print(f"📐 Found {len(visual_structures['bordered_regions'])} potential table structures")
-
-    except Exception as e:
-        print(f"⚠️ Visual structure detection failed: {e}")
-
-    return visual_structures
-
-def bboxes_overlap(bbox1, bbox2, threshold: float = 0.5) -> bool:
+def bboxes_overlap(bbox1: BoundingBox, bbox2: BoundingBox, threshold: float = 0.5) -> bool:
     """Check if two bounding boxes overlap significantly"""
     # Calculate intersection
     intersection_x = max(0, min(bbox1.x_max, bbox2.x_max) - max(bbox1.x_min, bbox2.x_min))
@@ -338,171 +424,3 @@ def bboxes_overlap(bbox1, bbox2, threshold: float = 0.5) -> bool:
     overlap_ratio2 = intersection_area / bbox2_area
 
     return overlap_ratio1 >= threshold or overlap_ratio2 >= threshold
-
-def detect_table_candidates_by_content(lines: List, layout_analysis: Dict) -> List[Dict]:
-    """Detect table candidates based on content patterns"""
-    candidates = []
-
-    try:
-        # Group lines by Y proximity for row detection
-        rows = group_lines_into_rows(lines)
-
-        for row_group in rows:
-            if len(row_group) < 2:  # Need at least 2 lines for a row
-                continue
-
-            # Analyze row content
-            row_analysis = analyze_row_content(row_group)
-
-            if row_analysis['is_table_like']:
-                # Calculate bounding box
-                min_x = min(line.min_x for line in row_group)
-                max_x = max(line.max_x for line in row_group)
-                min_y = min(line.y for line in row_group)
-                max_y = max(line.y for line in row_group)
-
-                from .page_structures import BoundingBox
-                candidates.append({
-                    'bbox': BoundingBox(min_x, min_y, max_x, max_y),
-                    'confidence': row_analysis['confidence'],
-                    'type': 'content_based',
-                    'indicators': row_analysis['indicators']
-                })
-
-    except Exception as e:
-        print(f"⚠️ Content-based table detection failed: {e}")
-
-    return candidates
-
-def build_simple_units_from_lines(lines: List[str]) -> List:
-    """Build simple structured units from lines for fallback processing"""
-    from .page_structures import StructuredUnit
-
-    units = []
-    current_paragraph = []
-    paragraph_start_index = None
-
-    for i, line in enumerate(lines):
-        next_line = lines[i + 1] if i + 1 < len(lines) else None
-
-        if is_header(line):
-            # End current paragraph
-            if current_paragraph:
-                units.append(StructuredUnit(
-                    type='paragraph',
-                    text=' '.join(current_paragraph),
-                    lines=list(current_paragraph),
-                    start_line=paragraph_start_index,
-                    end_line=i
-                ))
-                current_paragraph = []
-                paragraph_start_index = None
-
-            # Add header unit
-            units.append(StructuredUnit(
-                type='header',
-                text=line,
-                lines=[line],
-                start_line=i + 1,
-                end_line=i + 1
-            ))
-
-        elif is_bullet_point(line):
-            # End current paragraph
-            if current_paragraph:
-                units.append(StructuredUnit(
-                    type='paragraph',
-                    text=' '.join(current_paragraph),
-                    lines=list(current_paragraph),
-                    start_line=paragraph_start_index,
-                    end_line=i
-                ))
-                current_paragraph = []
-                paragraph_start_index = None
-
-            # Add bullet unit
-            units.append(StructuredUnit(
-                type='bullet',
-                text=line,
-                lines=[line],
-                start_line=i + 1,
-                end_line=i + 1
-            ))
-
-        else:
-            # Regular text - add to paragraph
-            if not current_paragraph:
-                paragraph_start_index = i + 1
-            current_paragraph.append(line)
-
-            # Check if paragraph should end
-            if not next_line or len(line) == 0:
-                if current_paragraph:
-                    units.append(StructuredUnit(
-                        type='paragraph',
-                        text=' '.join(current_paragraph),
-                        lines=list(current_paragraph),
-                        start_line=paragraph_start_index,
-                        end_line=i + 1
-                    ))
-                    current_paragraph = []
-                    paragraph_start_index = None
-
-    # Add final paragraph if exists
-    if current_paragraph:
-        units.append(StructuredUnit(
-            type='paragraph',
-            text=' '.join(current_paragraph),
-            lines=list(current_paragraph),
-            start_line=paragraph_start_index,
-            end_line=len(lines)
-        ))
-
-    return units
-
-def detect_visual_structures(page, page_bbox) -> Dict:
-    """Detect visual structures like borders, lines, and rectangular regions"""
-    visual_structures = {
-        'bordered_regions': [],
-        'horizontal_lines': [],
-        'vertical_lines': [],
-        'rectangular_regions': []
-    }
-
-    try:
-        # Extract visual elements
-        drawings = getattr(page, 'drawings', [])
-        rects = getattr(page, 'rects', [])
-        lines = getattr(page, 'lines', [])
-
-        print(f"🔍 Visual elements found: {len(drawings)} drawings, {len(rects)} rects, {len(lines)} lines")
-
-        # Process rectangles (potential table borders)
-        for rect in rects:
-            if rect.get('width', 0) > 50 and rect.get('height', 0) > 20:  # Minimum table size
-                from .page_structures import BoundingBox
-                bbox = BoundingBox(
-                    x_min=rect['x0'],
-                    y_min=rect['y0'], 
-                    x_max=rect['x1'],
-                    y_max=rect['y1']
-                )
-                visual_structures['bordered_regions'].append({
-                    'bbox': bbox,
-                    'type': 'rectangle',
-                    'confidence': 0.9
-                })
-
-        # Process lines to detect table grids
-        h_lines = [l for l in lines if abs(l.get('y0', 0) - l.get('y1', 0)) < 2]  # Horizontal
-        v_lines = [l for l in lines if abs(l.get('x0', 0) - l.get('x1', 0)) < 2]  # Vertical
-
-        visual_structures['horizontal_lines'] = h_lines
-        visual_structures['vertical_lines'] = v_lines
-
-        print(f"📐 Found {len(visual_structures['bordered_regions'])} potential table structures")
-
-    except Exception as e:
-        print(f"⚠️ Visual structure detection failed: {e}")
-
-    return visual_structures

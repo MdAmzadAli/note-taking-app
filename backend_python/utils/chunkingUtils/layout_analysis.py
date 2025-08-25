@@ -1,3 +1,4 @@
+
 import re
 import numpy as np
 from typing import List, Dict, Any, Optional, Tuple
@@ -215,7 +216,6 @@ def bboxes_overlap(bbox1: BoundingBox, bbox2: BoundingBox, threshold: float = 0.
 
     return overlap_ratio1 >= threshold or overlap_ratio2 >= threshold
 
-
 def analyze_spacing_patterns(lines: List) -> Dict[str, Any]:
     """Analyze spacing patterns in text lines"""
     if not lines:
@@ -318,47 +318,122 @@ def create_text_region(lines: List, column_index: int):
     )
 
 def analyze_multi_column_layout(lines: List, columns: List, page_bbox: BoundingBox) -> Dict:
-    """Advanced multi-column layout analysis"""
+    """Robust multi-column layout analysis with enhanced detection"""
     layout_analysis = {
         'layout_type': 'single_column',
         'text_columns': [],
         'column_gaps': [],
         'reading_flow': 'top_to_bottom',
-        'column_boundaries': []
+        'column_boundaries': [],
+        'confidence': 0.0,
+        'multi_column_evidence': []
     }
 
     try:
-        if len(columns) <= 1:
-            layout_analysis['layout_type'] = 'single_column'
+        if not lines or not columns:
+            print("🔍 No lines or columns detected - defaulting to single column")
             layout_analysis['text_columns'] = [{'x_min': page_bbox.x_min, 'x_max': page_bbox.x_max, 'type': 'text'}]
             return layout_analysis
 
-        # Analyze column characteristics
-        for i, col in enumerate(columns):
-            col_lines = [line for line in lines if col.min_x <= line.min_x < col.max_x]
+        # Enhanced column analysis with multiple detection methods
+        print(f"🔍 Analyzing {len(columns)} detected columns with {len(lines)} lines")
 
-            # Determine column content type
-            text_density = calculate_text_density(col_lines)
-            table_indicators = count_table_indicators_in_column(col_lines)
+        # Method 1: X-position clustering analysis
+        x_positions = [line.min_x for line in lines if hasattr(line, 'min_x')]
+        x_clusters = _detect_x_position_clusters(x_positions, page_bbox)
+        
+        # Method 2: White space gap analysis
+        column_gaps = _analyze_white_space_gaps(lines, page_bbox)
+        
+        # Method 3: Text alignment patterns
+        alignment_patterns = _analyze_text_alignment_patterns(lines)
+        
+        # Method 4: Reading flow analysis
+        reading_flow_evidence = _analyze_reading_flow_evidence(lines, page_bbox)
 
-            column_info = {
-                'index': i,
-                'x_min': col.min_x,
-                'x_max': col.max_x,
-                'width': col.max_x - col.min_x,
-                'text_density': text_density,
-                'table_indicators': table_indicators,
-                'type': 'table' if table_indicators > text_density * 0.3 else 'text'
-            }
+        # Consolidate evidence
+        evidence_score = 0
+        evidence_details = []
 
-            layout_analysis['text_columns'].append(column_info)
+        # X-position clustering evidence
+        if len(x_clusters) > 1:
+            evidence_score += 30
+            evidence_details.append(f"X-position clustering detected {len(x_clusters)} distinct clusters")
+            layout_analysis['multi_column_evidence'].append('x_position_clusters')
 
-            # Calculate gaps
-            if i > 0:
-                gap = col.min_x - columns[i-1].max_x
-                layout_analysis['column_gaps'].append(gap)
+        # White space gap evidence
+        significant_gaps = [gap for gap in column_gaps if gap['confidence'] > 0.7]
+        if len(significant_gaps) > 0:
+            evidence_score += 25
+            evidence_details.append(f"Found {len(significant_gaps)} significant white space gaps")
+            layout_analysis['multi_column_evidence'].append('white_space_gaps')
 
-        # Determine layout type
+        # Text alignment evidence
+        if alignment_patterns['has_multiple_alignments']:
+            evidence_score += 20
+            evidence_details.append("Multiple text alignment patterns detected")
+            layout_analysis['multi_column_evidence'].append('alignment_patterns')
+
+        # Reading flow evidence
+        if reading_flow_evidence['suggests_columns']:
+            evidence_score += 25
+            evidence_details.append("Reading flow suggests columnar layout")
+            layout_analysis['multi_column_evidence'].append('reading_flow')
+
+        # Determine layout type based on consolidated evidence
+        layout_analysis['confidence'] = evidence_score / 100.0
+
+        if evidence_score >= 50:  # High confidence threshold
+            if len(x_clusters) >= 2:
+                layout_analysis['layout_type'] = 'multi_column_text'
+                print(f"✅ Multi-column layout detected with {evidence_score}% confidence")
+                print(f"   Evidence: {', '.join(evidence_details)}")
+            else:
+                layout_analysis['layout_type'] = 'mixed_content'
+        elif evidence_score >= 25:  # Medium confidence
+            layout_analysis['layout_type'] = 'possibly_multi_column'
+            print(f"⚠️ Possible multi-column layout with {evidence_score}% confidence")
+        else:
+            layout_analysis['layout_type'] = 'single_column'
+            print(f"📄 Single column layout detected ({evidence_score}% multi-column evidence)")
+
+        # Build detailed column information
+        if len(columns) > 1 or layout_analysis['layout_type'] in ['multi_column_text', 'mixed_content']:
+            for i, col in enumerate(columns):
+                col_lines = [line for line in lines if col.min_x <= line.min_x < col.max_x]
+                
+                text_density = calculate_text_density(col_lines)
+                table_indicators = count_table_indicators_in_column(col_lines)
+                
+                column_info = {
+                    'index': i,
+                    'x_min': col.min_x,
+                    'x_max': col.max_x,
+                    'width': col.max_x - col.min_x,
+                    'text_density': text_density,
+                    'table_indicators': table_indicators,
+                    'type': 'table' if table_indicators > text_density * 0.4 else 'text',
+                    'line_count': len(col_lines)
+                }
+                
+                layout_analysis['text_columns'].append(column_info)
+
+                # Calculate gaps
+                if i > 0:
+                    gap = col.min_x - columns[i-1].max_x
+                    layout_analysis['column_gaps'].append(gap)
+        else:
+            # Single column fallback
+            layout_analysis['text_columns'] = [{
+                'index': 0,
+                'x_min': page_bbox.x_min,
+                'x_max': page_bbox.x_max,
+                'type': 'text',
+                'width': page_bbox.width,
+                'line_count': len(lines)
+            }]
+
+        # Final layout type determination with table detection
         text_columns = [c for c in layout_analysis['text_columns'] if c['type'] == 'text']
         table_columns = [c for c in layout_analysis['text_columns'] if c['type'] == 'table']
 
@@ -369,12 +444,226 @@ def analyze_multi_column_layout(lines: List, columns: List, page_bbox: BoundingB
         elif len(table_columns) > 1:
             layout_analysis['layout_type'] = 'multi_table'
 
-        print(f"📊 Column analysis: {len(text_columns)} text, {len(table_columns)} table columns")
+        print(f"📊 Final analysis: {len(text_columns)} text, {len(table_columns)} table columns")
 
     except Exception as e:
         print(f"⚠️ Multi-column analysis failed: {e}")
+        # Fallback to single column
+        layout_analysis['text_columns'] = [{'x_min': page_bbox.x_min, 'x_max': page_bbox.x_max, 'type': 'text'}]
 
     return layout_analysis
+
+def _detect_x_position_clusters(x_positions: List[float], page_bbox: BoundingBox, min_cluster_size: int = 3) -> List[Dict]:
+    """Detect clusters in X positions to identify columns"""
+    if len(x_positions) < min_cluster_size:
+        return []
+
+    import numpy as np
+    
+    # Sort positions
+    sorted_positions = sorted(x_positions)
+    
+    # Calculate gaps between positions
+    gaps = [sorted_positions[i+1] - sorted_positions[i] for i in range(len(sorted_positions)-1)]
+    
+    if not gaps:
+        return []
+        
+    # Find significant gaps (larger than median gap by threshold)
+    median_gap = np.median(gaps)
+    gap_threshold = median_gap * 2  # Threshold for significant gaps
+    
+    clusters = []
+    current_cluster = [sorted_positions[0]]
+    
+    for i, gap in enumerate(gaps):
+        if gap > gap_threshold:
+            # Significant gap - start new cluster
+            if len(current_cluster) >= min_cluster_size:
+                clusters.append({
+                    'min_x': min(current_cluster),
+                    'max_x': max(current_cluster),
+                    'count': len(current_cluster),
+                    'positions': current_cluster.copy()
+                })
+            current_cluster = [sorted_positions[i+1]]
+        else:
+            current_cluster.append(sorted_positions[i+1])
+    
+    # Add final cluster
+    if len(current_cluster) >= min_cluster_size:
+        clusters.append({
+            'min_x': min(current_cluster),
+            'max_x': max(current_cluster),
+            'count': len(current_cluster),
+            'positions': current_cluster.copy()
+        })
+    
+    return clusters
+
+def _analyze_white_space_gaps(lines: List, page_bbox: BoundingBox) -> List[Dict]:
+    """Analyze white space to detect column separators"""
+    if not lines:
+        return []
+    
+    # Create a density map across page width
+    page_width = page_bbox.width
+    resolution = max(1, int(page_width / 10))  # 10-pixel resolution
+    density_map = [0] * resolution
+    
+    # Fill density map
+    for line in lines:
+        if hasattr(line, 'min_x') and hasattr(line, 'max_x'):
+            start_bin = int((line.min_x - page_bbox.x_min) / page_width * resolution)
+            end_bin = int((line.max_x - page_bbox.x_min) / page_width * resolution)
+            
+            start_bin = max(0, min(start_bin, resolution - 1))
+            end_bin = max(0, min(end_bin, resolution - 1))
+            
+            for i in range(start_bin, end_bin + 1):
+                density_map[i] += 1
+    
+    # Find gaps (consecutive zeros or low density)
+    gaps = []
+    in_gap = False
+    gap_start = 0
+    
+    max_density = max(density_map) if density_map else 1
+    low_density_threshold = max_density * 0.1  # 10% of max density
+    
+    for i, density in enumerate(density_map):
+        if density <= low_density_threshold:
+            if not in_gap:
+                in_gap = True
+                gap_start = i
+        else:
+            if in_gap:
+                gap_width = i - gap_start
+                if gap_width >= 2:  # Minimum gap width
+                    gap_x_start = page_bbox.x_min + (gap_start / resolution) * page_width
+                    gap_x_end = page_bbox.x_min + (i / resolution) * page_width
+                    
+                    gaps.append({
+                        'x_start': gap_x_start,
+                        'x_end': gap_x_end,
+                        'width': gap_x_end - gap_x_start,
+                        'confidence': min(1.0, gap_width / 5.0)  # Higher confidence for wider gaps
+                    })
+                in_gap = False
+    
+    return gaps
+
+def _analyze_text_alignment_patterns(lines: List) -> Dict:
+    """Analyze text alignment patterns to detect columns"""
+    if not lines:
+        return {'has_multiple_alignments': False, 'alignment_groups': []}
+    
+    # Group lines by similar X starting positions
+    alignment_tolerance = 10  # pixels
+    alignment_groups = []
+    
+    for line in lines:
+        if not hasattr(line, 'min_x'):
+            continue
+            
+        # Find existing group with similar alignment
+        found_group = False
+        for group in alignment_groups:
+            if abs(line.min_x - group['x_position']) <= alignment_tolerance:
+                group['lines'].append(line)
+                group['x_position'] = (group['x_position'] * len(group['lines']) + line.min_x) / (len(group['lines']) + 1)
+                found_group = True
+                break
+        
+        if not found_group:
+            alignment_groups.append({
+                'x_position': line.min_x,
+                'lines': [line],
+                'count': 1
+            })
+    
+    # Filter out small groups
+    significant_groups = [group for group in alignment_groups if len(group['lines']) >= 3]
+    
+    return {
+        'has_multiple_alignments': len(significant_groups) > 1,
+        'alignment_groups': significant_groups,
+        'total_groups': len(alignment_groups)
+    }
+
+def _analyze_reading_flow_evidence(lines: List, page_bbox: BoundingBox) -> Dict:
+    """Analyze reading flow patterns to detect columnar layout"""
+    if len(lines) < 6:  # Need sufficient lines for analysis
+        return {'suggests_columns': False, 'evidence': []}
+    
+    evidence = []
+    suggests_columns = False
+    
+    # Sort lines by Y position (top to bottom)
+    sorted_lines = sorted([line for line in lines if hasattr(line, 'y') and hasattr(line, 'min_x')], 
+                         key=lambda l: l.y)
+    
+    # Analyze Y-position transitions with X-position jumps
+    page_center_x = page_bbox.center_x
+    left_side_lines = 0
+    right_side_lines = 0
+    x_transitions = 0
+    
+    for i, line in enumerate(sorted_lines):
+        # Count lines on left vs right side
+        if line.min_x < page_center_x:
+            left_side_lines += 1
+        else:
+            right_side_lines += 1
+        
+        # Check for X-position transitions (jump from right back to left)
+        if i > 0:
+            prev_line = sorted_lines[i-1]
+            if (prev_line.min_x > page_center_x and line.min_x < page_center_x and 
+                abs(line.y - prev_line.y) < 50):  # Similar Y but different X
+                x_transitions += 1
+    
+    # Evidence: balanced left/right distribution
+    total_lines = len(sorted_lines)
+    if total_lines > 0:
+        left_ratio = left_side_lines / total_lines
+        if 0.3 <= left_ratio <= 0.7:  # Balanced distribution
+            evidence.append("balanced_left_right_distribution")
+    
+    # Evidence: X-position transitions
+    if x_transitions >= 2:
+        evidence.append("x_position_transitions")
+        suggests_columns = True
+    
+    # Evidence: lines with similar Y but different X regions
+    y_groups = {}
+    y_tolerance = 15
+    
+    for line in sorted_lines:
+        y_key = round(line.y / y_tolerance) * y_tolerance
+        if y_key not in y_groups:
+            y_groups[y_key] = []
+        y_groups[y_key].append(line)
+    
+    # Count Y groups with lines in different X regions
+    multi_x_y_groups = 0
+    for y_group in y_groups.values():
+        if len(y_group) > 1:
+            x_positions = [line.min_x for line in y_group]
+            if max(x_positions) - min(x_positions) > page_bbox.width * 0.3:
+                multi_x_y_groups += 1
+    
+    if multi_x_y_groups >= 2:
+        evidence.append("multiple_x_regions_same_y")
+        suggests_columns = True
+    
+    return {
+        'suggests_columns': suggests_columns,
+        'evidence': evidence,
+        'x_transitions': x_transitions,
+        'left_right_ratio': left_side_lines / max(total_lines, 1),
+        'multi_x_y_groups': multi_x_y_groups
+    }
 
 def calculate_text_density(lines: List) -> float:
     """Calculate text density in a column"""

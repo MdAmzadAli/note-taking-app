@@ -33,8 +33,8 @@ def extract_tables_with_camelot(file_path: str, page_number: int) -> List[Dict[s
 
             try:
                 lattice_tables = camelot.read_pdf(
-                    temp_pdf_path, 
-                    pages=str(page_number), 
+                    temp_pdf_path,
+                    pages=str(page_number),
                     flavor='lattice',
                     strip_text='\n'
                 )
@@ -97,8 +97,8 @@ def extract_tables_with_camelot(file_path: str, page_number: int) -> List[Dict[s
 
                 try:
                     stream_tables = camelot.read_pdf(
-                        temp_pdf_path, 
-                        pages=str(page_number), 
+                        temp_pdf_path,
+                        pages=str(page_number),
                         flavor='stream',
                         strip_text='\n'
                     )
@@ -196,7 +196,7 @@ def extract_tables_with_targeted_camelot(file_path: str, page_number: int, table
 
                                 extracted_tables.append({
                                     "json_data": structured_table,
-                                    "bbox": camelot_bbox_to_layout_bbox(getattr(table, '_bbox', None)) or 
+                                    "bbox": camelot_bbox_to_layout_bbox(getattr(table, '_bbox', None)) or
                                            BoundingBox(area[0], area[1], area[2], area[3]),
                                     "accuracy": table.accuracy,
                                     "source": "camelot_lattice_targeted"
@@ -212,8 +212,8 @@ def extract_tables_with_targeted_camelot(file_path: str, page_number: int, table
 
                 try:
                     lattice_tables = camelot.read_pdf(
-                        temp_pdf_path, 
-                        pages=str(page_number), 
+                        temp_pdf_path,
+                        pages=str(page_number),
                         flavor='lattice',
                         strip_text='\n'
                     )
@@ -246,8 +246,8 @@ def extract_tables_with_targeted_camelot(file_path: str, page_number: int, table
 
                 try:
                     stream_tables = camelot.read_pdf(
-                        temp_pdf_path, 
-                        pages=str(page_number), 
+                        temp_pdf_path,
+                        pages=str(page_number),
                         flavor='stream',
                         strip_text='\n'
                     )
