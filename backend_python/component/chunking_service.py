@@ -349,8 +349,11 @@ class ChunkingService:
             except Exception as e:
                 print(f"⚠️ Targeted camelot extraction failed: {e}")
 
+        # Initialize table bboxes list
+        table_bboxes = []
+        
         # Add camelot table regions
-        for camelot_table in camelot_tables:
+        for camelot_table in camelot_tables:</old_str>
             if camelot_table.get('bbox'):
                 bbox = camelot_table['bbox']
                 overlaps_existing = any(
@@ -892,8 +895,43 @@ class ChunkingService:
 
         return ' '.join(text_parts)
 
+    async def _extract_tables_with_targeted_camelot(self, file_path: str, page_number: int, table_areas: List[Dict], layout_analysis: Dict) -> List[Dict]:
+        """Enhanced camelot extraction with targeted areas and layout awareness using chunkingUtils"""
+        extracted_tables = []
+
+        if not CAMELOT_AVAILABLE:
+            print(f"⚠️ Camelot not available - skipping targeted extraction for page {page_number}")
+            return extracted_tables
+
+        try:
+            # Use chunkingUtils for targeted camelot extraction
+            targeted_tables = await extract_tables_with_targeted_camelot(
+                file_path, page_number, table_areas, layout_analysis
+            )
+            
+            for table_data in targeted_tables:
+                if table_data.get('json_data') and table_data.get('bbox'):
+                    # Convert to layout bbox using chunkingUtils
+                    layout_bbox = camelot_bbox_to_layout_bbox(table_data.get('bbox'))
+                    
+                    # Validate against layout analysis using chunkingUtils
+                    if validate_camelot_table(table_data, layout_analysis):
+                        extracted_tables.append({
+                            "json_data": table_data['json_data'],
+                            "bbox": layout_bbox,
+                            "accuracy": table_data.get('accuracy', 85.0),
+                            "source": table_data.get('source', 'camelot_targeted')
+                        })
+
+            print(f"🎯 Targeted camelot extraction complete: {len(extracted_tables)} tables")
+            
+        except Exception as e:
+            print(f"❌ Targeted camelot extraction failed: {e}")
+
+        return extracted_tables
+
     # Helper methods for targeted camelot extraction
-    def _get_targeted_table_areas(self, visual_structures: Dict, table_candidates: List[LayoutRegion], detected_tables: List[Dict]) -> List[Dict]:
+    def _get_targeted_table_areas(self, visual_structures: Dict, table_candidates: List[LayoutRegion], detected_tables: List[Dict]) -> List[Dict]:</old_str>
         """Get targeted table areas from visual structures and candidates"""
         table_areas = []
 
@@ -1028,3 +1066,7 @@ class ChunkingService:
     def analyze_numeric_content(self, text: str) -> NormalizedData:
         """Analyze numeric content using chunkingUtils"""
         return normalize_currency_and_numbers(text)
+
+    def _validate_stream_table_vs_multicolumn(self, table, layout_analysis: Dict) -> bool:
+        """Validate stream table against multi-column text using chunkingUtils"""
+        return validate_stream_table_vs_multicolumn(table, layout_analysis)
