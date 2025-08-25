@@ -1,3 +1,4 @@
+
 import os
 import asyncio
 from typing import Dict, List, Any, Optional, Union
@@ -8,57 +9,68 @@ from collections import defaultdict
 from utils.chunkingUtils import (
     # Data structures
     TextItem, BoundingBox, LayoutRegion, StructuredUnit, PageLayout, PageData, PDFData,
-    NumberData, NormalizedData,
+    NumberData, NormalizedData, Column,
 
     # PDF extraction
     extract_text_from_pdf, extract_page_with_enhanced_layout, fallback_page_extraction, fallback_extraction,
 
     # Layout analysis
     analyze_page_layout, detect_regions, group_text_lines_into_regions, classify_layout_type,
+    analyze_multi_column_layout, detect_layout_regions, group_by_columns, detect_reading_order, analyze_spacing_patterns,
 
     # Content detection
-    is_header, is_bullet_point, should_end_paragraph,
+    is_header, is_bullet_point, should_end_paragraph, analyze_row_content, calculate_text_density,
+    count_table_indicators_in_column, validate_table_vs_multicolumn, detect_table_candidates_by_content,
+    build_content_units_from_lines, build_simple_units_from_lines,
 
     # Line and column processing
-    group_items_into_lines, create_line_from_items, detect_columns_enhanced,
+    group_items_into_lines, create_line_from_items, detect_columns_enhanced, cluster_columns,
+    detect_columns, analyze_column_structure, validate_columns, merge_overlapping_columns, calculate_column_gaps,
+    group_lines_into_rows, line_intersects_bbox, group_text_into_lines, merge_nearby_lines,
+    detect_line_spacing, sort_lines_by_reading_order, calculate_line_statistics,
 
     # Visual structure detection
-    detect_visual_structures, bboxes_overlap,
+    detect_visual_structures, detect_grid_structures, group_nearby_lines, check_line_intersections,
+    find_peaks, bboxes_overlap, detect_borders, detect_lines, find_rectangular_regions,
+    analyze_visual_elements, detect_table_grids,
 
     # Text processing
     merge_soft_hyphens, normalize_text_spacing, post_process_extracted_text,
-    fix_character_spacing_line, fix_ocr_artifacts,
+    fix_character_spacing_line, fix_ocr_artifacts, fix_character_spacing,
 
     # Table processing
-    convert_table_to_json, create_table_summary_text, validate_stream_table_vs_multicolumn,
+    convert_table_to_json, is_likely_header_row, clean_header, generate_table_summary,
+    create_table_summary_text, validate_stream_table_vs_multicolumn,
     extract_table_columns_from_items, analyze_row_numeric_content,
 
     # Number parsing
     normalize_currency_and_numbers, parse_number_with_locale_detection, is_date_like,
+    parse_cell_value, is_numeric_string,
 
     # Semantic chunking
-    split_into_chunks, create_units_based_chunks, create_semantic_chunk,
+    split_into_chunks, create_units_based_chunks, split_large_unit, split_large_final_chunk,
+    get_controlled_overlap, create_semantic_chunk, calculate_chunk_coherence_score,
 
     # PDF processing
     process_pdf, process_text_content, create_simple_text_units,
 
     # Camelot integration
-    extract_tables_with_camelot, CAMELOT_AVAILABLE,
+    extract_tables_with_camelot, extract_tables_with_targeted_camelot, camelot_bbox_to_layout_bbox,
+    CAMELOT_AVAILABLE, extract_with_camelot, validate_camelot_table, convert_camelot_output,
+    merge_camelot_results, enhance_table_extraction,
 
     # Display utilities
     display_enhanced_table_structure, display_json_table_data, display_text_table_structure,
 
     # Service configuration
-    ChunkingConfig,
-    # Aliased imports to resolve duplicates
-    BoundingBox as BoundingBox_vs, # from visual_structure_detection
-    build_simple_units_from_lines as build_simple_units_from_lines_cd, # from content_detection
-    LayoutRegion as LayoutRegion_ls, # from layout_structures
-    StructuredUnit as StructuredUnit_ls, # from layout_structures
-    PageLayout as PageLayout_ls, # from layout_structures
-    PageData as PageData_ls, # from layout_structures
-    PDFData as PDFData_ls # from layout_structures
+    ChunkingConfig, get_chunking_stats, analyze_pdf_structure,
 
+    # Layout structures
+    LayoutRegion as LayoutRegion_ls, StructuredUnit as StructuredUnit_ls, 
+    PageLayout as PageLayout_ls, PageData as PageData_ls, PDFData as PDFData_ls,
+    classify_layout_type as classify_layout_type_ls, sort_regions_by_reading_order,
+    create_text_region, create_layout_regions, merge_regions, validate_region_structure,
+    optimize_region_boundaries, calculate_region_confidence
 )
 
 # Try to import camelot if available
@@ -71,16 +83,15 @@ except ImportError:
 
 class ChunkingService:
     """
-    New chunking service that leverages chunkingUtils for all operations.
-    This service provides the same functionality as the original but with 
-    modular, reusable utility functions.
+    Enhanced chunking service that matches temporary.py functionality
+    while leveraging chunkingUtils for all operations.
     """
 
     def __init__(self, chunk_size: int = 800, chunk_overlap: int = 75):
         self.config = ChunkingConfig(chunk_size, chunk_overlap)
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
-        print(f"🚀 ChunkingServiceNew initialized with chunk_size={chunk_size}, chunk_overlap={chunk_overlap}")
+        print(f"🚀 ChunkingService initialized with chunk_size={chunk_size}, chunk_overlap={chunk_overlap}")
 
     def set_chunk_size(self, size: int):
         """Update chunk size"""
@@ -97,9 +108,7 @@ class ChunkingService:
         return self.config.get_config()
 
     async def extract_text_from_pdf(self, file_path: str) -> PDFData:
-        """
-        Enhanced PDF text extraction using chunkingUtils
-        """
+        """Enhanced PDF text extraction with pdfplumber + camelot integration"""
         try:
             if not file_path or not isinstance(file_path, str):
                 raise ValueError('Invalid file path provided')
@@ -112,16 +121,18 @@ class ChunkingService:
             if file_size > max_size:
                 print(f"⚠️ Large PDF file: {file_size / 1024 / 1024:.1f}MB")
 
-            print('📄 Starting enhanced PDF extraction with chunkingUtils...')
+            print('📄 Starting enhanced PDF extraction with camelot integration...')
 
             pages = []
             full_text = ''
+            self.current_file_path = file_path  # Store for camelot access
 
             with pdfplumber.open(file_path) as pdf:
                 total_pages = len(pdf.pages)
                 print(f"📄 PDF loaded: {total_pages} pages")
 
                 for page_num, page in enumerate(pdf.pages, 1):
+                    # Enhanced page extraction using chunkingUtils
                     page_data = await self._extract_page_with_enhanced_layout(page, page_num, file_path)
                     pages.append(page_data)
                     full_text += page_data.text + '\n\n'
@@ -145,11 +156,9 @@ class ChunkingService:
             return await self._fallback_extraction(file_path)
 
     async def _extract_page_with_enhanced_layout(self, page, page_number: int, file_path: str = None) -> PageData:
-        """
-        Enhanced page extraction using chunkingUtils functions
-        """
+        """3-Step enhanced page extraction using chunkingUtils"""
         try:
-            print(f"📄 Page {page_number}: Starting enhanced extraction with chunkingUtils...")
+            print(f"📄 Page {page_number}: Starting 3-step enhanced extraction...")
 
             # Get characters with position information
             chars = page.chars
@@ -181,15 +190,15 @@ class ChunkingService:
 
             print(f"📄 Page {page_number}: Extracted {len(text_items)} text items")
 
-            # Use chunkingUtils for layout analysis
+            # STEP 1: Analyze page layout with enhanced table detection using chunkingUtils
             page_layout = await self._analyze_page_layout_with_camelot(text_items, page, page_number, file_path)
             print(f"📄 Page {page_number}: Layout type: {page_layout.layout_type}, Regions: {len(page_layout.regions)}")
 
-            # Extract content in reading order
+            # STEP 2: Extract content in reading order with JSON table data using chunkingUtils
             structured_units = await self._extract_content_in_reading_order_with_json(page_layout, text_items)
             print(f"📄 Page {page_number}: Extracted {len(structured_units)} units in reading order")
 
-            # Generate text from structured units
+            # Generate text from structured units using chunkingUtils
             page_text = self._generate_page_text_with_json_tables(structured_units)
 
             # Use chunkingUtils for text processing
@@ -215,9 +224,7 @@ class ChunkingService:
             return await self._fallback_page_extraction(page, page_number)
 
     async def _analyze_page_layout_with_camelot(self, text_items: List[TextItem], page, page_number: int, file_path: str = None) -> PageLayout:
-        """
-        Enhanced layout analysis using chunkingUtils with camelot integration
-        """
+        """Enhanced layout analysis with camelot integration using chunkingUtils"""
         if not text_items:
             return PageLayout(
                 regions=[],
@@ -244,7 +251,7 @@ class ChunkingService:
         regions = await self._detect_regions_with_camelot(lines, columns, page_bbox, page, page_number, file_path)
 
         # Use chunkingUtils for layout classification
-        layout_type = classify_layout_type(regions, columns)
+        layout_type = classify_layout_type_ls(regions, columns)
 
         return PageLayout(
             regions=regions,
@@ -253,21 +260,26 @@ class ChunkingService:
             layout_type=layout_type
         )
 
-    async def _detect_regions_with_camelot(self, lines, columns, page_bbox: BoundingBox, page, page_number: int, file_path: str = None) -> List[LayoutRegion]:
-        """
-        Enhanced table detection using chunkingUtils with camelot integration
-        """
+    async def _detect_regions_with_camelot(self, lines: List, columns: List[Column], page_bbox: BoundingBox, page, page_number: int, file_path: str = None) -> List[LayoutRegion]:
+        """Enhanced table detection with sophisticated layout analysis and targeted camelot extraction using chunkingUtils"""
         regions = []
         detected_tables = []
 
-        print(f"📐 Starting enhanced layout analysis for page {page_number} using chunkingUtils")
+        print(f"📐 Starting enhanced layout analysis for page {page_number}")
 
-        # Use chunkingUtils for visual structure detection
-        from utils.chunkingUtils.content_detection import detect_visual_structures
+        # Step 1: Enhanced Visual Structure Detection using chunkingUtils
         visual_structures = detect_visual_structures(page, page_bbox)
         print(f"🔍 Detected {len(visual_structures['bordered_regions'])} bordered regions")
 
-        # Try pdfplumber table detection
+        # Step 2: Advanced Multi-Column Layout Analysis using chunkingUtils  
+        layout_analysis = analyze_multi_column_layout(lines, columns, page_bbox)
+        print(f"📊 Layout analysis: {layout_analysis['layout_type']}, {len(layout_analysis['text_columns'])} text columns")
+
+        # Step 3: Content-Based Table Detection using chunkingUtils
+        table_candidates = detect_table_candidates_by_content(lines, layout_analysis)
+        print(f"🎯 Found {len(table_candidates)} table candidates by content analysis")
+
+        # Step 4: Try pdfplumber table detection with enhanced filtering
         try:
             tables = page.find_tables()
             pdfplumber_tables = []
@@ -280,12 +292,15 @@ class ChunkingService:
                         x_max=table.bbox[2],
                         y_max=table.bbox[3]
                     )
-                    pdfplumber_tables.append({
-                        'bbox': table_bbox,
-                        'table_obj': table,
-                        'source': 'pdfplumber',
-                        'confidence': 0.8
-                    })
+
+                    # Validate this is actually a table using chunkingUtils
+                    if validate_table_vs_multicolumn(table_bbox, layout_analysis, lines):
+                        pdfplumber_tables.append({
+                            'bbox': table_bbox,
+                            'table_obj': table,
+                            'source': 'pdfplumber',
+                            'confidence': 0.8
+                        })
 
             print(f"🔍 pdfplumber detected {len(pdfplumber_tables)} validated table regions")
             detected_tables.extend(pdfplumber_tables)
@@ -293,7 +308,7 @@ class ChunkingService:
         except Exception as e:
             print(f"⚠️ pdfplumber table detection failed: {e}")
 
-        # Enhanced camelot extraction
+        # Step 5: Enhanced camelot extraction using chunkingUtils
         camelot_tables = []
         if file_path and CAMELOT_AVAILABLE:
             try:
@@ -302,7 +317,7 @@ class ChunkingService:
             except Exception as e:
                 print(f"⚠️ Camelot table extraction failed: {e}")
         elif detected_tables:
-            # Convert pdfplumber tables to JSON format
+            # Convert pdfplumber tables to JSON format using chunkingUtils
             print(f"🔄 Converting pdfplumber tables to JSON format...")
             for table_info in detected_tables:
                 if 'table_obj' in table_info:
@@ -319,16 +334,16 @@ class ChunkingService:
                     except Exception as e:
                         print(f"⚠️ Failed to convert pdfplumber table to JSON: {e}")
 
-        # Create final regions
+        # Create final regions using chunkingUtils
         table_bboxes = []
         for table_info in detected_tables:
             table_bbox = table_info['bbox']
             table_bboxes.append(table_bbox)
 
-            # Find lines that belong to this table
+            # Find lines that belong to this table using chunkingUtils
             table_lines = [
                 line for line in lines 
-                if self._line_intersects_bbox(line, table_bbox, overlap_threshold=0.5)
+                if line_intersects_bbox(line, table_bbox, overlap_threshold=0.5)
             ]
 
             # Create table region
@@ -344,7 +359,7 @@ class ChunkingService:
             table_region.has_json_data = False
             table_region.table_json = None
 
-            # Try to extract structured data
+            # Try to extract structured data using chunkingUtils
             if table_info['source'] == 'pdfplumber' and 'table_obj' in table_info:
                 try:
                     table_data = table_info['table_obj'].extract()
@@ -385,7 +400,7 @@ class ChunkingService:
         # Create text regions using chunkingUtils
         text_lines = [
             line for line in lines 
-            if not any(self._line_intersects_bbox(line, table_bbox, 0.3) for table_bbox in table_bboxes)
+            if not any(line_intersects_bbox(line, table_bbox, 0.3) for table_bbox in table_bboxes)
         ]
 
         if text_lines:
@@ -411,34 +426,13 @@ class ChunkingService:
         print(f"📐 Layout analysis complete: {len(regions)} regions ({len([r for r in regions if 'table' in r.region_type])} tables)")
         return regions
 
-    def _line_intersects_bbox(self, line, bbox: BoundingBox, overlap_threshold: float = 0.5) -> bool:
-        """Check if line intersects with bounding box using chunkingUtils"""
-        if not line.bbox:
-            return False
-
-        # Calculate intersection
-        intersection_x = max(0, min(line.bbox.x_max, bbox.x_max) - max(line.bbox.x_min, bbox.x_min))
-        intersection_y = max(0, min(line.bbox.y_max, bbox.y_max) - max(line.bbox.y_min, bbox.y_min))
-
-        if intersection_x <= 0 or intersection_y <= 0:
-            return False
-
-        intersection_area = intersection_x * intersection_y
-        line_area = line.bbox.area
-
-        if line_area == 0:
-            return False
-
-        overlap_ratio = intersection_area / line_area
-        return overlap_ratio >= overlap_threshold
-
     async def _extract_content_in_reading_order_with_json(self, layout: PageLayout, text_items: List[TextItem]) -> List[StructuredUnit]:
-        """Extract content in reading order using chunkingUtils"""
+        """Extract content in reading order with JSON table handling using chunkingUtils"""
         if not layout.regions:
             return []
 
-        # Sort regions by reading order
-        sorted_regions = self._sort_regions_by_reading_order(layout.regions)
+        # Sort regions by reading order using chunkingUtils
+        sorted_regions = sort_regions_by_reading_order(layout.regions)
         structured_units = []
         reading_order = 0
 
@@ -452,19 +446,21 @@ class ChunkingService:
             print(f"\n🔍 Region {region_idx + 1}/{len(sorted_regions)}: {region.region_type}")
 
             if region.region_type == 'table_json':
-                # Handle JSON table regions
-                json_units = await self._extract_json_table_content_enhanced(region, reading_order, recent_headings)
+                # Handle JSON table regions using chunkingUtils
+                json_units = await self._extract_json_table_content_enhanced(region, reading_order, recent_headings, sorted_regions, region_idx)
                 structured_units.extend(json_units)
                 reading_order += len(json_units)
 
             elif region.region_type == 'table':
-                # Handle regular table regions
-                table_units = await self._extract_table_content_with_headings(region, reading_order, recent_headings)
+                # Handle regular table regions using chunkingUtils
+                table_units = await self._extract_table_content_with_enhanced_context(
+                    region, reading_order, recent_headings, sorted_regions, region_idx
+                )
                 structured_units.extend(table_units)
                 reading_order += len(table_units)
 
             elif region.region_type == 'text':
-                # Handle text regions
+                # Handle text regions using chunkingUtils
                 text_units = await self._extract_text_content(region, reading_order)
 
                 # Track headings for table association
@@ -486,23 +482,8 @@ class ChunkingService:
 
         return structured_units
 
-    def _sort_regions_by_reading_order(self, regions: List[LayoutRegion]) -> List[LayoutRegion]:
-        """Sort regions by natural reading order"""
-        def reading_order_key(region):
-            y_center = region.bbox.center_y
-            x_center = region.bbox.center_x
-            y_band = int(y_center / 50) * 50
-            return (y_band, x_center)
-
-        sorted_regions = sorted(regions, key=reading_order_key)
-
-        for i, region in enumerate(sorted_regions):
-            region.reading_order = i
-
-        return sorted_regions
-
     async def _extract_json_table_content_enhanced(self, region: LayoutRegion, start_order: int, recent_headings: List[StructuredUnit], all_regions: List[LayoutRegion] = None, region_idx: int = 0) -> List[StructuredUnit]:
-        """Extract JSON table content with enhanced context"""
+        """Extract JSON table content with enhanced context using chunkingUtils"""
         table_units = []
         current_order = start_order
 
@@ -538,7 +519,7 @@ class ChunkingService:
             table_units.append(heading_unit)
             current_order += 1
 
-        # Create JSON table unit
+        # Create JSON table unit using chunkingUtils
         if hasattr(region, 'table_json') and region.table_json:
             table_summary = create_table_summary_text(region.table_json)
 
@@ -560,8 +541,25 @@ class ChunkingService:
 
         return table_units
 
+    async def _extract_table_content_with_enhanced_context(self, region: LayoutRegion, start_order: int, recent_headings: List[StructuredUnit], all_regions: List[LayoutRegion], region_idx: int) -> List[StructuredUnit]:
+        """Extract table content with enhanced context detection using chunkingUtils"""
+        print(f"📊 Extracting regular table content (region {region_idx + 1})")
+
+        # Use enhanced heading association
+        associated_headings = self._find_associated_headings(region, recent_headings, 150)
+
+        # If no headings found, extract surrounding context
+        if not associated_headings:
+            print(f"   No direct headings found, extracting surrounding context...")
+            surrounding_context = self._extract_surrounding_context(region, all_regions, region_idx, word_limit=50)
+            if surrounding_context:
+                print(f"   ✅ Extracted surrounding context: '{surrounding_context[:100]}...'")
+
+        # Process with existing logic but enhanced headings
+        return await self._extract_table_content_with_headings(region, start_order, associated_headings)
+
     async def _extract_table_content_with_headings(self, region: LayoutRegion, start_order: int, associated_headings: List[StructuredUnit]) -> List[StructuredUnit]:
-        """Extract table content with associated headings"""
+        """Extract table content with associated headings using chunkingUtils"""
         table_units = []
         current_order = start_order
 
@@ -578,8 +576,7 @@ class ChunkingService:
             table_units.append(heading_unit)
             current_order += 1
 
-        # Group items into table rows
-        from collections import defaultdict
+        # Group items into table rows using chunkingUtils
         items_by_y = defaultdict(list)
 
         for item in region.text_items:
@@ -620,7 +617,7 @@ class ChunkingService:
         return table_units
 
     def _find_associated_headings(self, table_region: LayoutRegion, recent_headings: List[StructuredUnit], max_distance: float) -> List[StructuredUnit]:
-        """Find headings associated with this table"""
+        """Find headings associated with this table using chunkingUtils logic"""
         associated_headings = []
 
         for heading in recent_headings:
@@ -725,7 +722,7 @@ class ChunkingService:
         )
 
     def _generate_page_text_with_json_tables(self, structured_units: List[StructuredUnit]) -> str:
-        """Generate page text handling JSON table units"""
+        """Generate page text handling JSON table units using chunkingUtils"""
         text_parts = []
 
         for unit in structured_units:
@@ -753,7 +750,7 @@ class ChunkingService:
                 )
 
             lines = [line.strip() for line in page_text.split('\n') if line.strip()]
-            structured_units = build_simple_units_from_lines_cd(lines) # Use aliased function
+            structured_units = build_simple_units_from_lines(lines)
 
             # Use chunkingUtils for text processing
             clean_text = merge_soft_hyphens(page_text)
@@ -785,11 +782,6 @@ class ChunkingService:
                 columns=1,
                 has_table=False
             )
-
-    def _build_simple_units_from_lines(self, lines: List[str]) -> List[StructuredUnit]:
-        """Build simple units using chunkingUtils"""
-        # Use chunkingUtils build_simple_units_from_lines function
-        return build_simple_units_from_lines_cd(lines) # Use aliased function
 
     async def _fallback_extraction(self, file_path: str) -> PDFData:
         """Fallback extraction using chunkingUtils"""
@@ -849,15 +841,13 @@ class ChunkingService:
         """Split into chunks using chunkingUtils"""
         return split_into_chunks(self, pdf_data, metadata)
 
-    # Analysis and statistics methods
+    # Analysis and statistics methods using chunkingUtils
     def get_chunking_stats(self, chunks: List[Dict]) -> Dict[str, Any]:
         """Get chunking statistics using chunkingUtils"""
-        from ..utils.chunkingUtils.service_config import get_chunking_stats
         return get_chunking_stats(chunks)
 
     def analyze_pdf_structure(self, pdf_data: PDFData) -> Dict[str, Any]:
         """Analyze PDF structure using chunkingUtils"""
-        from ..utils.chunkingUtils.service_config import analyze_pdf_structure
         return analyze_pdf_structure(pdf_data)
 
     # Display methods using chunkingUtils
@@ -873,7 +863,7 @@ class ChunkingService:
         """Display text table structure using chunkingUtils"""
         display_text_table_structure(chunk, chunk_index)
 
-    # Utility methods for backward compatibility
+    # Utility methods using chunkingUtils
     def _normalize_currency_and_numbers(self, text: str) -> NormalizedData:
         """Use chunkingUtils for currency/number normalization"""
         return normalize_currency_and_numbers(text)
@@ -881,58 +871,6 @@ class ChunkingService:
     def _parse_number_with_locale_detection(self, number_str: str) -> Optional[float]:
         """Use chunkingUtils for number parsing"""
         return parse_number_with_locale_detection(number_str)
-
-    def _is_bullet_point(self, line: str) -> bool:
-        """Use chunkingUtils for bullet point detection"""
-        return is_bullet_point(line)
-
-    def _is_header(self, line: str) -> bool:
-        """Use chunkingUtils for header detection"""  
-        return is_header(line)
-
-    def _merge_soft_hyphens(self, text: str) -> str:
-        """Use chunkingUtils for soft hyphen merging"""
-        return merge_soft_hyphens(text)
-
-    def _normalize_text_spacing(self, text: str) -> str:
-        """Use chunkingUtils for text spacing normalization"""
-        return normalize_text_spacing(text)
-
-    def _post_process_extracted_text(self, text: str) -> str:
-        """Use chunkingUtils for text post-processing"""
-        return post_process_extracted_text(text)
-
-    def _fix_character_spacing_line(self, text: str) -> str:
-        """Use chunkingUtils for character spacing fixes"""
-        return fix_character_spacing_line(text)
-
-    def _fix_ocr_artifacts(self, text: str) -> str:
-        """Use chunkingUtils for OCR artifact fixes"""
-        return fix_ocr_artifacts(text)
-
-    def _convert_table_to_json(self, table_data: List[List[str]]) -> Dict[str, Any]:
-        """Use chunkingUtils for table to JSON conversion"""
-        return convert_table_to_json(table_data)
-
-    def _create_table_summary_text(self, table_json: Dict[str, Any]) -> str:
-        """Use chunkingUtils for table summary creation"""
-        return create_table_summary_text(table_json)
-
-    def _extract_table_columns_from_items(self, row_items: List) -> List[Dict]:
-        """Use chunkingUtils for table column extraction"""
-        return extract_table_columns_from_items(row_items)
-
-    def _analyze_row_numeric_content(self, row_text: str) -> Dict:
-        """Use chunkingUtils for numeric content analysis"""
-        return analyze_row_numeric_content(row_text)
-
-    def _validate_stream_table_vs_multicolumn(self, table, layout_analysis: Dict) -> bool:
-        """Use chunkingUtils for table validation"""
-        return validate_stream_table_vs_multicolumn(table, layout_analysis)
-
-    def _create_semantic_chunk(self, chunk_text: str, metadata: Dict, chunk_index: int, page_number: Optional[int], units: List[StructuredUnit]) -> Dict:
-        """Use chunkingUtils for semantic chunk creation"""
-        return create_semantic_chunk(self, chunk_text, metadata, chunk_index, page_number, units)
 
     def _extract_surrounding_context(self, table_region: LayoutRegion, all_regions: List[LayoutRegion], region_idx: int, word_limit: int = 50) -> str:
         """Extract context from regions surrounding the table"""
@@ -977,3 +915,83 @@ class ChunkingService:
                 text_parts.append(item.text.strip())
 
         return ' '.join(text_parts)
+
+    # Additional utility methods for backward compatibility
+    def _create_semantic_chunk(self, chunk_text: str, metadata: Dict, chunk_index: int, page_number: Optional[int], units: List[StructuredUnit]) -> Dict:
+        """Use chunkingUtils for semantic chunk creation"""
+        return create_semantic_chunk(self, chunk_text, metadata, chunk_index, page_number, units)
+
+    def _create_units_based_chunks(self, units: List[StructuredUnit], page_number: Optional[int], metadata: Dict, start_index: int) -> List[Dict]:
+        """Create chunks based on structured units using chunkingUtils"""
+        return create_units_based_chunks(self, units, page_number, metadata, start_index)
+
+    def _split_large_unit(self, unit: StructuredUnit, max_size: int) -> List[str]:
+        """Split large unit using chunkingUtils"""
+        return split_large_unit(unit, max_size)
+
+    def _split_large_final_chunk(self, chunk_text: str, units: List[StructuredUnit], metadata: Dict, start_index: int, page_number: Optional[int], chunks: List[Dict]):
+        """Split large final chunk using chunkingUtils"""
+        return split_large_final_chunk(chunk_text, units, metadata, start_index, page_number, chunks)
+
+    def _get_controlled_overlap(self, chunk_text: str, min_overlap: int = 70, max_overlap: int = 110) -> str:
+        """Get controlled overlap using chunkingUtils"""
+        return get_controlled_overlap(chunk_text, min_overlap, max_overlap)
+
+    def _calculate_chunk_coherence_score(self, semantic_units: List[StructuredUnit], heading_table_associations: List[Dict]) -> float:
+        """Calculate chunk coherence score using chunkingUtils"""
+        return calculate_chunk_coherence_score(semantic_units, heading_table_associations)
+
+    # Configuration methods
+    def set_chunk_size(self, size: int):
+        """Update chunk size configuration"""
+        self.chunk_size = size
+        self.config.set_chunk_size(size)
+        print(f"📏 Chunk size updated to: {size}")
+
+    def set_chunk_overlap(self, overlap: int):
+        """Update chunk overlap configuration"""
+        self.chunk_overlap = overlap
+        self.config.set_chunk_overlap(overlap)
+        print(f"🔄 Chunk overlap updated to: {overlap}")
+
+    def get_config(self) -> Dict:
+        """Get current configuration"""
+        return {
+            'chunk_size': self.chunk_size,
+            'chunk_overlap': self.chunk_overlap,
+            'strategy': 'enhanced_layout_aware_semantic'
+        }
+
+    # Test and analysis methods
+    def test_normalization(self, test_cases: Optional[List[str]] = None) -> List[NormalizedData]:
+        """Test currency/number normalization using chunkingUtils"""
+        default_tests = [
+            '₹1,23,456.78', '$1,234.56', '(1,234.56)', '€ 1.234,56',
+            '€1.234.567,89', 'USD 1,000.00', '12.5%', '₹(50,000)',
+            '$1.2M', '£250k', '€2.5B', '₹1 234.56', 'INR 1,00,000.00'
+        ]
+
+        tests = test_cases if test_cases else default_tests
+        print('🧪 Testing Currency/Number Normalization:')
+        results = []
+
+        for i, test in enumerate(tests):
+            try:
+                result = normalize_currency_and_numbers(test)
+                results.append(result)
+                print(f'Input: "{test}" → Numbers: {len(result.numbers)}, Currencies: [{", ".join(result.currencies)}]')
+            except Exception as error:
+                print(f'❌ Test {i + 1} failed for "{test}": {error}')
+                results.append(NormalizedData(
+                    original_text=test,
+                    normalized_text=test,
+                    currencies=[],
+                    numbers=[],
+                    has_negative=False
+                ))
+
+        return results
+
+    def analyze_numeric_content(self, text: str) -> NormalizedData:
+        """Analyze numeric content using chunkingUtils"""
+        return normalize_currency_and_numbers(text)
