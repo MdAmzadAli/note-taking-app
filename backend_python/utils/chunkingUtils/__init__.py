@@ -233,5 +233,8 @@ __all__ = [
     'ChunkingConfig', 'get_chunking_stats', 'analyze_pdf_structure',
 
     # Display utilities
-    'display_enhanced_table_structure', 'display_json_table_data', 'display_text_table_structure'
+    'display_enhanced_table_structure', 'display_json_table_data', 'display_text_table_structure',
+
+    # Text items
+    'TextItem', 'BoundingBox',
 ]
