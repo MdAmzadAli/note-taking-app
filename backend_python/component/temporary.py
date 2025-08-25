@@ -600,38 +600,53 @@ def chunk_pdf_page_with_hdbscan(
 
     with pdfplumber.open(pdf_path) as pdf:
       out: List[Dict[str, Any]] = []
+      print(f"📖 Processing PDF: {len(pdf.pages)} pages")
+      
       for page_num, page in enumerate(pdf.pages, 1):
+        print(f"\n🔍 Processing page {page_num}/{len(pdf.pages)}")
+        
         words, chars = _extract_words_and_chars(page)
         if not words:
-            return []
+            print(f"⚠️  Page {page_num}: No words extracted")
+            continue
+
+        print(f"📝 Page {page_num}: Extracted {len(words)} words, {len(chars)} chars")
 
         # enrich words with size/bold/italic
         _attach_fontsize_to_words(words, chars)
 
         # global lines (for heading scoring & gaps)
         lines_global = _group_into_lines(words, cfg)
+        print(f"📏 Page {page_num}: Grouped into {len(lines_global)} lines")
 
         # heading scores (line-level → assigned to words)
         hmap = _score_headings(words, lines_global, page.width, cfg)
+        heading_count = sum(1 for score in hmap.values() if score >= cfg.heading_score_threshold)
+        print(f"📋 Page {page_num}: Detected {heading_count} potential headings")
+        
         for i, w in enumerate(words):
             w["_heading_score"] = hmap.get(i, 0.0)
 
         # vertical bands (handle layout transitions along Y)
         bands = _find_vertical_bands(words, cfg)
+        print(f"📐 Page {page_num}: Found {len(bands)} vertical bands")
 
         # build reading order using HDBSCAN per band
         ordered = _build_reading_order(words, bands, cfg)
+        total_columns = sum(len(band_cols) for _, band_cols, _ in ordered)
+        print(f"🗂️  Page {page_num}: HDBSCAN detected {total_columns} columns across {len(bands)} bands")
 
         # global heading trail seed (e.g., page header if any)
         headings_seed: List[str] = []
 
         # pack chunks with overlap + 70-word rolling heading window
         chunks = _pack_chunks_in_reading_order(ordered, cfg, page_num, headings_path=headings_seed)
+        print(f"📦 Page {page_num}: Generated {len(chunks)} semantic chunks")
 
         # materialize to plain dicts
-        
+        page_chunks = []
         for c in chunks:
-            out.append({
+            chunk_dict = {
                 "text": c.text,
                 "tokens_est": c.tokens_est,
                 "page_num": c.page_num,
@@ -641,7 +656,18 @@ def chunk_pdf_page_with_hdbscan(
                 "headings_path": c.headings_path,
                 "heading_window": c.heading_window,
                 "meta": c.meta,
-            })
+            }
+            page_chunks.append(chunk_dict)
+            out.append(chunk_dict)
+        
+        # Log sample chunks for this page
+        print(f"✨ Page {page_num} chunk samples:")
+        for i, chunk in enumerate(page_chunks[:3]):  # Show first 3 chunks
+            preview = chunk["text"][:120] + "..." if len(chunk["text"]) > 120 else chunk["text"]
+            print(f"   Chunk {i+1}: {len(chunk['text'])} chars, Band {chunk['band_id']}, Col {chunk['column_id']}")
+            print(f"   Preview: {preview}")
+      
+      print(f"\n🎯 HDBSCAN Processing Complete: {len(out)} total chunks across {len(pdf.pages)} pages")
       return out
 
 

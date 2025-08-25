@@ -327,8 +327,139 @@ class ChunkingService:
     #         raise error
 
     async def process_pdf(self, file_path: str, metadata: Optional[Dict] = None) -> Dict:
-        chunk_pdf_page_with_hdbscan(file_path)
-        return {}
+        """Process PDF with HDBSCAN-based chunking and detailed logging"""
+        try:
+            print(f"🔬 Processing PDF with HDBSCAN chunking: {file_path}")
+            
+            # Get chunks from HDBSCAN
+            chunks = chunk_pdf_page_with_hdbscan(file_path)
+            
+            if not chunks:
+                print("❌ No chunks generated from HDBSCAN")
+                return {
+                    'pdf_data': {'pages': [], 'total_pages': 0},
+                    'chunks': [],
+                    'summary': {'total_chunks': 0, 'processing_method': 'hdbscan_failed'}
+                }
+            
+            # Process and analyze chunks
+            processed_chunks = []
+            page_groups = {}
+            
+            # Group chunks by page
+            for i, chunk in enumerate(chunks):
+                page_num = chunk.get('page_num', 1)
+                if page_num not in page_groups:
+                    page_groups[page_num] = []
+                
+                # Convert to our standard format
+                processed_chunk = {
+                    'chunk_index': i + 1,
+                    'text': chunk.get('text', ''),
+                    'type': 'semantic_hdbscan',
+                    'page_number': page_num,
+                    'band_id': chunk.get('band_id', -1),
+                    'column_id': chunk.get('column_id', -1),
+                    'bbox': chunk.get('bbox', (0, 0, 0, 0)),
+                    'tokens_est': chunk.get('tokens_est', 0),
+                    'headings_path': chunk.get('headings_path', []),
+                    'heading_window': chunk.get('heading_window', ''),
+                    'metadata': {
+                        **(metadata or {}),
+                        'chunk_method': 'hdbscan_semantic',
+                        'band_id': chunk.get('band_id', -1),
+                        'column_id': chunk.get('column_id', -1),
+                        'original_meta': chunk.get('meta', {})
+                    }
+                }
+                processed_chunks.append(processed_chunk)
+                page_groups[page_num].append(processed_chunk)
+            
+            # Detailed page-by-page analysis
+            self._log_hdbscan_analysis(page_groups, len(chunks))
+            
+            # Create summary
+            total_pages = max(page_groups.keys()) if page_groups else 0
+            pages_info = []
+            for page_num in sorted(page_groups.keys()):
+                page_chunks = page_groups[page_num]
+                pages_info.append({
+                    'page_number': page_num,
+                    'chunk_count': len(page_chunks),
+                    'columns_detected': len(set(c['column_id'] for c in page_chunks)),
+                    'bands_detected': len(set(c['band_id'] for c in page_chunks)),
+                    'has_headings': any(c['headings_path'] for c in page_chunks)
+                })
+            
+            return {
+                'pdf_data': {
+                    'pages': pages_info,
+                    'total_pages': total_pages
+                },
+                'chunks': processed_chunks,
+                'summary': {
+                    'total_pages': total_pages,
+                    'total_chunks': len(processed_chunks),
+                    'average_chunks_per_page': len(processed_chunks) / total_pages if total_pages > 0 else 0,
+                    'processing_method': 'hdbscan_semantic',
+                    'has_multi_column': any(p['columns_detected'] > 1 for p in pages_info),
+                    'has_structured_content': any(p['has_headings'] for p in pages_info)
+                }
+            }
+            
+        except Exception as error:
+            print(f'❌ HDBSCAN PDF processing failed: {error}')
+            import traceback
+            traceback.print_exc()
+            return {
+                'pdf_data': {'pages': [], 'total_pages': 0},
+                'chunks': [],
+                'summary': {'total_chunks': 0, 'processing_method': 'hdbscan_error', 'error': str(error)}
+            }
+
+    def _log_hdbscan_analysis(self, page_groups: Dict[int, List[Dict]], total_chunks: int):
+        """Log detailed HDBSCAN chunking analysis"""
+        print(f"\n" + "="*100)
+        print(f"🔬 HDBSCAN SEMANTIC CHUNKING ANALYSIS")
+        print(f"="*100)
+        print(f"📊 Total chunks generated: {total_chunks}")
+        print(f"📄 Pages processed: {len(page_groups)}")
+        
+        for page_num in sorted(page_groups.keys()):
+            page_chunks = page_groups[page_num]
+            print(f"\n📄 PAGE {page_num} ANALYSIS:")
+            print(f"   Chunks: {len(page_chunks)}")
+            print(f"   Columns detected: {len(set(c['column_id'] for c in page_chunks))}")
+            print(f"   Vertical bands: {len(set(c['band_id'] for c in page_chunks))}")
+            print(f"   Has headings: {any(c['headings_path'] for c in page_chunks)}")
+            
+            # Show up to 7 chunks for this page
+            chunks_to_show = min(7, len(page_chunks))
+            print(f"   📋 Showing {chunks_to_show}/{len(page_chunks)} chunks:")
+            
+            for i in range(chunks_to_show):
+                chunk = page_chunks[i]
+                text_preview = chunk['text'][:150] + ('...' if len(chunk['text']) > 150 else '')
+                
+                print(f"\n   🔸 CHUNK {i+1}:")
+                print(f"      Size: {len(chunk['text'])} chars ({chunk['tokens_est']} tokens)")
+                print(f"      Position: Band {chunk['band_id']}, Column {chunk['column_id']}")
+                print(f"      BBox: {chunk['bbox']}")
+                
+                if chunk['headings_path']:
+                    print(f"      Headings: {' > '.join(chunk['headings_path'])}")
+                
+                if chunk['heading_window']:
+                    hw_preview = chunk['heading_window'][:100] + ('...' if len(chunk['heading_window']) > 100 else '')
+                    print(f"      Context: {hw_preview}")
+                
+                print(f"      Preview: {text_preview}")
+                print(f"      {'-'*50}")
+            
+            if len(page_chunks) > chunks_to_show:
+                print(f"   ... and {len(page_chunks) - chunks_to_show} more chunks")
+        
+        print(f"\n" + "="*100)
 
     
     async def process_text_content(self, text: str, metadata: Optional[Dict] = None) -> Dict:
