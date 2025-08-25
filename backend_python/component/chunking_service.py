@@ -49,7 +49,16 @@ from utils.chunkingUtils import (
     display_enhanced_table_structure, display_json_table_data, display_text_table_structure,
 
     # Service configuration
-    ChunkingConfig
+    ChunkingConfig,
+    # Aliased imports to resolve duplicates
+    BoundingBox as BoundingBox_vs, # from visual_structure_detection
+    build_simple_units_from_lines as build_simple_units_from_lines_cd, # from content_detection
+    LayoutRegion as LayoutRegion_ls, # from layout_structures
+    StructuredUnit as StructuredUnit_ls, # from layout_structures
+    PageLayout as PageLayout_ls, # from layout_structures
+    PageData as PageData_ls, # from layout_structures
+    PDFData as PDFData_ls # from layout_structures
+
 )
 
 # Try to import camelot if available
@@ -744,7 +753,7 @@ class ChunkingService:
                 )
 
             lines = [line.strip() for line in page_text.split('\n') if line.strip()]
-            structured_units = self._build_simple_units_from_lines(lines)
+            structured_units = build_simple_units_from_lines_cd(lines) # Use aliased function
 
             # Use chunkingUtils for text processing
             clean_text = merge_soft_hyphens(page_text)
@@ -779,82 +788,8 @@ class ChunkingService:
 
     def _build_simple_units_from_lines(self, lines: List[str]) -> List[StructuredUnit]:
         """Build simple units using chunkingUtils"""
-        units = []
-        current_paragraph = []
-        paragraph_start_index = None
-
-        for i, line in enumerate(lines):
-            next_line = lines[i + 1] if i + 1 < len(lines) else None
-
-            # Use chunkingUtils for content detection
-            if is_header(line):
-                if current_paragraph:
-                    units.append(StructuredUnit(
-                        type='paragraph',
-                        text=' '.join(current_paragraph),
-                        lines=list(current_paragraph),
-                        start_line=paragraph_start_index,
-                        end_line=i
-                    ))
-                    current_paragraph = []
-                    paragraph_start_index = None
-
-                units.append(StructuredUnit(
-                    type='header',
-                    text=line,
-                    lines=[line],
-                    start_line=i + 1,
-                    end_line=i + 1
-                ))
-
-            elif is_bullet_point(line):
-                if current_paragraph:
-                    units.append(StructuredUnit(
-                        type='paragraph',
-                        text=' '.join(current_paragraph),
-                        lines=list(current_paragraph),
-                        start_line=paragraph_start_index,
-                        end_line=i
-                    ))
-                    current_paragraph = []
-                    paragraph_start_index = None
-
-                units.append(StructuredUnit(
-                    type='bullet',
-                    text=line,
-                    lines=[line],
-                    start_line=i + 1,
-                    end_line=i + 1
-                ))
-
-            else:
-                if not current_paragraph:
-                    paragraph_start_index = i + 1
-                current_paragraph.append(line)
-
-                if not next_line or len(line) == 0:
-                    if current_paragraph:
-                        units.append(StructuredUnit(
-                            type='paragraph',
-                            text=' '.join(current_paragraph),
-                            lines=list(current_paragraph),
-                            start_line=paragraph_start_index,
-                            end_line=len(lines)
-                        ))
-                        current_paragraph = []
-                        paragraph_start_index = None
-
-        # Add final paragraph
-        if current_paragraph:
-            units.append(StructuredUnit(
-                type='paragraph',
-                text=' '.join(current_paragraph),
-                lines=list(current_paragraph),
-                start_line=paragraph_start_index,
-                end_line=len(lines)
-            ))
-
-        return units
+        # Use chunkingUtils build_simple_units_from_lines function
+        return build_simple_units_from_lines_cd(lines) # Use aliased function
 
     async def _fallback_extraction(self, file_path: str) -> PDFData:
         """Fallback extraction using chunkingUtils"""

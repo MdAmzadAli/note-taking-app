@@ -8,11 +8,11 @@ from .text_items import (
 from .page_structures import (
     Line,
     Column,
-    LayoutRegion,
-    StructuredUnit,
-    PageLayout,
-    PageData,
-    PDFData
+    LayoutRegion as PageLayoutRegion,
+    StructuredUnit as PageStructuredUnit,
+    PageLayout as PageLayoutStructure,
+    PageData as PageDataStructure,
+    PDFData as PDFDataStructure
 )
 
 from .content_detection import (
@@ -24,7 +24,7 @@ from .content_detection import (
     validate_table_vs_multicolumn,
     detect_table_candidates_by_content,
     should_end_paragraph,
-    build_simple_units_from_lines
+    build_simple_units_from_lines as build_content_units_from_lines
 )
 
 from .layout_analysis import (
@@ -176,7 +176,7 @@ __all__ = [
     # Content detection
     'is_header', 'is_bullet_point', 'analyze_row_content', 'calculate_text_density',
     'count_table_indicators_in_column', 'validate_table_vs_multicolumn', 'detect_table_candidates_by_content',
-    'should_end_paragraph', 'build_simple_units_from_lines',
+    'should_end_paragraph', 'build_content_units_from_lines', 'build_simple_units_from_lines',
 
     # Layout analysis
     'analyze_multi_column_layout', 'analyze_page_layout', 'detect_regions', 'group_text_lines_into_regions',
@@ -197,7 +197,7 @@ __all__ = [
 
     # Visual structure detection
     'detect_visual_structures', 'detect_grid_structures', 'group_nearby_lines', 'check_line_intersections',
-    'find_peaks', 'bboxes_overlap', 'BoundingBox',
+    'find_peaks', 'bboxes_overlap',
     'detect_borders', 'detect_lines', 'find_rectangular_regions', 'analyze_visual_elements', 'detect_table_grids',
 
     # Line grouping
@@ -208,10 +208,13 @@ __all__ = [
     'detect_columns_enhanced', 'cluster_columns', 'Column',
     'detect_columns', 'analyze_column_structure', 'validate_columns', 'merge_overlapping_columns', 'calculate_column_gaps',
 
-    # Layout structures
+    # Layout structures (primary - from layout_structures)
     'LayoutRegion', 'StructuredUnit', 'PageLayout', 'PageData', 'PDFData',
     'classify_layout_type', 'sort_regions_by_reading_order', 'create_text_region',
     'create_layout_regions', 'merge_regions', 'validate_region_structure', 'optimize_region_boundaries', 'calculate_region_confidence',
+
+    # Page structures (aliases - from page_structures)  
+    'PageLayoutRegion', 'PageStructuredUnit', 'PageLayoutStructure', 'PageDataStructure', 'PDFDataStructure',
 
     # Camelot integration
     'extract_tables_with_camelot', 'extract_tables_with_targeted_camelot', 'camelot_bbox_to_layout_bbox',
@@ -220,7 +223,7 @@ __all__ = [
 
     # PDF extraction
     'extract_text_from_pdf', 'extract_page_with_enhanced_layout', 'fallback_page_extraction',
-    'fallback_extraction', 'build_simple_units_from_lines',
+    'fallback_extraction',
 
     # Semantic chunking
     'split_into_chunks', 'create_units_based_chunks', 'split_large_unit', 'split_large_final_chunk',
