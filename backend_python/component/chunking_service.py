@@ -351,9 +351,9 @@ class ChunkingService:
 
         # Initialize table bboxes list
         table_bboxes = []
-        
+
         # Add camelot table regions
-        for camelot_table in camelot_tables:</old_str>
+        for camelot_table in camelot_tables:
             if camelot_table.get('bbox'):
                 bbox = camelot_table['bbox']
                 overlaps_existing = any(
@@ -472,18 +472,18 @@ class ChunkingService:
         # If no headings found and all_regions provided, extract surrounding context
         if not associated_headings and all_regions and region_idx is not None:
             print(f"   No direct headings found, extracting surrounding context...")
-            surrounding_context = self._extract_surrounding_context(region, all_regions, region_idx, word_limit=50)
-            if surrounding_context:
-                print(f"   ✅ Extracted surrounding context: '{surrounding_context[:100]}...'")
+            context_unit = self._extract_surrounding_context(region, all_regions, region_idx, word_limit=50)
+            if context_unit:
+                print(f"   ✅ Extracted surrounding context: '{context_unit[:100]}...'")
                 # Create a synthetic heading from context
-                context_unit = StructuredUnit(
+                context_unit_obj = StructuredUnit(
                     type='table_context',
-                    text=surrounding_context,
-                    lines=[surrounding_context],
+                    text=context_unit,
+                    lines=[context_unit],
                     bbox=region.bbox,
                     reading_order=current_order
                 )
-                associated_headings = [context_unit]
+                associated_headings = [context_unit_obj]
 
         # Add associated headings first
         for heading in associated_headings:
@@ -908,12 +908,12 @@ class ChunkingService:
             targeted_tables = await extract_tables_with_targeted_camelot(
                 file_path, page_number, table_areas, layout_analysis
             )
-            
+
             for table_data in targeted_tables:
                 if table_data.get('json_data') and table_data.get('bbox'):
                     # Convert to layout bbox using chunkingUtils
                     layout_bbox = camelot_bbox_to_layout_bbox(table_data.get('bbox'))
-                    
+
                     # Validate against layout analysis using chunkingUtils
                     if validate_camelot_table(table_data, layout_analysis):
                         extracted_tables.append({
@@ -924,14 +924,14 @@ class ChunkingService:
                         })
 
             print(f"🎯 Targeted camelot extraction complete: {len(extracted_tables)} tables")
-            
+
         except Exception as e:
             print(f"❌ Targeted camelot extraction failed: {e}")
 
         return extracted_tables
 
     # Helper methods for targeted camelot extraction
-    def _get_targeted_table_areas(self, visual_structures: Dict, table_candidates: List[LayoutRegion], detected_tables: List[Dict]) -> List[Dict]:</old_str>
+    def _get_targeted_table_areas(self, visual_structures: Dict, table_candidates: List[LayoutRegion], detected_tables: List[Dict]) -> List[Dict]:
         """Get targeted table areas from visual structures and candidates"""
         table_areas = []
 
@@ -968,7 +968,7 @@ class ChunkingService:
                     'y2': bbox.y_max,
                     'source': 'pdfplumber_detected'
                 })
-        
+
         # Deduplicate areas based on overlap
         unique_table_areas = []
         for area in table_areas:
@@ -983,7 +983,7 @@ class ChunkingService:
                     break
             if is_unique:
                 unique_table_areas.append(area)
-        
+
         print(f"🎯 Identified {len(unique_table_areas)} unique targeted table areas.")
         return unique_table_areas
 
