@@ -809,6 +809,23 @@ class ChunkingService:
                 total_pages=1
             )
 
+    # PDF extraction utility methods using chunkingUtils
+    def _extract_text_from_pdf_util(self, file_path: str):
+        """Extract text from PDF using chunkingUtils"""
+        return extract_text_from_pdf(file_path)
+
+    def _extract_page_with_enhanced_layout_util(self, page, page_number: int, file_path: str = None):
+        """Extract page with enhanced layout using chunkingUtils"""
+        return extract_page_with_enhanced_layout(page, page_number, file_path)
+
+    def _fallback_page_extraction_util(self, page, page_number: int):
+        """Fallback page extraction using chunkingUtils"""
+        return fallback_page_extraction(page, page_number)
+
+    def _fallback_extraction_util(self, file_path: str):
+        """Fallback extraction using chunkingUtils"""
+        return fallback_extraction(file_path)
+
     # High-level processing methods using chunkingUtils
     async def process_pdf(self, file_path: str, metadata: Optional[Dict] = None) -> Dict:
         """Process PDF using chunkingUtils"""
@@ -822,27 +839,27 @@ class ChunkingService:
         """Split into chunks using chunkingUtils"""
         return split_into_chunks(self, pdf_data, metadata)
 
-    # Analysis and statistics methods using chunkingUtils
-    def get_chunking_stats(self, chunks: List[Dict]) -> Dict[str, Any]:
-        """Get chunking statistics using chunkingUtils"""
-        return get_chunking_stats(chunks)
+    # Analysis and statistics methods using chunkingUtils (delegation)
+    def get_chunking_statistics(self, chunks: List[Dict]) -> Dict[str, Any]:
+        """Get chunking statistics using chunkingUtils (public method)"""
+        return self.get_chunking_stats(chunks)
 
-    def analyze_pdf_structure(self, pdf_data: PDFData) -> Dict[str, Any]:
-        """Analyze PDF structure using chunkingUtils"""
-        return analyze_pdf_structure(pdf_data)
+    def analyze_document_structure(self, pdf_data: PDFData) -> Dict[str, Any]:
+        """Analyze PDF structure using chunkingUtils (public method)"""
+        return self.analyze_pdf_structure(pdf_data)
 
     # Display methods using chunkingUtils
-    def _display_enhanced_table_structure(self, chunk: Dict, chunk_index: int):
+    def display_enhanced_table_structure(self, chunk: Dict, chunk_index: int):
         """Display enhanced table structure using chunkingUtils"""
-        display_enhanced_table_structure(chunk, chunk_index)
+        return display_enhanced_table_structure(chunk, chunk_index)
 
-    def _display_json_table_data(self, table_data: Dict, table_index: int):
+    def display_json_table_data(self, table_data: Dict, table_index: int):
         """Display JSON table data using chunkingUtils"""
-        display_json_table_data(table_data, table_index)
+        return display_json_table_data(table_data, table_index)
 
-    def _display_text_table_structure(self, chunk: Dict, chunk_index: int):
+    def display_text_table_structure(self, chunk: Dict, chunk_index: int):
         """Display text table structure using chunkingUtils"""
-        display_text_table_structure(chunk, chunk_index)
+        return display_text_table_structure(chunk, chunk_index)
 
     # Utility methods using chunkingUtils
     def _normalize_currency_and_numbers(self, text: str) -> NormalizedData:
@@ -977,6 +994,31 @@ class ChunkingService:
         print(f"🎯 Identified {len(areas)} unique targeted table areas.")
         return areas
 
+    # Column detection utility methods using chunkingUtils
+    def _cluster_columns(self, x_starts: List[float], x_ends: List[float], page_bbox: BoundingBox) -> List[Column]:
+        """Cluster columns using chunkingUtils"""
+        return cluster_columns(x_starts, x_ends, page_bbox)
+
+    def _detect_columns(self, lines: List, min_column_width: float = 50) -> List[Column]:
+        """Detect columns using chunkingUtils"""
+        return detect_columns(lines, min_column_width)
+
+    def _analyze_column_structure(self, columns: List[Column]) -> Dict[str, Any]:
+        """Analyze column structure using chunkingUtils"""
+        return analyze_column_structure(columns)
+
+    def _validate_columns(self, columns: List[Column], lines: List) -> List[Column]:
+        """Validate columns using chunkingUtils"""
+        return validate_columns(columns, lines)
+
+    def _merge_overlapping_columns(self, columns: List[Column], overlap_threshold: float = 0.1) -> List[Column]:
+        """Merge overlapping columns using chunkingUtils"""
+        return merge_overlapping_columns(columns, overlap_threshold)
+
+    def _calculate_column_gaps(self, columns: List[Column]) -> List[float]:
+        """Calculate column gaps using chunkingUtils"""
+        return calculate_column_gaps(columns)
+
     # Utility methods for content detection
     def _analyze_row_content(self, row_lines: List) -> Dict:
         """Analyze if a row looks like table content"""
@@ -1068,6 +1110,19 @@ class ChunkingService:
         """Build content units from lines (alias for build_simple_units_from_lines)"""
         return build_simple_units_from_lines(lines)
 
+    # Text processing utility methods using chunkingUtils
+    def _fix_character_spacing_line(self, text: str) -> str:
+        """Fix character spacing issues using chunkingUtils"""
+        return fix_character_spacing_line(text)
+
+    def _fix_ocr_artifacts(self, text: str) -> str:
+        """Fix OCR artifacts using chunkingUtils"""
+        return fix_ocr_artifacts(text)
+
+    def _fix_character_spacing(self, text: str) -> str:
+        """Fix character spacing using chunkingUtils"""
+        return fix_character_spacing(text)
+
     def _detect_layout_regions(self, lines: List, columns: List, page_bbox: BoundingBox) -> List[LayoutRegion]:
         """Detect layout regions using chunkingUtils"""
         return detect_layout_regions(lines, columns, page_bbox)
@@ -1083,6 +1138,31 @@ class ChunkingService:
     def _analyze_spacing_patterns(self, lines: List) -> Dict:
         """Analyze spacing patterns using chunkingUtils"""
         return analyze_spacing_patterns(lines)
+
+    # Layout structure utility methods using chunkingUtils
+    def _create_text_region(self, lines: List, column_index: int) -> LayoutRegion:
+        """Create text region using chunkingUtils"""
+        return create_text_region(lines, column_index)
+
+    def _create_layout_regions(self, lines: List, columns: List, page_bbox: BoundingBox) -> List[LayoutRegion]:
+        """Create layout regions using chunkingUtils"""
+        return create_layout_regions(lines, columns, page_bbox)
+
+    def _merge_regions(self, regions: List[LayoutRegion]) -> List[LayoutRegion]:
+        """Merge regions using chunkingUtils"""
+        return merge_regions(regions)
+
+    def _validate_region_structure(self, region: LayoutRegion) -> bool:
+        """Validate region structure using chunkingUtils"""
+        return validate_region_structure(region)
+
+    def _optimize_region_boundaries(self, regions: List[LayoutRegion]) -> List[LayoutRegion]:
+        """Optimize region boundaries using chunkingUtils"""
+        return optimize_region_boundaries(regions)
+
+    def _calculate_region_confidence(self, region: LayoutRegion) -> float:
+        """Calculate region confidence using chunkingUtils"""
+        return calculate_region_confidence(region)
 
     # Utility methods for number parsing
     def _parse_cell_value(self, value: str):
@@ -1170,6 +1250,44 @@ class ChunkingService:
         """Analyze numeric content using chunkingUtils"""
         return normalize_currency_and_numbers(text)
 
+    def create_simple_text_units(self, text: str) -> List[StructuredUnit]:
+        """Create simple text units using chunkingUtils"""
+        return create_simple_text_units(text)
+
+    # Service configuration utility methods using chunkingUtils
+    def get_chunking_stats(self, chunks: List[Dict]) -> Dict[str, Any]:
+        """Get chunking statistics using chunkingUtils"""
+        return get_chunking_stats(chunks)
+
+    def analyze_pdf_structure(self, pdf_data: PDFData) -> Dict[str, Any]:
+        """Analyze PDF structure using chunkingUtils"""
+        return analyze_pdf_structure(pdf_data)
+
     def _validate_stream_table_vs_multicolumn(self, table, layout_analysis: Dict) -> bool:
         """Validate stream table against multi-column text using chunkingUtils"""
         return validate_stream_table_vs_multicolumn(table, layout_analysis)
+
+    # Semantic chunking utility methods using chunkingUtils
+    def _split_large_unit(self, unit: StructuredUnit, max_size: int) -> List[str]:
+        """Split large unit using chunkingUtils"""
+        return split_large_unit(unit, max_size)
+
+    def _split_large_final_chunk(self, chunk_text: str, units: List[StructuredUnit], 
+                                metadata: Dict, start_index: int, page_number: Optional[int], 
+                                chunks: List[Dict]):
+        """Split large final chunk using chunkingUtils"""
+        return split_large_final_chunk(chunk_text, units, metadata, start_index, page_number, chunks)
+
+    def _get_controlled_overlap(self, chunk_text: str, min_overlap: int = 70, max_overlap: int = 110) -> str:
+        """Get controlled overlap using chunkingUtils"""
+        return get_controlled_overlap(chunk_text, min_overlap, max_overlap)
+
+    def _create_semantic_chunk(self, text: str, metadata: Dict, chunk_index: int, 
+                              page_number: Optional[int], semantic_units: List[StructuredUnit]) -> Dict:
+        """Create semantic chunk using chunkingUtils"""
+        return create_semantic_chunk(text, metadata, chunk_index, page_number, semantic_units)
+
+    def _calculate_chunk_coherence_score(self, semantic_units: List[StructuredUnit], 
+                                       heading_table_associations: List[Dict]) -> float:
+        """Calculate chunk coherence score using chunkingUtils"""
+        return calculate_chunk_coherence_score(semantic_units, heading_table_associations)
