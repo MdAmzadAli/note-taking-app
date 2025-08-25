@@ -1,3 +1,4 @@
+
 import os
 import asyncio
 from typing import Dict, List, Any, Optional, Union, Tuple
@@ -6,13 +7,13 @@ from collections import defaultdict
 
 class ChunkingService:
     """
-    Basic chunking service that respects 800 character limit
+    Page-by-page chunking service that respects 800 character limit
     """
 
     def __init__(self, chunk_size: int = 800, chunk_overlap: int = 75):
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
-        print(f"🚀 Basic ChunkingService initialized with chunk_size={chunk_size}, chunk_overlap={chunk_overlap}")
+        print(f"🚀 Page-by-Page ChunkingService initialized with chunk_size={chunk_size}, chunk_overlap={chunk_overlap}")
 
     def set_chunk_size(self, size: int):
         """Update chunk size"""
@@ -27,11 +28,52 @@ class ChunkingService:
         return {
             'chunk_size': self.chunk_size,
             'chunk_overlap': self.chunk_overlap,
-            'strategy': 'basic_text_chunking'
+            'strategy': 'page_by_page_chunking'
         }
 
+    async def extract_and_chunk_page(self, pdf_page, page_number: int) -> Tuple[str, List[Dict]]:
+        """Extract text from a single page and create chunks"""
+        try:
+            print(f"📄 Processing page {page_number}...")
+            
+            # Extract text from this page
+            page_text = pdf_page.extract_text() or ""
+            
+            # Clean up the text
+            page_text = self._clean_text(page_text)
+            
+            # Create chunks from this page's text
+            page_chunks = []
+            if page_text and page_text.strip():
+                chunk_texts = self._split_text_basic(page_text)
+                
+                for i, chunk_text in enumerate(chunk_texts):
+                    chunk = {
+                        'text': chunk_text.strip(),
+                        'type': 'text',
+                        'page_number': page_number,
+                        'page_chunk_index': i + 1,
+                        'start_char': None,
+                        'end_char': None,
+                        'metadata': {
+                            'chunk_method': 'page_by_page',
+                            'chunk_size': len(chunk_text),
+                            'target_size': self.chunk_size,
+                            'overlap': self.chunk_overlap,
+                            'page_source': page_number
+                        }
+                    }
+                    page_chunks.append(chunk)
+            
+            print(f"📄 Page {page_number}: {len(page_text)} chars → {len(page_chunks)} chunks")
+            return page_text, page_chunks
+            
+        except Exception as error:
+            print(f'❌ Page {page_number} processing failed: {error}')
+            return "", []
+
     async def extract_text_from_pdf(self, file_path: str) -> Dict:
-        """Basic PDF text extraction"""
+        """Page-by-page PDF text extraction"""
         try:
             if not file_path or not isinstance(file_path, str):
                 raise ValueError('Invalid file path provided')
@@ -39,42 +81,55 @@ class ChunkingService:
             if not os.path.exists(file_path):
                 raise FileNotFoundError(f'File not found: {file_path}')
 
-            print('📄 Starting basic PDF extraction...')
+            print('📄 Starting page-by-page PDF extraction...')
 
             pages = []
+            all_chunks = []
             full_text = ''
+            global_chunk_index = 0
 
             with pdfplumber.open(file_path) as pdf:
                 total_pages = len(pdf.pages)
                 print(f"📄 PDF loaded: {total_pages} pages")
 
                 for page_num, page in enumerate(pdf.pages, 1):
-                    # Simple text extraction
-                    page_text = page.extract_text() or ""
-
-                    # Clean up the text
-                    # page_text = self._clean_text(page_text)
-
+                    # Process this page and get its chunks
+                    page_text, page_chunks = await self.extract_and_chunk_page(page, page_num)
+                    
+                    # Update global chunk indices
+                    for chunk in page_chunks:
+                        global_chunk_index += 1
+                        chunk['chunk_index'] = global_chunk_index
+                    
+                    # Store page info
                     pages.append({
                         'page_number': page_num,
                         'text': page_text,
                         'lines': [line.strip() for line in page_text.split('\n') if line.strip()],
                         'columns': 1,
-                        'has_table': False
+                        'has_table': False,
+                        'chunk_count': len(page_chunks)
                     })
 
+                    # Add to full collections
                     full_text += page_text + '\n\n'
+                    all_chunks.extend(page_chunks)
 
-            print(f"📄 Basic extraction completed: {len(pages)} pages processed")
+                    # Log progress every few pages
+                    if page_num % 5 == 0 or page_num == total_pages:
+                        print(f"📄 Progress: {page_num}/{total_pages} pages processed, {len(all_chunks)} total chunks")
+
+            print(f"📄 Page-by-page extraction completed: {len(pages)} pages, {len(all_chunks)} chunks")
 
             return {
                 'full_text': full_text.strip(),
                 'pages': pages,
-                'total_pages': total_pages
+                'total_pages': total_pages,
+                'chunks': all_chunks
             }
 
         except Exception as error:
-            print(f'❌ Basic extraction failed: {error}')
+            print(f'❌ Page-by-page extraction failed: {error}')
             return {
                 'full_text': 'Text extraction failed',
                 'pages': [{
@@ -82,9 +137,11 @@ class ChunkingService:
                     'text': 'Text extraction failed',
                     'lines': ['Text extraction failed'],
                     'columns': 1,
-                    'has_table': False
+                    'has_table': False,
+                    'chunk_count': 0
                 }],
-                'total_pages': 1
+                'total_pages': 1,
+                'chunks': []
             }
 
     def _clean_text(self, text: str) -> str:
@@ -102,53 +159,57 @@ class ChunkingService:
         return text.strip()
 
     def split_into_chunks(self, pdf_data: Dict, metadata: Optional[Dict] = None) -> List[Dict]:
-        """Split text into basic chunks respecting character limit"""
+        """Return pre-created chunks from page-by-page processing"""
         if metadata is None:
             metadata = {}
 
-        chunks = []
-        full_text = pdf_data.get('full_text', '')
+        # Chunks were already created during page-by-page extraction
+        chunks = pdf_data.get('chunks', [])
+        
+        if not chunks:
+            print("⚠️ No pre-created chunks found, falling back to full text chunking")
+            full_text = pdf_data.get('full_text', '')
+            if full_text and full_text.strip():
+                text_chunks = self._split_text_basic(full_text)
+                for i, chunk_text in enumerate(text_chunks):
+                    chunk = {
+                        'chunk_index': i + 1,
+                        'text': chunk_text.strip(),
+                        'type': 'text',
+                        'page_number': None,
+                        'start_char': None,
+                        'end_char': None,
+                        'metadata': {
+                            **metadata,
+                            'chunk_method': 'fallback_text_split',
+                            'chunk_size': len(chunk_text),
+                            'target_size': self.chunk_size,
+                            'overlap': self.chunk_overlap
+                        }
+                    }
+                    chunks.append(chunk)
 
-        if not full_text or not full_text.strip():
-            print("⚠️ No text content to chunk")
-            return chunks
+        # Add any additional metadata
+        for chunk in chunks:
+            if 'metadata' not in chunk:
+                chunk['metadata'] = {}
+            chunk['metadata'].update(metadata)
 
-        print(f"📄 Splitting text into chunks (target size: {self.chunk_size} chars)")
-
-        # Split into basic chunks
-        text_chunks = self._split_text_basic(full_text)
-
-        for i, chunk_text in enumerate(text_chunks):
-            chunk = {
-                'chunk_index': i + 1,
-                'text': chunk_text.strip(),
-                'type': 'text',
-                'page_number': None,  # Basic chunking doesn't track pages
-                'start_char': None,
-                'end_char': None,
-                'metadata': {
-                    **metadata,
-                    'chunk_method': 'basic_text_split',
-                    'chunk_size': len(chunk_text),
-                    'target_size': self.chunk_size,
-                    'overlap': self.chunk_overlap
-                }
-            }
-            chunks.append(chunk)
-
-        # Log the first 3-4 chunks to verify
+        # Log sample chunks to verify
         print(f"\n" + "="*80)
-        print(f"📋 BASIC CHUNK VERIFICATION")
+        print(f"📋 PAGE-BY-PAGE CHUNK VERIFICATION")
         print(f"="*80)
         print(f"Total chunks created: {len(chunks)}")
 
-        max_chunks_to_show = min(10, len(chunks))
+        max_chunks_to_show = min(4, len(chunks))
         for i in range(max_chunks_to_show):
             chunk = chunks[i]
             chunk_text = chunk.get('text', '')
-            chunk_preview = chunk_text
+            page_num = chunk.get('page_number', 'N/A')
+            chunk_preview = chunk_text[:200] + '...' if len(chunk_text) > 200 else chunk_text
 
             print(f"\n📄 CHUNK {i+1}/{len(chunks)}:")
+            print(f"   Page: {page_num}")
             print(f"   Size: {len(chunk_text)} characters")
             print(f"   Type: {chunk.get('type', 'N/A')}")
             print(f"   Preview: {chunk_preview}")
@@ -214,17 +275,17 @@ class ChunkingService:
 
     # High-level processing methods
     async def process_pdf(self, file_path: str, metadata: Optional[Dict] = None) -> Dict:
-        """Process PDF with basic chunking"""
+        """Process PDF with page-by-page chunking"""
         try:
-            print(f"Processing PDF: {file_path}")
+            print(f"Processing PDF page-by-page: {file_path}")
 
-            # Extract text
+            # Extract text and create chunks page by page
             pdf_data = await self.extract_text_from_pdf(file_path)
 
-            # Split into chunks
-            chunks = self.split_into_chunks(pdf_data, metadata)
+            # Chunks are already created in extract_text_from_pdf
+            chunks = pdf_data.get('chunks', [])
 
-            print(f"✅ PDF processing completed: {len(chunks)} chunks created")
+            print(f"✅ PDF page-by-page processing completed: {len(chunks)} chunks created")
 
             return {
                 'pdf_data': pdf_data,
@@ -234,12 +295,13 @@ class ChunkingService:
                     'total_chunks': len(chunks),
                     'full_text_length': len(pdf_data.get('full_text', '')),
                     'has_structured_content': False,
-                    'average_chunk_size': sum(len(chunk['text']) for chunk in chunks) / len(chunks) if chunks else 0
+                    'average_chunk_size': sum(len(chunk['text']) for chunk in chunks) / len(chunks) if chunks else 0,
+                    'processing_method': 'page_by_page'
                 }
             }
 
         except Exception as error:
-            print(f'❌ PDF processing failed: {error}')
+            print(f'❌ PDF page-by-page processing failed: {error}')
             raise error
 
     async def process_text_content(self, text: str, metadata: Optional[Dict] = None) -> Dict:
@@ -288,7 +350,7 @@ class ChunkingService:
 
     # Analysis methods
     def get_chunking_stats(self, chunks: List[Dict]) -> Dict[str, Any]:
-        """Get basic chunking statistics"""
+        """Get page-by-page chunking statistics"""
         if not chunks:
             return {
                 'total_chunks': 0,
@@ -299,6 +361,7 @@ class ChunkingService:
             }
 
         sizes = [len(chunk.get('text', '')) for chunk in chunks]
+        pages = set(chunk.get('page_number') for chunk in chunks if chunk.get('page_number'))
 
         return {
             'total_chunks': len(chunks),
@@ -306,19 +369,24 @@ class ChunkingService:
             'min_size': min(sizes),
             'max_size': max(sizes),
             'total_characters': sum(sizes),
-            'strategy': 'basic_text_chunking'
+            'pages_processed': len(pages),
+            'strategy': 'page_by_page_chunking'
         }
 
     def analyze_pdf_structure(self, pdf_data: Dict) -> Dict[str, Any]:
-        """Basic PDF structure analysis"""
+        """Page-by-page PDF structure analysis"""
         pages = pdf_data.get('pages', [])
         full_text = pdf_data.get('full_text', '')
+        chunks = pdf_data.get('chunks', [])
 
         return {
             'total_pages': len(pages),
             'total_characters': len(full_text),
+            'total_chunks': len(chunks),
             'average_characters_per_page': len(full_text) / len(pages) if pages else 0,
+            'average_chunks_per_page': len(chunks) / len(pages) if pages else 0,
             'has_multi_column': False,  # Basic service doesn't detect columns
             'has_tables': False,        # Basic service doesn't detect tables
-            'extraction_method': 'basic_pdfplumber'
+            'extraction_method': 'page_by_page_pdfplumber',
+            'processing_method': 'page_by_page'
         }
