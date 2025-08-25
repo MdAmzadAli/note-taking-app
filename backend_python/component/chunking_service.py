@@ -1,4 +1,3 @@
-
 import os
 import asyncio
 from typing import Dict, List, Any, Optional, Union
@@ -334,44 +333,21 @@ class ChunkingService:
                     except Exception as e:
                         print(f"⚠️ Failed to convert pdfplumber table to JSON: {e}")
 
-        # Create final regions using chunkingUtils
-        table_bboxes = []
-        for table_info in detected_tables:
-            table_bbox = table_info['bbox']
-            table_bboxes.append(table_bbox)
+        # Enhanced targeted camelot extraction (temporary.py approach)
+        if file_path:
+            try:
+                # Get targeted table areas from visual structures and candidates (temporary.py pattern)
+                table_areas = self._get_targeted_table_areas(visual_structures, table_candidates, detected_tables)
 
-            # Find lines that belong to this table using chunkingUtils
-            table_lines = [
-                line for line in lines 
-                if line_intersects_bbox(line, table_bbox, overlap_threshold=0.5)
-            ]
+                # Extract with camelot using targeted approach (temporary.py flow)
+                targeted_camelot_tables = await self._extract_tables_with_targeted_camelot(
+                    file_path, page_number, table_areas, layout_analysis
+                )
+                camelot_tables.extend(targeted_camelot_tables)
+                print(f"🎯 Targeted camelot extracted {len(targeted_camelot_tables)} additional tables")
 
-            # Create table region
-            table_region = LayoutRegion(
-                bbox=table_bbox,
-                region_type='table',
-                confidence=0.9,
-                text_items=[item for line in table_lines for item in line.items]
-            )
-
-            # Add metadata
-            table_region.table_source = table_info['source']
-            table_region.has_json_data = False
-            table_region.table_json = None
-
-            # Try to extract structured data using chunkingUtils
-            if table_info['source'] == 'pdfplumber' and 'table_obj' in table_info:
-                try:
-                    table_data = table_info['table_obj'].extract()
-                    if table_data:
-                        structured_table = convert_table_to_json(table_data)
-                        table_region.table_json = structured_table
-                        table_region.has_json_data = True
-                        print(f"✅ Extracted {len(table_data)} rows as JSON")
-                except Exception as e:
-                    print(f"⚠️ Failed to extract JSON from table: {e}")
-
-            regions.append(table_region)
+            except Exception as e:
+                print(f"⚠️ Targeted camelot extraction failed: {e}")
 
         # Add camelot table regions
         for camelot_table in camelot_tables:
@@ -915,6 +891,63 @@ class ChunkingService:
                 text_parts.append(item.text.strip())
 
         return ' '.join(text_parts)
+
+    # Helper methods for targeted camelot extraction
+    def _get_targeted_table_areas(self, visual_structures: Dict, table_candidates: List[LayoutRegion], detected_tables: List[Dict]) -> List[Dict]:
+        """Get targeted table areas from visual structures and candidates"""
+        table_areas = []
+
+        # Add areas from visual structures (e.g., bordered regions)
+        for region in visual_structures.get('bordered_regions', []):
+            if region['bbox']:
+                table_areas.append({
+                    'x1': region['bbox'][0],
+                    'y1': region['bbox'][1],
+                    'x2': region['bbox'][2],
+                    'y2': region['bbox'][3],
+                    'source': 'visual_structure'
+                })
+
+        # Add areas from content-based table candidates
+        for candidate in table_candidates:
+            if candidate.bbox:
+                table_areas.append({
+                    'x1': candidate.bbox.x_min,
+                    'y1': candidate.bbox.y_min,
+                    'x2': candidate.bbox.x_max,
+                    'y2': candidate.bbox.y_max,
+                    'source': 'content_candidate'
+                })
+
+        # Add areas from pdfplumber detected tables
+        for table_info in detected_tables:
+            if table_info.get('bbox'):
+                bbox = table_info['bbox']
+                table_areas.append({
+                    'x1': bbox.x_min,
+                    'y1': bbox.y_min,
+                    'x2': bbox.x_max,
+                    'y2': bbox.y_max,
+                    'source': 'pdfplumber_detected'
+                })
+        
+        # Deduplicate areas based on overlap
+        unique_table_areas = []
+        for area in table_areas:
+            is_unique = True
+            for unique_area in unique_table_areas:
+                if bboxes_overlap(
+                    BoundingBox(area['x1'], area['y1'], area['x2'], area['y2']),
+                    BoundingBox(unique_area['x1'], unique_area['y1'], unique_area['x2'], unique_area['y2']),
+                    overlap_threshold=0.5
+                ):
+                    is_unique = False
+                    break
+            if is_unique:
+                unique_table_areas.append(area)
+        
+        print(f"🎯 Identified {len(unique_table_areas)} unique targeted table areas.")
+        return unique_table_areas
 
     # Additional utility methods for backward compatibility
     def _create_semantic_chunk(self, chunk_text: str, metadata: Dict, chunk_index: int, page_number: Optional[int], units: List[StructuredUnit]) -> Dict:
