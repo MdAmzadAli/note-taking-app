@@ -340,7 +340,7 @@ class ChunkingService:
                 table_areas = self._get_targeted_table_areas(visual_structures, table_candidates, detected_tables)
 
                 # Extract with camelot using targeted approach (temporary.py flow)
-                targeted_camelot_tables = await extract_tables_with_targeted_camelot(
+                targeted_camelot_tables = extract_tables_with_targeted_camelot(
                     file_path, page_number, table_areas, layout_analysis
                 )
                 camelot_tables.extend(targeted_camelot_tables)

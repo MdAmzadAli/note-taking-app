@@ -129,25 +129,32 @@ def analyze_row_content(row_lines: List) -> Dict:
         if re.search(r'\b(however|therefore|moreover|furthermore|additionally)\b', text.lower()):
             anti_table_indicators += 2
 
-    # Enhanced multi-column text detection
+    # Enhanced multi-column text detection with stricter validation
     if total_items >= 2:
         # Check for balanced text distribution (suggests multi-column text)
         total_chars = sum(len(line.text) for line in sorted_lines)
-        if total_chars > 100:  # Substantial text
+        if total_chars > 80:  # Substantial text (lowered threshold)
             char_distribution = [len(line.text) for line in sorted_lines]
             max_chars = max(char_distribution)
             min_chars = min(char_distribution)
 
             # If text is somewhat balanced, likely multi-column text
-            if min_chars > 0 and max_chars / min_chars < 3:
+            if min_chars > 0 and max_chars / min_chars < 2.5:  # Stricter balance check
+                anti_table_indicators += 4
+
+        # Enhanced narrative flow detection
+        combined_text = ' '.join(line.text for line in sorted_lines)
+        if len(combined_text.split()) > 12:  # Substantial combined text (lowered threshold)
+            # Look for narrative connectors (expanded list)
+            narrative_words = re.findall(r'\b(and|but|however|therefore|when|while|after|before|that|which|who|because|since|although|though|unless|until|where)\b', combined_text.lower())
+            if len(narrative_words) > len(combined_text.split()) * 0.08:  # 8% narrative words threshold
                 anti_table_indicators += 3
 
-        # Check for narrative flow indicators
-        combined_text = ' '.join(line.text for line in sorted_lines)
-        if len(combined_text.split()) > 15:  # Substantial combined text
-            # Look for narrative connectors
-            if re.search(r'\b(and|but|however|therefore|when|while|after|before)\b', combined_text.lower()):
-                anti_table_indicators += 2
+        # Check for sentence patterns (strong anti-table indicator)
+        sentences = re.split(r'[.!?]+', combined_text)
+        complete_sentences = [s.strip() for s in sentences if len(s.split()) >= 5]
+        if len(complete_sentences) >= 2:
+            anti_table_indicators += 5
 
     # Aligned positioning check (table indicator)
     if len(sorted_lines) >= 3:
@@ -317,13 +324,15 @@ def detect_table_candidates_by_content(lines: List, layout_analysis: Dict) -> Li
             # Analyze row content with enhanced detection
             row_analysis = analyze_row_content(row_group)
 
-            # Apply stricter threshold for multi-column layouts
+            # Apply adaptive thresholds based on layout type and content
             layout_type = layout_analysis.get('layout_type', 'single_column')
 
             if layout_type == 'multi_column_text':
-                confidence_threshold = 0.7  # Higher threshold
+                confidence_threshold = 0.75  # Higher threshold for definite multi-column
+            elif layout_type == 'possibly_multi_column':
+                confidence_threshold = 0.65  # Medium threshold for possible multi-column
             else:
-                confidence_threshold = 0.6  # Standard threshold
+                confidence_threshold = 0.55  # Lower threshold for single column
 
             if row_analysis['is_table_like'] and row_analysis['confidence'] >= confidence_threshold:
                 # Calculate bounding box

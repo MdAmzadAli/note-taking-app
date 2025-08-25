@@ -380,22 +380,34 @@ def analyze_multi_column_layout(lines: List, columns: List, page_bbox: BoundingB
             evidence_details.append("Reading flow suggests columnar layout")
             layout_analysis['multi_column_evidence'].append('reading_flow')
 
-        # Determine layout type based on consolidated evidence
+        # Enhanced layout type determination with adaptive thresholds
         layout_analysis['confidence'] = evidence_score / 100.0
 
-        if evidence_score >= 50:  # High confidence threshold
+        # Adaptive thresholds based on page content
+        total_lines = len(lines)
+        if total_lines > 50:  # Dense pages need higher confidence
+            high_threshold = 60
+            medium_threshold = 35
+        else:  # Sparse pages can use lower thresholds
+            high_threshold = 45
+            medium_threshold = 25
+
+        if evidence_score >= high_threshold:  # High confidence threshold
             if len(x_clusters) >= 2:
                 layout_analysis['layout_type'] = 'multi_column_text'
                 print(f"✅ Multi-column layout detected with {evidence_score}% confidence")
                 print(f"   Evidence: {', '.join(evidence_details)}")
+                print(f"   X-clusters: {len(x_clusters)}, Lines: {total_lines}")
             else:
                 layout_analysis['layout_type'] = 'mixed_content'
-        elif evidence_score >= 25:  # Medium confidence
+        elif evidence_score >= medium_threshold:  # Medium confidence
             layout_analysis['layout_type'] = 'possibly_multi_column'
             print(f"⚠️ Possible multi-column layout with {evidence_score}% confidence")
+            print(f"   Evidence: {', '.join(evidence_details)}")
         else:
             layout_analysis['layout_type'] = 'single_column'
             print(f"📄 Single column layout detected ({evidence_score}% multi-column evidence)")
+            print(f"   Lines: {total_lines}, X-clusters: {len(x_clusters)}")
 
         # Build detailed column information
         if len(columns) > 1 or layout_analysis['layout_type'] in ['multi_column_text', 'mixed_content']:

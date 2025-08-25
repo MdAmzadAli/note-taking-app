@@ -154,7 +154,7 @@ def extract_tables_with_camelot(file_path: str, page_number: int) -> List[Dict[s
 
     return extracted_tables
 
-def extract_tables_with_targeted_camelot(file_path: str, page_number: int, table_areas: List[Tuple], layout_analysis: Dict) -> List[Dict[str, Any]]:
+def extract_tables_with_targeted_camelot(file_path: str, page_number: int, table_areas: List[Dict], layout_analysis: Dict) -> List[Dict[str, Any]]:
     """Enhanced camelot extraction with targeted areas and layout awareness"""
     extracted_tables = []
 
@@ -175,11 +175,17 @@ def extract_tables_with_targeted_camelot(file_path: str, page_number: int, table
 
                 for i, area in enumerate(table_areas):
                     try:
+                        # Convert area dict to string format for camelot
+                        if isinstance(area, dict):
+                            area_str = f"{area['x1']},{area['y1']},{area['x2']},{area['y2']}"
+                        else:
+                            area_str = f"{area[0]},{area[1]},{area[2]},{area[3]}"
+                            
                         lattice_tables = camelot.read_pdf(
                             temp_pdf_path,
                             pages=str(page_number),
                             flavor='lattice',
-                            table_areas=[f"{area[0]},{area[1]},{area[2]},{area[3]}"],
+                            table_areas=[area_str],
                             strip_text='\n'
                         )
 
@@ -194,10 +200,15 @@ def extract_tables_with_targeted_camelot(file_path: str, page_number: int, table
                                 structured_table["table_metadata"]["accuracy"] = table.accuracy
                                 structured_table["table_metadata"]["table_index"] = len(extracted_tables)
 
+                                # Create bbox from area
+                                if isinstance(area, dict):
+                                    area_bbox = BoundingBox(area['x1'], area['y1'], area['x2'], area['y2'])
+                                else:
+                                    area_bbox = BoundingBox(area[0], area[1], area[2], area[3])
+
                                 extracted_tables.append({
                                     "json_data": structured_table,
-                                    "bbox": camelot_bbox_to_layout_bbox(getattr(table, '_bbox', None)) or
-                                           BoundingBox(area[0], area[1], area[2], area[3]),
+                                    "bbox": camelot_bbox_to_layout_bbox(getattr(table, '_bbox', None)) or area_bbox,
                                     "accuracy": table.accuracy,
                                     "source": "camelot_lattice_targeted"
                                 })
