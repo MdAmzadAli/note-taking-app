@@ -4,6 +4,7 @@ import asyncio
 from typing import Dict, List, Any, Optional, Union, Tuple
 import pdfplumber
 from collections import defaultdict
+from component.temporary import chunk_pdf_page_with_hdbscan
 
 class ChunkingService:
     """
@@ -31,6 +32,27 @@ class ChunkingService:
             'strategy': 'page_by_page_chunking'
         }
 
+    def console_log_chunks(self, chunks: List[Dict]):
+        max_chunks_to_show = min(4, len(chunks))
+        for i in range(max_chunks_to_show):
+            chunk = chunks[i]
+            chunk_text = chunk.get('text', '')
+            page_num = chunk.get('page_number', 'N/A')
+            chunk_preview = chunk_text
+
+            print(f"\n📄 CHUNK {i+1}/{len(chunks)}:")
+            print(f"   Page: {page_num}")
+            print(f"   Size: {len(chunk_text)} characters")
+            print(f"   Type: {chunk.get('type', 'N/A')}")
+            print(f"   Preview: {chunk_preview}")
+            print(f"   {'-'*60}")
+
+        if len(chunks) > max_chunks_to_show:
+            print(f"\n... and {len(chunks) - max_chunks_to_show} more chunks")
+
+        print(f"="*80)
+
+    
     async def extract_and_chunk_page(self, pdf_page, page_number: int) -> Tuple[str, List[Dict]]:
         """Extract text from a single page and create chunks"""
         try:
@@ -39,13 +61,12 @@ class ChunkingService:
             # Extract text from this page
             page_text = pdf_page.extract_text() or ""
             
-            # Clean up the text
-            page_text = self._clean_text(page_text)
-            
             # Create chunks from this page's text
             page_chunks = []
             if page_text and page_text.strip():
                 chunk_texts = self._split_text_basic(page_text)
+                
+               
                 
                 for i, chunk_text in enumerate(chunk_texts):
                     chunk = {
@@ -66,6 +87,7 @@ class ChunkingService:
                     page_chunks.append(chunk)
             
             print(f"📄 Page {page_number}: {len(page_text)} chars → {len(page_chunks)} chunks")
+            self.console_log_chunks(page_chunks)
             return page_text, page_chunks
             
         except Exception as error:
@@ -104,7 +126,7 @@ class ChunkingService:
                     # Store page info
                     pages.append({
                         'page_number': page_num,
-                        'text': page_text,
+                        # 'text': page_text,
                         'lines': [line.strip() for line in page_text.split('\n') if line.strip()],
                         'columns': 1,
                         'has_table': False,
@@ -112,7 +134,7 @@ class ChunkingService:
                     })
 
                     # Add to full collections
-                    full_text += page_text + '\n\n'
+                    # full_text += page_text + '\n\n'
                     all_chunks.extend(page_chunks)
 
                     # Log progress every few pages
@@ -122,7 +144,7 @@ class ChunkingService:
             print(f"📄 Page-by-page extraction completed: {len(pages)} pages, {len(all_chunks)} chunks")
 
             return {
-                'full_text': full_text.strip(),
+                # 'full_text': full_text.strip(),
                 'pages': pages,
                 'total_pages': total_pages,
                 'chunks': all_chunks
@@ -206,7 +228,7 @@ class ChunkingService:
             chunk = chunks[i]
             chunk_text = chunk.get('text', '')
             page_num = chunk.get('page_number', 'N/A')
-            chunk_preview = chunk_text[:200] + '...' if len(chunk_text) > 200 else chunk_text
+            chunk_preview = chunk_text
 
             print(f"\n📄 CHUNK {i+1}/{len(chunks)}:")
             print(f"   Page: {page_num}")
@@ -274,36 +296,41 @@ class ChunkingService:
         return chunks
 
     # High-level processing methods
+    # async def process_pdf(self, file_path: str, metadata: Optional[Dict] = None) -> Dict:
+    #     """Process PDF with page-by-page chunking"""
+    #     try:
+    #         print(f"Processing PDF page-by-page: {file_path}")
+
+    #         # Extract text and create chunks page by page
+    #         pdf_data = await self.extract_text_from_pdf(file_path)
+
+    #         # Chunks are already created in extract_text_from_pdf
+    #         chunks = pdf_data.get('chunks', [])
+
+    #         print(f"✅ PDF page-by-page processing completed: {len(chunks)} chunks created")
+
+    #         return {
+    #             'pdf_data': pdf_data,
+    #             'chunks': chunks,
+    #             'summary': {
+    #                 'total_pages': pdf_data.get('total_pages', 0),
+    #                 'total_chunks': len(chunks),
+    #                 'full_text_length': len(pdf_data.get('full_text', '')),
+    #                 'has_structured_content': False,
+    #                 'average_chunk_size': sum(len(chunk['text']) for chunk in chunks) / len(chunks) if chunks else 0,
+    #                 'processing_method': 'page_by_page'
+    #             }
+    #         }
+
+    #     except Exception as error:
+    #         print(f'❌ PDF page-by-page processing failed: {error}')
+    #         raise error
+
     async def process_pdf(self, file_path: str, metadata: Optional[Dict] = None) -> Dict:
-        """Process PDF with page-by-page chunking"""
-        try:
-            print(f"Processing PDF page-by-page: {file_path}")
+        chunk_pdf_page_with_hdbscan(file_path)
+        return {}
 
-            # Extract text and create chunks page by page
-            pdf_data = await self.extract_text_from_pdf(file_path)
-
-            # Chunks are already created in extract_text_from_pdf
-            chunks = pdf_data.get('chunks', [])
-
-            print(f"✅ PDF page-by-page processing completed: {len(chunks)} chunks created")
-
-            return {
-                'pdf_data': pdf_data,
-                'chunks': chunks,
-                'summary': {
-                    'total_pages': pdf_data.get('total_pages', 0),
-                    'total_chunks': len(chunks),
-                    'full_text_length': len(pdf_data.get('full_text', '')),
-                    'has_structured_content': False,
-                    'average_chunk_size': sum(len(chunk['text']) for chunk in chunks) / len(chunks) if chunks else 0,
-                    'processing_method': 'page_by_page'
-                }
-            }
-
-        except Exception as error:
-            print(f'❌ PDF page-by-page processing failed: {error}')
-            raise error
-
+    
     async def process_text_content(self, text: str, metadata: Optional[Dict] = None) -> Dict:
         """Process text content"""
         if metadata is None:
