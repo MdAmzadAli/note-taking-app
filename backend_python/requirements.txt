@@ -21,3 +21,4 @@ regex
 hdbscan
 scikit-learn
 nltk
+matplotlib

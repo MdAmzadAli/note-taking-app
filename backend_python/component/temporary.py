@@ -24,17 +24,18 @@ except Exception:
 @dataclass
 class ChunkingConfig:
     # Chunk sizing
-    target_tokens: int = 350
-    max_tokens: int = 450
-    overlap_tokens: int = 60
-
+    target_tokens: int = 130
+    overlap_tokens: int = 11
+    Is_Noise_Taken=False
+    Max_Heading_Words=10
+    minimum_tokens=50
     # FIXED: More conservative layout detection
     line_height_variance: float = 0.3           # Allow 30% variance in line heights
     min_column_gap: float = 25.0               # Minimum gap to consider column separation
     column_gap_ratio: float = 2.0              # Gap must be 2x median word spacing
 
     # FIXED: Conservative HDBSCAN parameters
-    hdbscan_min_cluster_size: int = 6          # Reduced from 12
+    hdbscan_min_cluster_size: int = 10          # Reduced from 12
     hdbscan_min_samples: int = 3               # Fixed conservative value
     hdbscan_eps: float = 20.0                  # Maximum clustering distance
 
@@ -52,6 +53,9 @@ class ChunkingConfig:
     heading_size_threshold: float = 1.2        # Size must be 1.2x median
     heading_bold_weight: float = 0.5
     heading_score_threshold: float = 0.8
+
+    # Not used in main
+    max_tokens: int = 800
 
 
 @dataclass  
@@ -121,6 +125,7 @@ def _extract_and_enrich_words(page) -> List[Dict[str, Any]]:
             use_text_flow=True,
             extra_attrs=["fontname", "size"]
         )
+        return words
         chars = page.chars
     except Exception as e:
         print(f"Warning: Error extracting words: {e}")
@@ -167,7 +172,7 @@ def _extract_and_enrich_words(page) -> List[Dict[str, Any]]:
         enriched_word = {
             "text": w["text"].strip(),
             "x0": w["x0"], "top": w["top"], "x1": w["x1"], "bottom": w["bottom"],
-            "size_est": font_size,
+            "size": w["size"],
             "fontname": font_name,
             "is_bold": is_bold,
             "is_italic": is_italic
@@ -186,70 +191,89 @@ def _reconstruct_lines_precisely(words: List[Dict[str, Any]], cfg: ChunkingConfi
     sorted_words = sorted(words, key=lambda w: (w["top"], w["x0"]))
 
     # Group into lines based on y-position with font-size aware tolerance
-    lines = []
-    current_line = []
-
+    lines=[]
+    bottom_min=0
+    current_line=[]
     for word in sorted_words:
         if not current_line:
-            current_line = [word]
+            current_line=[word]
+            bottom_min=word["bottom"]
             continue
-
-        # Calculate line tolerance based on font sizes
-        prev_word = current_line[-1]
-        avg_size = (word["size_est"] + prev_word["size_est"]) / 2
-        tolerance = avg_size * cfg.line_height_variance
-
-        y_diff = abs(word["top"] - statistics.mean([w["top"] for w in current_line]))
-
-        if y_diff <= tolerance:
-            current_line.append(word)
-        else:
-            if current_line:
-                lines.append(sorted(current_line, key=lambda w: w["x0"]))
-            current_line = [word]
-
-    if current_line:
-        lines.append(sorted(current_line, key=lambda w: w["x0"]))
-
-    # FIXED: Reconstruct text with proper spacing
-    processed_lines = []
-    for line in lines:
-        if not line:
+        if word["top"]>bottom_min:
+            lines.append(current_line)
+            current_line=[word]
+            bottom_min=word["bottom"]
             continue
+        current_line.append(word)
+        bottom_min=max(bottom_min,word["bottom"])
 
-        # Calculate average character width for this line
-        char_widths = []
-        for w in line:
-            width = max(w["x1"] - w["x0"], 1.0)
-            char_count = max(len(w["text"]), 1)
-            char_widths.append(width / char_count)
+    lines.append(current_line)
+        
+    return lines
+    # lines = []
+    # current_line = []
 
-        avg_char_width = statistics.mean(char_widths) if char_widths else 5.0
+    # for word in sorted_words:
+    #     if not current_line:
+    #         current_line = [word]
+    #         continue
 
-        # Reconstruct line text with proper spacing
-        text_parts = []
-        for i, word in enumerate(line):
-            if i == 0:
-                text_parts.append(word["text"])
-            else:
-                prev_word = line[i-1]
-                gap = word["x0"] - prev_word["x1"]
+    #     # Calculate line tolerance based on font sizes
+    #     prev_word = current_line[-1]
+    #     avg_size = (word["size"] + prev_word["size"]) / 2
+    #     tolerance = avg_size * cfg.line_height_variance
 
-                # Insert space based on gap size relative to character width
-                if gap >= cfg.space_multiplier * avg_char_width:
-                    text_parts.append(" ")
+    #     y_diff = abs(word["top"] - statistics.mean([w["top"] for w in current_line]))
 
-                text_parts.append(word["text"])
+    #     if y_diff <= tolerance:
+    #         current_line.append(word)
+    #     else:
+    #         if current_line:
+    #             lines.append(sorted(current_line, key=lambda w: w["x0"]))
+    #         current_line = [word]
 
-        line_text = "".join(text_parts).strip()
+    # if current_line:
+    #     lines.append(sorted(current_line, key=lambda w: w["x0"]))
 
-        # Store reconstructed text in line
-        for word in line:
-            word["line_text"] = line_text
+    # # FIXED: Reconstruct text with proper spacing
+    # processed_lines = []
+    # for line in lines:
+    #     if not line:
+    #         continue
 
-        processed_lines.append(line)
+    #     # Calculate average character width for this line
+    #     char_widths = []
+    #     for w in line:
+    #         width = max(w["x1"] - w["x0"], 1.0)
+    #         char_count = max(len(w["text"]), 1)
+    #         char_widths.append(width / char_count)
 
-    return processed_lines
+    #     avg_char_width = statistics.mean(char_widths) if char_widths else 5.0
+
+    #     # Reconstruct line text with proper spacing
+    #     text_parts = []
+    #     for i, word in enumerate(line):
+    #         if i == 0:
+    #             text_parts.append(word["text"])
+    #         else:
+    #             prev_word = line[i-1]
+    #             gap = word["x0"] - prev_word["x1"]
+
+    #             # Insert space based on gap size relative to character width
+    #             if gap >= cfg.space_multiplier * avg_char_width:
+    #                 text_parts.append(" ")
+
+    #             text_parts.append(word["text"])
+
+    #     line_text = "".join(text_parts).strip()
+
+    #     # Store reconstructed text in line
+    #     for word in line:
+    #         word["line_text"] = line_text
+
+    #     processed_lines.append(line)
+
+    # return processed_lines
 
 
 def _detect_layout_structure(lines: List[List[Dict[str, Any]]], page_width: float, cfg: ChunkingConfig) -> List[Dict[str, Any]]:
@@ -629,9 +653,17 @@ def chunk_pdf_page_with_hdbscan(pdf_path: str, config: Optional[ChunkingConfig] 
 
             for page_num, page in enumerate(pdf.pages, 1):
                 print(f"\nProcessing page {page_num}/{len(pdf.pages)}")
+               
 
                 # Step 1: Extract and enrich words with accurate font info
                 words = _extract_and_enrich_words(page)
+                # avg=0
+                # for w in words:
+                #     avg+=w["size"]
+                # avg/=len(words)
+                # for w in words:
+                #   print(f"word: {w} Avg: {avg}\n")
+                # return all_chunks 
                 if not words:
                     print(f"  No words found on page {page_num}")
                     continue
@@ -641,62 +673,142 @@ def chunk_pdf_page_with_hdbscan(pdf_path: str, config: Optional[ChunkingConfig] 
                 # Step 2: Reconstruct lines with proper spacing
                 lines = _reconstruct_lines_precisely(words, cfg)
                 print(f"  Formed {len(lines)} lines")
+                analyze_page_with_2d_hdbscan(lines,page,page_num)
+                return all_chunks
+            #     # Step 3: Create layout elements maintaining reading order
+            #     elements = _detect_layout_structure(lines, page.width, cfg)
+            #     if not elements:
+            #         print(f"  No valid elements on page {page_num}")
+            #         continue
 
-                # Step 3: Create layout elements maintaining reading order
-                elements = _detect_layout_structure(lines, page.width, cfg)
-                if not elements:
-                    print(f"  No valid elements on page {page_num}")
-                    continue
+            #     headings = [e for e in elements if e["type"] == "heading"]
+            #     print(f"  Found {len(elements)} elements ({len(headings)} headings)")
 
-                headings = [e for e in elements if e["type"] == "heading"]
-                print(f"  Found {len(elements)} elements ({len(headings)} headings)")
+            #     # Step 4: Detect columns conservatively (only if beneficial)
+            #     columns = _detect_columns_conservatively(elements, cfg, page_num, page.width, page.height)
+            #     print(f"  Detected {len(columns)} columns")
 
-                # Step 4: Detect columns conservatively (only if beneficial)
-                columns = _detect_columns_conservatively(elements, cfg, page_num, page.width, page.height)
-                print(f"  Detected {len(columns)} columns")
+            #     # Step 5: Process each column maintaining reading order
+            #     page_chunks = []
+            #     for col_idx, column_elements in enumerate(columns):
+            #         if not column_elements:
+            #             continue
 
-                # Step 5: Process each column maintaining reading order
-                page_chunks = []
-                for col_idx, column_elements in enumerate(columns):
-                    if not column_elements:
-                        continue
+            #         chunks = _create_chunks_with_overlap(column_elements, page_num, cfg)
+            #         page_chunks.extend(chunks)
+            #         print(f"    Column {col_idx + 1}: {len(chunks)} chunks")
 
-                    chunks = _create_chunks_with_overlap(column_elements, page_num, cfg)
-                    page_chunks.extend(chunks)
-                    print(f"    Column {col_idx + 1}: {len(chunks)} chunks")
+            #     # Convert to dict format
+            #     for chunk in page_chunks:
+            #         chunk_dict = {
+            #             "text": chunk.text,
+            #             "tokens_est": chunk.tokens_est,
+            #             "page_num": chunk.page_num,
+            #             "bbox": chunk.bbox,
+            #             "headings": chunk.headings,
+            #             "meta": chunk.meta
+            #         }
+            #         all_chunks.append(chunk_dict)
 
-                # Convert to dict format
-                for chunk in page_chunks:
-                    chunk_dict = {
-                        "text": chunk.text,
-                        "tokens_est": chunk.tokens_est,
-                        "page_num": chunk.page_num,
-                        "bbox": chunk.bbox,
-                        "headings": chunk.headings,
-                        "meta": chunk.meta
-                    }
-                    all_chunks.append(chunk_dict)
+            #     print(f"  Total page chunks: {len(page_chunks)}")
 
-                print(f"  Total page chunks: {len(page_chunks)}")
+            #     # Quality check: ensure we're not losing text
+            #     total_chars = sum(len(chunk.text) for chunk in page_chunks)
+            #     original_chars = sum(len(word["text"]) for word in words)
+            #     coverage = total_chars / max(original_chars, 1) * 100
+            #     print(f"  Text coverage: {coverage:.1f}%")
 
-                # Quality check: ensure we're not losing text
-                total_chars = sum(len(chunk.text) for chunk in page_chunks)
-                original_chars = sum(len(word["text"]) for word in words)
-                coverage = total_chars / max(original_chars, 1) * 100
-                print(f"  Text coverage: {coverage:.1f}%")
+            #     if coverage < 70:
+            #         print(f"  WARNING: Low text coverage on page {page_num}")
 
-                if coverage < 70:
-                    print(f"  WARNING: Low text coverage on page {page_num}")
-
-            print(f"\nCompleted processing: {len(all_chunks)} total chunks")
-            return all_chunks
+            # print(f"\nCompleted processing: {len(all_chunks)} total chunks")
+            # return all_chunks
 
     except Exception as e:
         print(f"Error processing PDF: {e}")
         return []
-
-
-def analyze_page_with_2d_hdbscan(page, page_num: int = 1) -> Dict[str, Any]:
+# def get_heading_from_deque(heading):
+def create_sequence_from_words(words, labels):
+    labels_dict={}
+    reading_order_words=[[]]
+    last_word_index=0
+    avg_size=0
+    total_word=0
+    for i in range(len(words)):
+        if labels[i] == -1:
+            if config.Is_Noise_Taken:
+                reading_order_words[last_word_index].append(words[i])
+            continue
+        elif labels[i] not in labels_dict:
+            labels_dict[labels[i]]=len(reading_order_words)
+            reading_order_words.append([words[i]])
+        else:
+            reading_order_words[labels_dict[labels[i]]].append(words[i])
+        last_word_index=labels_dict[labels[i]]
+        avg_size+=words[i]["size"]
+        total_word+=1
+    avg_size/=total_word
+    return reading_order_words,avg_size
+            
+def create_single_chunkObject(chunk,page_num,heading):
+    chunk_text=" ".join([word["text"] for word in chunk])
+    return {
+            "text": chunk_text,
+            "Total_chars": len(chunk_text),
+            "page_num": page_num,
+            "headings": list(heading),
+    }
+def create_chunks(words2d,avg,page_num):
+    heading=deque()
+    chunks=[] 
+    current_chunk=[]
+    
+    prev_word={}
+    for words in words2d:
+        for word in words:
+         chunk_length=len(current_chunk)   
+            
+         if word["size"]>avg:
+            if chunk_length<=config.minimum_tokens:
+                if chunks:
+                    current_chunk_text=" ".join([word["text"] for word in current_chunk])
+                    chunks[-1]["text"]+= " " + current_chunk_text
+                    current_chunk=[word]
+                else:
+                    current_chunk.append(word)
+            else:
+                chunks.append(create_single_chunkObject(current_chunk,page_num,heading))
+                current_chunk=[word]
+                    
+            heading.append(word["text"])
+            if len(heading)>config.Max_Heading_Words:
+                heading.popleft()
+            continue
+         if chunk_length >= config.target_tokens:
+                 chunks.append(create_single_chunkObject(current_chunk,page_num,heading))
+                 current_chunk=current_chunk[-config.overlap_tokens:]
+                 current_chunk.append(word)
+                 continue
+         # if "bottom" in prev_word and prev_word["bottom"] < word["top"]:  
+         #    if chunk_length>=config.minimum_tokens:
+         #        chunks.append(create_single_chunkObject(current_chunk,page_num,heading))
+         #        current_chunk=current_chunk[-config.overlap_tokens:]
+         #        current_chunk.append(word)
+         #        continue
+         current_chunk.append(word)
+         prev_word=word
+            
+    if current_chunk:
+     if len(current_chunk)>=config.minimum_tokens:
+        chunks.append(create_single_chunkObject(current_chunk,page_num,heading))
+     else:
+        current_chunk_text=" ".join([word["text"] for word in current_chunk])
+        chunks[-1]["text"]+= " " + current_chunk_text
+             
+    return chunks
+        
+    
+def analyze_page_with_2d_hdbscan(lines, page, page_num: int = 1) -> Dict[str, Any]:
     """
     Analyze a single page with 2D HDBSCAN clustering (X and Y coordinates)
     Directly clusters extracted words without intermediate processing
@@ -704,15 +816,8 @@ def analyze_page_with_2d_hdbscan(page, page_num: int = 1) -> Dict[str, Any]:
     try:
         print(f"\n🔍 Analyzing page {page_num} with 2D HDBSCAN (Direct Word Clustering)...")
         
-        # Step 1: Extract and enrich words directly
-        words = _extract_and_enrich_words(page)
-        if not words:
-            print(f"  ❌ No words found on page {page_num}")
-            return {"error": "No words found"}
-        
-        print(f"  📝 Extracted {len(words)} words")
-        
         # Step 2: Prepare 2D coordinates for HDBSCAN directly from words
+        words = [word for line in lines for word in line]
         coordinates_2d = np.array([[word["x0"], word["top"]] for word in words])
         
         print(f"  📊 Prepared 2D coordinates: {coordinates_2d.shape}")
@@ -725,12 +830,20 @@ def analyze_page_with_2d_hdbscan(page, page_num: int = 1) -> Dict[str, Any]:
         )
         
         labels = clusterer.fit_predict(coordinates_2d)
-        
+        print(f"  🌟 HDBSCAN clustering complete Labels : {labels}")
+        reading_order_words,avg_size=create_sequence_from_words(words,labels)
+        # for sentences_words in reading_order_words:
+        #    text=" ".join([word["text"] for word in sentences_words])
+        #    print(f"Sentence: {text}")
+        chunks=create_chunks(reading_order_words,avg_size,page_num)
+        print(f"  🌟 Chunks created:{len(chunks)}")
+        for ch in chunks:
+            print(f"Chunk: {ch}")
         # Step 4: Plot the 2D clusters with words
         _plot_2d_word_clusters(words, labels, coordinates_2d, page_num, page.width, page.height)
         
         # Step 5: Generate detailed summary for words
-        summary = _generate_word_hdbscan_summary(words, labels, coordinates_2d, clusterer)
+        # summary = _generate_word_hdbscan_summary(words, labels, coordinates_2d, clusterer)
         
         print(f"  ✅ Analysis complete for page {page_num}")
         
