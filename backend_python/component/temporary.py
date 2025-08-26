@@ -696,6 +696,323 @@ def chunk_pdf_page_with_hdbscan(pdf_path: str, config: Optional[ChunkingConfig] 
         return []
 
 
+def analyze_page_with_2d_hdbscan(page, page_num: int = 1) -> Dict[str, Any]:
+    """
+    Analyze a single page with 2D HDBSCAN clustering (X and Y coordinates)
+    Plots the clusters and provides detailed summary
+    """
+    try:
+        print(f"\n🔍 Analyzing page {page_num} with 2D HDBSCAN...")
+        
+        # Step 1: Extract and enrich words
+        words = _extract_and_enrich_words(page)
+        if not words:
+            print(f"  ❌ No words found on page {page_num}")
+            return {"error": "No words found"}
+        
+        print(f"  📝 Extracted {len(words)} words")
+        
+        # Step 2: Reconstruct lines
+        lines = _reconstruct_lines_precisely(words, config)
+        if not lines:
+            print(f"  ❌ No lines formed on page {page_num}")
+            return {"error": "No lines formed"}
+        
+        print(f"  📄 Formed {len(lines)} lines")
+        
+        # Step 3: Create layout elements
+        elements = _detect_layout_structure(lines, page.width, config)
+        if not elements:
+            print(f"  ❌ No layout elements on page {page_num}")
+            return {"error": "No layout elements"}
+        
+        print(f"  🏗️ Created {len(elements)} layout elements")
+        
+        # Step 4: Prepare 2D coordinates for HDBSCAN
+        coordinates_2d = np.array([[elem["bbox"][0], elem["bbox"][1]] for elem in elements])
+        
+        print(f"  📊 Prepared 2D coordinates: {coordinates_2d.shape}")
+        
+        # Step 5: Apply HDBSCAN without cluster_selection_epsilon
+        clusterer = hdbscan.HDBSCAN(
+            min_cluster_size=config.hdbscan_min_cluster_size,
+            min_samples=config.hdbscan_min_samples
+            # Note: cluster_selection_epsilon parameter removed as requested
+        )
+        
+        labels = clusterer.fit_predict(coordinates_2d)
+        
+        # Step 6: Plot the 2D clusters
+        _plot_2d_hdbscan_clusters(elements, labels, coordinates_2d, page_num, page.width, page.height)
+        
+        # Step 7: Generate detailed summary
+        summary = _generate_hdbscan_summary(elements, labels, coordinates_2d, clusterer)
+        
+        print(f"  ✅ Analysis complete for page {page_num}")
+        
+        return {
+            "page_num": page_num,
+            "total_elements": len(elements),
+            "coordinates_shape": coordinates_2d.shape,
+            "cluster_labels": labels.tolist(),
+            "unique_clusters": len(set(labels)),
+            "noise_points": np.sum(labels == -1),
+            "clusterer_params": {
+                "min_cluster_size": config.hdbscan_min_cluster_size,
+                "min_samples": config.hdbscan_min_samples
+            },
+            "summary": summary,
+            "elements_sample": [
+                {
+                    "text": elem["text"][:100] + "..." if len(elem["text"]) > 100 else elem["text"],
+                    "bbox": elem["bbox"],
+                    "cluster": int(labels[i]) if i < len(labels) else -1
+                }
+                for i, elem in enumerate(elements[:5])  # First 5 elements
+            ]
+        }
+        
+    except Exception as e:
+        print(f"  ❌ Error analyzing page {page_num}: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e)}
+
+
+def _plot_2d_hdbscan_clusters(elements: List[Dict[str, Any]], labels: np.ndarray, coordinates_2d: np.ndarray, page_num: int, page_width: float, page_height: float):
+    """Plot 2D HDBSCAN clusters showing both X and Y coordinates"""
+    try:
+        # Create figure with subplots
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(20, 16))
+        
+        # Extract coordinates
+        x_positions = coordinates_2d[:, 0]
+        y_positions = coordinates_2d[:, 1]
+        y_positions_flipped = page_height - coordinates_2d[:, 1]  # Flip for visualization
+        
+        # Get unique labels and colors
+        unique_labels = set(labels)
+        n_clusters = len(unique_labels) - (1 if -1 in unique_labels else 0)
+        colors = plt.cm.Set1(np.linspace(0, 1, max(n_clusters, 1)))
+        color_map = {}
+        color_idx = 0
+        
+        for label in unique_labels:
+            if label == -1:
+                color_map[label] = 'black'
+            else:
+                color_map[label] = colors[color_idx % len(colors)]
+                color_idx += 1
+        
+        # Plot 1: X-coordinates distribution
+        ax1.set_title(f'Page {page_num}: X-Coordinates Distribution by Cluster')
+        ax1.set_xlabel('X Position')
+        ax1.set_ylabel('Count')
+        
+        for label in unique_labels:
+            mask = labels == label
+            cluster_x = x_positions[mask]
+            
+            if label == -1:
+                label_name = f'Noise ({len(cluster_x)})'
+                alpha = 0.6
+            else:
+                label_name = f'Cluster {label} ({len(cluster_x)})'
+                alpha = 0.8
+            
+            ax1.hist(cluster_x, bins=20, alpha=alpha, color=color_map[label], 
+                    label=label_name, edgecolor='black', linewidth=0.5)
+        
+        ax1.set_xlim(0, page_width)
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+        
+        # Plot 2: Y-coordinates distribution
+        ax2.set_title(f'Page {page_num}: Y-Coordinates Distribution by Cluster')
+        ax2.set_xlabel('Y Position')
+        ax2.set_ylabel('Count')
+        
+        for label in unique_labels:
+            mask = labels == label
+            cluster_y = y_positions[mask]
+            
+            if label == -1:
+                label_name = f'Noise ({len(cluster_y)})'
+                alpha = 0.6
+            else:
+                label_name = f'Cluster {label} ({len(cluster_y)})'
+                alpha = 0.8
+            
+            ax2.hist(cluster_y, bins=20, alpha=alpha, color=color_map[label], 
+                    label=label_name, edgecolor='black', linewidth=0.5)
+        
+        ax2.set_xlim(0, page_height)
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+        
+        # Plot 3: 2D Scatter Plot (Page Layout View)
+        ax3.set_title(f'Page {page_num}: 2D Layout with Clusters')
+        ax3.set_xlabel('X Position')
+        ax3.set_ylabel('Y Position (flipped for readability)')
+        
+        for label in unique_labels:
+            mask = labels == label
+            cluster_x = x_positions[mask]
+            cluster_y = y_positions_flipped[mask]
+            
+            if label == -1:
+                marker = 'x'
+                size = 30
+                alpha = 0.6
+                label_name = f'Noise ({len(cluster_x)})'
+            else:
+                marker = 'o'
+                size = 60
+                alpha = 0.8
+                label_name = f'Cluster {label} ({len(cluster_x)})'
+            
+            ax3.scatter(cluster_x, cluster_y, c=[color_map[label]], marker=marker, 
+                       s=size, alpha=alpha, label=label_name, edgecolors='black', linewidth=0.5)
+        
+        ax3.set_xlim(0, page_width)
+        ax3.set_ylim(0, page_height)
+        ax3.legend()
+        ax3.grid(True, alpha=0.3)
+        
+        # Plot 4: Cluster Statistics
+        ax4.axis('off')
+        ax4.set_title(f'Page {page_num}: Cluster Statistics', pad=20)
+        
+        # Create statistics text
+        stats_text = []
+        stats_text.append(f"Total Elements: {len(elements)}")
+        stats_text.append(f"Total Clusters: {n_clusters}")
+        stats_text.append(f"Noise Points: {np.sum(labels == -1)}")
+        stats_text.append("")
+        
+        for label in sorted(unique_labels):
+            mask = labels == label
+            count = np.sum(mask)
+            cluster_x = x_positions[mask]
+            cluster_y = y_positions[mask]
+            
+            if label == -1:
+                stats_text.append(f"Noise:")
+            else:
+                stats_text.append(f"Cluster {label}:")
+            
+            stats_text.append(f"  • Elements: {count}")
+            if len(cluster_x) > 0:
+                stats_text.append(f"  • X Range: {min(cluster_x):.1f} - {max(cluster_x):.1f}")
+                stats_text.append(f"  • Y Range: {min(cluster_y):.1f} - {max(cluster_y):.1f}")
+                stats_text.append(f"  • X Center: {np.mean(cluster_x):.1f}")
+                stats_text.append(f"  • Y Center: {np.mean(cluster_y):.1f}")
+            stats_text.append("")
+        
+        # Display statistics
+        ax4.text(0.1, 0.9, '\n'.join(stats_text), transform=ax4.transAxes, 
+                fontsize=10, verticalalignment='top', fontfamily='monospace',
+                bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.8))
+        
+        # Save plot
+        plot_filename = f"2d_hdbscan_analysis_page_{page_num}.png"
+        plt.tight_layout()
+        plt.savefig(plot_filename, dpi=150, bbox_inches='tight')
+        print(f"  📊 2D cluster analysis plot saved: {plot_filename}")
+        
+        plt.close()  # Close to free memory
+        
+    except Exception as e:
+        print(f"  ⚠️ Error plotting 2D clusters: {e}")
+
+
+def _generate_hdbscan_summary(elements: List[Dict[str, Any]], labels: np.ndarray, coordinates_2d: np.ndarray, clusterer) -> Dict[str, Any]:
+    """Generate comprehensive HDBSCAN analysis summary"""
+    try:
+        unique_labels = set(labels)
+        n_clusters = len(unique_labels) - (1 if -1 in unique_labels else 0)
+        n_noise = np.sum(labels == -1)
+        
+        # Calculate cluster statistics
+        cluster_stats = {}
+        for label in unique_labels:
+            mask = labels == label
+            cluster_elements = np.array(elements)[mask]
+            cluster_coords = coordinates_2d[mask]
+            
+            if len(cluster_coords) > 0:
+                stats = {
+                    "count": len(cluster_elements),
+                    "x_range": [float(np.min(cluster_coords[:, 0])), float(np.max(cluster_coords[:, 0]))],
+                    "y_range": [float(np.min(cluster_coords[:, 1])), float(np.max(cluster_coords[:, 1]))],
+                    "x_center": float(np.mean(cluster_coords[:, 0])),
+                    "y_center": float(np.mean(cluster_coords[:, 1])),
+                    "x_std": float(np.std(cluster_coords[:, 0])),
+                    "y_std": float(np.std(cluster_coords[:, 1])),
+                    "text_sample": [elem["text"][:50] + "..." if len(elem["text"]) > 50 else elem["text"] 
+                                  for elem in cluster_elements[:3]]  # First 3 text samples
+                }
+                
+                if label == -1:
+                    cluster_stats["noise"] = stats
+                else:
+                    cluster_stats[f"cluster_{label}"] = stats
+        
+        # Overall statistics
+        summary = {
+            "overview": {
+                "total_elements": len(elements),
+                "total_clusters": n_clusters,
+                "noise_points": int(n_noise),
+                "clustering_success_rate": float((len(elements) - n_noise) / len(elements) * 100) if len(elements) > 0 else 0.0
+            },
+            "parameters": {
+                "min_cluster_size": clusterer.min_cluster_size,
+                "min_samples": clusterer.min_samples,
+                "algorithm": "HDBSCAN",
+                "metric": "euclidean",
+                "dimensions": "2D (X, Y coordinates)"
+            },
+            "cluster_details": cluster_stats,
+            "quality_metrics": {
+                "silhouette_score": None,  # Would need sklearn for this
+                "noise_ratio": float(n_noise / len(elements)) if len(elements) > 0 else 0.0,
+                "largest_cluster_size": max([stats["count"] for stats in cluster_stats.values() if isinstance(stats, dict)], default=0),
+                "smallest_cluster_size": min([stats["count"] for stats in cluster_stats.values() if isinstance(stats, dict) and "cluster" in str(stats)], default=0) if n_clusters > 0 else 0
+            }
+        }
+        
+        # Print detailed summary
+        print(f"\n" + "="*80)
+        print(f"📊 HDBSCAN 2D CLUSTERING SUMMARY")
+        print(f"="*80)
+        print(f"Total Elements: {summary['overview']['total_elements']}")
+        print(f"Clusters Found: {summary['overview']['total_clusters']}")
+        print(f"Noise Points: {summary['overview']['noise_points']}")
+        print(f"Success Rate: {summary['overview']['clustering_success_rate']:.1f}%")
+        print(f"Noise Ratio: {summary['quality_metrics']['noise_ratio']:.2f}")
+        
+        for key, stats in cluster_stats.items():
+            if key == "noise":
+                print(f"\n🔸 NOISE POINTS:")
+            else:
+                cluster_id = key.replace("cluster_", "")
+                print(f"\n🔸 CLUSTER {cluster_id}:")
+            
+            print(f"   Elements: {stats['count']}")
+            print(f"   X Range: {stats['x_range'][0]:.1f} - {stats['x_range'][1]:.1f} (center: {stats['x_center']:.1f})")
+            print(f"   Y Range: {stats['y_range'][0]:.1f} - {stats['y_range'][1]:.1f} (center: {stats['y_center']:.1f})")
+            print(f"   Text Samples: {stats['text_sample']}")
+        
+        print(f"="*80)
+        
+        return summary
+        
+    except Exception as e:
+        print(f"  ⚠️ Error generating summary: {e}")
+        return {"error": str(e)}
+
+
 # ---------- Example usage ----------
 # if __name__ == "__main__":
 #     # Example usage
@@ -713,3 +1030,9 @@ def chunk_pdf_page_with_hdbscan(pdf_path: str, config: Optional[ChunkingConfig] 
 #         print(f"Page: {chunk['page_num']}")
 #         print(f"Headings: {chunk['headings']}")
 #         print(f"Text preview: {chunk['text'][:200]}...")
+        
+#     # Example of using the new 2D analysis function
+#     # with pdfplumber.open("sample.pdf") as pdf:
+#     #     page = pdf.pages[0]  # First page
+#     #     analysis_result = analyze_page_with_2d_hdbscan(page, 1)
+#     #     print("Analysis result:", analysis_result)
