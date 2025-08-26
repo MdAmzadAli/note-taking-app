@@ -390,22 +390,30 @@ class ChunkingService:
                     'bands_detected': len(set(c['band_id'] for c in page_chunks)),
                     'has_headings': any(c['headings_path'] for c in page_chunks)
                 })
-            
+
             return {
                 'pdf_data': {
-                    'pages': pages_info,
+                    'pages': ["pages_info"],
                     'total_pages': total_pages
                 },
-                'chunks': processed_chunks,
-                'summary': {
-                    'total_pages': total_pages,
-                    'total_chunks': len(processed_chunks),
-                    'average_chunks_per_page': len(processed_chunks) / total_pages if total_pages > 0 else 0,
-                    'processing_method': 'hdbscan_semantic',
-                    'has_multi_column': any(p['columns_detected'] > 1 for p in pages_info),
-                    'has_structured_content': any(p['has_headings'] for p in pages_info)
-                }
+                'chunks': ["processed_chunks"],
+                
             }
+            # return {
+            #     'pdf_data': {
+            #         'pages': pages_info,
+            #         'total_pages': total_pages
+            #     },
+            #     'chunks': processed_chunks,
+            #     'summary': {
+            #         'total_pages': total_pages,
+            #         'total_chunks': len(processed_chunks),
+            #         'average_chunks_per_page': len(processed_chunks) / total_pages if total_pages > 0 else 0,
+            #         'processing_method': 'hdbscan_semantic',
+            #         'has_multi_column': any(p['columns_detected'] > 1 for p in pages_info),
+            #         'has_structured_content': any(p['has_headings'] for p in pages_info)
+            #     }
+            # }
             
         except Exception as error:
             print(f'❌ HDBSCAN PDF processing failed: {error}')
@@ -439,7 +447,7 @@ class ChunkingService:
             
             for i in range(chunks_to_show):
                 chunk = page_chunks[i]
-                text_preview = chunk['text'][:150] + ('...' if len(chunk['text']) > 150 else '')
+                text_preview = chunk['text']
                 
                 print(f"\n   🔸 CHUNK {i+1}:")
                 print(f"      Size: {len(chunk['text'])} chars ({chunk['tokens_est']} tokens)")

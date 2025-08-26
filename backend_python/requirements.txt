@@ -16,3 +16,8 @@ beautifulsoup4==4.12.3
 camelot-py[cv]==0.10.1
 opencv-python
 PyPDF2==2.12.1
+numpy
+regex
+hdbscan
+scikit-learn
+nltk

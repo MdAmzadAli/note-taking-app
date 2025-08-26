@@ -1,6 +1,5 @@
 # requirements:
 #   pip install pdfplumber hdbscan numpy scikit-learn regex nltk
-# (optional: python -m nltk.downloader punkt)
 
 import pdfplumber
 import numpy as np
@@ -9,7 +8,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Any, Tuple, Optional
 import statistics
 import hdbscan
-from collections import deque
+from collections import deque, defaultdict
 
 try:
     import nltk
@@ -18,44 +17,50 @@ try:
 except Exception:
     _NLTK_READY = False
 
-# ---------- Config dataclasses ----------
+# ---------- FIXED Config dataclasses ----------
 
 @dataclass
 class ChunkingConfig:
     # Chunk sizing
-    target_tokens: int = 350            # approx tokens per chunk (≈ 0.75 * word_count)
-    max_tokens: int = 450               # hard ceiling
-    overlap_tokens: int = 60            # overlap between chunks
+    target_tokens: int = 350
+    max_tokens: int = 450
+    overlap_tokens: int = 60
 
-    # Page segmentation
-    vertical_gap_sigma: float = 2.0     # threshold for splitting vertical bands
-    min_band_height: float = 60.0       # ignore micro-bands
+    # FIXED: More conservative layout detection
+    line_height_variance: float = 0.3           # Allow 30% variance in line heights
+    min_column_gap: float = 25.0               # Minimum gap to consider column separation
+    column_gap_ratio: float = 2.0              # Gap must be 2x median word spacing
 
-    # HDBSCAN (column detection)
-    hdbscan_min_cluster_size: int = 12  # minimal words to deem a column in a band
-    hdbscan_min_samples: Optional[int] = None  # if None, defaults to min_cluster_size
+    # FIXED: Conservative HDBSCAN parameters
+    hdbscan_min_cluster_size: int = 6          # Reduced from 12
+    hdbscan_min_samples: int = 3               # Fixed conservative value
+    hdbscan_eps: float = 20.0                  # Maximum clustering distance
 
-    # Line grouping
-    line_merge_y_tol: float = 3.0       # y tolerance for line grouping (points)
-    word_join_gap_ratio: float = 0.5    # ratio of median char width to decide spaces
+    # FIXED: Improved space detection
+    space_multiplier: float = 0.8              # Space if gap > 0.8 * avg char width
+    min_space_gap: float = 2.0                 # Minimum pixel gap for space
+    max_space_gap: float = 50.0                # Maximum gap before considering column break
 
-    # Heading detection scoring
-    heading_z_threshold: float = 1.0    # (kept for compatibility; not used directly now)
-    heading_min_len: int = 2            # minimal chars to consider heading text
-    heading_bold_boost: float = 0.5
-    heading_italic_boost: float = 0.25
-    heading_caps_boost: float = 0.3
-    heading_numbering_boost: float = 0.25
-    heading_no_trailing_punct_boost: float = 0.15
-    heading_center_boost: float = 0.2
-    heading_gap_above_sigma: float = 1.2
-    heading_score_threshold: float = 1.1
+    # Quality control
+    min_text_length: int = 10                  # Minimum characters for valid text
+    max_chunks_per_page: int = 15              # Prevent over-segmentation
+    min_words_per_chunk: int = 5               # Minimum words per chunk
 
-    # Rolling heading window
-    heading_window_max_words: int = 70  # CRITICAL: 70-word rolling window of headings
+    # Heading detection (simplified)
+    heading_size_threshold: float = 1.2        # Size must be 1.2x median
+    heading_bold_weight: float = 0.5
+    heading_score_threshold: float = 0.8
 
-    # Misc
-    min_sentence_for_chunk: int = 1     # require at least N sentences per chunk
+
+@dataclass  
+class TextElement:
+    text: str
+    bbox: Tuple[float, float, float, float]  # x0, top, x1, bottom
+    font_size: float
+    is_bold: bool
+    is_italic: bool
+    reading_order: int
+    element_type: str = "text"  # text, heading, table
 
 
 @dataclass
@@ -63,619 +68,528 @@ class Chunk:
     text: str
     tokens_est: int
     page_num: int
-    band_id: int
-    column_id: int
-    bbox: Tuple[float, float, float, float]  # (x0, top, x1, bottom)
-    headings_path: List[str]
-    heading_window: str                 # 70-word rolling heading window snapshot
+    bbox: Tuple[float, float, float, float]
+    elements: List[TextElement]
+    headings: List[str]
     meta: Dict[str, Any]
 
 
-# ---------- Utilities ----------
+# ---------- FIXED Utilities ----------
 
-def _estimate_tokens_from_words(n_words: int) -> int:
-    # crude, fast estimator; works well enough for packing chunks
-    return int(round(n_words / 0.75))
-
-
-def _detect_bold(fontname: str) -> bool:
-    if not fontname:
-        return False
-    name = fontname.lower()
-    return 'bold' in name or 'black' in name or 'semibold' in name or 'heavy' in name
-
-
-def _detect_italic(fontname: str) -> bool:
-    if not fontname:
-        return False
-    name = fontname.lower()
-    return 'italic' in name or 'oblique' in name
+def _estimate_tokens(n_words: int) -> int:
+    """More accurate token estimation"""
+    return max(1, int(round(n_words * 0.75)))
 
 
 def _safe_sent_tokenize(text: str) -> List[str]:
+    """Robust sentence tokenization with fallback"""
     if _NLTK_READY:
         try:
-            return [s.strip() for s in sent_tokenize(text) if s.strip()]
-        except Exception:
+            sentences = sent_tokenize(text)
+            return [s.strip() for s in sentences if s.strip()]
+        except:
             pass
-    # very simple fallback sentence splitter
-    parts = re.split(r'(?<=[\.!?])\s+(?=[A-Z0-9“(])', text)
-    return [p.strip() for p in parts if p.strip()]
+
+    # Enhanced fallback with better sentence boundary detection
+    text = re.sub(r'\s+', ' ', text.strip())
+    sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
+    return [s.strip() for s in sentences if s.strip()]
 
 
-def _median(values: List[float], default: float = 0.0) -> float:
-    return statistics.median(values) if values else default
+def _compute_font_stats(words: List[Dict[str, Any]]) -> Dict[str, float]:
+    """Compute font statistics for the page"""
+    sizes = [float(w.get("size_est", 0) or 0) for w in words if w.get("size_est")]
+    if not sizes:
+        return {"median": 12.0, "mean": 12.0, "std": 1.0}
+
+    return {
+        "median": statistics.median(sizes),
+        "mean": statistics.mean(sizes), 
+        "std": statistics.pstdev(sizes) or 1.0
+    }
 
 
-def _z_scores(values: List[float]) -> List[float]:
-    if not values:
+# ---------- FIXED Core Processing ----------
+
+def _extract_and_enrich_words(page) -> List[Dict[str, Any]]:
+    """Extract words with proper font information"""
+    try:
+        words = page.extract_words(
+            keep_blank_chars=False,
+            use_text_flow=True,
+            extra_attrs=["fontname", "size"]
+        )
+        chars = page.chars
+    except Exception as e:
+        print(f"Warning: Error extracting words: {e}")
         return []
-    m = statistics.mean(values)
-    sd = statistics.pstdev(values) or 1.0
-    return [(v - m) / sd for v in values]
 
-
-def _to_bbox(items: List[Dict[str, Any]]) -> Tuple[float, float, float, float]:
-    x0 = min(i["x0"] for i in items)
-    x1 = max(i["x1"] for i in items)
-    top = min(i["top"] for i in items)
-    bottom = max(i["bottom"] for i in items)
-    return (x0, top, x1, bottom)
-
-
-# ---------- Core steps ----------
-
-def _extract_words_and_chars(page) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    # words: boxes with text; chars: glyph-level with sizes/fonts
-    words = page.extract_words(
-        keep_blank_chars=False,
-        use_text_flow=True,   # helps group lines more naturally
-        extra_attrs=["fontname", "size"]  # not always filled; we’ll derive from chars anyway
-    )
-    chars = page.chars
-    return words, chars
-
-
-def _attach_fontsize_to_words(words, chars) -> None:
-    # For each word box, compute max font size of chars whose center falls inside
-    # Also mark bold/italic flags
-    if not chars:
-        for w in words:
-            w["size_est"] = float(w.get("size", 0.0) or 0.0)
-            fname = (w.get("fontname", "") or "")
-            w["is_bold"] = _detect_bold(fname)
-            w["is_italic"] = _detect_italic(fname)
-        return
-
-    # Bucket chars by integer row to reduce comparisons
-    buckets: Dict[int, List[Dict[str, Any]]] = {}
-    for c in chars:
-        key = int(c["top"] // 5)  # 5pt vertical buckets
-        buckets.setdefault(key, []).append(c)
-
-    for w in words:
-        cx0, cy0, cx1, cy1 = w["x0"], w["top"], w["x1"], w["bottom"]
-        y_keys = range(int(cy0 // 5), int(cy1 // 5) + 1)
-        sizes = []
-        bold_hits = 0
-        italic_hits = 0
-        for k in y_keys:
-            for c in buckets.get(k, []):
-                cx = (c["x0"] + c["x1"]) / 2
-                cy = (c["top"] + c["bottom"]) / 2
-                if (cx0 <= cx <= cx1) and (cy0 <= cy <= cy1):
-                    sizes.append(float(c.get("size", 0.0) or 0.0))
-                    fname = (c.get("fontname", "") or "")
-                    if _detect_bold(fname):
-                        bold_hits += 1
-                    if _detect_italic(fname):
-                        italic_hits += 1
-        w["size_est"] = max(sizes) if sizes else (float(w.get("size") or 0.0))
-        w["is_bold"] = bold_hits > 0
-        w["is_italic"] = italic_hits > 0
-
-
-def _group_into_lines(words: List[Dict[str, Any]], cfg: ChunkingConfig) -> List[List[Dict[str, Any]]]:
-    """
-    Group words into lines by y proximity; within a line, sort by x0 and insert spaces by gap.
-    Returns list of lines; each line is list of word dicts (with added 'text_joined').
-    Also annotates each word with `_line_id`.
-    """
     if not words:
         return []
 
-    # Sort by top then x0
-    words = sorted(words, key=lambda w: (w["top"], w["x0"]))
+    # Enrich words with accurate font information from chars
+    char_buckets = defaultdict(list)
+    for c in chars:
+        bucket_key = int(c["top"] // 3)  # 3pt buckets for efficiency
+        char_buckets[bucket_key].append(c)
 
-    lines: List[List[Dict[str, Any]]] = []
-    current: List[Dict[str, Any]] = []
-    last_top = None
-
+    enriched_words = []
     for w in words:
-        if last_top is None or abs(w["top"] - last_top) <= cfg.line_merge_y_tol:
-            current.append(w)
-            last_top = w["top"] if last_top is None else (last_top + w["top"]) / 2.0
+        if not w.get("text", "").strip():
+            continue
+
+        # Find chars that overlap with word bbox
+        cx0, cy0, cx1, cy1 = w["x0"], w["top"], w["x1"], w["bottom"]
+        y_buckets = range(int(cy0 // 3), int(cy1 // 3) + 1)
+
+        sizes, fonts = [], []
+        for bucket in y_buckets:
+            for c in char_buckets.get(bucket, []):
+                cx = (c["x0"] + c["x1"]) / 2
+                cy = (c["top"] + c["bottom"]) / 2
+                if cx0 <= cx <= cx1 and cy0 <= cy <= cy1:
+                    if c.get("size"):
+                        sizes.append(float(c["size"]))
+                    if c.get("fontname"):
+                        fonts.append(c["fontname"])
+
+        # Determine font properties
+        font_size = max(sizes) if sizes else float(w.get("size", 12) or 12)
+        font_name = max(set(fonts), key=fonts.count) if fonts else w.get("fontname", "")
+
+        is_bold = any("bold" in str(f).lower() or "black" in str(f).lower() 
+                     for f in fonts) if fonts else False
+        is_italic = any("italic" in str(f).lower() or "oblique" in str(f).lower() 
+                       for f in fonts) if fonts else False
+
+        enriched_word = {
+            "text": w["text"].strip(),
+            "x0": w["x0"], "top": w["top"], "x1": w["x1"], "bottom": w["bottom"],
+            "size_est": font_size,
+            "fontname": font_name,
+            "is_bold": is_bold,
+            "is_italic": is_italic
+        }
+        enriched_words.append(enriched_word)
+
+    return enriched_words
+
+
+def _reconstruct_lines_precisely(words: List[Dict[str, Any]], cfg: ChunkingConfig) -> List[List[Dict[str, Any]]]:
+    """FIXED: Precisely reconstruct lines with proper spacing"""
+    if not words:
+        return []
+
+    # Sort by vertical position first, then horizontal
+    sorted_words = sorted(words, key=lambda w: (w["top"], w["x0"]))
+
+    # Group into lines based on y-position with font-size aware tolerance
+    lines = []
+    current_line = []
+
+    for word in sorted_words:
+        if not current_line:
+            current_line = [word]
+            continue
+
+        # Calculate line tolerance based on font sizes
+        prev_word = current_line[-1]
+        avg_size = (word["size_est"] + prev_word["size_est"]) / 2
+        tolerance = avg_size * cfg.line_height_variance
+
+        y_diff = abs(word["top"] - statistics.mean([w["top"] for w in current_line]))
+
+        if y_diff <= tolerance:
+            current_line.append(word)
         else:
-            if current:
-                lines.append(sorted(current, key=lambda x: x["x0"]))
-            current = [w]
-            last_top = w["top"]
+            if current_line:
+                lines.append(sorted(current_line, key=lambda w: w["x0"]))
+            current_line = [word]
 
-    if current:
-        lines.append(sorted(current, key=lambda x: x["x0"]))
+    if current_line:
+        lines.append(sorted(current_line, key=lambda w: w["x0"]))
 
-    # Join words into text for each line with space heuristics based on median char width
+    # FIXED: Reconstruct text with proper spacing
+    processed_lines = []
     for line in lines:
         if not line:
             continue
-        # estimate median char width from the line
+
+        # Calculate average character width for this line
         char_widths = []
         for w in line:
-            width = max(w["x1"] - w["x0"], 0.1)
-            nchar = max(len(w["text"]), 1)
-            char_widths.append(width / nchar)
-        med_cw = _median(char_widths, default=3.0)
+            width = max(w["x1"] - w["x0"], 1.0)
+            char_count = max(len(w["text"]), 1)
+            char_widths.append(width / char_count)
 
-        parts = []
-        last_x1 = None
-        for w in line:
-            if last_x1 is None:
-                parts.append(w["text"])
+        avg_char_width = statistics.mean(char_widths) if char_widths else 5.0
+
+        # Reconstruct line text with proper spacing
+        text_parts = []
+        for i, word in enumerate(line):
+            if i == 0:
+                text_parts.append(word["text"])
             else:
-                gap = w["x0"] - last_x1
-                # if the gap is big relative to char width, insert a space
-                if gap > cfg.word_join_gap_ratio * med_cw:
-                    parts.append(" ")
-                parts.append(w["text"])
-            last_x1 = w["x1"]
-        line_text = "".join(parts).strip()
-        for w in line:
-            w["line_text"] = line_text  # store for later context
-        line[0]["text_joined"] = line_text  # anchor
+                prev_word = line[i-1]
+                gap = word["x0"] - prev_word["x1"]
 
-    # annotate line ids
-    for lid, line in enumerate(lines):
-        for w in line:
-            w["_line_id"] = lid
+                # Insert space based on gap size relative to character width
+                if gap >= cfg.space_multiplier * avg_char_width:
+                    text_parts.append(" ")
 
-    return lines
+                text_parts.append(word["text"])
+
+        line_text = "".join(text_parts).strip()
+
+        # Store reconstructed text in line
+        for word in line:
+            word["line_text"] = line_text
+
+        processed_lines.append(line)
+
+    return processed_lines
 
 
-def _find_vertical_bands(words: List[Dict[str, Any]], cfg: ChunkingConfig) -> List[Tuple[int, float, float]]:
-    """
-    Return list of bands as (band_id, y_top, y_bottom).
-    We split on unusually large gaps between successive word 'top's.
-    """
-    if not words:
+def _detect_layout_structure(lines: List[List[Dict[str, Any]]], page_width: float, cfg: ChunkingConfig) -> List[Dict[str, Any]]:
+    """FIXED: Detect actual layout structure without premature segmentation"""
+    if not lines:
         return []
 
-    y_tops = sorted(w["top"] for w in words)
-    gaps = [y_tops[i+1] - y_tops[i] for i in range(len(y_tops)-1)] or [0.0]
-    mu = statistics.mean(gaps)
-    sd = statistics.pstdev(gaps) or 1.0
-    threshold = mu + cfg.vertical_gap_sigma * sd
+    layout_elements = []
 
-    bands = []
-    start = min(w["top"] for w in words)
-    for i, g in enumerate(gaps):
-        if g > threshold:
-            y_end = y_tops[i]
-            if y_end - start >= cfg.min_band_height:
-                bands.append((len(bands), start, y_end))
-            start = y_tops[i+1]
-    page_bottom = max(w["bottom"] for w in words)
-    if page_bottom - start >= cfg.min_band_height or not bands:
-        bands.append((len(bands), start, page_bottom))
+    for line_idx, line in enumerate(lines):
+        if not line:
+            continue
 
-    return bands
+        # Get line properties
+        line_text = line[0].get("line_text", "")
+        if len(line_text.strip()) < cfg.min_text_length:
+            continue
+
+        bbox = (
+            min(w["x0"] for w in line),
+            min(w["top"] for w in line), 
+            max(w["x1"] for w in line),
+            max(w["bottom"] for w in line)
+        )
+
+        avg_font_size = statistics.mean([w["size_est"] for w in line])
+        has_bold = any(w.get("is_bold", False) for w in line)
+
+        # Simple heading detection
+        element_type = "text"
+        font_stats = _compute_font_stats([w for line in lines for w in line])
+
+        if (avg_font_size > font_stats["median"] * cfg.heading_size_threshold or 
+            (has_bold and len(line_text.strip()) < 100)):
+            element_type = "heading"
+
+        element = {
+            "text": line_text,
+            "bbox": bbox,
+            "font_size": avg_font_size,
+            "is_bold": has_bold,
+            "type": element_type,
+            "line_idx": line_idx,
+            "reading_order": line_idx
+        }
+
+        layout_elements.append(element)
+
+    return layout_elements
 
 
-def _cluster_columns_in_band(band_words: List[Dict[str, Any]], cfg: ChunkingConfig) -> Dict[int, int]:
-    """
-    Run HDBSCAN on x0 positions to find columns.
-    Returns mapping: word_index_in_band -> column_label (0..C-1, left-to-right).
-    Noise points (-1) are assigned to nearest column by x, or make a new singleton column if none found.
-    """
-    if not band_words:
-        return {}
+def _detect_columns_conservatively(elements: List[Dict[str, Any]], cfg: ChunkingConfig) -> List[List[Dict[str, Any]]]:
+    """FIXED: Conservative column detection that validates actual columns"""
+    if len(elements) < 10:  # Too few elements for meaningful column detection
+        return [elements]
 
-    X = np.array([[w["x0"]] for w in band_words], dtype=float)
-    min_samples = cfg.hdbscan_min_samples or cfg.hdbscan_min_cluster_size
+    # Extract x-positions
+    x_positions = np.array([[elem["bbox"][0]] for elem in elements])
 
+    # Use HDBSCAN with conservative parameters
     clusterer = hdbscan.HDBSCAN(
         min_cluster_size=cfg.hdbscan_min_cluster_size,
-        min_samples=min_samples,
-        cluster_selection_method="leaf"
+        min_samples=cfg.hdbscan_min_samples,
+        cluster_selection_epsilon=cfg.hdbscan_eps
     )
-    labels = clusterer.fit_predict(X)
 
-    # Remap labels to left-to-right order
-    col_centers: Dict[int, float] = {}
-    for lbl in set(labels):
-        if lbl == -1:
-            continue
-        xs = [band_words[i]["x0"] for i, l in enumerate(labels) if l == lbl]
-        col_centers[lbl] = statistics.mean(xs)
+    labels = clusterer.fit_predict(x_positions)
 
-    ordered = sorted(col_centers.items(), key=lambda kv: kv[1])
-    remap = {old: new for new, (old, _) in enumerate(ordered)}
+    # Group by cluster labels
+    clusters = defaultdict(list)
+    for elem, label in zip(elements, labels):
+        clusters[label].append(elem)
 
-    # Assign noise to nearest center; if no centers, make single column 0
-    if not remap:
-        return {i: 0 for i in range(len(band_words))}
-    centers_vec = np.array([c for _, c in ordered]).reshape(-1, 1)
+    # Validate clusters as actual columns
+    valid_columns = []
+    noise_elements = clusters.get(-1, [])  # HDBSCAN noise points
 
-    assigned: Dict[int, int] = {}
-    for i, lbl in enumerate(labels):
-        if lbl != -1:
-            assigned[i] = remap[lbl]
-        else:
-            x = X[i, 0]
-            j = int(np.argmin(np.abs(centers_vec.flatten() - x)))
-            assigned[i] = j
-    return assigned
-
-
-def _group_into_lines_per_column(words: List[Dict[str, Any]], cfg: ChunkingConfig) -> List[List[Dict[str, Any]]]:
-    """Group words into lines for a single column (wrapper around _group_into_lines)."""
-    return _group_into_lines(words, cfg)
-
-
-def _build_reading_order(words: List[Dict[str, Any]], bands, cfg: ChunkingConfig):
-    """
-    For each vertical band:
-      - cluster columns
-      - assign column ids
-      - within each column: lines by y; then concatenate cols L->R
-    Returns ordered list of (band_id, column_id, lines)
-    """
-    result = []
-    for band_id, y0, y1 in bands:
-        band_words = [w for w in words if y0 <= w["top"] <= y1]
-        if not band_words:
+    for label, cluster_elements in clusters.items():
+        if label == -1:  # Skip noise for now
             continue
 
-        mapping = _cluster_columns_in_band(band_words, cfg)
-
-        # group words by assigned column
-        col_groups: Dict[int, List[Dict[str, Any]]] = {}
-        for idx, w in enumerate(band_words):
-            col_id = mapping.get(idx, 0)
-            w["_col_id"] = col_id
-            col_groups.setdefault(col_id, []).append(w)
-
-        # order columns left->right by mean x0
-        ordered_cols = sorted(
-            col_groups.items(),
-            key=lambda kv: statistics.mean([w["x0"] for w in kv[1]])
-        )
-
-        band_cols = []
-        for col_id, col_words in ordered_cols:
-            lines = _group_into_lines_per_column(col_words, cfg)
-            band_cols.append((col_id, lines))
-
-        result.append((band_id, band_cols, (y0, y1)))
-
-    return result
-
-
-# ---------- Heading scoring ----------
-
-def _score_headings(words: List[Dict[str, Any]], lines: List[List[Dict[str, Any]]], page_width: float, cfg: ChunkingConfig) -> Dict[int, float]:
-    """Compute a line-level heading score and assign to words in that line.
-    Features used:
-      - size z-score (largest char size in the line)
-      - bold / italic presence
-      - ALL-CAPS dominance
-      - enumerated/numbered pattern ("1.", "2.3.", "I.")
-      - no trailing period/punct
-      - centered alignment (approx against page center)
-      - large vertical gap above vs median
-    Returns mapping word_index -> heading_score.
-    """
-    if not lines:
-        return {i: 0.0 for i, _ in enumerate(words)}
-
-    # Compute per-line bbox, size, styles
-    line_info = []
-    for lid, line in enumerate(lines):
-        if not line:
-            line_info.append({"lid": lid, "text": "", "x0": 0, "x1": 0, "top": 0, "bottom": 0,
-                              "size_max": 0.0, "bold": False, "italic": False, "word_idxs": []})
-            continue
-        text = line[0].get("text_joined", "").strip()
-        x0, top, x1, bottom = _to_bbox(line)
-        size_max = max(float(w.get("size_est") or 0.0) for w in line)
-        bold_any = any(w.get("is_bold") for w in line)
-        italic_any = any(w.get("is_italic") for w in line)
-        word_idxs = [i for i, w in enumerate(words) if w.get("_line_id") == lid]
-        line_info.append({
-            "lid": lid, "text": text, "x0": x0, "x1": x1, "top": top, "bottom": bottom,
-            "size_max": size_max, "bold": bold_any, "italic": italic_any, "word_idxs": word_idxs
-        })
-
-    # size z-scores across lines
-    sizes = [li["size_max"] for li in line_info]
-    size_z = _z_scores(sizes)
-
-    # gaps above
-    sorted_by_top = sorted(line_info, key=lambda li: li["top"])
-    gaps = []
-    gap_above_by_lid = {li["lid"]: 0.0 for li in line_info}
-    prev = None
-    for li in sorted_by_top:
-        if prev is not None:
-            gap = li["top"] - prev["bottom"]
-            gaps.append(gap)
-            gap_above_by_lid[li["lid"]] = gap
-        prev = li
-    mu_gap = statistics.mean(gaps) if gaps else 0.0
-    sd_gap = statistics.pstdev(gaps) if len(gaps) > 1 else 0.0
-    threshold_gap = mu_gap + cfg.heading_gap_above_sigma * (sd_gap or 1.0)
-
-    # scoring
-    word_scores = [0.0] * len(words)
-    for li, z in zip(line_info, size_z):
-        text = li["text"]
-        if not text or len(text) < cfg.heading_min_len:
+        if len(cluster_elements) < cfg.min_words_per_chunk:
+            noise_elements.extend(cluster_elements)
             continue
 
-        # features
-        caps_letters = re.findall(r"[A-Z]", text)
-        all_letters = re.findall(r"[A-Za-z]", text)
-        caps_ratio = (len(caps_letters) / len(all_letters)) if all_letters else 0.0
-        numbered = bool(re.match(r"^\s*((\d+(?:\.\d+)*)|[A-Z]\.|[IVXLCM]+\.)\s+\S", text))
-        no_trailing_punct = not bool(re.search(r"[\.!?]$", text))
-        center_distance = abs(((li["x0"] + li["x1"]) / 2) - (page_width / 2)) / max(page_width, 1.0)
-        centered = center_distance < 0.15
-        big_gap_above = gap_above_by_lid[li["lid"]] > threshold_gap
+        # Check if cluster forms a valid column (reasonable vertical distribution)
+        y_positions = [elem["bbox"][1] for elem in cluster_elements]
+        y_range = max(y_positions) - min(y_positions)
 
-        score = (
-            z
-            + (cfg.heading_bold_boost if li["bold"] else 0.0)
-            + (cfg.heading_italic_boost if li["italic"] else 0.0)
-            + (cfg.heading_caps_boost if caps_ratio >= 0.6 else 0.0)
-            + (cfg.heading_numbering_boost if numbered else 0.0)
-            + (cfg.heading_no_trailing_punct_boost if no_trailing_punct else 0.0)
-            + (cfg.heading_center_boost if centered else 0.0)
-            + (0.4 if big_gap_above else 0.0)
-        )
+        if y_range < 50:  # Too small vertical range, likely not a real column
+            noise_elements.extend(cluster_elements)
+            continue
 
-        for wi in li["word_idxs"]:
-            word_scores[wi] = score
+        valid_columns.append(sorted(cluster_elements, key=lambda e: (e["bbox"][1], e["bbox"][0])))
 
-    return {i: s for i, s in enumerate(word_scores)}
+    # If no valid columns found or only one column, treat as single column
+    if len(valid_columns) <= 1:
+        all_elements = sorted(elements, key=lambda e: (e["bbox"][1], e["bbox"][0]))
+        return [all_elements]
+
+    # Sort columns left to right
+    valid_columns.sort(key=lambda col: statistics.mean([elem["bbox"][0] for elem in col]))
+
+    # Add noise elements to the nearest column
+    if noise_elements:
+        for noise_elem in noise_elements:
+            noise_x = noise_elem["bbox"][0]
+            # Find closest column
+            min_dist = float('inf')
+            closest_col = 0
+
+            for col_idx, column in enumerate(valid_columns):
+                col_x = statistics.mean([elem["bbox"][0] for elem in column])
+                dist = abs(noise_x - col_x)
+                if dist < min_dist:
+                    min_dist = dist
+                    closest_col = col_idx
+
+            valid_columns[closest_col].append(noise_elem)
+
+        # Re-sort each column
+        for col in valid_columns:
+            col.sort(key=lambda e: (e["bbox"][1], e["bbox"][0]))
+
+    return valid_columns
 
 
-# ---------- Packing (reading order → chunks) ----------
+def _create_chunks_with_overlap(elements: List[Dict[str, Any]], page_num: int, cfg: ChunkingConfig) -> List[Chunk]:
+    """FIXED: Create chunks preserving reading order with proper overlap"""
+    if not elements:
+        return []
 
-def _pack_chunks_in_reading_order(
-    ordered_bands, cfg: ChunkingConfig, page_num: int, headings_path: List[str]
-) -> List[Chunk]:
-    """
-    Consume reading order stream (band -> columns L->R -> lines top->bottom)
-    and build sentence-aware chunks with overlap, guided by headings & gaps.
-
-    Implements a 70-word rolling HEADING WINDOW:
-      - Initially empty.
-      - When a heading line appears (score >= threshold), push its words into the window.
-      - If it exceeds 70 words, oldest words drop off (deque maxlen).
-      - Each chunk stores a snapshot of the window at the moment it is flushed.
-    """
-    # Flatten into a stream of (band_id, col_id, line_text, bbox, heading_score)
-    stream = []
-    for band_id, band_cols, (y0, y1) in ordered_bands:
-        for col_id, lines in band_cols:
-            for ln in lines:
-                if not ln:
-                    continue
-                anchor = ln[0]
-                text = anchor.get("text_joined", "").strip()
-                if not text:
-                    continue
-                bbox = _to_bbox(ln)
-                hscore = max((w.get("_heading_score", 0.0) for w in ln), default=0.0)
-                stream.append((band_id, col_id, text, bbox, hscore))
-
-    # Build chunks
-    chunks: List[Chunk] = []
-    current_lines: List[str] = []
-    current_bboxes: List[Tuple[float, float, float, float]] = []
+    chunks = []
+    current_elements = []
     current_words = 0
-    current_band = None
-    current_col = None
-    current_heading_path = list(headings_path)
+    current_headings = []
 
-    heading_window = deque([], maxlen=cfg.heading_window_max_words)
+    def flush_chunk():
+        nonlocal current_elements, current_words, current_headings
 
-    def _heading_window_text() -> str:
-        return " ".join(list(heading_window)).strip()
-
-    def flush(make_overlap: bool = True):
-        nonlocal current_lines, current_bboxes, current_words, current_band, current_col, current_heading_path
-        if not current_lines:
+        if not current_elements:
             return
-        text = "\n".join(current_lines).strip()
-        n_words = len(re.findall(r"\S+", text))
-        tokens = _estimate_tokens_from_words(n_words)
-        x0 = min(b[0] for b in current_bboxes)
-        top = min(b[1] for b in current_bboxes)
-        x1 = max(b[2] for b in current_bboxes)
-        bottom = max(b[3] for b in current_bboxes)
-        chunks.append(Chunk(
-            text=text,
-            tokens_est=tokens,
-            page_num=page_num,
-            band_id=current_band if current_band is not None else -1,
-            column_id=current_col if current_col is not None else -1,
-            bbox=(x0, top, x1, bottom),
-            headings_path=list(current_heading_path),
-            heading_window=_heading_window_text(),
-            meta={"lines": len(current_lines)}
-        ))
 
-        if make_overlap and chunks:
-            # Overlap: keep tail sentences up to overlap_tokens
-            tail_text = text
-            sents = _safe_sent_tokenize(tail_text)
-            keep = []
-            count = 0
-            for s in reversed(sents):
-                w = len(re.findall(r"\S+", s))
-                t = _estimate_tokens_from_words(w)
-                if count + t > cfg.overlap_tokens:
+        # Combine text preserving order
+        texts = []
+        for elem in current_elements:
+            text = elem["text"].strip()
+            if text:
+                texts.append(text)
+
+        if not texts:
+            return
+
+        combined_text = "\n".join(texts)
+        word_count = len(re.findall(r'\S+', combined_text))
+
+        if word_count < cfg.min_words_per_chunk:
+            return
+
+        # Calculate bounding box
+        bbox = (
+            min(elem["bbox"][0] for elem in current_elements),
+            min(elem["bbox"][1] for elem in current_elements),
+            max(elem["bbox"][2] for elem in current_elements),
+            max(elem["bbox"][3] for elem in current_elements)
+        )
+
+        chunk = Chunk(
+            text=combined_text,
+            tokens_est=_estimate_tokens(word_count),
+            page_num=page_num,
+            bbox=bbox,
+            elements=[TextElement(
+                text=elem["text"],
+                bbox=elem["bbox"],
+                font_size=elem["font_size"],
+                is_bold=elem["is_bold"],
+                is_italic=elem.get("is_italic", False),
+                reading_order=elem["reading_order"],
+                element_type=elem["type"]
+            ) for elem in current_elements],
+            headings=list(current_headings),
+            meta={"element_count": len(current_elements)}
+        )
+
+        chunks.append(chunk)
+
+        # Create overlap by keeping last few sentences
+        if chunks and cfg.overlap_tokens > 0:
+            sentences = _safe_sent_tokenize(combined_text)
+            overlap_sentences = []
+            overlap_words = 0
+
+            for sent in reversed(sentences):
+                sent_words = len(re.findall(r'\S+', sent))
+                if overlap_words + sent_words > cfg.overlap_tokens:
                     break
-                keep.append(s)
-                count += t
-            keep = list(reversed(keep))
-            current_lines = keep[:] if keep else []
-            current_bboxes = []  # conservative; bbox recomputed with new lines
-            current_words = len(re.findall(r"\S+", " ".join(current_lines)))
+                overlap_sentences.append(sent)
+                overlap_words += sent_words
+
+            if overlap_sentences:
+                overlap_text = " ".join(reversed(overlap_sentences))
+                # Find elements that contribute to overlap
+                overlap_elements = current_elements[-len(overlap_sentences):] if overlap_sentences else []
+                current_elements = overlap_elements
+                current_words = overlap_words
+            else:
+                current_elements = []
+                current_words = 0
         else:
-            current_lines = []
-            current_bboxes = []
+            current_elements = []
             current_words = 0
 
-    # Pack greedily, reset on headings or band/column changes or size overflow
-    for band_id, col_id, text, bbox, hscore in stream:
-        is_heading = hscore >= cfg.heading_score_threshold
+    # Process elements in reading order
+    for elem in elements:
+        elem_words = len(re.findall(r'\S+', elem["text"]))
 
-        # Change of region/column => soft boundary
-        region_changed = (current_band is not None and (band_id != current_band or col_id != current_col))
+        # Check if adding this element would exceed max tokens
+        if current_words + elem_words > cfg.max_tokens and current_elements:
+            flush_chunk()
 
-        # If heading or region change or size overflow, flush current chunk FIRST
-        prospective_words = current_words + len(re.findall(r"\S+", text))
-        prospective_tokens = _estimate_tokens_from_words(prospective_words)
+        current_elements.append(elem)
+        current_words += elem_words
 
-        if is_heading or region_changed or prospective_tokens > cfg.max_tokens:
-            flush(make_overlap=True)
+        # Track headings
+        if elem["type"] == "heading":
+            current_headings.append(elem["text"].strip())
+            # Keep only recent headings
+            current_headings = current_headings[-3:]
 
-            # Update heading window and path AFTER flushing so the new heading applies going forward
-            if is_heading:
-                # push heading words into rolling window (trim handled by maxlen)
-                for tok in re.findall(r"\S+", text):
-                    heading_window.append(tok)
+        # Flush if we reach target size
+        if current_words >= cfg.target_tokens:
+            flush_chunk()
 
-                # Also maintain a hierarchical path (heuristic)
-                if len(text) > 4:
-                    if current_heading_path and len(current_heading_path[-1]) < len(text):
-                        current_heading_path[-1] = text
-                    else:
-                        current_heading_path.append(text)
-                else:
-                    current_heading_path.append(text)
+    # Flush remaining elements
+    flush_chunk()
 
-            current_band, current_col = band_id, col_id
-
-        # Start new if empty
-        if not current_lines:
-            current_band, current_col = band_id, col_id
-
-        # Append line and repack if exceeds target (but under max)
-        current_lines.append(text)
-        current_bboxes.append(bbox)
-        current_words += len(re.findall(r"\S+", text))
-
-        if _estimate_tokens_from_words(current_words) >= cfg.target_tokens:
-            flush(make_overlap=True)
-
-    # tail
-    flush(make_overlap=False)
     return chunks
 
+config = ChunkingConfig(
+        target_tokens=300,
+        max_tokens=400,
+        overlap_tokens=50
+    )
 
-# ---------- Public API ----------
-# pdf_path: str,
-# page_index: int = 0,
-def chunk_pdf_page_with_hdbscan(
-    pdf_path: str,
-    config: Optional[ChunkingConfig] = None
-) -> List[Dict[str, Any]]:
+# ---------- FIXED Main Function ----------
+
+def chunk_pdf_page_with_hdbscan(pdf_path: str, config: Optional[ChunkingConfig] = config) -> List[Dict[str, Any]]:
     """
-    Process a single PDF page into high-quality semantic chunks with robust reading order.
-    Returns list of chunk dicts with text + metadata, including a 70-word rolling heading window.
+    FIXED: Process PDF with preserved reading order and accurate text extraction
     """
     cfg = config or ChunkingConfig()
 
-    with pdfplumber.open(pdf_path) as pdf:
-      out: List[Dict[str, Any]] = []
-      print(f"📖 Processing PDF: {len(pdf.pages)} pages")
-      
-      for page_num, page in enumerate(pdf.pages, 1):
-        print(f"\n🔍 Processing page {page_num}/{len(pdf.pages)}")
-        
-        words, chars = _extract_words_and_chars(page)
-        if not words:
-            print(f"⚠️  Page {page_num}: No words extracted")
-            continue
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            all_chunks = []
 
-        print(f"📝 Page {page_num}: Extracted {len(words)} words, {len(chars)} chars")
+            print(f"Processing PDF: {len(pdf.pages)} pages")
 
-        # enrich words with size/bold/italic
-        _attach_fontsize_to_words(words, chars)
+            for page_num, page in enumerate(pdf.pages, 1):
+                print(f"\nProcessing page {page_num}/{len(pdf.pages)}")
 
-        # global lines (for heading scoring & gaps)
-        lines_global = _group_into_lines(words, cfg)
-        print(f"📏 Page {page_num}: Grouped into {len(lines_global)} lines")
+                # Step 1: Extract and enrich words with accurate font info
+                words = _extract_and_enrich_words(page)
+                if not words:
+                    print(f"  No words found on page {page_num}")
+                    continue
 
-        # heading scores (line-level → assigned to words)
-        hmap = _score_headings(words, lines_global, page.width, cfg)
-        heading_count = sum(1 for score in hmap.values() if score >= cfg.heading_score_threshold)
-        print(f"📋 Page {page_num}: Detected {heading_count} potential headings")
-        
-        for i, w in enumerate(words):
-            w["_heading_score"] = hmap.get(i, 0.0)
+                print(f"  Extracted {len(words)} words")
 
-        # vertical bands (handle layout transitions along Y)
-        bands = _find_vertical_bands(words, cfg)
-        print(f"📐 Page {page_num}: Found {len(bands)} vertical bands")
+                # Step 2: Reconstruct lines with proper spacing
+                lines = _reconstruct_lines_precisely(words, cfg)
+                print(f"  Formed {len(lines)} lines")
 
-        # build reading order using HDBSCAN per band
-        ordered = _build_reading_order(words, bands, cfg)
-        total_columns = sum(len(band_cols) for _, band_cols, _ in ordered)
-        print(f"🗂️  Page {page_num}: HDBSCAN detected {total_columns} columns across {len(bands)} bands")
+                # Step 3: Create layout elements maintaining reading order
+                elements = _detect_layout_structure(lines, page.width, cfg)
+                if not elements:
+                    print(f"  No valid elements on page {page_num}")
+                    continue
 
-        # global heading trail seed (e.g., page header if any)
-        headings_seed: List[str] = []
+                headings = [e for e in elements if e["type"] == "heading"]
+                print(f"  Found {len(elements)} elements ({len(headings)} headings)")
 
-        # pack chunks with overlap + 70-word rolling heading window
-        chunks = _pack_chunks_in_reading_order(ordered, cfg, page_num, headings_path=headings_seed)
-        print(f"📦 Page {page_num}: Generated {len(chunks)} semantic chunks")
+                # Step 4: Detect columns conservatively (only if beneficial)
+                columns = _detect_columns_conservatively(elements, cfg)
+                print(f"  Detected {len(columns)} columns")
 
-        # materialize to plain dicts
-        page_chunks = []
-        for c in chunks:
-            chunk_dict = {
-                "text": c.text,
-                "tokens_est": c.tokens_est,
-                "page_num": c.page_num,
-                "band_id": c.band_id,
-                "column_id": c.column_id,
-                "bbox": c.bbox,
-                "headings_path": c.headings_path,
-                "heading_window": c.heading_window,
-                "meta": c.meta,
-            }
-            page_chunks.append(chunk_dict)
-            out.append(chunk_dict)
-        
-        # Log sample chunks for this page
-        print(f"✨ Page {page_num} chunk samples:")
-        for i, chunk in enumerate(page_chunks[:3]):  # Show first 3 chunks
-            preview = chunk["text"][:120] + "..." if len(chunk["text"]) > 120 else chunk["text"]
-            print(f"   Chunk {i+1}: {len(chunk['text'])} chars, Band {chunk['band_id']}, Col {chunk['column_id']}")
-            print(f"   Preview: {preview}")
-      
-      print(f"\n🎯 HDBSCAN Processing Complete: {len(out)} total chunks across {len(pdf.pages)} pages")
-      return out
+                # Step 5: Process each column maintaining reading order
+                page_chunks = []
+                for col_idx, column_elements in enumerate(columns):
+                    if not column_elements:
+                        continue
+
+                    chunks = _create_chunks_with_overlap(column_elements, page_num, cfg)
+                    page_chunks.extend(chunks)
+                    print(f"    Column {col_idx + 1}: {len(chunks)} chunks")
+
+                # Convert to dict format
+                for chunk in page_chunks:
+                    chunk_dict = {
+                        "text": chunk.text,
+                        "tokens_est": chunk.tokens_est,
+                        "page_num": chunk.page_num,
+                        "bbox": chunk.bbox,
+                        "headings": chunk.headings,
+                        "meta": chunk.meta
+                    }
+                    all_chunks.append(chunk_dict)
+
+                print(f"  Total page chunks: {len(page_chunks)}")
+
+                # Quality check: ensure we're not losing text
+                total_chars = sum(len(chunk.text) for chunk in page_chunks)
+                original_chars = sum(len(word["text"]) for word in words)
+                coverage = total_chars / max(original_chars, 1) * 100
+                print(f"  Text coverage: {coverage:.1f}%")
+
+                if coverage < 70:
+                    print(f"  WARNING: Low text coverage on page {page_num}")
+
+            print(f"\nCompleted processing: {len(all_chunks)} total chunks")
+            return all_chunks
+
+    except Exception as e:
+        print(f"Error processing PDF: {e}")
+        return []
 
 
 # ---------- Example usage ----------
-# chunks = chunk_pdf_page_with_hdbscan("sample.pdf", page_index=0)
-# for i, ch in enumerate(chunks):
-#     print(f"--- Chunk {i+1} (tokens~{ch['tokens_est']}) ---")
-#     print("Heading Window:", ch["heading_window"])
-#     print("Headings Path:", " > ".join(ch["headings_path"]))
-#     print("Band:", ch["band_id"], "Column:", ch["column_id"], "BBox:", ch["bbox"]) 
-#     print(ch["text"])
+# if __name__ == "__main__":
+#     # Example usage
+#     config = ChunkingConfig(
+#         target_tokens=300,
+#         max_tokens=400,
+#         overlap_tokens=50
+#     )
+
+#     chunks = chunk_pdf_page_with_hdbscan("sample.pdf", config)
+
+#     for i, chunk in enumerate(chunks[:3]):  # Show first 3 chunks
+#         print(f"\n--- Chunk {i+1} ---")
+#         print(f"Tokens: {chunk['tokens_est']}")
+#         print(f"Page: {chunk['page_num']}")
+#         print(f"Headings: {chunk['headings']}")
+#         print(f"Text preview: {chunk['text'][:200]}...")
