@@ -699,12 +699,12 @@ def chunk_pdf_page_with_hdbscan(pdf_path: str, config: Optional[ChunkingConfig] 
 def analyze_page_with_2d_hdbscan(page, page_num: int = 1) -> Dict[str, Any]:
     """
     Analyze a single page with 2D HDBSCAN clustering (X and Y coordinates)
-    Plots the clusters and provides detailed summary
+    Directly clusters extracted words without intermediate processing
     """
     try:
-        print(f"\n🔍 Analyzing page {page_num} with 2D HDBSCAN...")
+        print(f"\n🔍 Analyzing page {page_num} with 2D HDBSCAN (Direct Word Clustering)...")
         
-        # Step 1: Extract and enrich words
+        # Step 1: Extract and enrich words directly
         words = _extract_and_enrich_words(page)
         if not words:
             print(f"  ❌ No words found on page {page_num}")
@@ -712,28 +712,12 @@ def analyze_page_with_2d_hdbscan(page, page_num: int = 1) -> Dict[str, Any]:
         
         print(f"  📝 Extracted {len(words)} words")
         
-        # Step 2: Reconstruct lines
-        lines = _reconstruct_lines_precisely(words, config)
-        if not lines:
-            print(f"  ❌ No lines formed on page {page_num}")
-            return {"error": "No lines formed"}
-        
-        print(f"  📄 Formed {len(lines)} lines")
-        
-        # Step 3: Create layout elements
-        elements = _detect_layout_structure(lines, page.width, config)
-        if not elements:
-            print(f"  ❌ No layout elements on page {page_num}")
-            return {"error": "No layout elements"}
-        
-        print(f"  🏗️ Created {len(elements)} layout elements")
-        
-        # Step 4: Prepare 2D coordinates for HDBSCAN
-        coordinates_2d = np.array([[elem["bbox"][0], elem["bbox"][1]] for elem in elements])
+        # Step 2: Prepare 2D coordinates for HDBSCAN directly from words
+        coordinates_2d = np.array([[word["x0"], word["top"]] for word in words])
         
         print(f"  📊 Prepared 2D coordinates: {coordinates_2d.shape}")
         
-        # Step 5: Apply HDBSCAN without cluster_selection_epsilon
+        # Step 3: Apply HDBSCAN without cluster_selection_epsilon
         clusterer = hdbscan.HDBSCAN(
             min_cluster_size=config.hdbscan_min_cluster_size,
             min_samples=config.hdbscan_min_samples
@@ -742,17 +726,17 @@ def analyze_page_with_2d_hdbscan(page, page_num: int = 1) -> Dict[str, Any]:
         
         labels = clusterer.fit_predict(coordinates_2d)
         
-        # Step 6: Plot the 2D clusters
-        _plot_2d_hdbscan_clusters(elements, labels, coordinates_2d, page_num, page.width, page.height)
+        # Step 4: Plot the 2D clusters with words
+        _plot_2d_word_clusters(words, labels, coordinates_2d, page_num, page.width, page.height)
         
-        # Step 7: Generate detailed summary
-        summary = _generate_hdbscan_summary(elements, labels, coordinates_2d, clusterer)
+        # Step 5: Generate detailed summary for words
+        summary = _generate_word_hdbscan_summary(words, labels, coordinates_2d, clusterer)
         
         print(f"  ✅ Analysis complete for page {page_num}")
         
         return {
             "page_num": page_num,
-            "total_elements": len(elements),
+            "total_words": len(words),
             "coordinates_shape": coordinates_2d.shape,
             "cluster_labels": labels.tolist(),
             "unique_clusters": len(set(labels)),
@@ -762,13 +746,14 @@ def analyze_page_with_2d_hdbscan(page, page_num: int = 1) -> Dict[str, Any]:
                 "min_samples": config.hdbscan_min_samples
             },
             "summary": summary,
-            "elements_sample": [
+            "words_sample": [
                 {
-                    "text": elem["text"][:100] + "..." if len(elem["text"]) > 100 else elem["text"],
-                    "bbox": elem["bbox"],
+                    "text": word["text"],
+                    "bbox": [word["x0"], word["top"], word["x1"], word["bottom"]],
+                    "font_size": word["size_est"],
                     "cluster": int(labels[i]) if i < len(labels) else -1
                 }
-                for i, elem in enumerate(elements[:5])  # First 5 elements
+                for i, word in enumerate(words[:10])  # First 10 words
             ]
         }
         
@@ -777,6 +762,158 @@ def analyze_page_with_2d_hdbscan(page, page_num: int = 1) -> Dict[str, Any]:
         import traceback
         traceback.print_exc()
         return {"error": str(e)}
+
+
+def _plot_2d_word_clusters(words: List[Dict[str, Any]], labels: np.ndarray, coordinates_2d: np.ndarray, page_num: int, page_width: float, page_height: float):
+    """Plot 2D HDBSCAN clusters for individual words"""
+    try:
+        # Create figure with subplots
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(20, 16))
+        
+        # Extract coordinates
+        x_positions = coordinates_2d[:, 0]
+        y_positions = coordinates_2d[:, 1]
+        y_positions_flipped = page_height - coordinates_2d[:, 1]  # Flip for visualization
+        
+        # Get unique labels and colors
+        unique_labels = set(labels)
+        n_clusters = len(unique_labels) - (1 if -1 in unique_labels else 0)
+        colors = plt.cm.Set1(np.linspace(0, 1, max(n_clusters, 1)))
+        color_map = {}
+        color_idx = 0
+        
+        for label in unique_labels:
+            if label == -1:
+                color_map[label] = 'black'
+            else:
+                color_map[label] = colors[color_idx % len(colors)]
+                color_idx += 1
+        
+        # Plot 1: X-coordinates distribution
+        ax1.set_title(f'Page {page_num}: Word X-Coordinates Distribution by Cluster')
+        ax1.set_xlabel('X Position')
+        ax1.set_ylabel('Count')
+        
+        for label in unique_labels:
+            mask = labels == label
+            cluster_x = x_positions[mask]
+            
+            if label == -1:
+                label_name = f'Noise ({len(cluster_x)})'
+                alpha = 0.6
+            else:
+                label_name = f'Cluster {label} ({len(cluster_x)})'
+                alpha = 0.8
+            
+            ax1.hist(cluster_x, bins=30, alpha=alpha, color=color_map[label], 
+                    label=label_name, edgecolor='black', linewidth=0.5)
+        
+        ax1.set_xlim(0, page_width)
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+        
+        # Plot 2: Y-coordinates distribution
+        ax2.set_title(f'Page {page_num}: Word Y-Coordinates Distribution by Cluster')
+        ax2.set_xlabel('Y Position')
+        ax2.set_ylabel('Count')
+        
+        for label in unique_labels:
+            mask = labels == label
+            cluster_y = y_positions[mask]
+            
+            if label == -1:
+                label_name = f'Noise ({len(cluster_y)})'
+                alpha = 0.6
+            else:
+                label_name = f'Cluster {label} ({len(cluster_y)})'
+                alpha = 0.8
+            
+            ax2.hist(cluster_y, bins=30, alpha=alpha, color=color_map[label], 
+                    label=label_name, edgecolor='black', linewidth=0.5)
+        
+        ax2.set_xlim(0, page_height)
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+        
+        # Plot 3: 2D Scatter Plot (Page Layout View)
+        ax3.set_title(f'Page {page_num}: 2D Word Layout with Clusters')
+        ax3.set_xlabel('X Position')
+        ax3.set_ylabel('Y Position (flipped for readability)')
+        
+        for label in unique_labels:
+            mask = labels == label
+            cluster_x = x_positions[mask]
+            cluster_y = y_positions_flipped[mask]
+            
+            if label == -1:
+                marker = 'x'
+                size = 20
+                alpha = 0.5
+                label_name = f'Noise ({len(cluster_x)})'
+            else:
+                marker = 'o'
+                size = 30
+                alpha = 0.7
+                label_name = f'Cluster {label} ({len(cluster_x)})'
+            
+            ax3.scatter(cluster_x, cluster_y, c=[color_map[label]], marker=marker, 
+                       s=size, alpha=alpha, label=label_name, edgecolors='black', linewidth=0.3)
+        
+        ax3.set_xlim(0, page_width)
+        ax3.set_ylim(0, page_height)
+        ax3.legend()
+        ax3.grid(True, alpha=0.3)
+        
+        # Plot 4: Cluster Statistics and Word Samples
+        ax4.axis('off')
+        ax4.set_title(f'Page {page_num}: Word Cluster Statistics', pad=20)
+        
+        # Create statistics text
+        stats_text = []
+        stats_text.append(f"Total Words: {len(words)}")
+        stats_text.append(f"Total Clusters: {n_clusters}")
+        stats_text.append(f"Noise Words: {np.sum(labels == -1)}")
+        stats_text.append("")
+        
+        for label in sorted(unique_labels):
+            mask = labels == label
+            count = np.sum(mask)
+            cluster_words = np.array(words)[mask]
+            cluster_x = x_positions[mask]
+            cluster_y = y_positions[mask]
+            
+            if label == -1:
+                stats_text.append(f"Noise Words:")
+            else:
+                stats_text.append(f"Cluster {label}:")
+            
+            stats_text.append(f"  • Words: {count}")
+            if len(cluster_x) > 0:
+                stats_text.append(f"  • X Range: {min(cluster_x):.1f} - {max(cluster_x):.1f}")
+                stats_text.append(f"  • Y Range: {min(cluster_y):.1f} - {max(cluster_y):.1f}")
+                stats_text.append(f"  • X Center: {np.mean(cluster_x):.1f}")
+                stats_text.append(f"  • Y Center: {np.mean(cluster_y):.1f}")
+                
+                # Show first few words from this cluster
+                sample_words = [w["text"] for w in cluster_words[:3]]
+                stats_text.append(f"  • Sample: {', '.join(sample_words)}")
+            stats_text.append("")
+        
+        # Display statistics
+        ax4.text(0.05, 0.95, '\n'.join(stats_text), transform=ax4.transAxes, 
+                fontsize=9, verticalalignment='top', fontfamily='monospace',
+                bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.8))
+        
+        # Save plot
+        plot_filename = f"2d_word_hdbscan_analysis_page_{page_num}.png"
+        plt.tight_layout()
+        plt.savefig(plot_filename, dpi=150, bbox_inches='tight')
+        print(f"  📊 2D word cluster analysis plot saved: {plot_filename}")
+        
+        plt.close()  # Close to free memory
+        
+    except Exception as e:
+        print(f"  ⚠️ Error plotting 2D word clusters: {e}")
 
 
 def _plot_2d_hdbscan_clusters(elements: List[Dict[str, Any]], labels: np.ndarray, coordinates_2d: np.ndarray, page_num: int, page_width: float, page_height: float):
@@ -924,6 +1061,105 @@ def _plot_2d_hdbscan_clusters(elements: List[Dict[str, Any]], labels: np.ndarray
         
     except Exception as e:
         print(f"  ⚠️ Error plotting 2D clusters: {e}")
+
+
+def _generate_word_hdbscan_summary(words: List[Dict[str, Any]], labels: np.ndarray, coordinates_2d: np.ndarray, clusterer) -> Dict[str, Any]:
+    """Generate comprehensive HDBSCAN analysis summary for words"""
+    try:
+        unique_labels = set(labels)
+        n_clusters = len(unique_labels) - (1 if -1 in unique_labels else 0)
+        n_noise = np.sum(labels == -1)
+        
+        # Calculate cluster statistics
+        cluster_stats = {}
+        for label in unique_labels:
+            mask = labels == label
+            cluster_words = np.array(words)[mask]
+            cluster_coords = coordinates_2d[mask]
+            
+            if len(cluster_coords) > 0:
+                # Extract word texts and font sizes
+                word_texts = [w["text"] for w in cluster_words]
+                font_sizes = [w["size_est"] for w in cluster_words]
+                
+                stats = {
+                    "count": len(cluster_words),
+                    "x_range": [float(np.min(cluster_coords[:, 0])), float(np.max(cluster_coords[:, 0]))],
+                    "y_range": [float(np.min(cluster_coords[:, 1])), float(np.max(cluster_coords[:, 1]))],
+                    "x_center": float(np.mean(cluster_coords[:, 0])),
+                    "y_center": float(np.mean(cluster_coords[:, 1])),
+                    "x_std": float(np.std(cluster_coords[:, 0])),
+                    "y_std": float(np.std(cluster_coords[:, 1])),
+                    "avg_font_size": float(np.mean(font_sizes)) if font_sizes else 12.0,
+                    "font_size_range": [float(min(font_sizes)), float(max(font_sizes))] if font_sizes else [12.0, 12.0],
+                    "word_samples": word_texts[:5],  # First 5 words
+                    "total_characters": sum(len(w) for w in word_texts),
+                    "avg_word_length": float(np.mean([len(w) for w in word_texts])) if word_texts else 0.0
+                }
+                
+                if label == -1:
+                    cluster_stats["noise"] = stats
+                else:
+                    cluster_stats[f"cluster_{label}"] = stats
+        
+        # Overall statistics
+        summary = {
+            "overview": {
+                "total_words": len(words),
+                "total_clusters": n_clusters,
+                "noise_words": int(n_noise),
+                "clustering_success_rate": float((len(words) - n_noise) / len(words) * 100) if len(words) > 0 else 0.0,
+                "avg_words_per_cluster": float((len(words) - n_noise) / n_clusters) if n_clusters > 0 else 0.0
+            },
+            "parameters": {
+                "min_cluster_size": clusterer.min_cluster_size,
+                "min_samples": clusterer.min_samples,
+                "algorithm": "HDBSCAN",
+                "metric": "euclidean",
+                "dimensions": "2D (X, Y coordinates)",
+                "input_type": "individual_words"
+            },
+            "cluster_details": cluster_stats,
+            "quality_metrics": {
+                "noise_ratio": float(n_noise / len(words)) if len(words) > 0 else 0.0,
+                "largest_cluster_size": max([stats["count"] for stats in cluster_stats.values() if isinstance(stats, dict)], default=0),
+                "smallest_cluster_size": min([stats["count"] for stats in cluster_stats.values() if isinstance(stats, dict) and "cluster" in str(stats)], default=0) if n_clusters > 0 else 0,
+                "cluster_size_variance": float(np.var([stats["count"] for stats in cluster_stats.values() if isinstance(stats, dict) and "cluster" in str(stats)])) if n_clusters > 0 else 0.0
+            }
+        }
+        
+        # Print detailed summary
+        print(f"\n" + "="*80)
+        print(f"📊 HDBSCAN 2D WORD CLUSTERING SUMMARY")
+        print(f"="*80)
+        print(f"Total Words: {summary['overview']['total_words']}")
+        print(f"Clusters Found: {summary['overview']['total_clusters']}")
+        print(f"Noise Words: {summary['overview']['noise_words']}")
+        print(f"Success Rate: {summary['overview']['clustering_success_rate']:.1f}%")
+        print(f"Avg Words/Cluster: {summary['overview']['avg_words_per_cluster']:.1f}")
+        print(f"Noise Ratio: {summary['quality_metrics']['noise_ratio']:.2f}")
+        
+        for key, stats in cluster_stats.items():
+            if key == "noise":
+                print(f"\n🔸 NOISE WORDS:")
+            else:
+                cluster_id = key.replace("cluster_", "")
+                print(f"\n🔸 CLUSTER {cluster_id}:")
+            
+            print(f"   Words: {stats['count']}")
+            print(f"   X Range: {stats['x_range'][0]:.1f} - {stats['x_range'][1]:.1f} (center: {stats['x_center']:.1f})")
+            print(f"   Y Range: {stats['y_range'][0]:.1f} - {stats['y_range'][1]:.1f} (center: {stats['y_center']:.1f})")
+            print(f"   Font Size: {stats['avg_font_size']:.1f} avg ({stats['font_size_range'][0]:.1f}-{stats['font_size_range'][1]:.1f})")
+            print(f"   Word Samples: {stats['word_samples']}")
+            print(f"   Avg Word Length: {stats['avg_word_length']:.1f} chars")
+        
+        print(f"="*80)
+        
+        return summary
+        
+    except Exception as e:
+        print(f"  ⚠️ Error generating word summary: {e}")
+        return {"error": str(e)}
 
 
 def _generate_hdbscan_summary(elements: List[Dict[str, Any]], labels: np.ndarray, coordinates_2d: np.ndarray, clusterer) -> Dict[str, Any]:
