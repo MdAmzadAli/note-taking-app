@@ -71,12 +71,26 @@ class UnifiedChunkingService:
             'processing_strategy': 'enhanced_layout_aware_semantic'
         })
         
+        # Handle case where result might be a list instead of dict
+        if isinstance(result, list):
+            # Convert list of chunks to expected dict format
+            result = {
+                'chunks': result,
+                'success': True,
+                'processing_strategy': 'enhanced_layout_aware_semantic',
+                'summary': {
+                    'total_chunks': len(result),
+                    'content_type': 'pdf'
+                }
+            }
+        
         # Add unified service metadata
-        result['unified_service_info'] = {
-            'service_type': 'UnifiedChunkingService',
-            'chunking_strategy': 'pdf_specialized',
-            # 'pdf_chunker_config': self.pdf_chunker.get_config()
-        }
+        if isinstance(result, dict):
+            result['unified_service_info'] = {
+                'service_type': 'UnifiedChunkingService',
+                'chunking_strategy': 'pdf_specialized',
+                # 'pdf_chunker_config': self.pdf_chunker.get_config()
+            }
         
         return result
     
