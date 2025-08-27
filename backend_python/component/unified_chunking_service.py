@@ -75,7 +75,7 @@ class UnifiedChunkingService:
         result['unified_service_info'] = {
             'service_type': 'UnifiedChunkingService',
             'chunking_strategy': 'pdf_specialized',
-            'pdf_chunker_config': self.pdf_chunker.get_config()
+            # 'pdf_chunker_config': self.pdf_chunker.get_config()
         }
         
         return result
@@ -117,7 +117,7 @@ class UnifiedChunkingService:
         result['unified_service_info'] = {
             'service_type': 'UnifiedChunkingService',
             'chunking_strategy': 'webpage_specialized',
-            'text_chunker_config': self.pdf_chunker.get_config(),
+            # 'text_chunker_config': self.pdf_chunker.get_config(),
             'web_extractor_stats': self.web_extractor.get_stats()
         }
         
@@ -141,7 +141,7 @@ class UnifiedChunkingService:
         result['unified_service_info'] = {
             'service_type': 'UnifiedChunkingService',
             'chunking_strategy': 'text_specialized',
-            'text_chunker_config': self.pdf_chunker.get_config()
+            # 'text_chunker_config': self.pdf_chunker.get_config()
         }
         
         return result
@@ -198,7 +198,7 @@ class UnifiedChunkingService:
             'service_type': 'UnifiedChunkingService',
             'chunk_size': self.chunk_size,
             'chunk_overlap': self.chunk_overlap,
-            'pdf_chunker_config': self.pdf_chunker.get_config(),
+            # 'pdf_chunker_config': self.pdf_chunker.get_config(),
             'web_extractor_config': self.web_extractor.get_stats(),
             'supported_content_types': ['pdf', 'webpage', 'text']
         }
@@ -283,5 +283,5 @@ class UnifiedChunkingService:
             'pdf_chunker': 'available',
             'web_extractor': 'available',
             'supported_types': ['pdf', 'webpage', 'text'],
-            'config': self.get_config()
+            # 'config': self.get_config()
         }
