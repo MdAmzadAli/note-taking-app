@@ -168,7 +168,9 @@ def chunk_pdf_page_with_hdbscan(
                 print(f"  Extracted {len(words)} words")
 
                 chunks = analyze_page_with_2d_hdbscan(words, page, page_num)
-                all_chunks.append(chunks)
+                for ch in chunks:
+                    all_chunks.append(ch)
+            # print(f'Chunk is : {all_chunks[0]}')
             return all_chunks
 
             #     # Convert to dict format
@@ -329,9 +331,9 @@ def analyze_page_with_2d_hdbscan(words,
 
         # Step 5: Generate detailed summary for words
         # summary = _generate_word_hdbscan_summary(words, labels, coordinates_2d, clusterer)
-
+        
         print(f"  ✅ Analysis complete for page {page_num}")
-
+        
         return chunks
 
     except Exception as e:

@@ -75,7 +75,7 @@ class UnifiedChunkingService:
         if isinstance(result, list):
             # Convert list of chunks to expected dict format
             result = {
-                'chunks': result,
+                'chunks': result["chunks"],
                 'success': True,
                 'processing_strategy': 'enhanced_layout_aware_semantic',
                 'summary': {

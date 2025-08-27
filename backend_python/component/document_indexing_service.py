@@ -59,11 +59,14 @@ class DocumentIndexingService:
                     'contentType': content_type
                 }
             )
-
+            # print(f'📊 Unified Processing Result: {processing_result}')
             chunks = processing_result.get('chunks', [])
             if not chunks:
                 raise Exception('No chunks generated from content')
-
+           
+                
+            # print(f"Chunk is: {chunks[0]}\n")
+            # print(f'📊 Testing chunk: {chunks[0]['text']}')
             # Log processing summary
             print(f'📊 Unified Processing Summary:', processing_result.get('summary', {}))
 
@@ -110,7 +113,7 @@ class DocumentIndexingService:
 
             # Extract texts for batch embedding
             batch_texts = [chunk['text'] for chunk in batch_chunks]
-
+            print('📝 Batch texts: crossed')
             # Generate embeddings for the entire batch
             batch_embeddings = await self.embedding_service.generate_batch_embeddings(batch_texts, 'document')
             all_embeddings.extend(batch_embeddings)
