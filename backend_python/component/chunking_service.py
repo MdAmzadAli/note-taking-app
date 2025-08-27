@@ -16,169 +16,7 @@ class ChunkingService:
         self.chunk_overlap = chunk_overlap
         print(f"🚀 Page-by-Page ChunkingService initialized with chunk_size={chunk_size}, chunk_overlap={chunk_overlap}")
 
-    def set_chunk_size(self, size: int):
-        """Update chunk size"""
-        self.chunk_size = size
-
-    def set_chunk_overlap(self, overlap: int):
-        """Update chunk overlap"""
-        self.chunk_overlap = overlap
-
-    def get_config(self) -> Dict:
-        """Get current configuration"""
-        return {
-            'chunk_size': self.chunk_size,
-            'chunk_overlap': self.chunk_overlap,
-            'strategy': 'page_by_page_chunking'
-        }
-
-    def console_log_chunks(self, chunks: List[Dict]):
-        max_chunks_to_show = min(4, len(chunks))
-        for i in range(max_chunks_to_show):
-            chunk = chunks[i]
-            chunk_text = chunk.get('text', '')
-            page_num = chunk.get('page_number', 'N/A')
-            chunk_preview = chunk_text
-
-            print(f"\n📄 CHUNK {i+1}/{len(chunks)}:")
-            print(f"   Page: {page_num}")
-            print(f"   Size: {len(chunk_text)} characters")
-            print(f"   Type: {chunk.get('type', 'N/A')}")
-            print(f"   Preview: {chunk_preview}")
-            print(f"   {'-'*60}")
-
-        if len(chunks) > max_chunks_to_show:
-            print(f"\n... and {len(chunks) - max_chunks_to_show} more chunks")
-
-        print(f"="*80)
-
-    
-    async def extract_and_chunk_page(self, pdf_page, page_number: int) -> Tuple[str, List[Dict]]:
-        """Extract text from a single page and create chunks"""
-        try:
-            print(f"📄 Processing page {page_number}...")
-            
-            # Extract text from this page
-            page_text = pdf_page.extract_text() or ""
-            
-            # Create chunks from this page's text
-            page_chunks = []
-            if page_text and page_text.strip():
-                chunk_texts = self._split_text_basic(page_text)
-                
-               
-                
-                for i, chunk_text in enumerate(chunk_texts):
-                    chunk = {
-                        'text': chunk_text.strip(),
-                        'type': 'text',
-                        'page_number': page_number,
-                        'page_chunk_index': i + 1,
-                        'start_char': None,
-                        'end_char': None,
-                        'metadata': {
-                            'chunk_method': 'page_by_page',
-                            'chunk_size': len(chunk_text),
-                            'target_size': self.chunk_size,
-                            'overlap': self.chunk_overlap,
-                            'page_source': page_number
-                        }
-                    }
-                    page_chunks.append(chunk)
-            
-            print(f"📄 Page {page_number}: {len(page_text)} chars → {len(page_chunks)} chunks")
-            self.console_log_chunks(page_chunks)
-            return page_text, page_chunks
-            
-        except Exception as error:
-            print(f'❌ Page {page_number} processing failed: {error}')
-            return "", []
-
-    async def extract_text_from_pdf(self, file_path: str) -> Dict:
-        """Page-by-page PDF text extraction"""
-        try:
-            if not file_path or not isinstance(file_path, str):
-                raise ValueError('Invalid file path provided')
-
-            if not os.path.exists(file_path):
-                raise FileNotFoundError(f'File not found: {file_path}')
-
-            print('📄 Starting page-by-page PDF extraction...')
-
-            pages = []
-            all_chunks = []
-            full_text = ''
-            global_chunk_index = 0
-
-            with pdfplumber.open(file_path) as pdf:
-                total_pages = len(pdf.pages)
-                print(f"📄 PDF loaded: {total_pages} pages")
-
-                for page_num, page in enumerate(pdf.pages, 1):
-                    # Process this page and get its chunks
-                    page_text, page_chunks = await self.extract_and_chunk_page(page, page_num)
-                    
-                    # Update global chunk indices
-                    for chunk in page_chunks:
-                        global_chunk_index += 1
-                        chunk['chunk_index'] = global_chunk_index
-                    
-                    # Store page info
-                    pages.append({
-                        'page_number': page_num,
-                        # 'text': page_text,
-                        'lines': [line.strip() for line in page_text.split('\n') if line.strip()],
-                        'columns': 1,
-                        'has_table': False,
-                        'chunk_count': len(page_chunks)
-                    })
-
-                    # Add to full collections
-                    # full_text += page_text + '\n\n'
-                    all_chunks.extend(page_chunks)
-
-                    # Log progress every few pages
-                    if page_num % 5 == 0 or page_num == total_pages:
-                        print(f"📄 Progress: {page_num}/{total_pages} pages processed, {len(all_chunks)} total chunks")
-
-            print(f"📄 Page-by-page extraction completed: {len(pages)} pages, {len(all_chunks)} chunks")
-
-            return {
-                # 'full_text': full_text.strip(),
-                'pages': pages,
-                'total_pages': total_pages,
-                'chunks': all_chunks
-            }
-
-        except Exception as error:
-            print(f'❌ Page-by-page extraction failed: {error}')
-            return {
-                'full_text': 'Text extraction failed',
-                'pages': [{
-                    'page_number': 1,
-                    'text': 'Text extraction failed',
-                    'lines': ['Text extraction failed'],
-                    'columns': 1,
-                    'has_table': False,
-                    'chunk_count': 0
-                }],
-                'total_pages': 1,
-                'chunks': []
-            }
-
-    def _clean_text(self, text: str) -> str:
-        """Basic text cleaning"""
-        if not text:
-            return ""
-
-        # Remove excessive whitespace
-        text = ' '.join(text.split())
-
-        # Replace multiple newlines with double newlines
-        import re
-        text = re.sub(r'\n{3,}', '\n\n', text)
-
-        return text.strip()
+  
 
     def split_into_chunks(self, pdf_data: Dict, metadata: Optional[Dict] = None) -> List[Dict]:
         """Return pre-created chunks from page-by-page processing"""
@@ -332,88 +170,10 @@ class ChunkingService:
             print(f"🔬 Processing PDF with HDBSCAN chunking: {file_path}")
             
             # Get chunks from HDBSCAN
-            chunks = chunk_pdf_page_with_hdbscan(file_path)
-            
-            if not chunks:
-                print("❌ No chunks generated from HDBSCAN")
-                return {
-                    'pdf_data': {'pages': [], 'total_pages': 0},
-                    'chunks': [],
-                    'summary': {'total_chunks': 0, 'processing_method': 'hdbscan_failed'}
-                }
-            
-            # Process and analyze chunks
-            processed_chunks = []
-            page_groups = {}
-            
-            # Group chunks by page
-            for i, chunk in enumerate(chunks):
-                page_num = chunk.get('page_num', 1)
-                if page_num not in page_groups:
-                    page_groups[page_num] = []
-                
-                # Convert to our standard format
-                processed_chunk = {
-                    'chunk_index': i + 1,
-                    'text': chunk.get('text', ''),
-                    'type': 'semantic_hdbscan',
-                    'page_number': page_num,
-                    'band_id': chunk.get('band_id', -1),
-                    'column_id': chunk.get('column_id', -1),
-                    'bbox': chunk.get('bbox', (0, 0, 0, 0)),
-                    'tokens_est': chunk.get('tokens_est', 0),
-                    'headings_path': chunk.get('headings_path', []),
-                    'heading_window': chunk.get('heading_window', ''),
-                    'metadata': {
-                        **(metadata or {}),
-                        'chunk_method': 'hdbscan_semantic',
-                        'band_id': chunk.get('band_id', -1),
-                        'column_id': chunk.get('column_id', -1),
-                        'original_meta': chunk.get('meta', {})
-                    }
-                }
-                processed_chunks.append(processed_chunk)
-                page_groups[page_num].append(processed_chunk)
-            
-            # Detailed page-by-page analysis
-            self._log_hdbscan_analysis(page_groups, len(chunks))
-            
-            # Create summary
-            total_pages = max(page_groups.keys()) if page_groups else 0
-            pages_info = []
-            for page_num in sorted(page_groups.keys()):
-                page_chunks = page_groups[page_num]
-                pages_info.append({
-                    'page_number': page_num,
-                    'chunk_count': len(page_chunks),
-                    'columns_detected': len(set(c['column_id'] for c in page_chunks)),
-                    'bands_detected': len(set(c['band_id'] for c in page_chunks)),
-                    'has_headings': any(c['headings_path'] for c in page_chunks)
-                })
-
+            chunks=chunk_pdf_page_with_hdbscan(file_path)
             return {
-                'pdf_data': {
-                    'pages': ["pages_info"],
-                    'total_pages': total_pages
-                },
-                'chunks': ["processed_chunks"],
-                
+                "chunks": chunks
             }
-            # return {
-            #     'pdf_data': {
-            #         'pages': pages_info,
-            #         'total_pages': total_pages
-            #     },
-            #     'chunks': processed_chunks,
-            #     'summary': {
-            #         'total_pages': total_pages,
-            #         'total_chunks': len(processed_chunks),
-            #         'average_chunks_per_page': len(processed_chunks) / total_pages if total_pages > 0 else 0,
-            #         'processing_method': 'hdbscan_semantic',
-            #         'has_multi_column': any(p['columns_detected'] > 1 for p in pages_info),
-            #         'has_structured_content': any(p['has_headings'] for p in pages_info)
-            #     }
-            # }
             
         except Exception as error:
             print(f'❌ HDBSCAN PDF processing failed: {error}')
@@ -425,50 +185,7 @@ class ChunkingService:
                 'summary': {'total_chunks': 0, 'processing_method': 'hdbscan_error', 'error': str(error)}
             }
 
-    def _log_hdbscan_analysis(self, page_groups: Dict[int, List[Dict]], total_chunks: int):
-        """Log detailed HDBSCAN chunking analysis"""
-        print(f"\n" + "="*100)
-        print(f"🔬 HDBSCAN SEMANTIC CHUNKING ANALYSIS")
-        print(f"="*100)
-        print(f"📊 Total chunks generated: {total_chunks}")
-        print(f"📄 Pages processed: {len(page_groups)}")
-        
-        for page_num in sorted(page_groups.keys()):
-            page_chunks = page_groups[page_num]
-            print(f"\n📄 PAGE {page_num} ANALYSIS:")
-            print(f"   Chunks: {len(page_chunks)}")
-            print(f"   Columns detected: {len(set(c['column_id'] for c in page_chunks))}")
-            print(f"   Vertical bands: {len(set(c['band_id'] for c in page_chunks))}")
-            print(f"   Has headings: {any(c['headings_path'] for c in page_chunks)}")
-            
-            # Show up to 7 chunks for this page
-            chunks_to_show = min(7, len(page_chunks))
-            print(f"   📋 Showing {chunks_to_show}/{len(page_chunks)} chunks:")
-            
-            for i in range(chunks_to_show):
-                chunk = page_chunks[i]
-                text_preview = chunk['text']
-                
-                print(f"\n   🔸 CHUNK {i+1}:")
-                print(f"      Size: {len(chunk['text'])} chars ({chunk['tokens_est']} tokens)")
-                print(f"      Position: Band {chunk['band_id']}, Column {chunk['column_id']}")
-                print(f"      BBox: {chunk['bbox']}")
-                
-                if chunk['headings_path']:
-                    print(f"      Headings: {' > '.join(chunk['headings_path'])}")
-                
-                if chunk['heading_window']:
-                    hw_preview = chunk['heading_window'][:100] + ('...' if len(chunk['heading_window']) > 100 else '')
-                    print(f"      Context: {hw_preview}")
-                
-                print(f"      Preview: {text_preview}")
-                print(f"      {'-'*50}")
-            
-            if len(page_chunks) > chunks_to_show:
-                print(f"   ... and {len(page_chunks) - chunks_to_show} more chunks")
-        
-        print(f"\n" + "="*100)
-
+    
     
     async def process_text_content(self, text: str, metadata: Optional[Dict] = None) -> Dict:
         """Process text content"""
@@ -527,7 +244,7 @@ class ChunkingService:
             }
 
         sizes = [len(chunk.get('text', '')) for chunk in chunks]
-        pages = set(chunk.get('page_number') for chunk in chunks if chunk.get('page_number'))
+        pages = set(chunk.get('page_num','') for chunk in chunks if chunk.get('page_num'))
 
         return {
             'total_chunks': len(chunks),

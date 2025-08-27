@@ -69,7 +69,7 @@ class DocumentIndexingService:
 
             # Add processing statistics
             processing_stats = self.unified_chunking_service.get_processing_stats(chunks)
-            content_analysis = self.unified_chunking_service.analyze_content_structure(processing_result)
+            # content_analysis = self.unified_chunking_service.analyze_content_structure(processing_result)
 
             print(f'📄 Created {len(chunks)} chunks for {file_name}')
 
