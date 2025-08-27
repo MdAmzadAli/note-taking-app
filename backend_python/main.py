@@ -229,7 +229,7 @@ async def delete_file(file_id: str):
 async def upload_workspace(
     workspaceId: str = Form(...),
     urls: Optional[str] = Form(None),
-    files: List[UploadFile] = File(default=[])
+    files: List[UploadFile] = File(default= [])
 ):
     try:
         print("📤 Workspace mixed upload request received")
@@ -345,13 +345,20 @@ async def upload_workspace(
                     print(f"🧹 Cleaned up temporary download file: {download_result['filePath']}")
 
                 elif url_info.get("type") == "webpage":
-                    # Extract text from webpage
-                    print(f"🌐 Extracting text from webpage: {url_info.get('url')}")
-                    extract_result = await webpage_text_extractor_service.extract_webpage_text(url_info.get("url"), file_id)
+                    # Process webpage with crawling
+                    print(f"🌐 Processing webpage with crawling: {url_info.get('url')}")
 
-                    if not extract_result.get("success"):
-                        raise Exception(f"Failed to extract webpage text: {extract_result.get('error', 'Unknown error')}")
+                    # Use the URL directly for processing - the unified chunking service will handle crawling
+                    file_path = url_info.get("url")
+                    content_type = "webpage"
 
+                    # Skip the old extraction logic - let unified chunking service handle it
+                    extract_result = {
+                        'success': True,
+                        'text': file_path,  # Pass URL directly
+                        'fileName': f"webpage_{file_id}_{url_info.get('url').split('/')[-1] or 'index'}.txt",
+                        'mimetype': 'text/plain'
+                    }
                     file_content = extract_result["text"].encode('utf-8')
                     original_name = extract_result["fileName"]
                     mimetype = extract_result["mimetype"]

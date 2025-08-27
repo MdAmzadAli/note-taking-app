@@ -3,6 +3,7 @@ import asyncio
 from typing import Dict, List, Any, Optional, Union
 from .chunking_service import ChunkingService
 from .webpage_text_extractor_service import WebpageTextExtractorService
+from ..utils.webpageUtils.webpage_crawler import WebpageCrawler
 import os
 
 
@@ -12,10 +13,15 @@ class UnifiedChunkingService:
     based on content type while maintaining specialized handling.
     """
     
-    def __init__(self, chunk_size: int = 800, chunk_overlap: int = 75):
+    def __init__(self, chunk_size: int = 800, chunk_overlap: int = 60):
         # Initialize specialized chunking services
         self.pdf_chunker = ChunkingService(chunk_size, chunk_overlap)
         self.web_extractor = WebpageTextExtractorService()
+        self.webpage_crawler = WebpageCrawler(
+            web_extractor=self.web_extractor,
+            max_pages=50,  # Limit to 50 pages per crawl
+            max_total_size=10 * 1024 * 1024  # 10MB limit
+        )
         
         # Configuration
         self.chunk_size = chunk_size
@@ -95,47 +101,68 @@ class UnifiedChunkingService:
         return result
     
     async def _process_webpage_content(self, url_or_text: str, metadata: Dict) -> Dict[str, Any]:
-        """Process webpage content using web extractor + text chunking"""
+        """Process webpage content using web crawler + text chunking"""
         print(f"🌐 Processing webpage content: {url_or_text}")
         
         # Determine if input is URL or extracted text
         if url_or_text.startswith(('http://', 'https://')):
-            # Extract text from URL
             file_id = metadata.get('fileId', 'webpage_extract')
-            extraction_result = await self.web_extractor.extract_webpage_text(url_or_text, file_id)
             
-            if not extraction_result['success']:
-                raise Exception(f"Failed to extract text from webpage: {url_or_text}")
+            # Use webpage crawler for recursive URL processing
+            print(f"🕷️ Starting webpage crawling process...")
+            crawl_result = await self.webpage_crawler.crawl_website(
+                initial_url=url_or_text,
+                file_id=file_id,
+                same_domain_only=True  # Restrict to same domain for safety
+            )
             
-            text_content = extraction_result['text']
+            if not crawl_result['success']:
+                raise Exception(f"Failed to crawl website: {crawl_result.get('error', 'Unknown error')}")
             
-            # Merge webpage metadata
-            webpage_metadata = {
+            # Get aggregated data from crawler
+            aggregated_data = crawl_result['aggregated_data']
+            
+            # Use the aggregated data for chunking (similar to PDF processing)
+            result = self.pdf_chunker.split_into_chunks(aggregated_data, {
                 **metadata,
                 'content_type': 'webpage',
-                'originalUrl': extraction_result['metadata']['originalUrl'],
-                'title': extraction_result['metadata']['title'],
-                'description': extraction_result['metadata']['description'],
-                'wordCount': extraction_result['metadata']['wordCount'],
-                'extractedAt': extraction_result['metadata']['extractedAt']
+                'crawling_stats': crawl_result['crawl_stats'],
+                'pages_processed': crawl_result['pages_processed'],
+                'total_size': crawl_result['total_size'],
+                'initial_url': url_or_text
+            })
+            
+            # Create result structure
+            processing_result = {
+                'chunks': result,
+                'webpage_data': aggregated_data,
+                'crawl_result': crawl_result,
+                'summary': {
+                    'total_pages': aggregated_data['total_pages'],
+                    'total_chunks': len(result),
+                    'full_text_length': len(aggregated_data['full_text']),
+                    'pages_processed': crawl_result['pages_processed'],
+                    'total_size': crawl_result['total_size'],
+                    'processing_method': 'webpage_crawling'
+                }
             }
+            
         else:
-            # Assume it's already extracted text
+            # Assume it's already extracted text - use existing logic
             text_content = url_or_text
             webpage_metadata = {**metadata, 'content_type': 'webpage'}
-        
-        # Use text chunking for webpage content
-        result = await self.pdf_chunker.process_text_content(text_content, webpage_metadata)
+            
+            processing_result = await self.pdf_chunker.process_text_content(text_content, webpage_metadata)
         
         # Add unified service metadata
-        result['unified_service_info'] = {
+        processing_result['unified_service_info'] = {
             'service_type': 'UnifiedChunkingService',
-            'chunking_strategy': 'webpage_specialized',
-            # 'text_chunker_config': self.pdf_chunker.get_config(),
-            'web_extractor_stats': self.web_extractor.get_stats()
+            'chunking_strategy': 'webpage_crawler_specialized',
+            'web_extractor_stats': self.web_extractor.get_stats(),
+            'crawler_stats': self.webpage_crawler.get_crawler_stats()
         }
         
-        return result
+        return processing_result
     
     async def _process_text_content(self, text: str, metadata: Dict) -> Dict[str, Any]:
         """Process plain text content using text chunking"""

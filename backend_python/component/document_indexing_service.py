@@ -63,8 +63,8 @@ class DocumentIndexingService:
             chunks = processing_result.get('chunks', [])
             if not chunks:
                 raise Exception('No chunks generated from content')
-           
-                
+
+
             # print(f"Chunk is: {chunks[0]}\n")
             # print(f'📊 Testing chunk: {chunks[0]['text']}')
             # Log processing summary
@@ -80,14 +80,20 @@ class DocumentIndexingService:
             embeddings = await self.generate_embeddings_for_chunks(chunks)
 
             # Store in vector database
+            # For webpages, don't pass cloudinaryData to prevent Cloudinary integration
+            cloudinary_for_storage = cloudinary_data if content_type != 'webpage' else None
+
             print(f'🔄 Storing {len(chunks)} chunks with workspaceId: {workspace_id or "null"}')
+            if content_type == 'webpage':
+                print(f'🌐 Webpage content - excluding Cloudinary integration')
+
             result = await self.vector_database_service.store_document_chunks(
                 file_id,
                 file_name,
                 chunks,
                 embeddings,
                 workspace_id,
-                cloudinary_data
+                cloudinary_for_storage
             )
 
             print(f'✅ Successfully indexed {result.get("chunksCount")} chunks for {file_name} in workspace: {workspace_id or "null"}')
@@ -186,7 +192,7 @@ class DocumentIndexingService:
                     'fileId': file_id,
                     'fileName': file_name,
                     'workspaceId': workspace_id,
-                    'cloudinaryData': cloudinary_data,
+                    'cloudinaryData':cloudinary_data,
                     'contentType': content_type
                 }
             )
@@ -201,14 +207,20 @@ class DocumentIndexingService:
             embeddings = await self.generate_embeddings_for_chunks(chunks)
 
             # Store in vector database
+            # For webpages, don't pass cloudinaryData to prevent Cloudinary integration
+            cloudinary_for_storage = cloudinary_data if content_type != 'webpage' else None
+
             print(f'🔄 Storing {len(chunks)} chunks with workspaceId: {workspace_id or "null"}')
+            if content_type == 'webpage':
+                print(f'🌐 Webpage content - excluding Cloudinary integration')
+
             result = await self.vector_database_service.store_document_chunks(
                 file_id,
                 file_name,
                 chunks,
                 embeddings,
                 workspace_id,
-                cloudinary_data
+                cloudinary_for_storage
             )
 
             # Add processing statistics

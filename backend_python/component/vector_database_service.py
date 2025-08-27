@@ -153,6 +153,13 @@ class VectorDatabaseService:
                     'cloudinaryUrl': cloudinary_data.get('secureUrl') if cloudinary_data else None,
                     'embeddingType': 'RETRIEVAL_DOCUMENT'
                 }
+                
+                # For webpage content, add source URL information
+                content_type = chunk.get('metadata', {}).get('content_type')
+                if content_type == 'webpage':
+                    point_payload['sourceUrl'] = chunk.get('metadata', {}).get('initial_url')
+                    point_payload['contentType'] = 'webpage'
+                    point_payload['pagesProcessed'] = chunk.get('metadata', {}).get('pages_processed', 1)
 
                 # Add additional metadata
                 metadata = chunk.get('metadata', {})

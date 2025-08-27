@@ -11,7 +11,7 @@ class ChunkingService:
     Page-by-page chunking service that respects 800 character limit
     """
 
-    def __init__(self, chunk_size: int = 800, chunk_overlap: int = 75):
+    def __init__(self, chunk_size: int = 800, chunk_overlap: int = 60):
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         print(f"🚀 Page-by-Page ChunkingService initialized with chunk_size={chunk_size}, chunk_overlap={chunk_overlap}")
