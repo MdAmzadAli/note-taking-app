@@ -1,23 +1,94 @@
+
 from collections import deque
 from typing import Set, Optional
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, urlunparse
 import re
 from bs4 import BeautifulSoup
+import hashlib
 
 class URLQueue:
     """
-    Queue-based URL management system for webpage crawling
+    Queue-based URL management system for webpage crawling with improved duplicate detection
     """
 
     def __init__(self, base_domain: Optional[str] = None, max_urls: int = 100):
         self.queue = deque()
-        self.visited = set()
+        self.visited_hashes = set()  # Store hashes of visited URLs
+        self.queued_hashes = set()   # Store hashes of queued URLs
         self.base_domain = base_domain
         self.max_urls = max_urls
+        self.url_stats = {
+            'total_processed': 0,
+            'duplicates_skipped': 0,
+            'domain_restricted': 0,
+            'invalid_urls': 0
+        }
 
-        print(f"🔗 URLQueue initialized:")
-        print(f"   Base domain: {base_domain}")
-        print(f"   Max URLs: {max_urls}")
+        print(f"🔗 URLQueue initialized - Base domain: {base_domain}, Max URLs: {max_urls}")
+
+    def _canonicalize_url(self, url: str) -> Optional[str]:
+        """
+        Canonicalize URL to prevent duplicate visits
+        
+        Args:
+            url: Raw URL to canonicalize
+            
+        Returns:
+            Canonicalized URL or None if invalid
+        """
+        try:
+            # Remove whitespace and fragments
+            url = url.strip().split('#')[0]
+            
+            if not url:
+                return None
+
+            # Skip javascript, mailto, tel links
+            if url.lower().startswith(('javascript:', 'mailto:', 'tel:', 'data:')):
+                return None
+
+            # Add protocol if missing
+            if not url.startswith(('http://', 'https://')):
+                url = 'https://' + url
+
+            # Parse URL
+            parsed = urlparse(url)
+            if not parsed.netloc:
+                return None
+
+            # Skip non-web protocols
+            if parsed.scheme not in ['http', 'https']:
+                return None
+
+            # Normalize domain (remove www prefix for canonicalization)
+            netloc = parsed.netloc.lower()
+            if netloc.startswith('www.'):
+                netloc = netloc[4:]
+
+            # Normalize path
+            path = parsed.path or '/'
+            
+            # Handle common index files
+            if path.endswith(('index.html', 'index.htm', 'index.php', 'default.html')):
+                path = path.rsplit('/', 1)[0] + '/'
+            
+            # Remove trailing slash except for root
+            if len(path) > 1 and path.endswith('/'):
+                path = path[:-1]
+
+            # Reconstruct canonical URL
+            canonical_url = f"{parsed.scheme}://{netloc}{path}"
+            if parsed.query:
+                canonical_url += f"?{parsed.query}"
+
+            return canonical_url
+
+        except Exception:
+            return None
+
+    def _get_url_hash(self, canonical_url: str) -> str:
+        """Generate hash for URL to use in visited/queued sets"""
+        return hashlib.md5(canonical_url.encode('utf-8')).hexdigest()
 
     def add_url(self, url: str) -> bool:
         """
@@ -29,53 +100,52 @@ class URLQueue:
         Returns:
             True if URL was added, False otherwise
         """
-        try:
-            print(f"\n🔍 Processing URL for queue: {url}")
-
-            # Normalize URL
-            normalized_url = self._normalize_url(url)
-            print(f"   Normalized: {normalized_url}")
-
-            if not normalized_url:
-                print(f"   ❌ URL normalization failed")
-                return False
-
-            # Check if already visited or queued
-            if normalized_url in self.visited:
-                print(f"   ⚠️ URL already visited")
-                return False
-
-            if normalized_url in self.queue:
-                print(f"   ⚠️ URL already in queue")
-                return False
-
-            # Check domain restriction
-            if self.base_domain and not self._is_same_domain(normalized_url):
-                print(f"   ⚠️ URL not in same domain (base: {urlparse(self.base_domain).netloc}, url: {urlparse(normalized_url).netloc})")
-                return False
-
-            # Check queue size limit
-            if len(self.queue) >= self.max_urls:
-                print(f"   ⚠️ Queue size limit reached ({self.max_urls})")
-                return False
-
-            self.queue.append(normalized_url)
-            print(f"   ✅ URL added to queue. Queue size: {len(self.queue)}")
-            return True
-
-        except Exception as e:
-            print(f"   ❌ Error adding URL to queue: {e}")
+        self.url_stats['total_processed'] += 1
+        
+        # Canonicalize URL
+        canonical_url = self._canonicalize_url(url)
+        if not canonical_url:
+            self.url_stats['invalid_urls'] += 1
             return False
 
+        # Generate hash for duplicate checking
+        url_hash = self._get_url_hash(canonical_url)
+
+        # Check if already visited or queued
+        if url_hash in self.visited_hashes or url_hash in self.queued_hashes:
+            self.url_stats['duplicates_skipped'] += 1
+            return False
+
+        # Check domain restriction
+        if self.base_domain and not self._is_same_domain(canonical_url):
+            self.url_stats['domain_restricted'] += 1
+            return False
+
+        # Check queue size limit
+        if len(self.queue) >= self.max_urls:
+            return False
+
+        # Add to queue
+        self.queue.append(canonical_url)
+        self.queued_hashes.add(url_hash)
+        
+        # Only log unique URLs
+        print(f"✅ Added unique URL to queue: {canonical_url}")
+        return True
+
     def get_next_url(self) -> Optional[str]:
-        """Get next URL from queue"""
+        """Get next URL from queue and mark as visited"""
         if self.queue:
             url = self.queue.popleft()
-            self.visited.add(url)
-            print(f"🔗 Dequeued URL: {url} (Queue: {len(self.queue)}, Visited: {len(self.visited)})")
+            url_hash = self._get_url_hash(url)
+            
+            # Move from queued to visited
+            self.queued_hashes.discard(url_hash)
+            self.visited_hashes.add(url_hash)
+            
+            print(f"🔗 Processing URL: {url} (Queue: {len(self.queue)}, Visited: {len(self.visited_hashes)})")
             return url
 
-        print(f"🔗 No more URLs in queue")
         return None
 
     def has_urls(self) -> bool:
@@ -88,52 +158,7 @@ class URLQueue:
 
     def get_visited_count(self) -> int:
         """Get number of visited URLs"""
-        return len(self.visited)
-
-    def _normalize_url(self, url: str) -> Optional[str]:
-        """
-        Normalize URL format
-
-        Args:
-            url: Raw URL
-
-        Returns:
-            Normalized URL or None if invalid
-        """
-        try:
-            # Remove whitespace and fragments
-            url = url.strip().split('#')[0]
-
-            if not url:
-                return None
-
-            # Skip javascript, mailto, tel links
-            if url.lower().startswith(('javascript:', 'mailto:', 'tel:')):
-                return None
-
-            # Add protocol if missing
-            if not url.startswith(('http://', 'https://')):
-                url = 'https://' + url
-
-            # Parse and validate
-            parsed = urlparse(url)
-            if not parsed.netloc:
-                return None
-
-            # Skip non-web protocols
-            if parsed.scheme not in ['http', 'https']:
-                return None
-
-            # Reconstruct clean URL
-            clean_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
-            if parsed.query:
-                clean_url += f"?{parsed.query}"
-
-            return clean_url
-
-        except Exception as e:
-            print(f"   ❌ URL normalization error: {e}")
-            return None
+        return len(self.visited_hashes)
 
     def _is_same_domain(self, url: str) -> bool:
         """
@@ -158,13 +183,12 @@ class URLQueue:
 
             return url_domain == base_domain
 
-        except Exception as e:
-            print(f"   ❌ Domain comparison error: {e}")
+        except Exception:
             return False
 
     def extract_base_url(self, url: str) -> str:
         """
-        Extract base URL from given URL using regex
+        Extract base URL from given URL
 
         Args:
             url: Full URL to extract base from
@@ -173,14 +197,11 @@ class URLQueue:
             Base URL (scheme + netloc)
         """
         try:
-                parsed = urlparse(url)
-                base_url = f"{parsed.scheme}://{parsed.netloc}"
-                print(f"   🔍 Fallback base URL: {base_url} from {url}")
-                return base_url
-        except Exception as e:
-            print(f"   ❌ Error extracting base URL: {e}")
+            parsed = urlparse(url)
+            base_url = f"{parsed.scheme}://{parsed.netloc}"
+            return base_url
+        except Exception:
             return url
-
 
     def extract_urls_from_text(self, text: str, base_url: str) -> int:
         """
@@ -193,30 +214,21 @@ class URLQueue:
         Returns:
             Number of URLs added
         """
-        print(f"\n🔍 Extracting URLs from HTML content using BeautifulSoup:")
-        print(f"   Given URL: {base_url}")
-
-        # Extract actual base URL from the given URL
         actual_base_url = self.extract_base_url(base_url)
-        print(f"   Extracted base URL: {actual_base_url}")
-        print(f"   Content length: {len(text)} characters")
-
         added_count = 0
-        all_found_urls = []
+        unique_urls_found = set()
 
         try:
             # Parse HTML content with BeautifulSoup
-            print(f"\n   🧹 Parsing HTML content with BeautifulSoup...")
             soup = BeautifulSoup(text, 'html.parser')
 
             # Extract all links using BeautifulSoup
-            print(f"   🔗 Finding all <a> tags with href attributes...")
             links = [urljoin(actual_base_url, a['href']) for a in soup.find_all('a', href=True)]
 
-            print(f"   📊 Found {len(links)} links total")
+            print(f"🔍 Found {len(links)} total links on page")
 
             # Process each found link
-            for i, link in enumerate(links, 1):
+            for link in links:
                 try:
                     # Clean and validate the link
                     link = link.strip()
@@ -229,7 +241,8 @@ class URLQueue:
                         continue
 
                     # Skip common non-page URLs
-                    skip_extensions = ['.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg', '.pdf', '.zip', '.mp4', '.mp3']
+                    skip_extensions = ['.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg', 
+                                     '.pdf', '.zip', '.mp4', '.mp3', '.woff', '.woff2', '.ttf']
                     if any(link.lower().endswith(ext) for ext in skip_extensions):
                         continue
 
@@ -237,62 +250,50 @@ class URLQueue:
                     if any(link.lower().startswith(prefix) for prefix in ['mailto:', 'tel:', 'javascript:', 'data:']):
                         continue
 
-                    print(f"      🔗 Processing link {i}: {link}")
-                    all_found_urls.append(link)
+                    # Canonicalize for uniqueness check
+                    canonical = self._canonicalize_url(link)
+                    if canonical and canonical not in unique_urls_found:
+                        unique_urls_found.add(canonical)
+                        
+                        if self.add_url(link):
+                            added_count += 1
 
-                    if self.add_url(link):
-                        added_count += 1
-                        print(f"         ✅ Added to queue (#{added_count})")
-                    else:
-                        print(f"         ⚠️ Skipped (duplicate, invalid, or different domain)")
-
-                except Exception as link_error:
-                    print(f"         ❌ Error processing link '{link}': {link_error}")
+                except Exception:
                     continue
 
-            print(f"\n📊 URL EXTRACTION SUMMARY:")
-            print(f"   Total links found: {len(all_found_urls)}")
-            print(f"   Valid links added to queue: {added_count}")
-            print(f"   Queue size after extraction: {self.get_queue_size()}")
+            # Summary log with statistics
+            print(f"📊 URL extraction summary:")
+            print(f"   Unique URLs found: {len(unique_urls_found)}")
+            print(f"   URLs added to queue: {added_count}")
+            print(f"   Duplicates skipped: {self.url_stats['duplicates_skipped']}")
+            print(f"   Domain restricted: {self.url_stats['domain_restricted']}")
 
             return added_count
 
         except Exception as e:
-            print(f"❌ BeautifulSoup URL extraction failed: {e}")
-            print(f"   Falling back to basic link detection...")
-
-            # Fallback: simple href extraction if BeautifulSoup fails
-            try:
-                href_pattern = r'href\s*=\s*["\']([^"\']+)["\']'
-                matches = re.findall(href_pattern, text, re.IGNORECASE)
-
-                for match in matches:
-                    try:
-                        absolute_url = urljoin(actual_base_url, match)
-                        if self.add_url(absolute_url):
-                            added_count += 1
-                    except:
-                        continue
-
-                print(f"   📊 Fallback extraction added {added_count} URLs")
-                return added_count
-
-            except Exception as fallback_error:
-                print(f"   ❌ Fallback extraction also failed: {fallback_error}")
-                return 0
-
+            print(f"❌ URL extraction failed: {e}")
+            return 0
 
     def clear(self):
-        """Clear queue and visited set"""
-        print(f"🧹 Clearing URL queue (had {len(self.queue)} URLs, {len(self.visited)} visited)")
+        """Clear queue and visited sets"""
+        print(f"🧹 Clearing URL queue - Had {len(self.queue)} URLs, {len(self.visited_hashes)} visited")
         self.queue.clear()
-        self.visited.clear()
+        self.visited_hashes.clear()
+        self.queued_hashes.clear()
+        self.url_stats = {
+            'total_processed': 0,
+            'duplicates_skipped': 0,
+            'domain_restricted': 0,
+            'invalid_urls': 0
+        }
 
     def get_stats(self) -> dict:
-        """Get queue statistics"""
+        """Get comprehensive queue statistics"""
         return {
             'queue_size': len(self.queue),
-            'visited_count': len(self.visited),
+            'visited_count': len(self.visited_hashes),
+            'queued_count': len(self.queued_hashes),
             'max_urls': self.max_urls,
-            'base_domain': self.base_domain
+            'base_domain': self.base_domain,
+            'processing_stats': self.url_stats
         }
