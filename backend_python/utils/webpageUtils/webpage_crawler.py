@@ -167,9 +167,10 @@ class WebpageCrawler:
                     
                     # Extract URLs from the page content for next iterations
                     print(f"\n🔗 EXTRACTING URLs FROM PAGE CONTENT...")
-                    page_text = extraction_result.get('text', '')
-                    if page_text:
-                        urls_found = self.url_queue.extract_urls_from_text(page_text, current_url)
+                    # Get the raw HTML content from the web extractor instead of processed text
+                    page_html = getattr(self.web_extractor, '_last_html_content', '')
+                    if page_html:
+                        urls_found = self.url_queue.extract_urls_from_text(page_html, current_url)
                         crawl_stats['urls_found'] += urls_found
                         
                         print(f"   🔍 URLs extraction completed:")
@@ -177,7 +178,7 @@ class WebpageCrawler:
                         print(f"      Total URLs found so far: {crawl_stats['urls_found']}")
                         print(f"      Current queue size: {self.url_queue.get_queue_size()}")
                     else:
-                        print(f"   ⚠️ No text content available for URL extraction")
+                        print(f"   ⚠️ No HTML content available for URL extraction")
                     
                     pages_processed += 1
                     crawl_stats['pages_processed'] = pages_processed

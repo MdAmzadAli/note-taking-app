@@ -11,6 +11,7 @@ class WebpageTextExtractorService:
     def __init__(self):
         self.max_content_length = 10 * 1024 * 1024  # 10MB limit
         self.timeout = 30  # 30 seconds
+        self._last_html_content = ''  # Store raw HTML for URL extraction
 
     async def extract_webpage_text(self, url: str, file_id: str) -> dict:
         """
@@ -47,6 +48,9 @@ class WebpageTextExtractorService:
                     # Prevent memory overflow
                     if received_bytes > self.max_content_length:
                         raise Exception(f'Content exceeds size limit: {received_bytes} bytes')
+
+                    # Store raw HTML content for URL extraction
+                    self._last_html_content = html_content
 
             print(f'📄 Downloaded {received_bytes} bytes of HTML content')
 
