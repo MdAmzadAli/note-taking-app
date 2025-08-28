@@ -429,7 +429,8 @@ async def upload_workspace(
                                 file_metadata["path"],
                                 file_metadata["originalName"],
                                 workspaceId,
-                                cloudinary_data
+                                cloudinary_data,
+                                content_type="webpage" if url_info.get("type") == "webpage" else "pdf"
                             )
                             print(f"✅ RAG indexing completed for URL {i + 1}: {index_result.get('chunksCount', 0)} chunks")
                         except Exception as rag_error:
