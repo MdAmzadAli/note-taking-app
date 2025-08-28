@@ -14,6 +14,7 @@ from pydantic import BaseModel
 import mimetypes
 from dotenv import load_dotenv
 import time
+from datetime import datetime
 
 # Load environment variables from the backend_python directory FIRST
 import os
@@ -82,10 +83,12 @@ app = FastAPI(title="Document Management API")
 PORT = int(os.getenv("PORT", 5000))
 UPLOADS_DIR = Path("uploads")
 PREVIEWS_DIR = Path("previews")
+METADATA_DIR = Path("metadata") # Added for metadata storage
 
 # Ensure directories exist
 UPLOADS_DIR.mkdir(exist_ok=True)
 PREVIEWS_DIR.mkdir(exist_ok=True)
+METADATA_DIR.mkdir(exist_ok=True) # Ensure metadata directory exists
 
 # CORS configuration
 def get_cors_origins():
@@ -135,12 +138,26 @@ try:
 
     # Initialize RAG service immediately
     print("🔄 Initializing RAG service...")
-    import asyncio
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(rag_service.initialize())
-    loop.close()
-    print("✅ RAGService initialized successfully")
+    # Note: Directly calling asyncio.run() inside a FastAPI app can cause issues.
+    # It's better to rely on the event loop managed by Uvicorn.
+    # For initialization that needs to run once, it's often handled within a startup event.
+    # However, for simplicity in this example, we'll keep the direct call, but be aware of potential issues.
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+             # If loop is already running (e.g., in test environment), create a new task
+             loop.create_task(rag_service.initialize())
+        else:
+            loop.run_until_complete(rag_service.initialize())
+        print("✅ RAGService initialization task scheduled/completed")
+    except RuntimeError:
+        # Fallback if no event loop is set yet or it's closed
+        print("🔄 Creating new event loop for RAG service initialization...")
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(rag_service.initialize())
+        loop.close()
+        print("✅ RAGService initialized successfully (new loop)")
 
 except Exception as e:
     print(f"❌ Failed to initialize RAGService: {e}")
@@ -185,10 +202,11 @@ async def log_requests(request: Request, call_next):
 @app.get("/health")
 async def health_check():
     print("💗 Health check requested")
+    # A more realistic health check would involve checking service dependencies
     return {
         "status": "healthy",
-        "timestamp": "2024-01-01T00:00:00Z",
-        "uptime": 0
+        "timestamp": datetime.now().isoformat(),
+        "rag_initialized": rag_service.is_initialized if 'rag_service' in globals() else False
     }
 
 # List all files
@@ -247,7 +265,7 @@ async def upload_workspace(
             except json.JSONDecodeError as parse_error:
                 print(f"❌ Failed to parse URLs: {parse_error}")
 
-        uploaded_files = []
+        uploaded_files_metadata = [] # Store metadata for indexing
         errors = []
 
         # Process uploaded files
@@ -255,11 +273,11 @@ async def upload_workspace(
             try:
                 print(f"📤 Processing device file {i + 1}/{len(files)}: {file.filename}")
 
-                file_id = f"{int(asyncio.get_event_loop().time() * 1000)}{str(uuid.uuid4()).replace('-', '')[:9]}"
-                file_path = UPLOADS_DIR / f"{file_id}_{file.filename}"
+                file_id = f"{int(time.time() * 1000)}{str(uuid.uuid4()).replace('-', '')[:9]}" # Use time.time() for more precise IDs
+                file_path_on_disk = UPLOADS_DIR / f"{file_id}_{file.filename}"
 
                 # Save uploaded file
-                async with aiofiles.open(file_path, 'wb') as f:
+                async with aiofiles.open(file_path_on_disk, 'wb') as f:
                     content = await file.read()
                     await f.write(content)
 
@@ -268,8 +286,8 @@ async def upload_workspace(
                     "originalName": file.filename,
                     "mimetype": file.content_type,
                     "size": len(content),
-                    "path": str(file_path),
-                    "uploadDate": "2024-01-01T00:00:00Z",
+                    "path": str(file_path_on_disk),
+                    "uploadDate": datetime.now().isoformat(),
                     "workspaceId": workspaceId,
                 }
 
@@ -277,7 +295,7 @@ async def upload_workspace(
                 await file_service.save_file_metadata(file_info)
 
                 print(f"🔄 Processing upload for device file {i + 1}...")
-                processed_file = await file_service.process_file_upload(file_info)
+                processed_file_details = await file_service.process_file_upload(file_info)
 
                 print(f"🖼️ Generating preview for device file {i + 1}...")
                 try:
@@ -286,28 +304,22 @@ async def upload_workspace(
                 except Exception as preview_error:
                     print(f"❌ Preview generation failed for device file {i + 1}: {preview_error}")
 
-                # Auto-index PDF files for RAG with workspace ID
-                if file_info["mimetype"] == "application/pdf":
-                    print(f"🔄 Starting RAG indexing for device file {i + 1} ({file_info['originalName']})...")
+                # Prepare metadata for RAG indexing
+                rag_file_metadata = {
+                    "id": file_id,
+                    "originalName": file.filename,
+                    "mimetype": file.content_type,
+                    "size": len(content),
+                    "path": str(file_path_on_disk),
+                    "uploadDate": datetime.now().isoformat(),
+                    "workspaceId": workspaceId,
+                    "sourceUrl": None,
+                    "sourceType": "upload",
+                    "isProcessed": True,
+                    "cloudinary": processed_file_details.get("cloudinary") # Include Cloudinary data if available
+                }
+                uploaded_files_metadata.append(rag_file_metadata)
 
-                    # Check if RAG service is ready for indexing
-                    if not rag_service.is_ready_for_indexing():
-                        print(f"⚠️ RAG service not ready for indexing device file {i + 1}, skipping RAG indexing")
-                        print(f"🔧 RAG status: initialized={rag_service.is_initialized}, ready_for_indexing={rag_service.is_ready_for_indexing()}")
-                    else:
-                        try:
-                            index_result = await rag_service.index_document(
-                                file_info["id"],
-                                file_info["path"],
-                                file_info["originalName"],
-                                workspaceId,
-                                processed_file.get("cloudinary")
-                            )
-                            print(f"✅ RAG indexing completed for device file {i + 1}: {index_result.get('chunksCount', 0)} chunks")
-                        except Exception as rag_error:
-                            print(f"❌ RAG indexing failed for device file {i + 1}: {rag_error}")
-
-                uploaded_files.append(processed_file)
                 print(f"✅ Successfully processed device file {i + 1}: {file.filename}")
 
             except Exception as file_error:
@@ -320,147 +332,155 @@ async def upload_workspace(
 
         # Process URLs
         for i, url_info in enumerate(parsed_urls):
-            file_id = str(uuid.uuid4())
+            url = url_info.get("url")
+            file_id = f"{int(time.time() * 1000)}{str(uuid.uuid4()).replace('-', '')[:9]}" # Use time.time() for more precise IDs
 
             try:
-                print(f"🌐 Processing URL {i + 1}/{len(parsed_urls)}: {url_info.get('url')} ({url_info.get('type')})")
+                print(f"🌐 Processing URL {i + 1}/{len(parsed_urls)}: {url} ({url_info.get('type')})")
+
+                original_name = None
+                mimetype = None
+                file_path_on_disk = None # Path to the saved file
+                processed_file_details = None # Details from file_service.process_file_upload
 
                 if url_info.get("type") in ["from_url", "url"]:
                     # Download PDF from URL
-                    print(f"📥 Downloading PDF from URL: {url_info.get('url')}")
-                    download_result = await url_download_service.download_pdf(url_info.get("url"), file_id)
+                    print(f"📥 Downloading PDF from URL: {url}")
+                    download_result = await url_download_service.download_pdf(url, file_id)
 
                     if not download_result.get("success"):
                         raise Exception(f"Failed to download PDF: {download_result.get('error', 'Unknown error')}")
 
-                    # Read the downloaded file
+                    # Read the downloaded file content
                     async with aiofiles.open(download_result["filePath"], 'rb') as f:
                         file_content = await f.read()
 
                     original_name = download_result["fileName"]
                     mimetype = download_result["mimetype"]
+                    file_path_on_disk = UPLOADS_DIR / f"{file_id}_{original_name}"
 
-                    # Clean up the temporary file
+                    # Save the downloaded file
+                    async with aiofiles.open(file_path_on_disk, 'wb') as f:
+                        await f.write(file_content)
+                    print(f"✅ Saved downloaded content to: {file_path_on_disk}")
+
+                    # Clean up the temporary download file
                     os.unlink(download_result["filePath"])
                     print(f"🧹 Cleaned up temporary download file: {download_result['filePath']}")
 
-                elif url_info.get("type") == "webpage":
-                    # Process webpage with crawling
-                    print(f"🌐 Processing webpage with crawling: {url_info.get('url')}")
-
-                    # Use the URL directly for processing - the unified chunking service will handle crawling
-                    file_path = url_info.get("url")
-                    content_type = "webpage"
-
-                    # Skip the old extraction logic - let unified chunking service handle it
-                    extract_result = {
-                        'success': True,
-                        'text': file_path,  # Pass URL directly
-                        'fileName': f"webpage_{file_id}_{url_info.get('url').split('/')[-1] or 'index'}.txt",
-                        'mimetype': 'text/plain'
+                    # Process the saved file (e.g., for Cloudinary upload)
+                    file_metadata_for_processing = {
+                        "id": file_id,
+                        "originalName": original_name,
+                        "mimetype": mimetype,
+                        "size": len(file_content),
+                        "path": str(file_path_on_disk),
+                        "uploadDate": datetime.now().isoformat(),
+                        "workspaceId": workspaceId,
                     }
-                    file_content = extract_result["text"].encode('utf-8')
-                    original_name = extract_result["fileName"]
-                    mimetype = extract_result["mimetype"]
+                    processed_file_details = await file_service.process_file_upload(file_metadata_for_processing)
+
+                elif url_info.get("type") == "webpage":
+                    print(f'🌐 Processing webpage URL directly with crawler: {url}')
+                    # Skip file storage for webpages - pass URL directly to processing
+                    original_name = f'webpage_{file_id}' # Placeholder, actual name might come from crawler
+                    mimetype = 'text/plain'
+                    file_path_on_disk = None # No local file path for webpages
+                    processed_file_details = None # No Cloudinary processing for webpages
+
+                    # The `rag_service.index_document` will handle crawling and text extraction
+                    # by receiving the URL directly.
 
                 else:
                     raise Exception(f"Unsupported URL type: {url_info.get('type')}")
 
-                file_path = UPLOADS_DIR / f"{file_id}-{original_name}"
-                async with aiofiles.open(file_path, 'wb') as f:
-                    await f.write(file_content)
-                print(f"✅ Saved processed content to temporary path: {file_path}")
-
-                file_metadata = {
-                    "id": file_id,
-                    "originalName": original_name,
-                    "mimetype": mimetype,
-                    "size": len(file_content),
-                    "path": str(file_path),
-                    "uploadDate": "2024-01-01T00:00:00Z",
-                    "workspaceId": workspaceId,
-                    "sourceUrl": url_info.get("url"),
-                    "sourceType": url_info.get("type")
+                # Save file metadata (skip for webpages as they don't need local storage)
+                rag_file_metadata = {
+                    'id': file_id,
+                    'originalName': original_name,
+                    'mimetype': mimetype,
+                    'size': processed_file_details.get("size") if processed_file_details else (len(file_content) if 'file_content' in locals() else 0),
+                    'path': str(file_path_on_disk) if file_path_on_disk else None,
+                    'uploadDate': datetime.now().isoformat(),
+                    'workspaceId': workspaceId,
+                    'sourceUrl': url,
+                    'sourceType': url_info['type'],
+                    'isProcessed': True if processed_file_details or url_info.get("type") == "webpage" else False,
+                    'cloudinary': processed_file_details.get("cloudinary") if processed_file_details else None
                 }
 
-                print(f"💾 Saving metadata for URL {i + 1}: {file_metadata['id']}")
-                await file_service.save_file_metadata(file_metadata)
-
-                # Initialize processed_file variable
-                processed_file = None
-                
-                print(f"🔄 Processing upload for URL {i + 1}...") 
-                
-                # Only process through file service for PDF URLs (not webpages)
-                if url_info.get("type") != "webpage":
-                    processed_file = await file_service.process_file_upload(file_metadata)
+                if url_info['type'] != 'webpage':
+                    print(f"💾 Saving metadata for URL {i + 1}: {rag_file_metadata['id']}")
+                    await file_service.save_file_metadata(rag_file_metadata)
                 else:
-                    # For webpages, create a basic processed file structure without Cloudinary
-                    processed_file = {
-                        "id": file_metadata["id"],
-                        "originalName": file_metadata["originalName"],
-                        "mimetype": file_metadata["mimetype"],
-                        "size": file_metadata["size"],
-                        "uploadDate": file_metadata["uploadDate"],
-                        "workspaceId": file_metadata["workspaceId"],
-                        "sourceUrl": file_metadata["sourceUrl"],
-                        "sourceType": file_metadata["sourceType"],
-                        "cloudinary": None  # Webpages don't use Cloudinary
-                    }
+                    print('🌐 Skipping metadata creation for webpage')
 
-                # Auto-index PDF files and webpages for RAG with workspace ID
-                if file_metadata["mimetype"] == "application/pdf" or url_info.get("type") == "webpage": 
-                    print(f"🔄 Starting RAG indexing for URL {i + 1} ({file_metadata['originalName']})...")
+                uploaded_files_metadata.append(rag_file_metadata)
 
-                    # Check if RAG service is ready for indexing
-                    if not rag_service.is_ready_for_indexing():
-                        print(f"⚠️ RAG service not ready for indexing URL {i + 1}, skipping RAG indexing")
-                        print(f"🔧 RAG status: initialized={rag_service.is_initialized}, ready_for_indexing={rag_service.is_ready_for_indexing()}")
-                    else:
-                        try:
-                            # For webpages, don't pass cloudinary data (it's None anyway)
-                            # For PDFs, pass the cloudinary data from processed_file
-                            cloudinary_data = None
-                            if url_info.get("type") != "webpage" and processed_file:
-                                cloudinary_data = processed_file.get("cloudinary")
-                            
-                            index_result = await rag_service.index_document(
-                                file_metadata["id"],
-                                file_metadata["path"],
-                                file_metadata["originalName"],
-                                workspaceId,
-                                cloudinary_data,
-                                content_type="webpage" if url_info.get("type") == "webpage" else "pdf"
-                            )
-                            print(f"✅ RAG indexing completed for URL {i + 1}: {index_result.get('chunksCount', 0)} chunks")
-                        except Exception as rag_error:
-                            print(f"❌ RAG indexing failed for URL {i + 1}: {rag_error}")
-
-                uploaded_files.append(processed_file)
-                print(f"✅ Successfully processed URL {i + 1}: {url_info.get('url')}")
+                print(f"✅ Successfully processed URL {i + 1}: {url}")
 
             except Exception as url_error:
-                print(f"❌ Failed to process URL {i + 1} ({url_info.get('url')}): {url_error}")
+                print(f"❌ Failed to process URL {i + 1} ({url}): {url_error}")
                 errors.append({
-                    "filename": url_info.get("url"),
+                    "filename": url,
                     "error": str(url_error),
                     "type": url_info.get("type")
                 })
 
-        if len(uploaded_files) == 0:
-            raise HTTPException(status_code=400, detail="No files or URLs were successfully processed")
+        # Process documents with RAG service for indexing
+        print(f'\n📚 Starting document processing and indexing for {len(uploaded_files_metadata)} items...')
+        indexed_count = 0
+        for item_metadata in uploaded_files_metadata:
+            try:
+                print(f"📚 Indexing item: ID={item_metadata['id']}, Name={item_metadata['originalName']}, Type={item_metadata['sourceType']}")
+                if not rag_service.is_ready_for_indexing():
+                    print(f"⚠️ RAG service not ready for indexing item {item_metadata['id']}, skipping.")
+                    print(f"🔧 RAG status: initialized={rag_service.is_initialized}, ready_for_indexing={rag_service.is_ready_for_indexing()}")
+                    continue
+
+                if item_metadata['sourceType'] == 'webpage':
+                    # For webpages, pass the URL directly to the RAG service for crawling and indexing
+                    print(f"🌐 Processing webpage directly for RAG: {item_metadata['sourceUrl']}")
+                    index_result = await rag_service.index_document(
+                        item_metadata['id'],
+                        item_metadata['sourceUrl'],  # Pass URL directly
+                        item_metadata
+                    )
+                else:
+                    # For other file types, use the file path
+                    if not item_metadata.get('path'):
+                        print(f"❌ Skipping RAG indexing for item {item_metadata['id']}: No file path available.")
+                        continue
+                    index_result = await rag_service.index_document(
+                        item_metadata['id'],
+                        item_metadata['path'],
+                        item_metadata
+                    )
+                
+                print(f"✅ RAG indexing completed for item {item_metadata['id']}: {index_result.get('chunksCount', 0)} chunks")
+                indexed_count += 1
+            except Exception as rag_index_error:
+                print(f"❌ RAG indexing failed for item {item_metadata['id']}: {rag_index_error}")
+                # Add to errors if needed, or handle gracefully
+                errors.append({
+                    "id": item_metadata['id'],
+                    "filename": item_metadata.get('originalName', item_metadata.get('sourceUrl')),
+                    "error": f"RAG indexing failed: {str(rag_index_error)}",
+                    "type": item_metadata['sourceType']
+                })
+
+        if not uploaded_files_metadata:
+            raise HTTPException(status_code=400, detail="No files or URLs were provided for upload")
 
         response = {
             "success": True,
-            "files": uploaded_files,
-            "processedCount": len(uploaded_files),
-            "totalCount": len(files) + len(parsed_urls),
-            "deviceFilesCount": len(files),
-            "urlsCount": len(parsed_urls),
+            "filesProcessed": len(uploaded_files_metadata),
+            "filesIndexed": indexed_count,
+            "totalItems": len(files) + len(parsed_urls),
             "errors": errors if errors else None
         }
 
-        print(f"📤 Workspace mixed upload completed: {len(uploaded_files)}/{response['totalCount']} items processed")
+        print(f"📤 Workspace mixed upload completed: {len(uploaded_files_metadata)} items processed, {indexed_count} indexed.")
         return response
 
     except Exception as error:
@@ -480,11 +500,11 @@ async def upload_file(
         if workspaceId:
             print(f"🏢 File uploaded for workspace: {workspaceId}")
 
-        file_id = f"{int(asyncio.get_event_loop().time() * 1000)}{str(uuid.uuid4()).replace('-', '')[:9]}"
-        file_path = UPLOADS_DIR / f"{file_id}_{file.filename}"
+        file_id = f"{int(time.time() * 1000)}{str(uuid.uuid4()).replace('-', '')[:9]}"
+        file_path_on_disk = UPLOADS_DIR / f"{file_id}_{file.filename}"
 
         # Save uploaded file
-        async with aiofiles.open(file_path, 'wb') as f:
+        async with aiofiles.open(file_path_on_disk, 'wb') as f:
             content = await file.read()
             await f.write(content)
 
@@ -493,8 +513,8 @@ async def upload_file(
             "originalName": file.filename,
             "mimetype": file.content_type,
             "size": len(content),
-            "path": str(file_path),
-            "uploadDate": "2024-01-01T00:00:00Z",
+            "path": str(file_path_on_disk),
+            "uploadDate": datetime.now().isoformat(),
             "workspaceId": workspaceId,
         }
 
@@ -686,7 +706,7 @@ async def rag_index(file_id: str, request: RAGIndexRequest):
     print(f"📄 File ID: {file_id}")
     print(f"🏢 Request body: {request}")
 
-    start_time = asyncio.get_event_loop().time()
+    start_time = time.time() # Use time.time() for more accurate duration measurement
     try:
         print(f"🔍 Looking for file metadata: {file_id}")
 
@@ -699,13 +719,16 @@ async def rag_index(file_id: str, request: RAGIndexRequest):
 
         print(f"📊 File metadata: {file_info}")
 
-        file_path = file_info["path"]
+        file_path = file_info.get("path") # Use .get for safety
         print(f"📁 File path from metadata: {file_path}")
-        print(f"📁 File exists: {Path(file_path).exists()}")
-
-        if not Path(file_path).exists():
-            print(f"❌ File not found on disk: {file_path}")
-            raise HTTPException(status_code=404, detail="File not found on disk")
+        if file_path:
+            print(f"📁 File exists: {Path(file_path).exists()}")
+            if not Path(file_path).exists():
+                print(f"❌ File not found on disk: {file_path}")
+                raise HTTPException(status_code=404, detail="File not found on disk")
+        else:
+            # Handle cases where path might be missing (e.g., for URLs handled differently)
+            print(f"⚠️ No file path found for item {file_id}. Indexing might rely on direct URL processing.")
 
         print(f"🔄 Starting RAG indexing process...")
         print(f"📄 Indexing parameters: fileId={file_id}, filePath={file_path}, fileName={file_info['originalName']}, workspaceId={request.workspaceId}")
@@ -716,15 +739,15 @@ async def rag_index(file_id: str, request: RAGIndexRequest):
         # Index the document using RAG service with content type
         result = await rag_service.index_document(
             file_id,
-            file_path,
+            file_path, # This might be a URL if the source was a webpage
             file_info["originalName"],
             request.workspaceId,
             file_info.get("cloudinary"),
             content_type
         )
 
-        processing_time = (asyncio.get_event_loop().time() - start_time) * 1000
-        print(f"✅ RAG indexing completed successfully in {processing_time}ms")
+        processing_time = (time.time() - start_time) * 1000
+        print(f"✅ RAG indexing completed successfully in {processing_time:.2f}ms")
         print(f"📊 Indexing result: {result}")
 
         return {
@@ -735,8 +758,8 @@ async def rag_index(file_id: str, request: RAGIndexRequest):
         }
 
     except Exception as error:
-        processing_time = (asyncio.get_event_loop().time() - start_time) * 1000
-        print(f"❌ RAG indexing error after {processing_time}ms")
+        processing_time = (time.time() - start_time) * 1000
+        print(f"❌ RAG indexing error after {processing_time:.2f}ms")
         print(f"❌ Error type: {type(error).__name__}")
         print(f"❌ Error message: {error}")
 
@@ -773,7 +796,7 @@ async def rag_remove(file_id: str):
 
 @app.post("/rag/query")
 async def rag_query(request: RAGQueryRequest):
-    start_time = asyncio.get_event_loop().time()
+    start_time = time.time()
     print(f"🔍 RAG: Received query request")
     print(f"❓ Query: {request.query}")
     print(f"📄 File IDs: {request.fileIds}")
@@ -787,8 +810,8 @@ async def rag_query(request: RAGQueryRequest):
         print(f"🔄 Starting RAG query process...")
         result = await rag_service.generate_answer(request.query, request.fileIds, request.workspaceId)
 
-        processing_time = (asyncio.get_event_loop().time() - start_time) * 1000
-        print(f"✅ RAG query completed successfully in {processing_time}ms")
+        processing_time = (time.time() - start_time) * 1000
+        print(f"✅ RAG query completed successfully in {processing_time:.2f}ms")
         print(f"💡 Answer: {result.get('answer')}")
         print(f"📚 Sources: {result.get('sources')}")
         print(f"✅ Confidence: {result.get('confidence')}")
@@ -802,8 +825,8 @@ async def rag_query(request: RAGQueryRequest):
         }
 
     except Exception as error:
-        processing_time = (asyncio.get_event_loop().time() - start_time) * 1000
-        print(f"❌ RAG query error after {processing_time}ms")
+        processing_time = (time.time() - start_time) * 1000
+        print(f"❌ RAG query error after {processing_time:.2f}ms")
         print(f"❌ Error type: {type(error).__name__}")
         print(f"❌ Error message: {error}")
 
@@ -865,12 +888,13 @@ async def rag_health_check():
 # 404 handler
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc: HTTPException):
+    print(f"❌ 404 Not Found for: {request.method} {request.url.path}")
     return JSONResponse(status_code=404, content={"error": "Endpoint not found"})
 
 # Error handling
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    print("❌ Unhandled error occurred")
+    print(f"❌ Unhandled error occurred for: {request.method} {request.url.path}")
     print(f"❌ Error type: {type(exc).__name__}")
     print(f"❌ Error message: {exc}")
 
@@ -878,14 +902,33 @@ async def general_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={
             "error": "Internal server error",
-            "details": str(exc) if os.getenv("NODE_ENV") == "development" else "Something went wrong"
+            "details": str(exc) if os.getenv("NODE_ENV") == "development" else "An unexpected error occurred."
         }
     )
 
-# Start server
+# Startup event to ensure RAG is initialized
+@app.on_event("startup")
+async def startup_event():
+    print("🚀 FastAPI application starting up...")
+    # Ensure RAG service is initialized if not already done or if startup is called again
+    if 'rag_service' in globals() and not rag_service.is_initialized:
+        print("🔄 Initializing RAG service on startup...")
+        try:
+            await rag_service.initialize()
+            if rag_service.is_initialized:
+                print("✅ RAG service initialized successfully on startup.")
+            else:
+                print("⚠️ RAG service initialization might have issues.")
+        except Exception as e:
+            print(f"❌ Error during RAG service initialization on startup: {e}")
+    else:
+        print(" RAG service already initialized or not available.")
+
+# Server startup logic
 async def start_server():
     print(f"📁 Uploads directory: {UPLOADS_DIR}")
     print(f"🖼️ Previews directory: {PREVIEWS_DIR}")
+    print(f"🗂️ Metadata directory: {METADATA_DIR}")
 
     # Log environment variables status with actual values (masked for security)
     print("🔧 Environment Variables Check:")
@@ -902,11 +945,11 @@ async def start_server():
 
     # File upload config
     max_file_size = os.getenv('MAX_FILE_SIZE', '')
-    upload_dir = os.getenv('UPLOAD_DIR', '')
-    preview_dir = os.getenv('PREVIEW_DIR', '')
+    upload_dir_env = os.getenv('UPLOAD_DIR', '')
+    preview_dir_env = os.getenv('PREVIEW_DIR', '')
     print(f"   MAX_FILE_SIZE: {'✅ Set' if max_file_size else '❌ Not set'} ({max_file_size})")
-    print(f"   UPLOAD_DIR: {'✅ Set' if upload_dir else '❌ Not set'} ({upload_dir})")
-    print(f"   PREVIEW_DIR: {'✅ Set' if preview_dir else '❌ Not set'} ({preview_dir})")
+    print(f"   UPLOAD_DIR: {'✅ Set' if upload_dir_env else '❌ Not set'} ({upload_dir_env})")
+    print(f"   PREVIEW_DIR: {'✅ Set' if preview_dir_env else '❌ Not set'} ({preview_dir_env})")
 
     # RAG/Vector DB config
     qdrant_url = os.getenv('QDRANT_URL', '')
@@ -955,32 +998,22 @@ async def start_server():
     # Debug: Show all environment variables that start with common prefixes
     print("🔧 ENV: All environment variables with common prefixes:")
     for key, value in os.environ.items():
-        if any(key.startswith(prefix) for prefix in ['QDRANT_', 'GEMINI_', 'CLOUDINARY_', 'AWS_', 'REDIS_', 'PORT', 'NODE_ENV', 'ALLOWED_', 'MAX_', 'UPLOAD_', 'PREVIEW_', 'RATE_']):
-            masked_value = '*' * min(len(value), 8) if any(sensitive in key.lower() for sensitive in ['key', 'secret', 'password']) else value
+        if any(key.startswith(prefix) for prefix in ['QDRANT_', 'GEMINI_', 'CLOUDINARY_', 'AWS_', 'REDIS_', 'PORT', 'NODE_ENV', 'ALLOWED_', 'MAX_', 'UPLOAD_', 'PREVIEW_', 'RATE_', 'METADATA_DIR']):
+            masked_value = '*' * min(len(value), 8) if any(sensitive in key.lower() for sensitive in ['key', 'secret', 'password', 'token']) else value
             print(f"     {key}: {masked_value}")
-
-    # Initialize RAG service
-    print("🔄 Initializing RAG service...")
-    await rag_service.initialize()
-
-    if rag_service.is_initialized:
-        print("✅ RAG service initialization completed successfully")
-        print("🎯 RAG is ready for document indexing and search")
-    else:
-        print("⚠️ RAG service initialization completed with issues")
-        print("⚠️ Some RAG features may not be available")
-
-    # Always continue - partial functionality is better than no functionality
 
     print(f"🚀 Server running on port {PORT}")
     print(f"🌐 Server accessible at http://0.0.0.0:{PORT}")
-    print(f"🌐 Replit external URL: https://{os.getenv('REPLIT_DEV_DOMAIN')}:{PORT}")
+    # Check for Replit domain and provide external URL if available
+    replit_domain = os.getenv('REPLIT_DEV_DOMAIN')
+    if replit_domain:
+        print(f"🌐 Replit external URL: https://{replit_domain}:{PORT}")
     print(f"🛡️ Environment: {os.getenv('NODE_ENV', 'development')}")
-    print(f"🔧 RAG Service initialized: {'Yes' if rag_service.is_initialized else 'No'}")
+    print(f"🔧 RAG Service initialized: {'Yes' if 'rag_service' in globals() and rag_service.is_initialized else 'No'}")
     print("🎯 All APIs and services status logged above")
 
+
 if __name__ == "__main__":
-    import uvicorn
+    # Running Uvicorn directly. For more complex deployments, consider using an entrypoint script.
     print("🚀 Starting Python backend server on port 5000...")
-    print("🔗 Server will be accessible at http://0.0.0.0:5000")
-    uvicorn.run(app, host="0.0.0.0", port=5000)
+    uvicorn.run(app, host="0.0.0.0", port=PORT)

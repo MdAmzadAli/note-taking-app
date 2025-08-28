@@ -17,90 +17,68 @@ class DocumentIndexingService:
             chunk_overlap=getattr(chunking_service, 'chunk_overlap', 75)
         )
 
-    async def index_document(self, file_id: str, file_path: str, file_name: str, 
-                           workspace_id: Optional[str] = None, cloudinary_data: Optional[Dict] = None, 
-                           content_type: str = 'pdf') -> Dict[str, Any]:
+    async def index_document(self, file_id: str, file_path_or_url: str, metadata: Dict = None) -> Dict:
         """
-        Index a document with optimized document embeddings
+        Index document with chunking and vector storage
+        @param file_id: Unique file identifier
+        @param file_path_or_url: Path to file or URL to process
+        @param metadata: Optional metadata
+        @returns: Indexing result
         """
+        print(f'📚 Starting document indexing for: {file_id}')
+        print(f'📂 Input: {file_path_or_url}')
+
+        if metadata is None:
+            metadata = {}
+
         try:
-            print(f'📄 Starting document indexing for: {file_name} ({file_id})')
-            print(f'🏢 Indexing with workspaceId: {workspace_id or "null"}')
-            print(f'📋 Content type: {content_type}')
+            # Determine if input is URL or file path
+            is_url = isinstance(file_path_or_url, str) and (file_path_or_url.startswith('http://') or file_path_or_url.startswith('https://'))
 
-            if not self.vector_database_service.is_initialized():
-                raise Exception("Vector database not initialized")
+            print(f'🔍 Processing {"URL" if is_url else "file"}: {file_path_or_url}')
 
-            # Check if document is already indexed first
-            document_exists = await self.vector_database_service.check_document_exists(file_id)
-            if document_exists:
-                print(f'📄 Document already indexed: {file_id} (found existing chunks)')
-                chunks_count = await self.vector_database_service.get_document_chunk_count(file_id)
+            # Process with unified chunking service
+            if is_url:
+                # For URLs, let unified chunking service handle the processing
+                print(f'🌐 Processing URL with unified chunking service (webpage crawler)')
+                chunking_result = await self.unified_chunking_service.process_url(file_path_or_url, file_id, metadata)
+            else:
+                # For files, check if it exists and process accordingly
+                if not os.path.exists(file_path_or_url):
+                    raise FileNotFoundError(f'File not found: {file_path_or_url}')
 
-                return {
-                    'success': True,
-                    'message': 'Document already indexed',
-                    'chunksCount': chunks_count,
-                    'alreadyIndexed': True
-                }
+                print(f'📄 Processing file with unified chunking service')
+                chunking_result = await self.unified_chunking_service.process_file(file_path_or_url, metadata)
 
-            chunks = []
-            result = None
-
-            # Use unified chunking service for all content types
-            processing_result = await self.unified_chunking_service.process_content(
-                file_path, 
-                content_type, 
-                {
-                    'fileId': file_id,
-                    'fileName': file_name,
-                    'workspaceId': workspace_id,
-                    'cloudinaryData':cloudinary_data,
-                    'contentType': content_type
-                }
-            )
-            # print(f'📊 Unified Processing Result: {processing_result}')
-            chunks = processing_result.get('chunks', [])
+            chunks = chunking_result.get('chunks', [])
             if not chunks:
                 raise Exception('No chunks generated from content')
-
-
-            # print(f"Chunk is: {chunks[0]}\n")
-            # print(f'📊 Testing chunk: {chunks[0]['text']}')
-            # Log processing summary
-            print(f'📊 Unified Processing Summary:', processing_result.get('summary', {}))
-
-            # Add processing statistics
-            processing_stats = self.unified_chunking_service.get_processing_stats(chunks)
-            # content_analysis = self.unified_chunking_service.analyze_content_structure(processing_result)
-
-            print(f'📄 Created {len(chunks)} chunks for {file_name}')
 
             # Generate document-optimized embeddings in batches
             embeddings = await self.generate_embeddings_for_chunks(chunks)
 
             # Store in vector database
             # For webpages, don't pass cloudinaryData to prevent Cloudinary integration
-            cloudinary_for_storage = cloudinary_data if content_type != 'webpage' else None
+            cloudinary_for_storage = metadata.get('cloudinaryData') if not is_url else None
 
-            print(f'🔄 Storing {len(chunks)} chunks with workspaceId: {workspace_id or "null"}')
-            if content_type == 'webpage':
+            print(f'🔄 Storing {len(chunks)} chunks with workspaceId: {metadata.get("workspaceId") or "null"}')
+            if is_url:
                 print(f'🌐 Webpage content - excluding Cloudinary integration')
 
             result = await self.vector_database_service.store_document_chunks(
                 file_id,
-                file_name,
+                metadata.get('fileName', os.path.basename(file_path_or_url)),
                 chunks,
                 embeddings,
-                workspace_id,
+                metadata.get('workspaceId'),
                 cloudinary_for_storage
             )
 
-            print(f'✅ Successfully indexed {result.get("chunksCount")} chunks for {file_name} in workspace: {workspace_id or "null"}')
+            print(f'✅ Successfully indexed {result.get("chunksCount")} chunks for {file_id} in workspace: {metadata.get("workspaceId") or "null"}')
             return result
 
         except Exception as error:
-            print(f'❌ Document indexing failed for {file_name}: {error}')
+            print(f'❌ Document indexing failed for {file_id}: {error}')
             raise error
 
     async def generate_embeddings_for_chunks(self, chunks: List[Dict[str, Any]]) -> List[List[float]]:
