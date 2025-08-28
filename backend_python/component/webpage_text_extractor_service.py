@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 import re
 from datetime import datetime
+import random
 
 
 class WebpageTextExtractorService:
@@ -12,6 +13,16 @@ class WebpageTextExtractorService:
         self.max_content_length = 10 * 1024 * 1024  # 10MB limit
         self.timeout = 30  # 30 seconds
         self._last_html_content = ''  # Store raw HTML for URL extraction
+        
+        # Realistic User-Agent strings to rotate
+        self.user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"
+        ]
 
     async def extract_webpage_text(self, url: str, file_id: str) -> dict:
         """
@@ -26,9 +37,27 @@ class WebpageTextExtractorService:
         if not self.is_valid_url(url):
             raise ValueError('Invalid URL format')
 
+        # Prepare realistic browser headers
+        headers = self._get_realistic_headers(url)
+        print(f'🔧 Using User-Agent: {headers["User-Agent"][:50]}...')
+
         try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout)) as session:
-                async with session.get(url, allow_redirects=True) as response:
+            # Create session with proper configuration
+            connector = aiohttp.TCPConnector(
+                ssl=False,  # Allow HTTP requests
+                limit=100,
+                ttl_dns_cache=300,
+                use_dns_cache=True,
+            )
+            
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=self.timeout),
+                headers=headers,
+                connector=connector,
+                cookie_jar=aiohttp.CookieJar()  # Enable cookie handling
+            ) as session:
+                print(f'📡 Making request with realistic browser headers...')
+                async with session.get(url, allow_redirects=True, ssl=False) as response:
                     if response.status != 200:
                         raise Exception(f'HTTP {response.status}: {response.reason}')
 
@@ -75,6 +104,13 @@ class WebpageTextExtractorService:
                 print(f'❌ HTML processing error: {processing_error}')
                 raise Exception(f'Text extraction failed: {str(processing_error)}')
 
+        except aiohttp.ClientResponseError as error:
+            if error.status == 403:
+                print(f'🚫 403 Forbidden error, attempting retry with different headers...')
+                return await self._retry_with_different_headers(url, file_id)
+            else:
+                print(f'❌ HTTP error {error.status}: {error.message}')
+                raise Exception(f'HTTP {error.status}: {error.message}')
         except Exception as error:
             print(f'❌ Request error: {error}')
             raise Exception(f'Request failed: {str(error)}')
@@ -300,6 +336,45 @@ class WebpageTextExtractorService:
         except Exception:
             return 'webpage'
 
+    def _get_realistic_headers(self, url: str) -> dict:
+        """
+        Generate realistic browser headers to avoid 403 errors
+        @param url: Target URL for contextual headers
+        @returns: Dictionary of headers
+        """
+        # Get domain for referer
+        parsed_url = urlparse(url)
+        domain = f"{parsed_url.scheme}://{parsed_url.netloc}"
+        
+        # Randomly select user agent
+        user_agent = random.choice(self.user_agents)
+        
+        headers = {
+            "User-Agent": user_agent,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "DNT": "1",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Cache-Control": "max-age=0",
+            "Referer": "https://www.google.com/"
+        }
+        
+        # Add Chrome-specific headers if Chrome user agent is used
+        if "Chrome" in user_agent:
+            headers.update({
+                "sec-ch-ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": '"Windows"' if "Windows" in user_agent else '"macOS"' if "Mac" in user_agent else '"Linux"'
+            })
+        
+        return headers
+
     def is_valid_url(self, url: str) -> bool:
         """
         Validate URL format
@@ -312,6 +387,97 @@ class WebpageTextExtractorService:
         except Exception:
             return False
 
+    async def _retry_with_different_headers(self, url: str, file_id: str, max_retries: int = 2) -> dict:
+        """
+        Retry request with different headers if 403 error occurs
+        @param url: URL to retry
+        @param file_id: File identifier
+        @param max_retries: Maximum number of retries
+        @returns: Extraction result
+        """
+        for attempt in range(max_retries):
+            try:
+                print(f'🔄 Retry attempt {attempt + 1}/{max_retries} for URL: {url}')
+                
+                # Use different headers for each retry
+                headers = self._get_realistic_headers(url)
+                # Add delay between retries to appear more human-like
+                if attempt > 0:
+                    await asyncio.sleep(2 + attempt)
+                
+                connector = aiohttp.TCPConnector(
+                    ssl=False,
+                    limit=100,
+                    ttl_dns_cache=300,
+                    use_dns_cache=True,
+                )
+                
+                async with aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=self.timeout + 10),  # Longer timeout for retries
+                    headers=headers,
+                    connector=connector,
+                    cookie_jar=aiohttp.CookieJar()
+                ) as session:
+                    async with session.get(url, allow_redirects=True, ssl=False) as response:
+                        if response.status == 200:
+                            print(f'✅ Retry successful on attempt {attempt + 1}')
+                            
+                            # Check content type
+                            content_type = response.headers.get('content-type', '')
+                            if 'text/html' not in content_type and 'text/plain' not in content_type:
+                                print(f'⚠️ Content-Type is {content_type}, may not be suitable for text extraction')
+
+                            # Check content length
+                            content_length = int(response.headers.get('content-length', 0))
+                            if content_length > self.max_content_length:
+                                raise Exception(f'Content too large: {content_length} bytes (max: {self.max_content_length})')
+
+                            html_content = await response.text()
+                            received_bytes = len(html_content.encode('utf-8'))
+
+                            # Prevent memory overflow
+                            if received_bytes > self.max_content_length:
+                                raise Exception(f'Content exceeds size limit: {received_bytes} bytes')
+
+                            # Store raw HTML content for URL extraction
+                            self._last_html_content = html_content
+
+                            print(f'📄 Downloaded {received_bytes} bytes of HTML content on retry')
+
+                            try:
+                                extracted_text = self.process_html_content(html_content, url)
+
+                                return {
+                                    'success': True,
+                                    'text': extracted_text['cleanedText'],
+                                    'metadata': {
+                                        'originalUrl': url,
+                                        'title': extracted_text['title'],
+                                        'description': extracted_text['description'],
+                                        'wordCount': extracted_text['wordCount'],
+                                        'size': len(extracted_text['cleanedText']),
+                                        'extractedAt': datetime.now().isoformat(),
+                                        'retryAttempt': attempt + 1
+                                    },
+                                    'fileName': f"webpage_{file_id}_{self.extract_page_name_from_url(url)}.txt",
+                                    'mimetype': 'text/plain'
+                                }
+                            except Exception as processing_error:
+                                print(f'❌ HTML processing error on retry: {processing_error}')
+                                if attempt == max_retries - 1:
+                                    raise Exception(f'Text extraction failed after {max_retries} retries: {str(processing_error)}')
+                        else:
+                            print(f'❌ Retry attempt {attempt + 1} failed with status: {response.status}')
+                            if attempt == max_retries - 1:
+                                raise Exception(f'All retry attempts failed. Final status: {response.status}')
+                            
+            except Exception as retry_error:
+                print(f'❌ Retry attempt {attempt + 1} failed: {retry_error}')
+                if attempt == max_retries - 1:
+                    raise Exception(f'All retry attempts failed: {str(retry_error)}')
+        
+        raise Exception(f'All {max_retries} retry attempts failed')
+
     def get_stats(self) -> dict:
         """
         Get service statistics
@@ -321,5 +487,7 @@ class WebpageTextExtractorService:
             'serviceName': 'WebpageTextExtractorService',
             'maxContentLength': self.max_content_length,
             'timeout': self.timeout,
-            'supportedProtocols': ['http', 'https']
+            'supportedProtocols': ['http', 'https'],
+            'userAgentsCount': len(self.user_agents),
+            'featuresEnabled': ['realistic_headers', 'cookie_support', 'retry_mechanism']
         }
