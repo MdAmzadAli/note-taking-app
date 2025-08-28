@@ -1,15 +1,16 @@
-
 { pkgs }: {
   deps = [
+    pkgs.python312Full
+    pkgs.python312Packages.pip
+    pkgs.python312Packages.brotli
+    pkgs.nodejs_20
     pkgs.cairo
     pkgs.pango
     pkgs.libjpeg
     pkgs.giflib
     pkgs.librsvg
-    pkgs.libpng
-    pkgs.libuuid
-    pkgs.pkg-config
     pkgs.pixman
-    pkgs.ghostscript
+    pkgs.pkg-config
+    pkgs.python312Packages.pillow
   ];
 }
