@@ -386,11 +386,13 @@ async def upload_workspace(
                 print(f"💾 Saving metadata for URL {i + 1}: {file_metadata['id']}")
                 await file_service.save_file_metadata(file_metadata)
 
-                print(f"🔄 Processing upload for URL {i + 1}...")
-                processed_file = await file_service.process_file_upload(file_metadata)
+                print(f"🔄 Processing upload for URL {i + 1}...") 
+                
+                if url_info.get("type") != "webpage":
+                 processed_file = await file_service.process_file_upload(file_metadata)
 
                 # Auto-index PDF files for RAG with workspace ID
-                if file_metadata["mimetype"] == "application/pdf":
+                if file_metadata["mimetype"] == "application/pdf"or url_info.get("type") == "webpage" : 
                     print(f"🔄 Starting RAG indexing for URL {i + 1} ({file_metadata['originalName']})...")
 
                     # Check if RAG service is ready for indexing
@@ -404,7 +406,7 @@ async def upload_workspace(
                                 file_metadata["path"],
                                 file_metadata["originalName"],
                                 workspaceId,
-                                processed_file.get("cloudinary")
+                                processed_file.get("cloudinary","")
                             )
                             print(f"✅ RAG indexing completed for URL {i + 1}: {index_result.get('chunksCount', 0)} chunks")
                         except Exception as rag_error:

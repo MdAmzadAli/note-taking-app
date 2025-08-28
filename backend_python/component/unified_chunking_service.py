@@ -3,7 +3,7 @@ import asyncio
 from typing import Dict, List, Any, Optional, Union
 from .chunking_service import ChunkingService
 from .webpage_text_extractor_service import WebpageTextExtractorService
-from ..utils.webpageUtils.webpage_crawler import WebpageCrawler
+from utils.webpageUtils import WebpageCrawler
 import os
 
 
