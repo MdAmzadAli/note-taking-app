@@ -42,6 +42,7 @@ export default function WorkspaceModal({
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [showFileOptionsModal, setShowFileOptionsModal] = useState(false);
+  const [modalPosition, setModalPosition] = useState(0);
 
   const modalContentRef = useRef<View>(null);
 
@@ -49,18 +50,26 @@ export default function WorkspaceModal({
     const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', (e) => {
       setKeyboardHeight(e.endCoordinates.height);
       setIsKeyboardVisible(true);
+      // Only set modal position if it hasn't been set before or if no URL input is active
+      if (modalPosition === 0 && !activeUrlInput) {
+        setModalPosition(-e.endCoordinates.height * 0.3);
+      }
     });
 
     const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
       setKeyboardHeight(0);
       setIsKeyboardVisible(false);
+      // Reset modal position when keyboard is completely hidden
+      if (!activeUrlInput) {
+        setModalPosition(0);
+      }
     });
 
     return () => {
       keyboardDidShowListener?.remove();
       keyboardDidHideListener?.remove();
     };
-  }, []);
+  }, [modalPosition, activeUrlInput]);
 
   const handleClose = () => {
     onClose();
@@ -74,6 +83,7 @@ export default function WorkspaceModal({
     setKeyboardHeight(0);
     setIsKeyboardVisible(false);
     setShowFileOptionsModal(false);
+    setModalPosition(0);
   };
 
   const handleNext = () => {
@@ -88,6 +98,7 @@ export default function WorkspaceModal({
     setActiveUrlInput(null);
     setUrlInput('');
     setShowFileOptionsModal(false);
+    setModalPosition(0);
   };
 
   const handleAddFromDevice = async () => {
@@ -313,8 +324,8 @@ export default function WorkspaceModal({
     </View>
   );
 
-  const modalTransform = isKeyboardVisible && Platform.OS === 'ios'
-    ? Math.max(-keyboardHeight / 3, -100)
+  const modalTransform = Platform.OS === 'ios' && activeUrlInput
+    ? modalPosition
     : 0;
 
   return (
