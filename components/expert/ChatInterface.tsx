@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import FilePreviewModal from './FilePreviewModal';
-import FileOptionsModal from './FileOptionsModal';
+import UploadModal from './UploadModal';
 import { ragService, RAGSource } from '@/services/ragService';
 
 interface SingleFile {
@@ -85,7 +85,7 @@ export default function ChatInterface({
   const [showSourceModal, setShowSourceModal] = useState(false);
   const [selectedSources, setSelectedSources] = useState<RAGSource[]>([]);
   const [ragHealth, setRagHealth] = useState({ status: 'unknown', qdrant: false, gemini: false });
-  const [showFileOptionsModal, setShowFileOptionsModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const getFileSize = (file: SingleFile) => {
     if (!file.size) return 'Unknown';
     const kb = file.size / 1024;
@@ -175,14 +175,24 @@ export default function ChatInterface({
     setIsFilePreviewVisible(true);
   };
 
-  const handleFilesAdded = (files: any[]) => {
+  const handleUploadFile = (file: any) => {
     if (selectedWorkspace && onAddWorkspaceFile) {
-      // Convert files to the format expected by the workspace system
-      files.forEach(file => {
-        onAddWorkspaceFile(selectedWorkspace.id, file);
-      });
+      onAddWorkspaceFile(selectedWorkspace.id, file);
     }
-    setShowFileOptionsModal(false);
+    setShowUploadModal(false);
+  };
+
+  const handleUploadFromUrl = (url: string) => {
+    if (selectedWorkspace && onAddWorkspaceFile) {
+      // Create a file object with URL info for workspace processing
+      const urlFile = {
+        uri: url,
+        name: url,
+        type: 'url'
+      };
+      onAddWorkspaceFile(selectedWorkspace.id, urlFile);
+    }
+    setShowUploadModal(false);
   };
 
   // Helper function to render formatted text with markdown-like styling
@@ -393,7 +403,7 @@ export default function ChatInterface({
                     { opacity: (selectedWorkspace.files.length >= 5 || isLoading) ? 0.5 : 1 }
                   ]}
                   disabled={selectedWorkspace.files.length >= 5 || isLoading}
-                  onPress={() => setShowFileOptionsModal(true)}
+                  onPress={() => setShowUploadModal(true)}
                 >
                   {isLoading ? (
                     <ActivityIndicator size={16} color="#007AFF" />
@@ -606,13 +616,14 @@ export default function ChatInterface({
         }}
       />
 
-      {/* File Options Modal */}
-      <FileOptionsModal
-        isVisible={showFileOptionsModal}
-        onClose={() => setShowFileOptionsModal(false)}
-        onFilesAdded={handleFilesAdded}
-        maxFiles={5}
-        currentFileCount={selectedWorkspace?.files.length || 0}
+      {/* Upload Modal */}
+      <UploadModal
+        isVisible={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onUpload={handleUploadFile}
+        onUploadFromUrl={handleUploadFromUrl}
+        isBackendConnected={true}
+        isLoading={isLoading}
       />
     </SafeAreaView>
   );
