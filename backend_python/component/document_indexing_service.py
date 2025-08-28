@@ -41,14 +41,14 @@ class DocumentIndexingService:
             if is_url:
                 # For URLs, let unified chunking service handle the processing
                 print(f'🌐 Processing URL with unified chunking service (webpage crawler)')
-                chunking_result = await self.unified_chunking_service.process_url(file_path_or_url, file_id, metadata)
+                chunking_result = await self.unified_chunking_service.process_content(file_path_or_url, "webpage", metadata)
             else:
                 # For files, check if it exists and process accordingly
                 if not os.path.exists(file_path_or_url):
                     raise FileNotFoundError(f'File not found: {file_path_or_url}')
 
                 print(f'📄 Processing file with unified chunking service')
-                chunking_result = await self.unified_chunking_service.process_file(file_path_or_url, metadata)
+                chunking_result = await self.unified_chunking_service.process_content(file_path_or_url,"pdf", metadata)
 
             chunks = chunking_result.get('chunks', [])
             if not chunks:

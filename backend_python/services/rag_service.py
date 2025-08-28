@@ -205,9 +205,9 @@ class RAGService:
         return await self.embedding_service.generate_batch_embeddings(texts, task_type)
 
     # Delegate to DocumentIndexingService
-    async def index_document(self, file_id, file_path, file_name, workspace_id=None, cloudinary_data=None, content_type='pdf'):
+    async def index_document(self, file_id, file_path,metadata):
         return await self.document_indexing_service.index_document(
-            file_id, file_path, file_name, workspace_id, cloudinary_data, content_type)
+            file_id, file_path, metadata)
 
     async def index_document_unified(self, file_id, source, file_name, workspace_id=None, cloudinary_data=None, content_type=None):
         return await self.document_indexing_service.index_document_unified(
