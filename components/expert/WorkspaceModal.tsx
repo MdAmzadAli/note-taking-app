@@ -153,7 +153,7 @@ export default function WorkspaceModal({
       };
       setFiles([...files, newFile]);
       setUrlInput('');
-      setActiveUrlInput(null);
+      // Don't reset activeUrlInput to keep the input section open
     } else {
       Alert.alert('Error', 'Please enter a valid URL');
     }
