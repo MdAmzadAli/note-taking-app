@@ -22,14 +22,14 @@ export default function UploadModal({
   isLoading
 }: UploadModalProps) {
   const [showDropdown, setShowDropdown] = useState(false);
-  const [uploadMode, setUploadMode] = useState<'phone' | 'url'>('phone');
+  const [uploadMode, setUploadMode] = useState<'phone' | 'url' | 'webpage'>('phone');
   const [urlInput, setUrlInput] = useState('');
 
   const handleMainButtonPress = () => {
     if (uploadMode === 'phone') {
       handlePhoneUpload();
     } else {
-      // Handle URL upload
+      // Handle URL upload (both 'url' and 'webpage' modes)
       if (urlInput.trim() && onUploadFromUrl) {
         onUploadFromUrl(urlInput.trim());
       }
@@ -53,7 +53,7 @@ export default function UploadModal({
     }
   };
 
-  const handleDropdownOptionPress = (mode: 'phone' | 'url') => {
+  const handleDropdownOptionPress = (mode: 'phone' | 'url' | 'webpage') => {
     setUploadMode(mode);
     setShowDropdown(false);
     if (mode === 'phone') {
@@ -66,6 +66,23 @@ export default function UploadModal({
     setUploadMode('phone');
     setUrlInput('');
     onClose();
+  };
+
+  const getButtonText = () => {
+    switch (uploadMode) {
+      case 'phone':
+        return 'Upload PDF';
+      case 'url':
+        return 'Upload from URL';
+      case 'webpage':
+        return 'Add Webpage';
+      default:
+        return 'Upload PDF';
+    }
+  };
+
+  const getPlaceholderText = () => {
+    return uploadMode === 'webpage' ? 'Enter webpage URL...' : 'Enter PDF URL...';
   };
 
   return (
@@ -112,7 +129,7 @@ export default function UploadModal({
                   <>
                     <IconSymbol size={16} name="arrow.up.circle" color="#FFFFFF" />
                     <Text style={styles.uploadButtonText}>
-                      {uploadMode === 'phone' ? 'Upload PDF' : 'Upload from URL'}
+                      {getButtonText()}
                     </Text>
                   </>
                 )}
@@ -128,14 +145,14 @@ export default function UploadModal({
               </TouchableOpacity>
             </View>
 
-            {/* URL Input Field (shown when uploadMode is 'url') */}
-            {uploadMode === 'url' && (
+            {/* URL Input Field (shown when uploadMode is 'url' or 'webpage') */}
+            {(uploadMode === 'url' || uploadMode === 'webpage') && (
               <View style={styles.urlInputContainer}>
                 <TextInput
                   style={styles.urlInput}
                   value={urlInput}
                   onChangeText={setUrlInput}
-                  placeholder="Enter PDF URL..."
+                  placeholder={getPlaceholderText()}
                   placeholderTextColor="#999999"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -163,6 +180,16 @@ export default function UploadModal({
                 >
                   <IconSymbol size={14} name="link" color="#4B5563" />
                   <Text style={styles.dropdownOptionText}>From URL</Text>
+                </TouchableOpacity>
+                
+                <View style={styles.dropdownSeparator} />
+                
+                <TouchableOpacity 
+                  style={styles.dropdownOption}
+                  onPress={() => handleDropdownOptionPress('webpage')}
+                >
+                  <IconSymbol size={14} name="globe" color="#4B5563" />
+                  <Text style={styles.dropdownOptionText}>Add Webpage</Text>
                 </TouchableOpacity>
               </View>
             )}
