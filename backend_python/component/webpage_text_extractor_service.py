@@ -37,83 +37,124 @@ class WebpageTextExtractorService:
         if not self.is_valid_url(url):
             raise ValueError('Invalid URL format')
 
-        # Prepare realistic browser headers
-        headers = self._get_realistic_headers(url)
-        print(f'🔧 Using User-Agent: {headers["User-Agent"][:50]}...')
-
-        try:
-            # Create session with proper configuration
-            connector = aiohttp.TCPConnector(
-                ssl=False,  # Allow HTTP requests
-                limit=100,
-                ttl_dns_cache=300,
-                use_dns_cache=True,
-            )
-            
-            async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=self.timeout),
-                headers=headers,
-                connector=connector,
-                cookie_jar=aiohttp.CookieJar()  # Enable cookie handling
-            ) as session:
-                print(f'📡 Making request with realistic browser headers...')
-                async with session.get(url, allow_redirects=True, ssl=False) as response:
-                    if response.status != 200:
-                        raise Exception(f'HTTP {response.status}: {response.reason}')
-
-                    # Check content type
-                    content_type = response.headers.get('content-type', '')
-                    if 'text/html' not in content_type and 'text/plain' not in content_type:
-                        print(f'⚠️ Content-Type is {content_type}, may not be suitable for text extraction')
-
-                    # Check content length
-                    content_length = int(response.headers.get('content-length', 0))
-                    if content_length > self.max_content_length:
-                        raise Exception(f'Content too large: {content_length} bytes (max: {self.max_content_length})')
-
-                    html_content = await response.text()
-                    received_bytes = len(html_content.encode('utf-8'))
-
-                    # Prevent memory overflow
-                    if received_bytes > self.max_content_length:
-                        raise Exception(f'Content exceeds size limit: {received_bytes} bytes')
-
-                    # Store raw HTML content for URL extraction
-                    self._last_html_content = html_content
-
-            print(f'📄 Downloaded {received_bytes} bytes of HTML content')
+        # Try different encoding strategies if needed
+        encoding_strategies = ['full', 'no_brotli', 'minimal', 'identity']
+        
+        for strategy_index, encoding_strategy in enumerate(encoding_strategies):
+            # Prepare realistic browser headers with appropriate encoding
+            headers = self._get_realistic_headers(url, encoding_strategy)
+            print(f'🔧 Attempt {strategy_index + 1}: Using encoding strategy "{encoding_strategy}"')
+            print(f'🔧 Accept-Encoding: {headers["Accept-Encoding"]}')
+            print(f'🔧 User-Agent: {headers["User-Agent"][:50]}...')
 
             try:
-                extracted_text = self.process_html_content(html_content, url)
+                # Create session with proper configuration
+                connector = aiohttp.TCPConnector(
+                    ssl=False,  # Allow HTTP requests
+                    limit=100,
+                    ttl_dns_cache=300,
+                    use_dns_cache=True,
+                )
+                
+                async with aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=self.timeout),
+                    headers=headers,
+                    connector=connector,
+                    cookie_jar=aiohttp.CookieJar()  # Enable cookie handling
+                ) as session:
+                    print(f'📡 Making request with {encoding_strategy} encoding strategy...')
+                    async with session.get(url, allow_redirects=True, ssl=False) as response:
+                    if response.status != 200:
+                            if strategy_index < len(encoding_strategies) - 1:
+                                print(f'❌ HTTP {response.status} with {encoding_strategy} strategy, trying next...')
+                                break  # Try next encoding strategy
+                            else:
+                                raise Exception(f'HTTP {response.status}: {response.reason}')
 
-                return {
-                    'success': True,
-                    'text': extracted_text['cleanedText'],
-                    'metadata': {
-                        'originalUrl': url,
-                        'title': extracted_text['title'],
-                        'description': extracted_text['description'],
-                        'wordCount': extracted_text['wordCount'],
-                        'size': len(extracted_text['cleanedText']),
-                        'extractedAt': datetime.now().isoformat()
-                    },
-                    'fileName': f"webpage_{file_id}_{self.extract_page_name_from_url(url)}.txt",
-                    'mimetype': 'text/plain'
-                }
-            except Exception as processing_error:
-                print(f'❌ HTML processing error: {processing_error}')
-                raise Exception(f'Text extraction failed: {str(processing_error)}')
+                        # Check content type
+                        content_type = response.headers.get('content-type', '')
+                        if 'text/html' not in content_type and 'text/plain' not in content_type:
+                            print(f'⚠️ Content-Type is {content_type}, may not be suitable for text extraction')
 
-        except aiohttp.ClientResponseError as error:
-            if error.status == 403:
-                print(f'🚫 403 Forbidden error, attempting retry with different headers...')
-                return await self._retry_with_different_headers(url, file_id)
-            else:
-                print(f'❌ HTTP error {error.status}: {error.message}')
-                raise Exception(f'HTTP {error.status}: {error.message}')
-        except Exception as error:
-            print(f'❌ Request error: {error}')
-            raise Exception(f'Request failed: {str(error)}')
+                        # Check content length
+                        content_length = int(response.headers.get('content-length', 0))
+                        if content_length > self.max_content_length:
+                            raise Exception(f'Content too large: {content_length} bytes (max: {self.max_content_length})')
+
+                        # Check actual encoding used by server
+                        content_encoding = response.headers.get('content-encoding', 'none')
+                        print(f'📊 Server response encoding: {content_encoding}')
+
+                        html_content = await response.text()
+                        received_bytes = len(html_content.encode('utf-8'))
+
+                        # Prevent memory overflow
+                        if received_bytes > self.max_content_length:
+                            raise Exception(f'Content exceeds size limit: {received_bytes} bytes')
+
+                        # Store raw HTML content for URL extraction
+                        self._last_html_content = html_content
+
+                        print(f'📄 Downloaded {received_bytes} bytes of HTML content using {encoding_strategy} strategy')
+
+                        try:
+                            extracted_text = self.process_html_content(html_content, url)
+
+                            return {
+                                'success': True,
+                                'text': extracted_text['cleanedText'],
+                                'metadata': {
+                                    'originalUrl': url,
+                                    'title': extracted_text['title'],
+                                    'description': extracted_text['description'],
+                                    'wordCount': extracted_text['wordCount'],
+                                    'size': len(extracted_text['cleanedText']),
+                                    'extractedAt': datetime.now().isoformat(),
+                                    'encodingStrategy': encoding_strategy,
+                                    'serverEncoding': content_encoding
+                                },
+                                'fileName': f"webpage_{file_id}_{self.extract_page_name_from_url(url)}.txt",
+                                'mimetype': 'text/plain'
+                            }
+                        except Exception as processing_error:
+                            print(f'❌ HTML processing error with {encoding_strategy}: {processing_error}')
+                            if strategy_index < len(encoding_strategies) - 1:
+                                print(f'🔄 Trying next encoding strategy...')
+                                break  # Try next encoding strategy
+                            else:
+                                raise Exception(f'Text extraction failed with all encoding strategies: {str(processing_error)}')
+
+            except aiohttp.ClientResponseError as error:
+                if error.status == 403:
+                    print(f'🚫 403 Forbidden error with {encoding_strategy}, attempting retry with different headers...')
+                    return await self._retry_with_different_headers(url, file_id)
+                elif strategy_index < len(encoding_strategies) - 1:
+                    print(f'❌ HTTP error {error.status} with {encoding_strategy}, trying next encoding strategy...')
+                    continue  # Try next encoding strategy
+                else:
+                    print(f'❌ HTTP error {error.status}: {error.message}')
+                    raise Exception(f'HTTP {error.status}: {error.message}')
+            except Exception as error:
+                error_msg = str(error)
+                
+                # Check if it's a Brotli-related error
+                if 'brotli' in error_msg.lower() or 'br' in error_msg.lower():
+                    print(f'❌ Brotli encoding error with {encoding_strategy}: {error}')
+                    if strategy_index < len(encoding_strategies) - 1:
+                        print(f'🔄 Trying next encoding strategy without Brotli...')
+                        continue  # Try next encoding strategy
+                    else:
+                        raise Exception(f'All encoding strategies failed due to compression issues: {str(error)}')
+                elif strategy_index < len(encoding_strategies) - 1:
+                    print(f'❌ Request error with {encoding_strategy}: {error}')
+                    print(f'🔄 Trying next encoding strategy...')
+                    continue  # Try next encoding strategy
+                else:
+                    print(f'❌ Request error: {error}')
+                    raise Exception(f'Request failed with all encoding strategies: {str(error)}')
+        
+        # If we get here, all strategies failed
+        raise Exception('All encoding strategies failed to extract webpage content')
 
     def process_html_content(self, html_content: str, url: str) -> dict:
         """
@@ -336,10 +377,11 @@ class WebpageTextExtractorService:
         except Exception:
             return 'webpage'
 
-    def _get_realistic_headers(self, url: str) -> dict:
+    def _get_realistic_headers(self, url: str, encoding_strategy: str = 'full') -> dict:
         """
         Generate realistic browser headers to avoid 403 errors
         @param url: Target URL for contextual headers
+        @param encoding_strategy: 'full', 'no_brotli', or 'minimal'
         @returns: Dictionary of headers
         """
         # Get domain for referer
@@ -349,11 +391,21 @@ class WebpageTextExtractorService:
         # Randomly select user agent
         user_agent = random.choice(self.user_agents)
         
+        # Choose encoding based on strategy
+        if encoding_strategy == 'full':
+            accept_encoding = "gzip, deflate, br"
+        elif encoding_strategy == 'no_brotli':
+            accept_encoding = "gzip, deflate"
+        elif encoding_strategy == 'minimal':
+            accept_encoding = "gzip"
+        else:
+            accept_encoding = "identity"  # No compression
+        
         headers = {
             "User-Agent": user_agent,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Encoding": accept_encoding,
             "DNT": "1",
             "Connection": "keep-alive",
             "Upgrade-Insecure-Requests": "1",
@@ -395,12 +447,17 @@ class WebpageTextExtractorService:
         @param max_retries: Maximum number of retries
         @returns: Extraction result
         """
+        encoding_strategies = ['no_brotli', 'minimal', 'identity']
+        
         for attempt in range(max_retries):
             try:
                 print(f'🔄 Retry attempt {attempt + 1}/{max_retries} for URL: {url}')
                 
-                # Use different headers for each retry
-                headers = self._get_realistic_headers(url)
+                # Use different headers and encoding for each retry
+                encoding_strategy = encoding_strategies[attempt % len(encoding_strategies)]
+                headers = self._get_realistic_headers(url, encoding_strategy)
+                print(f'🔧 Retry using encoding strategy: {encoding_strategy}')
+                
                 # Add delay between retries to appear more human-like
                 if attempt > 0:
                     await asyncio.sleep(2 + attempt)
