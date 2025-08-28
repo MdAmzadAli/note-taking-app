@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, ScrollView, Alert, Dimensions } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ActivityIndicator, ScrollView, Alert, KeyboardAvoidingView, Platform, Dimensions, Keyboard } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import UploadModal from './UploadModal';
+import * as DocumentPicker from 'expo-document-picker';
 
 interface WorkspaceModalProps {
   isVisible: boolean;
@@ -36,9 +36,40 @@ export default function WorkspaceModal({
   const [currentStep, setCurrentStep] = useState(1);
   const [description, setDescription] = useState('');
   const [files, setFiles] = useState<FileItem[]>([]);
+  const [showFileOptions, setShowFileOptions] = useState(false);
+  const [activeUrlInput, setActiveUrlInput] = useState<'url' | 'webpage' | null>(null);
+  const [urlInput, setUrlInput] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [showFileOptionsModal, setShowFileOptionsModal] = useState(false);
+  const [modalPosition, setModalPosition] = useState(0);
 
-  
+  const modalContentRef = useRef<View>(null);
+
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+      setIsKeyboardVisible(true);
+      // Only set modal position if it hasn't been set before or if no URL input is active
+      if (modalPosition === 0 && !activeUrlInput) {
+        setModalPosition(-e.endCoordinates.height * 0.3);
+      }
+    });
+
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+      setIsKeyboardVisible(false);
+      // Reset modal position when keyboard is completely hidden
+      if (!activeUrlInput) {
+        setModalPosition(0);
+      }
+    });
+
+    return () => {
+      keyboardDidShowListener?.remove();
+      keyboardDidHideListener?.remove();
+    };
+  }, [modalPosition, activeUrlInput]);
 
   const handleClose = () => {
     onClose();
@@ -46,7 +77,13 @@ export default function WorkspaceModal({
     setDescription('');
     setFiles([]);
     setCurrentStep(1);
+    setShowFileOptions(false);
+    setActiveUrlInput(null);
+    setUrlInput('');
+    setKeyboardHeight(0);
+    setIsKeyboardVisible(false);
     setShowFileOptionsModal(false);
+    setModalPosition(0);
   };
 
   const handleNext = () => {
@@ -57,43 +94,80 @@ export default function WorkspaceModal({
 
   const handleBack = () => {
     setCurrentStep(1);
+    setShowFileOptions(false);
+    setActiveUrlInput(null);
+    setUrlInput('');
     setShowFileOptionsModal(false);
+    setModalPosition(0);
   };
 
-  const handleUploadFile = (file: any) => {
-    if (files.length >= 5) {
+  const handleAddFromDevice = async () => {
+    const remainingSlots = 5 - files.length;
+    if (remainingSlots <= 0) {
       Alert.alert('Limit Reached', 'Maximum 5 files can be uploaded.');
       return;
     }
 
-    const newFile: FileItem = {
-      id: Date.now().toString(),
-      name: file.name,
-      type: 'device',
-      source: file.name,
-      file: file
-    };
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+        multiple: true,
+      });
 
-    setFiles([...files, newFile]);
-    setShowFileOptionsModal(false);
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const filesToAdd = result.assets.slice(0, remainingSlots);
+        const newFiles: FileItem[] = filesToAdd.map((file, index) => ({
+          id: (Date.now() + index).toString(),
+          name: file.name,
+          type: 'device',
+          source: file.name,
+          file: file
+        }));
+
+        setFiles([...files, ...newFiles]);
+        setShowFileOptionsModal(false);
+
+        if (result.assets.length > remainingSlots) {
+          Alert.alert(
+            'Some files not added',
+            `Only ${filesToAdd.length} files were added due to the 5-file limit. ${result.assets.length - remainingSlots} files were skipped.`
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error picking document:', error);
+      Alert.alert('Error', 'Failed to pick document');
+    }
   };
 
-  const handleUploadFromUrl = (url: string) => {
+  const handleUrlOptionClick = (type: 'url' | 'webpage') => {
     if (files.length >= 5) {
       Alert.alert('Limit Reached', 'Maximum 5 files can be uploaded.');
       return;
     }
+    setActiveUrlInput(type);
+    setUrlInput('');
+  };
 
-    // Default to 'from_url' type - UploadModal will determine if it's webpage or URL based on user selection
-    const newFile: FileItem = {
-      id: Date.now().toString(),
-      name: url,
-      type: 'from_url',
-      source: url,
-    };
+  const handleAddUrl = () => {
+    if (urlInput.trim() && activeUrlInput) {
+      // Map frontend types to backend expected types
+      const backendType = activeUrlInput === 'url' ? 'from_url' : 'webpage';
 
-    setFiles([...files, newFile]);
-    setShowFileOptionsModal(false);
+      const newFile: FileItem = {
+        id: Date.now().toString(),
+        name: urlInput.trim(),
+        type: backendType, // 'from_url' or 'webpage'
+        source: urlInput.trim(),
+        isUrl: true,
+      };
+      setFiles([...files, newFile]);
+      setUrlInput('');
+      // Don't reset activeUrlInput to keep the input section open
+    } else {
+      Alert.alert('Error', 'Please enter a valid URL');
+    }
   };
 
   const handleRemoveFile = (fileId: string) => {
@@ -250,13 +324,19 @@ export default function WorkspaceModal({
     </View>
   );
 
+  const modalTransform = Platform.OS === 'ios' && activeUrlInput
+    ? modalPosition
+    : 0;
+
   return (
     <Modal visible={isVisible} transparent animationType="slide">
       <View style={styles.modalOverlay}>
         <View
+          ref={modalContentRef}
           style={[
             styles.modalContent,
             {
+              transform: [{ translateY: modalTransform }],
               height: MODAL_HEIGHT,
             }
           ]}
@@ -265,15 +345,100 @@ export default function WorkspaceModal({
         </View>
       </View>
 
-      {/* Upload Modal */}
-      <UploadModal
-        isVisible={showFileOptionsModal}
-        onClose={() => setShowFileOptionsModal(false)}
-        onUpload={handleUploadFile}
-        onUploadFromUrl={handleUploadFromUrl}
-        isBackendConnected={isBackendConnected}
-        isLoading={isLoading}
-      />
+      {/* File Options Modal */}
+      <Modal visible={showFileOptionsModal} transparent animationType="fade">
+        <View style={styles.fileOptionsModalOverlay}>
+          <View style={styles.fileOptionsModal}>
+            <View style={styles.fileOptionsHeader}>
+              <Text style={styles.fileOptionsTitle}>Add File</Text>
+              <TouchableOpacity
+                style={styles.closeOptionsButton}
+                onPress={() => {
+                  setShowFileOptionsModal(false);
+                  setActiveUrlInput(null);
+                  setUrlInput('');
+                }}
+              >
+                <IconSymbol size={16} name="xmark" color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.fileOptionsContent}>
+              <TouchableOpacity
+                style={styles.fileOptionModal}
+                onPress={handleAddFromDevice}
+              >
+                <IconSymbol size={20} name="phone" color="#4B5563" />
+                <Text style={styles.fileOptionModalText}>From Device</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.fileOptionModal}
+                onPress={() => handleUrlOptionClick('url')}
+              >
+                <IconSymbol size={20} name="link" color="#4B5563" />
+                <Text style={styles.fileOptionModalText}>From Internet</Text>
+              </TouchableOpacity>
+
+              {activeUrlInput === 'url' && (
+                <View style={styles.urlInputModalSection}>
+                  <View style={styles.urlInputModalContainer}>
+                    <TextInput
+                      style={styles.urlInputModal}
+                      value={urlInput}
+                      onChangeText={setUrlInput}
+                      placeholder="Enter URL..."
+                      placeholderTextColor="#999999"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="url"
+                      autoFocus={true}
+                    />
+                    <TouchableOpacity
+                      style={styles.sendButtonModal}
+                      onPress={handleAddUrl}
+                    >
+                      <IconSymbol size={16} name="arrow.right" color="#8B5CF6" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={styles.fileOptionModal}
+                onPress={() => handleUrlOptionClick('webpage')}
+              >
+                <IconSymbol size={20} name="globe" color="#4B5563" />
+                <Text style={styles.fileOptionModalText}>Add Webpage</Text>
+              </TouchableOpacity>
+
+              {activeUrlInput === 'webpage' && (
+                <View style={styles.urlInputModalSection}>
+                  <View style={styles.urlInputModalContainer}>
+                    <TextInput
+                      style={styles.urlInputModal}
+                      value={urlInput}
+                      onChangeText={setUrlInput}
+                      placeholder="Enter webpage URL..."
+                      placeholderTextColor="#999999"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="url"
+                      autoFocus={true}
+                    />
+                    <TouchableOpacity
+                      style={styles.sendButtonModal}
+                      onPress={handleAddUrl}
+                    >
+                      <IconSymbol size={16} name="arrow.right" color="#8B5CF6" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 }
@@ -490,5 +655,93 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontFamily: 'Inter',
   },
-  
+  fileOptionsModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fileOptionsModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    width: '80%',
+    maxWidth: 300,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  fileOptionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  fileOptionsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    fontFamily: 'Inter',
+  },
+  closeOptionsButton: {
+    padding: 4,
+  },
+  fileOptionsContent: {
+    padding: 8,
+  },
+  fileOptionModal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 8,
+    marginVertical: 2,
+    gap: 12,
+  },
+  fileOptionModalText: {
+    fontSize: 15,
+    color: '#4B5563',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  urlInputModalSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    marginVertical: 4,
+  },
+  urlInputModalContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 6,
+    paddingRight: 8,
+    gap: 8,
+  },
+  urlInputModal: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#1F2937',
+    fontFamily: 'Inter',
+  },
+  sendButtonModal: {
+    padding: 8,
+    backgroundColor: '#F3F0FF',
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
+  },
 });
