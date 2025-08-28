@@ -64,7 +64,7 @@ class WebpageTextExtractorService:
                 ) as session:
                     print(f'📡 Making request with {encoding_strategy} encoding strategy...')
                     async with session.get(url, allow_redirects=True, ssl=False) as response:
-                    if response.status != 200:
+                        if response.status != 200:
                             if strategy_index < len(encoding_strategies) - 1:
                                 print(f'❌ HTTP {response.status} with {encoding_strategy} strategy, trying next...')
                                 break  # Try next encoding strategy
