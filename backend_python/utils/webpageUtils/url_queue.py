@@ -173,14 +173,6 @@ class URLQueue:
             Base URL (scheme + netloc)
         """
         try:
-            # Use regex to extract protocol and domain
-            match = re.match(r'^(https?://[^/]+)', url)
-            if match:
-                base_url = match.group(1)
-                print(f"   🔍 Extracted base URL: {base_url} from {url}")
-                return base_url
-            else:
-                # Fallback to urlparse if regex fails
                 parsed = urlparse(url)
                 base_url = f"{parsed.scheme}://{parsed.netloc}"
                 print(f"   🔍 Fallback base URL: {base_url} from {url}")
