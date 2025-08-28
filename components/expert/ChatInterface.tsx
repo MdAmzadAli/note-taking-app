@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import FilePreviewModal from './FilePreviewModal';
+import FileOptionsModal from './FileOptionsModal';
 import { ragService, RAGSource } from '@/services/ragService';
 
 interface SingleFile {
@@ -58,7 +59,7 @@ interface ChatInterfaceProps {
   onBack: () => void;
   onFilePreview?: (file: SingleFile) => void;
   onDeleteWorkspaceFile?: (workspaceId: string, fileId: string) => void;
-  onAddWorkspaceFile?: (workspaceId: string) => void;
+  onAddWorkspaceFile?: (workspaceId: string, file?: any) => void;
   isLoading?: boolean;
 }
 
@@ -84,6 +85,7 @@ export default function ChatInterface({
   const [showSourceModal, setShowSourceModal] = useState(false);
   const [selectedSources, setSelectedSources] = useState<RAGSource[]>([]);
   const [ragHealth, setRagHealth] = useState({ status: 'unknown', qdrant: false, gemini: false });
+  const [showFileOptionsModal, setShowFileOptionsModal] = useState(false);
   const getFileSize = (file: SingleFile) => {
     if (!file.size) return 'Unknown';
     const kb = file.size / 1024;
@@ -171,6 +173,16 @@ export default function ChatInterface({
     });
     setPreviewFile(file);
     setIsFilePreviewVisible(true);
+  };
+
+  const handleFilesAdded = (files: any[]) => {
+    if (selectedWorkspace && onAddWorkspaceFile) {
+      // Convert files to the format expected by the workspace system
+      files.forEach(file => {
+        onAddWorkspaceFile(selectedWorkspace.id, file);
+      });
+    }
+    setShowFileOptionsModal(false);
   };
 
   // Helper function to render formatted text with markdown-like styling
@@ -381,7 +393,7 @@ export default function ChatInterface({
                     { opacity: (selectedWorkspace.files.length >= 5 || isLoading) ? 0.5 : 1 }
                   ]}
                   disabled={selectedWorkspace.files.length >= 5 || isLoading}
-                  onPress={() => onAddWorkspaceFile?.(selectedWorkspace.id)}
+                  onPress={() => setShowFileOptionsModal(true)}
                 >
                   {isLoading ? (
                     <ActivityIndicator size={16} color="#007AFF" />
@@ -592,6 +604,15 @@ export default function ChatInterface({
           setIsFilePreviewVisible(false);
           setPreviewFile(null);
         }}
+      />
+
+      {/* File Options Modal */}
+      <FileOptionsModal
+        isVisible={showFileOptionsModal}
+        onClose={() => setShowFileOptionsModal(false)}
+        onFilesAdded={handleFilesAdded}
+        maxFiles={5}
+        currentFileCount={selectedWorkspace?.files.length || 0}
       />
     </SafeAreaView>
   );
