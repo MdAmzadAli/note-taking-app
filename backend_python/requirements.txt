@@ -22,3 +22,4 @@ hdbscan
 scikit-learn
 nltk
 matplotlib
+brotli
