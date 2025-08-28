@@ -381,6 +381,7 @@ export default function WorkspaceModal({
                       autoCapitalize="none"
                       autoCorrect={false}
                       keyboardType="url"
+                      autoFocus={true}
                     />
                     <TouchableOpacity
                       style={styles.sendButtonModal}
@@ -412,6 +413,7 @@ export default function WorkspaceModal({
                       autoCapitalize="none"
                       autoCorrect={false}
                       keyboardType="url"
+                      autoFocus={true}
                     />
                     <TouchableOpacity
                       style={styles.sendButtonModal}
