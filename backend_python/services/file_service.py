@@ -1,4 +1,3 @@
-
 import os
 import json
 import aiofiles
@@ -35,7 +34,7 @@ class FileService:
             metadata_path = self.metadata_dir / f"{file_id}.json"
             if not metadata_path.exists():
                 return None
-            
+
             async with aiofiles.open(metadata_path, 'r') as f:
                 data = await f.read()
                 return json.loads(data)
@@ -71,7 +70,12 @@ class FileService:
             # Update file metadata with Cloudinary URLs
             updated_file_info = {
                 **file_info,
-                'cloudinary': cloudinary_result
+                **({"cloudinary": {
+                    "thumbnailUrl": cloudinary_result["thumbnailUrl"],
+                    "pageUrls": cloudinary_result["pageUrls"],
+                    "totalPages": cloudinary_result["totalPages"],
+                    "secureUrl": cloudinary_result["secureUrl"]
+                }} if cloudinary_result else {})
             }
 
             # Save updated metadata

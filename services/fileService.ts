@@ -21,11 +21,10 @@ export interface FileUploadResponse {
   size: number;
   uploadDate: string;
   cloudinary?: {
-    thumbnailUrl: string;
-    pageUrls: string[];
-    fullPdfUrl: string;
-    totalPages: number;
-    secureUrl: string;
+    thumbnailUrl?: string;
+    pageUrls?: string[];
+    totalPages?: number;
+    secureUrl?: string;
   };
 }
 

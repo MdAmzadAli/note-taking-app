@@ -1,4 +1,3 @@
-
 import asyncio
 import json
 import re
@@ -13,11 +12,11 @@ class AnswerGenerationService:
                             workspace_id: Optional[str] = None) -> Dict[str, Any]:
         try:
             print(f'🤖 Starting structured 3-step LLM flow for: "{query}"')
-            
+
             # Determine if this is single file mode or workspace mode
             is_single_file_mode = workspace_id and workspace_id.startswith("single_")
             is_workspace_mode = workspace_id and not workspace_id.startswith("single_") and file_ids and len(file_ids) > 1
-            
+
             print(f'📊 Mode Detection: Single={is_single_file_mode}, Workspace={is_workspace_mode}, WorkspaceId={workspace_id}')
 
             # Search for relevant chunks with appropriate limits
@@ -38,12 +37,12 @@ class AnswerGenerationService:
 
             # Step 0: Query recognition and refinement with mode context
             step0_result = await self.step0_query_recognition(query, relevant_chunks, is_single_file_mode, is_workspace_mode)
-            
+
             print(f'📊 Step 0 Result: Type={step0_result["queryType"]}, Mode={"Single" if is_single_file_mode else "Workspace" if is_workspace_mode else "Unknown"}, Refined="{step0_result["refinedQuery"]}"')
 
             # Route to appropriate processing based on enhanced query type
             query_type = step0_result['queryType']
-            
+
             if query_type == 'computational':
                 return await self.process_computational_query(step0_result['refinedQuery'], query, relevant_chunks)
             elif query_type == 'factual-table':
@@ -70,11 +69,11 @@ class AnswerGenerationService:
         has_json_tables = any(chunk['metadata'].get('has_json_tables', False) for chunk in relevant_chunks)
         has_financial_data = any(chunk['metadata'].get('hasFinancialData', False) for chunk in relevant_chunks)
         has_structured_tables = any(chunk.get('structured_tables') for chunk in relevant_chunks)
-        
+
         # Count table chunks and their types
         table_chunks = [chunk for chunk in relevant_chunks if chunk['metadata'].get('hasTableContent', False)]
         table_count = len(table_chunks)
-        
+
         # Analyze table metadata for better classification
         table_headers = []
         table_currencies = []
@@ -154,7 +153,7 @@ Return ONLY this JSON format:
             response_text = response.text
             print(f'📊 Step 0: Raw response: {response_text}')
             json_match = re.search(r'\{[\s\S]*\}', response_text)
-            
+
             if json_match:
                 result = json.loads(json_match.group())
                 print(f'✅ Step 0: {result["queryType"]} query identified - {result["reasoning"]}')
@@ -165,26 +164,26 @@ Return ONLY this JSON format:
 
         # Enhanced fallback classification based on keywords
         query_lower = user_query.lower()
-        
+
         computational_keywords = [
             'calculate', 'sum', 'total', 'average', 'percentage', 'ratio', 'difference',
             'how much', 'cost analysis', 'budget calculation'
         ]
-        
+
         table_keywords = [
             'table', 'list', 'show all', 'what are', 'which ones', 'entries', 'records'
         ]
-        
+
         comparison_keywords = [
             'highest', 'lowest', 'best', 'worst', 'top', 'bottom', 'most', 'least',
             'compare', 'rank', 'ranking', 'which is', 'who has'
         ]
-        
+
         # Determine query type based on keyword analysis
         has_computation = any(keyword in query_lower for keyword in computational_keywords)
         has_table_focus = any(keyword in query_lower for keyword in table_keywords)
         has_comparison = any(keyword in query_lower for keyword in comparison_keywords)
-        
+
         # Classification logic with mode awareness
         if has_comparison and (has_table_content or has_table_focus):
             query_type = 'mixed'  # Needs table data + comparison
@@ -229,7 +228,7 @@ Return ONLY this JSON format:
 
         # Filter and prioritize table chunks
         table_chunks = self._prioritize_table_chunks(relevant_chunks)
-        
+
         return await self.step2_factual_table_processing(refined_query, original_query, table_chunks)
 
     async def process_mixed_query(self, refined_query: str, original_query: str, 
@@ -248,7 +247,7 @@ Return ONLY this JSON format:
         # Separate table and non-table chunks
         table_chunks = []
         text_chunks = []
-        
+
         for chunk in chunks:
             metadata = chunk.get('metadata', {})
             if (metadata.get('hasTableContent', False) or 
@@ -257,10 +256,10 @@ Return ONLY this JSON format:
                 table_chunks.append(chunk)
             else:
                 text_chunks.append(chunk)
-        
+
         # Prioritize table chunks but include some text for context
         prioritized = table_chunks + text_chunks[:2]  # Include top 2 text chunks for context
-        
+
         print(f'🎯 Prioritized {len(table_chunks)} table chunks + {min(2, len(text_chunks))} context chunks')
         return prioritized[:12]  # Limit total chunks
 
@@ -270,7 +269,7 @@ Return ONLY this JSON format:
         numbered_contexts = []
         for index, chunk in enumerate(relevant_chunks):
             location_info = ''
-            
+
             # Build location info only if page/line data exists
             if chunk['metadata'].get('pageNumber') is not None:
                 location_info = f"Page {chunk['metadata']['pageNumber']}"
@@ -278,7 +277,7 @@ Return ONLY this JSON format:
                     location_info += f", Lines {chunk['metadata']['startLine']}-{chunk['metadata']['endLine']}"
             else:
                 location_info = 'Content'
-            
+
             numbered_contexts.append(f"[Context {index + 1} - Doc: {chunk['metadata']['fileName']} | {location_info}]: {chunk['text']}")
 
         structuring_prompt = f"""You are a data extraction expert. Convert the provided context into a well-structured JSON format for computational analysis.
@@ -343,7 +342,7 @@ Return a structured JSON with this format:
 
             response_text = response.text
             json_match = re.search(r'\{[\s\S]*\}', response_text)
-            
+
             if json_match:
                 structured_data = json.loads(json_match.group())
                 print(f'✅ Step 1: Extracted {structured_data.get("summary", {}).get("totalValues", 0)} values from {structured_data.get("summary", {}).get("totalContexts", 0)} contexts')
@@ -428,7 +427,7 @@ ANSWER:"""
                 int(s.strip()) for s in contexts_used_str.split(',') 
                 if s.strip().isdigit() and 1 <= int(s.strip()) <= len(relevant_chunks)
             ]
-            
+
             answer = re.sub(r'---\s*CONTEXTS_USED:.*$', '', full_response, flags=re.DOTALL).strip()
             print(f'🎯 Step 2: Used {len(used_context_numbers)} contexts: [{", ".join(map(str, used_context_numbers))}]')
         else:
@@ -456,7 +455,7 @@ ANSWER:"""
                 # Add page and line information only if available (PDF content)
                 if chunk['metadata'].get('pageNumber') is not None:
                     source['pageNumber'] = chunk['metadata']['pageNumber']
-                
+
                 if chunk['metadata'].get('startLine') is not None:
                     source['startLine'] = chunk['metadata']['startLine']
                     source['endLine'] = chunk['metadata']['endLine']
@@ -487,7 +486,7 @@ ANSWER:"""
         for index, chunk in enumerate(relevant_chunks):
             confidence = f"{chunk['score'] * 100:.1f}"
             location_info = ''
-            
+
             # Build location info only if page/line data exists
             if chunk['metadata'].get('pageNumber') is not None:
                 location_info = f"Page {chunk['metadata']['pageNumber']}"
@@ -495,7 +494,7 @@ ANSWER:"""
                     location_info += f", Lines {chunk['metadata']['startLine']}-{chunk['metadata']['endLine']}"
             else:
                 location_info = 'Content'
-            
+
             context_parts.append(f"[Context {index + 1} - {chunk['metadata']['fileName']} - {location_info} - Relevance: {confidence}%]: {chunk['text']}")
 
         context = '\n\n'.join(context_parts)
@@ -550,7 +549,7 @@ ANSWER:"""
                 int(s.strip()) - 1 for s in contexts_used_str.split(',') 
                 if s.strip().isdigit() and 1 <= int(s.strip()) <= len(relevant_chunks)
             ]
-            
+
             answer = re.sub(r'---\s*CONTEXTS_USED:.*$', '', full_response, flags=re.DOTALL).strip()
             print(f'🎯 Step 2: Used {len(used_context_indices)} contexts: [{", ".join(str(i + 1) for i in used_context_indices)}]')
         else:
@@ -577,7 +576,7 @@ ANSWER:"""
             # Add page and line information only if available (PDF content)
             if chunk['metadata'].get('pageNumber') is not None:
                 source['pageNumber'] = chunk['metadata']['pageNumber']
-            
+
             if chunk['metadata'].get('startLine') is not None:
                 source['startLine'] = chunk['metadata']['startLine']
                 source['endLine'] = chunk['metadata']['endLine']
@@ -603,14 +602,14 @@ ANSWER:"""
         for index, chunk in enumerate(relevant_chunks):
             confidence = f"{chunk['score'] * 100:.1f}"
             location_info = ''
-            
+
             if chunk['metadata'].get('pageNumber') is not None:
                 location_info = f"Page {chunk['metadata']['pageNumber']}"
                 if chunk['metadata'].get('startLine') is not None:
                     location_info += f", Lines {chunk['metadata']['startLine']}-{chunk['metadata']['endLine']}"
             else:
                 location_info = 'Content'
-            
+
             # Highlight if this chunk contains structured table data
             table_info = ""
             if chunk.get('structured_tables'):
@@ -618,7 +617,7 @@ ANSWER:"""
                 table_info = f" [STRUCTURED TABLES: {table_count}]"
             elif chunk['metadata'].get('hasTableContent', False):
                 table_info = " [TABLE CONTENT]"
-            
+
             context_parts.append(f"[Context {index + 1} - {chunk['metadata']['fileName']} - {location_info}{table_info} - Relevance: {confidence}%]: {chunk['text']}")
 
         context = '\n\n'.join(context_parts)
@@ -760,7 +759,7 @@ ANSWER:"""
                     int(s.strip()) - 1 for s in contexts_used_str.split(',') 
                     if s.strip().isdigit() and 1 <= int(s.strip()) <= len(relevant_chunks)
                 ]
-            
+
             answer = re.sub(r'---\s*CONTEXTS_USED:.*$', '', full_response, flags=re.DOTALL).strip()
             print(f'🎯 Step 2: Used {len(used_contexts)} contexts')
         else:
@@ -787,26 +786,30 @@ ANSWER:"""
         sources = []
         for index, chunk in enumerate(chunks):
             source = {
-                'id': f'source_{index + 1}',
-                'fileName': chunk['metadata']['fileName'],
-                'fileId': chunk['metadata']['fileId'],
-                'chunkIndex': chunk['metadata']['chunkIndex'],
-                'originalText': chunk['text'],
-                'relevanceScore': chunk['score'],
-                'pageUrl': chunk['metadata'].get('pageUrl'),
-                'cloudinaryUrl': chunk['metadata'].get('cloudinaryUrl'),
-                'thumbnailUrl': chunk['metadata'].get('thumbnailUrl'),
-                'confidencePercentage': f"{chunk['score'] * 100:.1f}"
+                "chunk_id": chunk.get("chunk_id"), # Changed from payload.get to get directly from chunk
+                "file_id": chunk.get("fileId"), # Changed from payload.get to get directly from chunk
+                "file_name": chunk.get("fileName"), # Changed from payload.get to get directly from chunk
+                "page_number": chunk.get("pageNumber"), # Changed from payload.get to get directly from chunk
+                "relevance_score": round(chunk.get('score', 0), 4), # Changed from chunk.score to chunk.get('score', 0)
+                "content": chunk.get("text", "")[:200] + "..." if len(chunk.get("text", "")) > 200 else chunk.get("text", "") # Changed from payload.get("content", "") to chunk.get("text", "")
             }
 
+            # Add URLs only if available
+            if chunk.get("pageUrl"): # Changed from payload.get("page_url") to chunk.get("pageUrl")
+                source["page_url"] = chunk.get("pageUrl") # Changed from payload.get("page_url") to chunk.get("pageUrl")
+            if chunk.get("cloudinaryUrl"): # Changed from payload.get("cloudinaryUrl") to chunk.get("cloudinaryUrl")
+                source["cloudinaryUrl"] = chunk.get("cloudinaryUrl") # Changed from payload.get("cloudinaryUrl") to chunk.get("cloudinaryUrl")
+            if chunk.get("thumbnailUrl"): # Changed from payload.get("thumbnail_url") to chunk.get("thumbnailUrl")
+                source["thumbnailUrl"] = chunk.get("thumbnailUrl") # Changed from payload.get("thumbnail_url") to chunk.get("thumbnailUrl")
+
             # Add page and line information only if available (PDF content)
-            if chunk['metadata'].get('pageNumber') is not None:
-                source['pageNumber'] = chunk['metadata']['pageNumber']
-            
-            if chunk['metadata'].get('startLine') is not None:
-                source['startLine'] = chunk['metadata']['startLine']
-                source['endLine'] = chunk['metadata']['endLine']
-                source['lineRange'] = f"Lines {chunk['metadata']['startLine']}-{chunk['metadata']['endLine']}"
+            if chunk.get('pageNumber') is not None:
+                source['pageNumber'] = chunk['pageNumber']
+
+            if chunk.get('startLine') is not None:
+                source['startLine'] = chunk['startLine']
+                source['endLine'] = chunk['endLine']
+                source['lineRange'] = f"Lines {chunk['startLine']}-{chunk['endLine']}"
             else:
                 source['lineRange'] = 'Full content'
 
@@ -822,7 +825,7 @@ ANSWER:"""
             'revenue', 'profit', 'loss', 'financial', 'money', 'currency', 'dollar',
             'rupee', 'euro', 'pound', '$', '₹', '€', '£', 'calculate', 'calculation'
         ]
-        
+
         query_lower = query.lower()
         return any(keyword in query_lower for keyword in financial_keywords)
 
@@ -837,10 +840,10 @@ ANSWER:"""
             'what are', 'list all', 'show me', 'find all', 'identify',
             'how many', 'which ones', 'what kind'
         ]
-        
+
         query_lower = query.lower()
         complex_keyword_count = sum(1 for keyword in complex_indicators if keyword in query_lower)
-        
+
         return complex_keyword_count >= 2 or len(query) > 100 or self.is_financial_query(query)
 
     # Legacy methods for backward compatibility

@@ -195,7 +195,7 @@ class ConnectionManager:
             except Exception as e:
                 print(f"❌ Failed to send summary via WebSocket: {e}")
                 disconnected.append(connection)
-        
+
         # Remove disconnected connections
         for conn in disconnected:
             self.disconnect(conn)
@@ -208,28 +208,28 @@ async def generate_file_summary_background(file_id: str, file_name: str, workspa
     """
     try:
         print(f"🔄 Starting background summary generation for file: {file_id}")
-        
+
         # Generate a summary query
         summary_query = f"Provide a comprehensive summary of the document '{file_name}'. Include key topics, main points, and important information."
-        
+
         print(f"🔍 Running summary search for: {file_id}")
-        
+
         # Use RAG service to generate summary
         summary_result = await rag_service.generate_answer(
             query=summary_query,
             file_ids=[file_id],
             workspace_id=workspace_id
         )
-        
+
         if summary_result and summary_result.get('answer'):
             summary_text = summary_result['answer']
             print(f"✅ Summary generated for file {file_id} ({len(summary_text)} characters)")
-            
+
             # Send summary via WebSocket
             await manager.send_summary(file_id, summary_text)
         else:
             print(f"⚠️ No summary generated for file: {file_id}")
-            
+
     except Exception as error:
         print(f"❌ Background summary generation failed for {file_id}: {error}")
         # Send error notification via WebSocket
@@ -324,7 +324,7 @@ async def upload_workspace(
         # Generate a default workspace ID if none provided (single file mode)
         effective_workspace_id = workspaceId or f"single_{int(time.time() * 1000)}"
         mode = "workspace" if workspaceId else "single"
-        
+
         print(f"📤 Mixed upload request received - Mode: {mode}")
         print(f"🏢 Workspace ID: {effective_workspace_id}")
         print(f"📄 Number of device files: {len(files)}")
@@ -531,10 +531,10 @@ async def upload_workspace(
                         item_metadata['path'],
                         item_metadata
                     )
-                
+
                 print(f"✅ RAG indexing completed for item {item_metadata['id']}: {index_result.get('chunksCount', 0)} chunks")
                 indexed_count += 1
-                
+
                 # Start background summary generation (non-blocking)
                 asyncio.create_task(generate_file_summary_background(
                     item_metadata['id'], 
@@ -594,7 +594,7 @@ async def upload_file(
 
         # Generate effective workspace ID for consistency
         effective_workspace_id = workspaceId or f"single_{int(time.time() * 1000)}"
-        
+
         file_info = {
             "id": file_id,
             "originalName": file.filename,
@@ -656,7 +656,7 @@ async def get_preview(file_id: str):
 
             if file_urls and file_urls.get("urls") and file_urls["urls"].get("thumbnailUrl"):
                 print(f"✅ Redirecting to Cloudinary thumbnail: {file_urls['urls']['thumbnailUrl']}")
-                return RedirectResponse(url=file_urls["urls"]["thumbnailUrl"])
+                return RedirectResponse(url=file_urls['urls']['thumbnailUrl'])
         except Exception as url_error:
             print(f"⚠️ Cloudinary URLs not available for file: {file_id}, trying local preview")
 
@@ -933,25 +933,25 @@ async def generate_summary(file_id: str, request: RAGIndexRequest):
     """
     try:
         print(f"🔄 Manual summary generation requested for file: {file_id}")
-        
+
         # Get file metadata
         file_info = await file_service.get_file_metadata(file_id)
         if not file_info:
             raise HTTPException(status_code=404, detail="File not found")
-        
+
         # Start background summary generation
         asyncio.create_task(generate_file_summary_background(
             file_id, 
             file_info['originalName'], 
             request.workspaceId
         ))
-        
+
         return {
             "success": True,
             "message": "Summary generation started",
             "fileId": file_id
         }
-        
+
     except Exception as error:
         print(f"❌ Manual summary generation failed: {error}")
         raise HTTPException(status_code=500, detail=f"Failed to start summary generation: {str(error)}")
