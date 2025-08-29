@@ -5,11 +5,18 @@ const getApiBaseUrl = () => {
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
 
-    // For Replit, the Python backend runs on port 8000
-    if (hostname.includes('replit.dev')) {
+    // Check if we're in Expo tunnel environment (mobile/Expo Go)
+    if (hostname.includes('.exp.direct')) {
+      // For Expo Go/tunnel, use the hardcoded Replit domain for backend
+      const baseUrl = 'https://5d1b2ccf-1ca9-4483-91c0-e3cdaa2485ed-00-1z2pee6icazdw.picard.replit.dev:8000';
+      console.log('🔗 API Base URL (Expo Go - Replit Backend):', baseUrl);
+      return baseUrl;
+    }
+    // For Replit web, the Python backend runs on port 8000
+    else if (hostname.includes('replit.dev')) {
       // Use the same domain with port 8000 (Python backend)
       const baseUrl = `${protocol}//${hostname}:8000`;
-      console.log('🔗 API Base URL (Replit - Python Backend):', baseUrl);
+      console.log('🔗 API Base URL (Replit Web - Python Backend):', baseUrl);
       return baseUrl;
     } else {
       // For local development (Python backend)
