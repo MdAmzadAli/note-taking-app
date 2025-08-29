@@ -27,13 +27,15 @@ export const API_ENDPOINTS = {
   base: API_BASE_URL,
   upload: `${API_BASE_URL}/upload`,
   uploadWorkspace: `${API_BASE_URL}/upload/workspace`,
+  deleteFile: (id: string) => `${API_BASE_URL}/file/${id}`,
   preview: (id: string) => `${API_BASE_URL}/preview/${id}`,
   file: (id: string) => `${API_BASE_URL}/file/${id}`,
   metadata: (id: string) => `${API_BASE_URL}/metadata/${id}`,
   pdfPage: (id: string, page: number) => `${API_BASE_URL}/pdf/${id}/page/${page}`,
   csvPage: (id: string, page: number) => `${API_BASE_URL}/csv/${id}/page/${page}`,
   download: (id: string) => `${API_BASE_URL}/download/${id}`,
-  health: `${API_BASE_URL}/health`
+  health: `${API_BASE_URL}/health`,
+  ragRemove: (id: string) => `${API_BASE_URL}/rag/index/${id}`
 };
 
 export interface ApiResponse<T = any> {

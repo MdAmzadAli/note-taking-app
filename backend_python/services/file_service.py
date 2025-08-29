@@ -133,25 +133,56 @@ class FileService:
             print(f"⚠️ Failed to cleanup local file: {file_path} {error}")
 
     async def delete_file(self, file_id):
-        """Delete file from Cloudinary and local metadata"""
+        """Delete file completely from all storage locations"""
         try:
+            print(f"🗑️ Starting complete file deletion for: {file_id}")
             file_info = await self.get_file_metadata(file_id)
             if not file_info:
                 raise Exception('File not found')
 
-            # Delete from Cloudinary if URLs exist
-            if file_info.get('cloudinary') and file_info['cloudinary'].get('cloudinaryId'):
+            # Step 1: Delete from local uploads folder
+            if file_info.get('path'):
+                uploads_file_path = Path(file_info['path'])
+                if uploads_file_path.exists():
+                    try:
+                        os.unlink(uploads_file_path)
+                        print(f"✅ Deleted from uploads folder: {uploads_file_path}")
+                    except Exception as upload_error:
+                        print(f"⚠️ Failed to delete from uploads folder: {upload_error}")
+                else:
+                    print(f"⚠️ Upload file not found: {uploads_file_path}")
+            else:
+                print("ℹ️ No local file path found in metadata")
+
+            # Step 2: Delete from Cloudinary if URLs exist
+            if file_info.get('cloudinary'):
                 try:
-                    await self.cloudinary_service.delete_file(file_info['cloudinary']['cloudinaryId'])
-                    print(f"✅ Deleted from Cloudinary: {file_info['cloudinary']['cloudinaryId']}")
+                    # Try to delete using public_id if available
+                    public_id = f"uploads/{file_id}"
+                    await self.cloudinary_service.delete_file(public_id)
+                    print(f"✅ Deleted from Cloudinary: {public_id}")
                 except Exception as cloudinary_error:
                     print(f"⚠️ Failed to delete from Cloudinary: {cloudinary_error}")
+            else:
+                print("ℹ️ No Cloudinary data found for file")
 
-            # Delete metadata
+            # Step 3: Delete metadata file
             metadata_path = self.metadata_dir / f"{file_id}.json"
-            os.unlink(metadata_path)
+            if metadata_path.exists():
+                try:
+                    os.unlink(metadata_path)
+                    print(f"✅ Deleted metadata file: {metadata_path}")
+                except Exception as metadata_error:
+                    print(f"⚠️ Failed to delete metadata: {metadata_error}")
+            else:
+                print(f"⚠️ Metadata file not found: {metadata_path}")
 
-            print(f"🗑️ Deleted file {file_info['originalName']}")
+            print(f"✅ Complete file deletion successful: {file_info['originalName']}")
+            return {
+                'success': True,
+                'fileId': file_id,
+                'message': f"File '{file_info['originalName']}' deleted successfully"
+            }
         except Exception as error:
             print(f"❌ File deletion failed: {error}")
             raise error

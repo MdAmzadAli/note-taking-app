@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ScrollView, Alert } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { summaryService } from '../../services/summaryService';
 
@@ -27,6 +27,7 @@ interface FilesListProps {
   onFileChat: (file: SingleFile) => void;
   onRefreshConnection: () => void;
   isBackendConnected: boolean;
+  onDeleteFile?: (fileId: string) => void;
 }
 
 export default function FilesList({ 
@@ -34,12 +35,14 @@ export default function FilesList({
   onFilePreview, 
   onFileChat, 
   onRefreshConnection, 
-  isBackendConnected 
+  isBackendConnected,
+  onDeleteFile 
 }: FilesListProps) {
   const [selectedFile, setSelectedFile] = useState<SingleFile | null>(null);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [fileSummary, setFileSummary] = useState<string>('');
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
 
   // Get file type display text
   const getFileTypeText = (file: SingleFile) => {
@@ -105,12 +108,48 @@ export default function FilesList({
     return words.slice(0, wordLimit).join(' ') + '...';
   };
 
+  // Handle long press delete functionality
+  const handleLongPressStart = (file: SingleFile) => {
+    const timer = setTimeout(() => {
+      // Show delete confirmation
+      Alert.alert(
+        'Delete File',
+        `Are you sure you want to delete "${file.name}"? This action cannot be undone.`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => {
+              if (onDeleteFile) {
+                onDeleteFile(file.id);
+              }
+            }
+          }
+        ]
+      );
+    }, 800); // 800ms long press duration
+    setLongPressTimer(timer);
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+  };
+
   const renderFileCard = ({ item }: { item: SingleFile }) => (
     <View style={styles.fileCard}>
       {/* Left Section (70% width) */}
       <TouchableOpacity 
         style={[styles.leftSection, { borderLeftColor: getBorderColor(item) }]}
         onPress={() => handleFileNameClick(item)}
+        onPressIn={() => handleLongPressStart(item)}
+        onPressOut={handleLongPressEnd}
         activeOpacity={0.7}
       >
         <Text style={styles.fileName} numberOfLines={1}>

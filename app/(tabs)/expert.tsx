@@ -514,8 +514,37 @@ export default function ExpertTab() {
     }
   };
 
+  const handleDeleteSingleFile = async (fileId: string) => {
+    try {
+      console.log('🗑️ Deleting single file:', fileId);
+      
+      // Delete from backend if connected
+      if (isBackendConnected) {
+        await fileService.deleteFile(fileId);
+      }
+
+      // Remove from local storage
+      const updatedFiles = singleFiles.filter(file => file.id !== fileId);
+      setSingleFiles(updatedFiles);
+      await AsyncStorage.setItem('expert_single_files', JSON.stringify(updatedFiles));
+      
+      console.log('✅ Single file deleted successfully');
+      Alert.alert('Success', 'File deleted successfully');
+    } catch (error) {
+      console.error('❌ Error deleting single file:', error);
+      Alert.alert('Error', 'Failed to delete file');
+    }
+  };
+
   const handleDeleteWorkspaceFile = async (workspaceId: string, fileId: string) => {
     try {
+      console.log('🗑️ Deleting workspace file:', fileId, 'from workspace:', workspaceId);
+      
+      // Delete from backend if connected
+      if (isBackendConnected) {
+        await fileService.deleteFile(fileId);
+      }
+
       const updatedWorkspaces = workspaces.map(workspace => {
         if (workspace.id === workspaceId) {
           return {
@@ -535,9 +564,10 @@ export default function ExpertTab() {
       }
 
       await saveData(singleFiles, updatedWorkspaces);
+      console.log('✅ Workspace file deleted successfully');
       Alert.alert('Success', 'File removed from workspace');
     } catch (error) {
-      console.error('Error deleting workspace file:', error);
+      console.error('❌ Error deleting workspace file:', error);
       Alert.alert('Error', 'Failed to delete file from workspace');
     }
   };
@@ -640,6 +670,7 @@ export default function ExpertTab() {
         onFileChat={openFileChat}
         onRefreshConnection={checkBackendConnection}
         isBackendConnected={isBackendConnected}
+        onDeleteFile={handleDeleteSingleFile}
       />
 
       <SideMenu

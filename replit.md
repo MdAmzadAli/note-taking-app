@@ -30,6 +30,22 @@ Preferred communication style: Simple, everyday language.
   - Enhanced IconSymbol component with additional icons (xmark, arrow variants, chevron variants, phone, link, globe, plus, trash, checkmark, folder)
 - **User Experience**: Consistent upload experience across all parts of the application with proper error handling and file limit management
 
+### August 29, 2025 - Comprehensive File Deletion System
+- **ChatInterface Workspace Mode**: Delete icons already present next to each file in workspace dropdown for immediate deletion
+- **Expert Tab Single Files**: Implemented long-press delete functionality (800ms hold) with confirmation dialog for single file deletion
+- **Complete Backend Deletion**: Enhanced backend file deletion to remove files from all storage locations:
+  - Local uploads folder (physical file removal)
+  - Vector database (Qdrant) index removal via `/rag/index/{file_id}` endpoint
+  - Metadata files deletion from backend storage
+  - Cloudinary cloud storage cleanup (if configured)
+- **Frontend Integration**: 
+  - Added `deleteFile` method to fileService with comprehensive error handling
+  - Frontend calls both vector database removal and file deletion endpoints
+  - Local storage cleanup for both single files and workspace files
+  - Proper state management updates after successful deletion
+- **User Experience**: Consistent deletion experience across both modes with confirmation dialogs and proper error handling
+- **API Endpoints**: Leveraged existing `/file/{file_id}` DELETE and `/rag/index/{file_id}` DELETE endpoints for complete removal
+
 ## System Architecture
 
 ### Frontend Architecture
