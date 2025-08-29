@@ -245,13 +245,17 @@ async def delete_file(file_id: str):
 # Workspace mixed file and URL upload endpoint
 @app.post("/upload/workspace")
 async def upload_workspace(
-    workspaceId: str = Form(...),
+    workspaceId: Optional[str] = Form(None),
     urls: Optional[str] = Form(None),
     files: List[UploadFile] = File(default= [])
 ):
     try:
-        print("📤 Workspace mixed upload request received")
-        print(f"🏢 Workspace ID: {workspaceId}")
+        # Generate a default workspace ID if none provided (single file mode)
+        effective_workspace_id = workspaceId or f"single_{int(time.time() * 1000)}"
+        mode = "workspace" if workspaceId else "single"
+        
+        print(f"📤 Mixed upload request received - Mode: {mode}")
+        print(f"🏢 Workspace ID: {effective_workspace_id}")
         print(f"📄 Number of device files: {len(files)}")
 
         # Parse URLs from FormData
@@ -288,7 +292,7 @@ async def upload_workspace(
                     "size": len(content),
                     "path": str(file_path_on_disk),
                     "uploadDate": datetime.now().isoformat(),
-                    "workspaceId": workspaceId,
+                    "workspaceId": effective_workspace_id,
                 }
 
                 print(f"💾 Saving metadata for device file {i + 1}: {file_info['id']}")
@@ -312,7 +316,7 @@ async def upload_workspace(
                     "size": len(content),
                     "path": str(file_path_on_disk),
                     "uploadDate": datetime.now().isoformat(),
-                    "workspaceId": workspaceId,
+                    "workspaceId": effective_workspace_id,
                     "sourceUrl": None,
                     "sourceType": "upload",
                     "isProcessed": True,
@@ -376,7 +380,7 @@ async def upload_workspace(
                         "size": len(file_content),
                         "path": str(file_path_on_disk),
                         "uploadDate": datetime.now().isoformat(),
-                        "workspaceId": workspaceId,
+                        "workspaceId": effective_workspace_id,
                     }
                     processed_file_details = await file_service.process_file_upload(file_metadata_for_processing)
 
@@ -402,7 +406,7 @@ async def upload_workspace(
                     'size': processed_file_details.get("size") if processed_file_details else (len(file_content) if 'file_content' in locals() else 0),
                     'path': str(file_path_on_disk) if file_path_on_disk else None,
                     'uploadDate': datetime.now().isoformat(),
-                    'workspaceId': workspaceId,
+                    'workspaceId': effective_workspace_id,
                     'sourceUrl': url,
                     'sourceType': url_info['type'],
                     'isProcessed': True if processed_file_details or url_info.get("type") == "webpage" else False,
@@ -474,13 +478,15 @@ async def upload_workspace(
 
         response = {
             "success": True,
+            "mode": mode,
+            "workspaceId": effective_workspace_id,
             "filesProcessed": len(uploaded_files_metadata),
             "filesIndexed": indexed_count,
             "totalItems": len(files) + len(parsed_urls),
             "errors": errors if errors else None
         }
 
-        print(f"📤 Workspace mixed upload completed: {len(uploaded_files_metadata)} items processed, {indexed_count} indexed.")
+        print(f"📤 Mixed upload completed ({mode} mode): {len(uploaded_files_metadata)} items processed, {indexed_count} indexed.")
         return response
 
     except Exception as error:
@@ -508,6 +514,9 @@ async def upload_file(
             content = await file.read()
             await f.write(content)
 
+        # Generate effective workspace ID for consistency
+        effective_workspace_id = workspaceId or f"single_{int(time.time() * 1000)}"
+        
         file_info = {
             "id": file_id,
             "originalName": file.filename,
@@ -515,7 +524,7 @@ async def upload_file(
             "size": len(content),
             "path": str(file_path_on_disk),
             "uploadDate": datetime.now().isoformat(),
-            "workspaceId": workspaceId,
+            "workspaceId": effective_workspace_id,
         }
 
         print(f"🏷️ Generated file info: {file_info}")
