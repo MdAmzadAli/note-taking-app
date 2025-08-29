@@ -207,34 +207,40 @@ export default function ExpertTab() {
       console.log('📤 Single file upload with item:', fileItem);
 
       // Use workspace endpoint for single file upload (no workspaceId = single mode)
-      const uploadedFiles = await fileService.uploadWorkspaceMixed([fileItem], ''); // Empty workspaceId for single file mode
+      const uploadResponse = await fileService.uploadWorkspaceMixed([fileItem], ''); // Empty workspaceId for single mode
 
-      if (uploadedFiles && uploadedFiles.length > 0) {
-        const uploadedFile = uploadedFiles[0];
+      console.log('📨 Upload response:', uploadResponse);
 
+      if (uploadResponse && uploadResponse.length > 0) {
+        // Since the backend returns mock data, create a proper file object using the original file info
         const processedFile: SingleFile = {
-          id: uploadedFile.id,
-          name: uploadedFile.originalName,
-          uploadDate: new Date(uploadedFile.uploadDate).toLocaleDateString(),
-          mimetype: uploadedFile.mimetype,
-          size: uploadedFile.size,
+          id: `single_${Date.now()}`, // Generate a unique ID for single file
+          name: fileItem.type === 'device' ? fileItem.file?.name || 'uploaded_file.pdf' : fileItem.source || 'uploaded_file.pdf',
+          uploadDate: new Date().toLocaleDateString(),
+          mimetype: fileItem.type === 'device' ? fileItem.file?.mimeType || 'application/pdf' : 'application/pdf',
+          size: fileItem.type === 'device' ? fileItem.file?.size || 0 : 0,
           isUploaded: true,
-          cloudinary: uploadedFile.cloudinary,
+          source: fileItem.type === 'device' ? 'device' : fileItem.type, // Store the source type
         };
+
+        console.log('✅ Processed file for display:', processedFile);
 
         const updatedFiles = [...singleFiles, processedFile];
         setSingleFiles(updatedFiles);
         await AsyncStorage.setItem('expert_single_files', JSON.stringify(updatedFiles));
 
-        setSelectedFile(processedFile);
+        // Auto-close modal and navigate to chat interface
         setIsUploadModalVisible(false);
+        setSelectedFile(processedFile);
         setIsChatVisible(true);
 
-        Alert.alert('Success', 'File uploaded and indexed successfully!');
+        console.log('✅ Upload successful - navigated to chat interface');
+      } else {
+        throw new Error('No files were processed successfully');
       }
     } catch (error) {
-      console.error('Error uploading file:', error);
-      Alert.alert('Error', `Failed to upload file: ${error.message}`);
+      console.error('❌ Error uploading single file:', error);
+      Alert.alert('Upload Error', `Failed to upload file: ${error.message || 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }

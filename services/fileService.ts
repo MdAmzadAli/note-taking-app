@@ -83,11 +83,31 @@ class FileService {
         throw new Error(`Mixed upload failed: ${response.status} - ${errorText}`);
       }
 
-      const result: ApiResponse<{ files: FileUploadResponse[] }> = await response.json();
-      const uploadedFiles = result.files!;
-      console.log('✅ Mixed files uploaded successfully:', uploadedFiles.length, 'files');
+      const result = await response.json();
+      console.log('📨 Backend response structure:', result);
 
-      return uploadedFiles;
+      // Backend returns: { success, mode, workspaceId, filesProcessed, filesIndexed, totalItems, errors }
+      // But we need to convert to FileUploadResponse format for compatibility
+      if (result.success && result.filesProcessed > 0) {
+        // For single file mode, return a mock response since backend doesn't return file details in this endpoint
+        const uploadedFiles: FileUploadResponse[] = [];
+        
+        // Create a mock file entry for each processed file
+        for (let i = 0; i < result.filesProcessed; i++) {
+          uploadedFiles.push({
+            id: `${Date.now()}_${i}`, // Temporary ID
+            originalName: 'uploaded_file.pdf', // Placeholder
+            mimetype: 'application/pdf',
+            size: 0,
+            uploadDate: new Date().toISOString()
+          });
+        }
+        
+        console.log('✅ Mixed files uploaded successfully:', uploadedFiles.length, 'files');
+        return uploadedFiles;
+      } else {
+        throw new Error(`Upload failed: ${result.errors ? JSON.stringify(result.errors) : 'Unknown error'}`);
+      }
     } catch (error) {
       console.error('❌ Mixed file upload error occurred');
       console.error('❌ Error type:', error.constructor.name);
@@ -134,11 +154,29 @@ class FileService {
         throw new Error(`Batch upload failed: ${response.status} - ${errorText}`);
       }
 
-      const result: ApiResponse<{ files: FileUploadResponse[] }> = await response.json();
-      const uploadedFiles = result.files!;
-      console.log('✅ Batch files uploaded successfully:', uploadedFiles.length, 'files');
+      const result = await response.json();
+      console.log('📨 Backend response structure:', result);
 
-      return uploadedFiles;
+      // Backend returns: { success, mode, workspaceId, filesProcessed, filesIndexed, totalItems, errors }
+      if (result.success && result.filesProcessed > 0) {
+        const uploadedFiles: FileUploadResponse[] = [];
+        
+        // Create mock file entries for each processed file
+        for (let i = 0; i < result.filesProcessed; i++) {
+          uploadedFiles.push({
+            id: `${Date.now()}_${i}`,
+            originalName: 'uploaded_file.pdf',
+            mimetype: 'application/pdf', 
+            size: 0,
+            uploadDate: new Date().toISOString()
+          });
+        }
+        
+        console.log('✅ Batch files uploaded successfully:', uploadedFiles.length, 'files');
+        return uploadedFiles;
+      } else {
+        throw new Error(`Upload failed: ${result.errors ? JSON.stringify(result.errors) : 'Unknown error'}`);
+      }
     } catch (error) {
       console.error('❌ Batch file upload error occurred');
       console.error('❌ Error type:', error.constructor.name);
