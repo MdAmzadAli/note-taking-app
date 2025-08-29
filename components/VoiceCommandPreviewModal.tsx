@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { IconSymbol } from './ui/IconSymbol';
 import { Note, Task, Reminder, CustomTemplate } from '@/types';
-
+// ksjdisjdji
 interface CreatedItem {
   type: 'note' | 'task' | 'reminder' | 'template';
   data: Note | Task | Reminder | CustomTemplate;
