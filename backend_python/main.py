@@ -6,11 +6,12 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 import aiofiles
 import uvicorn
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request, Response
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+import websockets
 import mimetypes
 from dotenv import load_dotenv
 import time
@@ -163,6 +164,76 @@ except Exception as e:
     print(f"❌ Failed to initialize RAGService: {e}")
 
 print("🔧 All services initialization completed")
+
+# WebSocket Connection Manager
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        print(f"🔌 WebSocket connected. Total connections: {len(self.active_connections)}")
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+        print(f"🔌 WebSocket disconnected. Total connections: {len(self.active_connections)}")
+
+    async def send_summary(self, file_id: str, summary: str):
+        message = {
+            "type": "summary",
+            "fileId": file_id,
+            "summary": summary,
+            "timestamp": datetime.now().isoformat()
+        }
+        disconnected = []
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(json.dumps(message))
+                print(f"📨 Summary sent via WebSocket for file: {file_id}")
+            except Exception as e:
+                print(f"❌ Failed to send summary via WebSocket: {e}")
+                disconnected.append(connection)
+        
+        # Remove disconnected connections
+        for conn in disconnected:
+            self.disconnect(conn)
+
+manager = ConnectionManager()
+
+async def generate_file_summary_background(file_id: str, file_name: str, workspace_id: str = None):
+    """
+    Generate file summary in background without blocking other operations
+    """
+    try:
+        print(f"🔄 Starting background summary generation for file: {file_id}")
+        
+        # Generate a summary query
+        summary_query = f"Provide a comprehensive summary of the document '{file_name}'. Include key topics, main points, and important information."
+        
+        print(f"🔍 Running summary search for: {file_id}")
+        
+        # Use RAG service to generate summary
+        summary_result = await rag_service.generate_answer(
+            query=summary_query,
+            file_ids=[file_id],
+            workspace_id=workspace_id
+        )
+        
+        if summary_result and summary_result.get('answer'):
+            summary_text = summary_result['answer']
+            print(f"✅ Summary generated for file {file_id} ({len(summary_text)} characters)")
+            
+            # Send summary via WebSocket
+            await manager.send_summary(file_id, summary_text)
+        else:
+            print(f"⚠️ No summary generated for file: {file_id}")
+            
+    except Exception as error:
+        print(f"❌ Background summary generation failed for {file_id}: {error}")
+        # Send error notification via WebSocket
+        await manager.send_summary(file_id, f"Failed to generate summary: {str(error)}")
 
 try:
     url_download_service = URLDownloadService()
@@ -463,6 +534,13 @@ async def upload_workspace(
                 
                 print(f"✅ RAG indexing completed for item {item_metadata['id']}: {index_result.get('chunksCount', 0)} chunks")
                 indexed_count += 1
+                
+                # Start background summary generation (non-blocking)
+                asyncio.create_task(generate_file_summary_background(
+                    item_metadata['id'], 
+                    item_metadata['originalName'], 
+                    effective_workspace_id
+                ))
             except Exception as rag_index_error:
                 print(f"❌ RAG indexing failed for item {item_metadata['id']}: {rag_index_error}")
                 # Add to errors if needed, or handle gracefully
@@ -848,6 +926,36 @@ async def rag_query(request: RAGQueryRequest):
             }
         )
 
+@app.post("/rag/summary/{file_id}")
+async def generate_summary(file_id: str, request: RAGIndexRequest):
+    """
+    Generate summary for a specific file (manual trigger)
+    """
+    try:
+        print(f"🔄 Manual summary generation requested for file: {file_id}")
+        
+        # Get file metadata
+        file_info = await file_service.get_file_metadata(file_id)
+        if not file_info:
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        # Start background summary generation
+        asyncio.create_task(generate_file_summary_background(
+            file_id, 
+            file_info['originalName'], 
+            request.workspaceId
+        ))
+        
+        return {
+            "success": True,
+            "message": "Summary generation started",
+            "fileId": file_id
+        }
+        
+    except Exception as error:
+        print(f"❌ Manual summary generation failed: {error}")
+        raise HTTPException(status_code=500, detail=f"Failed to start summary generation: {str(error)}")
+
 @app.get("/rag/health")
 async def rag_health_check():
     """Check RAG service health"""
@@ -899,6 +1007,20 @@ async def rag_health_check():
 async def not_found_handler(request: Request, exc: HTTPException):
     print(f"❌ 404 Not Found for: {request.method} {request.url.path}")
     return JSONResponse(status_code=404, content={"error": "Endpoint not found"})
+
+# WebSocket endpoint for summary notifications
+@app.websocket("/ws/summary")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Keep connection alive
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception as e:
+        print(f"❌ WebSocket error: {e}")
+        manager.disconnect(websocket)
 
 # Error handling
 @app.exception_handler(Exception)

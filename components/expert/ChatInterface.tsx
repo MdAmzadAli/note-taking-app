@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -17,6 +17,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import FilePreviewModal from './FilePreviewModal';
 import UploadModal from './UploadModal';
 import { ragService, RAGSource } from '@/services/ragService';
+import { summaryService, SummaryNotification } from '../../services/summaryService';
 
 interface SingleFile {
   id: string;
@@ -86,6 +87,11 @@ export default function ChatInterface({
   const [selectedSources, setSelectedSources] = useState<RAGSource[]>([]);
   const [ragHealth, setRagHealth] = useState({ status: 'unknown', qdrant: false, gemini: false });
   const [showUploadModal, setShowUploadModal] = useState(false);
+
+  const [summary, setSummary] = useState<string>('');
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+
   const getFileSize = (file: SingleFile) => {
     if (!file.size) return 'Unknown';
     const kb = file.size / 1024;
@@ -203,7 +209,7 @@ export default function ChatInterface({
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      
+
       // Skip empty lines but add spacing
       if (line.trim() === '') {
         elements.push(<View key={keyCounter++} style={styles.lineSpacing} />);
@@ -275,6 +281,58 @@ export default function ChatInterface({
       }
     });
   };
+
+  const files = selectedFile ? [selectedFile] : selectedWorkspace?.files || [];
+  const workspaceId = selectedWorkspace?.id;
+
+  useEffect(() => {
+    if (chatMessages.length > 0) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [chatMessages]);
+
+  // WebSocket connection for summary notifications
+  useEffect(() => {
+    const handleSummaryNotification = (notification: SummaryNotification) => {
+      console.log('📨 Received summary notification:', notification);
+
+      // Check if this summary is for one of our files
+      const isRelevantFile = files.some(file => file.id === notification.fileId);
+
+      if (isRelevantFile) {
+        setSummary(notification.summary);
+        setIsSummaryLoading(false);
+        console.log('✅ Summary updated for relevant file:', notification.fileId);
+      }
+    };
+
+    // Connect to WebSocket and add listener
+    summaryService.connect();
+    summaryService.addListener(handleSummaryNotification);
+
+    // Cleanup on unmount
+    return () => {
+      summaryService.removeListener(handleSummaryNotification);
+    };
+  }, [files]);
+
+  // Clear summary when files change and request new one
+  useEffect(() => {
+    setSummary(''); // Clear previous summary
+    setIsSummaryLoading(false);
+
+    if (files.length > 0) {
+      setIsSummaryLoading(true);
+      // Request summary for the first file (or all files in workspace mode)
+      const firstFile = files[0];
+      summaryService.requestSummary(firstFile.id, workspaceId).catch(error => {
+        console.error('❌ Failed to request summary:', error);
+        setIsSummaryLoading(false);
+      });
+    }
+  }, [files, workspaceId]);
 
   return (
     <SafeAreaView style={styles.pdfChatContainer}>
@@ -471,6 +529,43 @@ export default function ChatInterface({
             </View>
           ))}
         </ScrollView>
+
+        {/* Summary Section */}
+        <View style={styles.summarySection}>
+          <Text style={styles.sectionTitle}>📄 Summary</Text>
+          <View style={styles.summaryContent}>
+            {isSummaryLoading ? (
+              <View style={styles.summaryLoading}>
+                <ActivityIndicator size="small" color="#8B5CF6" />
+                <Text style={styles.summaryLoadingText}>Generating summary...</Text>
+              </View>
+            ) : summary ? (
+              <ScrollView style={styles.summaryScrollView} showsVerticalScrollIndicator={false}>
+                <Text style={styles.summaryText}>{summary}</Text>
+              </ScrollView>
+            ) : files.length > 0 ? (
+              <TouchableOpacity 
+                style={styles.generateSummaryButton}
+                onPress={() => {
+                  if (files.length > 0) {
+                    setIsSummaryLoading(true);
+                    summaryService.requestSummary(files[0].id, workspaceId).catch(error => {
+                      console.error('❌ Failed to request summary:', error);
+                      setIsSummaryLoading(false);
+                    });
+                  }
+                }}
+              >
+                <IconSymbol name="arrow.clockwise" size={16} color="#8B5CF6" />
+                <Text style={styles.generateSummaryText}>Generate Summary</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.summaryText}>
+                Upload documents to see their summary here.
+              </Text>
+            )}
+          </View>
+        </View>
 
         {/* Chat Input Section */}
         <View style={styles.pdfChatInputContainer}>
@@ -1120,5 +1215,60 @@ const styles = StyleSheet.create({
   },
   lineSpacing: {
     height: 8,
+  },
+  // Summary section styles
+  summarySection: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  summaryContent: {
+    backgroundColor: '#F8F9FA',
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#8B5CF6',
+    minHeight: 100,
+  },
+  summaryText: {
+    fontSize: 14,
+    color: '#4B5563',
+    lineHeight: 20,
+  },
+  summaryLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  summaryLoadingText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#8B5CF6',
+  },
+  summaryScrollView: {
+    maxHeight: 150,
+  },
+  generateSummaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  generateSummaryText: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: '#8B5CF6',
+    fontWeight: '500',
   },
 });
