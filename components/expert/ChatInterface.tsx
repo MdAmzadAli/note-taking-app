@@ -90,6 +90,9 @@ export default function ChatInterface({
 
   const [summary, setSummary] = useState<string>('');
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  const [summaries, setSummaries] = useState<{[fileId: string]: string}>({});
+  const [selectedSummaryFile, setSelectedSummaryFile] = useState<SingleFile | null>(null);
+  const [showSummaryDropdown, setShowSummaryDropdown] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const getFileSize = (file: SingleFile) => {
@@ -302,7 +305,31 @@ export default function ChatInterface({
       const isRelevantFile = files.some(file => file.id === notification.fileId);
 
       if (isRelevantFile) {
-        setSummary(notification.summary);
+        // Store summary for specific file
+        setSummaries(prev => ({
+          ...prev,
+          [notification.fileId]: notification.summary
+        }));
+        
+        // For single file mode, also set the main summary
+        if (files.length === 1 && files[0].id === notification.fileId) {
+          setSummary(notification.summary);
+        }
+        
+        // If this is the first file summary in workspace mode, select it
+        if (files.length > 1 && !selectedSummaryFile) {
+          const file = files.find(f => f.id === notification.fileId);
+          if (file) {
+            setSelectedSummaryFile(file);
+            setSummary(notification.summary);
+          }
+        }
+        
+        // If this is the currently selected file's summary, update display
+        if (selectedSummaryFile?.id === notification.fileId) {
+          setSummary(notification.summary);
+        }
+        
         setIsSummaryLoading(false);
         console.log('✅ Summary updated for relevant file:', notification.fileId);
       }
@@ -316,21 +343,39 @@ export default function ChatInterface({
     return () => {
       summaryService.removeListener(handleSummaryNotification);
     };
-  }, [files]);
+  }, [files, selectedSummaryFile]);
 
-  // Clear summary when files change and request new one
+  // Clear summary when files change and request new ones
   useEffect(() => {
     setSummary(''); // Clear previous summary
+    setSummaries({}); // Clear all summaries
+    setSelectedSummaryFile(null);
     setIsSummaryLoading(false);
 
     if (files.length > 0) {
       setIsSummaryLoading(true);
-      // Request summary for the first file (or all files in workspace mode)
-      const firstFile = files[0];
-      summaryService.requestSummary(firstFile.id, workspaceId).catch(error => {
-        console.error('❌ Failed to request summary:', error);
-        setIsSummaryLoading(false);
-      });
+      
+      if (files.length === 1) {
+        // Single file mode
+        const file = files[0];
+        summaryService.requestSummary(file.id, workspaceId).catch(error => {
+          console.error('❌ Failed to request summary:', error);
+          setIsSummaryLoading(false);
+        });
+      } else {
+        // Workspace mode - request summaries for all files
+        files.forEach((file, index) => {
+          setTimeout(() => {
+            summaryService.requestSummary(file.id, workspaceId).catch(error => {
+              console.error('❌ Failed to request summary for file:', file.id, error);
+              if (index === 0) setIsSummaryLoading(false);
+            });
+          }, index * 500); // Stagger requests by 500ms
+        });
+        
+        // Set first file as selected for initial display
+        setSelectedSummaryFile(files[0]);
+      }
     }
   }, [files, workspaceId]);
 
@@ -532,12 +577,58 @@ export default function ChatInterface({
 
         {/* Summary Section */}
         <View style={styles.summarySection}>
-          <Text style={styles.sectionTitle}>📄 Summary</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>📄 Summary</Text>
+            {/* File dropdown for workspace mode */}
+            {files.length > 1 && (
+              <TouchableOpacity 
+                style={styles.summaryFileDropdown}
+                onPress={() => setShowSummaryDropdown(!showSummaryDropdown)}
+              >
+                <Text style={styles.summaryFileDropdownText} numberOfLines={1}>
+                  {selectedSummaryFile?.name || 'Select file...'}
+                </Text>
+                <IconSymbol 
+                  size={12} 
+                  name={showSummaryDropdown ? "chevron.up" : "chevron.down"} 
+                  color="#8B5CF6" 
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Dropdown options for workspace mode */}
+          {showSummaryDropdown && files.length > 1 && (
+            <View style={styles.summaryDropdownOptions}>
+              {files.map((file) => (
+                <TouchableOpacity
+                  key={file.id}
+                  style={styles.summaryDropdownOption}
+                  onPress={() => {
+                    setSelectedSummaryFile(file);
+                    setSummary(summaries[file.id] || '');
+                    setShowSummaryDropdown(false);
+                  }}
+                >
+                  <IconSymbol size={12} name="doc.text" color="#8B5CF6" />
+                  <Text style={styles.summaryDropdownOptionText} numberOfLines={1}>
+                    {file.name}
+                  </Text>
+                  {summaries[file.id] && (
+                    <IconSymbol size={10} name="checkmark" color="#10B981" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
           <View style={styles.summaryContent}>
             {isSummaryLoading ? (
               <View style={styles.summaryLoading}>
                 <ActivityIndicator size="small" color="#8B5CF6" />
-                <Text style={styles.summaryLoadingText}>Generating summary...</Text>
+                <Text style={styles.summaryLoadingText}>
+                  {files.length > 1 ? 'Generating summaries...' : 'Generating summary...'}
+                </Text>
               </View>
             ) : summary ? (
               <ScrollView style={styles.summaryScrollView} showsVerticalScrollIndicator={false}>
@@ -549,15 +640,29 @@ export default function ChatInterface({
                 onPress={() => {
                   if (files.length > 0) {
                     setIsSummaryLoading(true);
-                    summaryService.requestSummary(files[0].id, workspaceId).catch(error => {
-                      console.error('❌ Failed to request summary:', error);
-                      setIsSummaryLoading(false);
-                    });
+                    if (files.length === 1) {
+                      summaryService.requestSummary(files[0].id, workspaceId).catch(error => {
+                        console.error('❌ Failed to request summary:', error);
+                        setIsSummaryLoading(false);
+                      });
+                    } else {
+                      // Request summaries for all files in workspace
+                      files.forEach((file, index) => {
+                        setTimeout(() => {
+                          summaryService.requestSummary(file.id, workspaceId).catch(error => {
+                            console.error('❌ Failed to request summary for file:', file.id, error);
+                            if (index === 0) setIsSummaryLoading(false);
+                          });
+                        }, index * 500);
+                      });
+                    }
                   }
                 }}
               >
                 <IconSymbol name="arrow.clockwise" size={16} color="#8B5CF6" />
-                <Text style={styles.generateSummaryText}>Generate Summary</Text>
+                <Text style={styles.generateSummaryText}>
+                  {files.length > 1 ? 'Generate All Summaries' : 'Generate Summary'}
+                </Text>
               </TouchableOpacity>
             ) : (
               <Text style={styles.summaryText}>
@@ -1221,11 +1326,53 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 16,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+    flex: 1,
+  },
+  summaryFileDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2A2A2A',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    maxWidth: 150,
+  },
+  summaryFileDropdownText: {
+    fontSize: 12,
+    color: '#8B5CF6',
+    flex: 1,
+    marginRight: 4,
+  },
+  summaryDropdownOptions: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 6,
     marginBottom: 8,
+    maxHeight: 120,
+  },
+  summaryDropdownOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  summaryDropdownOptionText: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    flex: 1,
+    marginLeft: 6,
+    marginRight: 4,
   },
   summaryContent: {
     backgroundColor: '#F8F9FA',

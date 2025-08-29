@@ -13,14 +13,20 @@ class AnswerGenerationService:
                             workspace_id: Optional[str] = None) -> Dict[str, Any]:
         try:
             print(f'🤖 Starting structured 3-step LLM flow for: "{query}"')
+            
+            # Determine if this is single file mode or workspace mode
+            is_single_file_mode = workspace_id and workspace_id.startswith("single_")
+            is_workspace_mode = workspace_id and not workspace_id.startswith("single_") and file_ids and len(file_ids) > 1
+            
+            print(f'📊 Mode Detection: Single={is_single_file_mode}, Workspace={is_workspace_mode}, WorkspaceId={workspace_id}')
 
-            # Search for relevant chunks
-            is_workspace_query = workspace_id and file_ids and len(file_ids) > 1
+            # Search for relevant chunks with appropriate limits
+            chunk_limit = 12 if is_workspace_mode else 6
             relevant_chunks = await self.search_service.search_relevant_chunks(
                 query,
                 file_ids,
                 workspace_id,
-                12 if is_workspace_query else 6
+                chunk_limit
             )
 
             if not relevant_chunks:
@@ -30,10 +36,10 @@ class AnswerGenerationService:
                     'confidence': 0
                 }
 
-            # Step 0: Query recognition and refinement
-            step0_result = await self.step0_query_recognition(query, relevant_chunks)
+            # Step 0: Query recognition and refinement with mode context
+            step0_result = await self.step0_query_recognition(query, relevant_chunks, is_single_file_mode, is_workspace_mode)
             
-            print(f'📊 Step 0 Result: Type={step0_result["queryType"]}, Refined="{step0_result["refinedQuery"]}"')
+            print(f'📊 Step 0 Result: Type={step0_result["queryType"]}, Mode={"Single" if is_single_file_mode else "Workspace" if is_workspace_mode else "Unknown"}, Refined="{step0_result["refinedQuery"]}"')
 
             # Route to appropriate processing based on enhanced query type
             query_type = step0_result['queryType']
@@ -51,13 +57,14 @@ class AnswerGenerationService:
             print(f'❌ Structured answer generation failed: {error}')
             raise error
 
-    async def step0_query_recognition(self, user_query: str, relevant_chunks: List[Dict]) -> Dict[str, Any]:
-        print('🔍 Step 0: Enhanced query recognition and refinement...')
+    async def step0_query_recognition(self, user_query: str, relevant_chunks: List[Dict], 
+                                     is_single_file_mode: bool = False, is_workspace_mode: bool = False) -> Dict[str, Any]:
+        print(f'🔍 Step 0: Enhanced query recognition and refinement (Single: {is_single_file_mode}, Workspace: {is_workspace_mode})...')
 
         if not self.embedding_service.chat_client:
             raise Exception("Google GenAI Chat client not initialized")
 
-        # Enhanced document context analysis
+        # Enhanced document context analysis with mode information
         document_types = list(set(chunk['metadata']['fileName'] for chunk in relevant_chunks))
         has_table_content = any(chunk['metadata'].get('hasTableContent', False) for chunk in relevant_chunks)
         has_json_tables = any(chunk['metadata'].get('has_json_tables', False) for chunk in relevant_chunks)
@@ -77,7 +84,8 @@ class AnswerGenerationService:
                 table_headers.extend(numeric_metadata.get('table_context_headings', []))
                 table_currencies.extend(numeric_metadata.get('currencies', []))
 
-        context_info = f"Documents: {', '.join(document_types)}. Tables: {table_count} chunks, JSON tables: {has_json_tables}, Structured tables: {has_structured_tables}. Financial data: {has_financial_data}. Table contexts: {table_headers[:3]}."
+        mode_info = "Single file mode" if is_single_file_mode else "Workspace mode" if is_workspace_mode else "Standard mode"
+        context_info = f"Mode: {mode_info}. Documents: {', '.join(document_types)}. Tables: {table_count} chunks, JSON tables: {has_json_tables}, Structured tables: {has_structured_tables}. Financial data: {has_financial_data}. Table contexts: {table_headers[:3]}."
 
         recognition_prompt = f"""You are an advanced query analysis expert. Analyze the user query and document context to determine the specific task type and processing strategy.
 
@@ -111,11 +119,14 @@ TASK TYPES TO CLASSIFY:
    - Example: "Which of these 5 cities has the highest investment?" (needs table data + comparison)
 
 CLASSIFICATION RULES:
+- Single file mode: Focus on individual document analysis
+- Workspace mode: Consider cross-document analysis and comparison
 - If query asks for specific table data without calculation → factual-table
 - If query asks "which is highest/lowest/best" from table data → mixed (needs retrieval + comparison)
 - If query asks for calculations on known values → computational  
 - If query is about general information without tables → factual-text
 - If context has {table_count} table chunks and query mentions ranking/comparison → likely mixed
+- In workspace mode, comparative queries across documents default to mixed type
 
 Return ONLY this JSON format:
 {{
@@ -174,23 +185,26 @@ Return ONLY this JSON format:
         has_table_focus = any(keyword in query_lower for keyword in table_keywords)
         has_comparison = any(keyword in query_lower for keyword in comparison_keywords)
         
-        # Classification logic
+        # Classification logic with mode awareness
         if has_comparison and (has_table_content or has_table_focus):
             query_type = 'mixed'  # Needs table data + comparison
         elif has_computation and not has_table_focus:
             query_type = 'computational'
         elif has_table_focus or (has_table_content and not has_computation):
             query_type = 'factual-table'
+        elif is_workspace_mode and has_comparison:
+            query_type = 'mixed'  # Workspace comparisons often need mixed processing
         else:
             query_type = 'factual-text'
 
         return {
             'queryType': query_type,
             'refinedQuery': user_query,
-            'reasoning': f'Fallback keyword-based classification: computation={has_computation}, table={has_table_focus}, comparison={has_comparison}',
+            'reasoning': f'Fallback classification ({mode_info}): computation={has_computation}, table={has_table_focus}, comparison={has_comparison}',
             'retrievalStrategy': 'hybrid' if query_type == 'mixed' else 'semantic',
             'requiresTableData': query_type in ['factual-table', 'mixed'],
-            'requiresCalculation': query_type in ['computational', 'mixed']
+            'requiresCalculation': query_type in ['computational', 'mixed'],
+            'processingMode': mode_info
         }
 
     async def process_computational_query(self, refined_query: str, original_query: str, 

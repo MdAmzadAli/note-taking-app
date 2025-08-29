@@ -16,8 +16,16 @@ class SearchService:
         Enhanced search with workspace-aware retrieval, MMR, and document bucketing
         """
         try:
-            print(f'🔍 Enhanced search for: "{query}"')
-            print(f'📄 FileIds: {len(file_ids) if file_ids else 0}, WorkspaceId: {workspace_id or "none"}')
+            print(f'🔍 Starting comprehensive search for: "{query}"')
+            print(f'📄 File IDs filter: {file_ids}')
+            print(f'🏢 Workspace ID filter: {workspace_id}')
+            print(f'📊 Chunk limit: {limit}')
+
+            # Mode detection for better logging
+            is_single_file_mode = workspace_id and workspace_id.startswith("single_")
+            is_workspace_mode = workspace_id and not workspace_id.startswith("single_") and file_ids and len(file_ids) > 1
+            mode_info = "Single file mode" if is_single_file_mode else "Workspace mode" if is_workspace_mode else "Standard mode"
+            print(f'🎯 Detected mode: {mode_info}')
 
             # For workspace mode (multiple files), use enhanced retrieval
             if workspace_id and file_ids and len(file_ids) > 1:
