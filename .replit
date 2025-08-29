@@ -104,3 +104,6 @@ args = "cd backend_python && python main.py"
 
 [deployment]
 run = ["sh", "-c", "npm run start"]
+
+[agent]
+expertMode = true
