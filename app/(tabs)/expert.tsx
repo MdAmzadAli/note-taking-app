@@ -198,25 +198,43 @@ export default function ExpertTab() {
     }
   };
 
-  const handleUploadSingleFile = async (file?: any) => {
-    if (!file) return;
+  const handleUploadSingleFile = async (fileItem?: any) => {
+    if (!fileItem) return;
 
     setIsLoading(true);
 
     try {
-      const processedFile = await handleFileUpload(file);
-      if (processedFile) {
+      console.log('📤 Single file upload with item:', fileItem);
+
+      // Use workspace endpoint for single file upload (no workspaceId = single mode)
+      const uploadedFiles = await fileService.uploadWorkspaceMixed([fileItem], ''); // Empty workspaceId for single file mode
+
+      if (uploadedFiles && uploadedFiles.length > 0) {
+        const uploadedFile = uploadedFiles[0];
+
+        const processedFile: SingleFile = {
+          id: uploadedFile.id,
+          name: uploadedFile.originalName,
+          uploadDate: new Date(uploadedFile.uploadDate).toLocaleDateString(),
+          mimetype: uploadedFile.mimetype,
+          size: uploadedFile.size,
+          isUploaded: true,
+          cloudinary: uploadedFile.cloudinary,
+        };
+
         const updatedFiles = [...singleFiles, processedFile];
         setSingleFiles(updatedFiles);
-        await AsyncStorage.setItem('expert_single_files', JSON.stringify(updatedFiles)); // Corrected key
+        await AsyncStorage.setItem('expert_single_files', JSON.stringify(updatedFiles));
 
         setSelectedFile(processedFile);
         setIsUploadModalVisible(false);
         setIsChatVisible(true);
+
+        Alert.alert('Success', 'File uploaded and indexed successfully!');
       }
     } catch (error) {
       console.error('Error uploading file:', error);
-      Alert.alert('Error', 'Failed to upload file');
+      Alert.alert('Error', `Failed to upload file: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -317,7 +335,7 @@ export default function ExpertTab() {
         console.log('📤 Making single batch upload call with both files and URLs');
         try {
           const uploadedFiles = await fileService.uploadWorkspaceMixed(workspaceData.files, newWorkspace.id);
-          
+
           // Convert uploaded files to SingleFile format
           for (const uploadedFile of uploadedFiles) {
             const singleFile: SingleFile = {
@@ -331,7 +349,7 @@ export default function ExpertTab() {
             };
             processedFiles.push(singleFile);
           }
-          
+
           console.log('✅ Batch upload completed:', uploadedFiles.length, 'files');
         } catch (uploadError) {
           console.error('❌ Batch upload failed:', uploadError);

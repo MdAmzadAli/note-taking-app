@@ -7,8 +7,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 interface UploadModalProps {
   isVisible: boolean;
   onClose: () => void;
-  onUpload: (file?: any) => void;
-  onUploadFromUrl?: (url: string) => void;
+  onUpload: (fileItem: any) => void;
   isBackendConnected: boolean;
   isLoading: boolean;
 }
@@ -17,7 +16,6 @@ export default function UploadModal({
   isVisible,
   onClose,
   onUpload,
-  onUploadFromUrl,
   isBackendConnected,
   isLoading
 }: UploadModalProps) {
@@ -30,8 +28,8 @@ export default function UploadModal({
       handlePhoneUpload();
     } else {
       // Handle URL upload (both 'url' and 'webpage' modes)
-      if (urlInput.trim() && onUploadFromUrl) {
-        onUploadFromUrl(urlInput.trim());
+      if (urlInput.trim()) {
+        handleUrlUpload();
       }
     }
   };
@@ -45,11 +43,26 @@ export default function UploadModal({
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
-        // Call the existing onUpload function with the selected file
-        onUpload(file);
+        // Format for uploadWorkspaceMixed
+        const fileItem = {
+          type: 'device',
+          file: file
+        };
+        onUpload(fileItem);
       }
     } catch (error) {
       console.error('Error picking document:', error);
+    }
+  };
+
+  const handleUrlUpload = () => {
+    if (urlInput.trim()) {
+      // Format for uploadWorkspaceMixed
+      const fileItem = {
+        type: uploadMode === 'webpage' ? 'webpage' : 'from_url',
+        source: urlInput.trim()
+      };
+      onUpload(fileItem);
     }
   };
 
