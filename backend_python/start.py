@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Startup script for Python backend
-Ensures all dependencies are installed and starts the server
+Ensures all dependencies are installed and starts the server planassj
 """
 
 import subprocess
