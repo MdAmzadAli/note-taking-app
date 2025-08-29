@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ActivityIndicator, ScrollView, Alert, KeyboardAvoidingView, Platform, Dimensions, Keyboard } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import * as DocumentPicker from 'expo-document-picker';
+import UploadModal from './UploadModal';
 
 interface WorkspaceModalProps {
   isVisible: boolean;
@@ -37,11 +37,9 @@ export default function WorkspaceModal({
   const [description, setDescription] = useState('');
   const [files, setFiles] = useState<FileItem[]>([]);
   const [showFileOptions, setShowFileOptions] = useState(false);
-  const [activeUrlInput, setActiveUrlInput] = useState<'url' | 'webpage' | null>(null);
-  const [urlInput, setUrlInput] = useState('');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  const [showFileOptionsModal, setShowFileOptionsModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [modalPosition, setModalPosition] = useState(0);
 
   const modalContentRef = useRef<View>(null);
@@ -50,8 +48,7 @@ export default function WorkspaceModal({
     const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', (e) => {
       setKeyboardHeight(e.endCoordinates.height);
       setIsKeyboardVisible(true);
-      // Only set modal position if it hasn't been set before or if no URL input is active
-      if (modalPosition === 0 && !activeUrlInput) {
+      if (modalPosition === 0) {
         setModalPosition(-e.endCoordinates.height * 0.3);
       }
     });
@@ -59,17 +56,14 @@ export default function WorkspaceModal({
     const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
       setKeyboardHeight(0);
       setIsKeyboardVisible(false);
-      // Reset modal position when keyboard is completely hidden
-      if (!activeUrlInput) {
-        setModalPosition(0);
-      }
+      setModalPosition(0);
     });
 
     return () => {
       keyboardDidShowListener?.remove();
       keyboardDidHideListener?.remove();
     };
-  }, [modalPosition, activeUrlInput]);
+  }, [modalPosition]);
 
   const handleClose = () => {
     onClose();
@@ -82,7 +76,7 @@ export default function WorkspaceModal({
     setUrlInput('');
     setKeyboardHeight(0);
     setIsKeyboardVisible(false);
-    setShowFileOptionsModal(false);
+    setShowUploadModal(false);
     setModalPosition(0);
   };
 
@@ -97,78 +91,21 @@ export default function WorkspaceModal({
     setShowFileOptions(false);
     setActiveUrlInput(null);
     setUrlInput('');
-    setShowFileOptionsModal(false);
+    setShowUploadModal(false);
     setModalPosition(0);
   };
 
-  const handleAddFromDevice = async () => {
-    const remainingSlots = 5 - files.length;
-    if (remainingSlots <= 0) {
-      Alert.alert('Limit Reached', 'Maximum 5 files can be uploaded.');
-      return;
-    }
-
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/pdf',
-        copyToCacheDirectory: true,
-        multiple: true,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const filesToAdd = result.assets.slice(0, remainingSlots);
-        const newFiles: FileItem[] = filesToAdd.map((file, index) => ({
-          id: (Date.now() + index).toString(),
-          name: file.name,
-          type: 'device',
-          source: file.name,
-          file: file
-        }));
-
-        setFiles([...files, ...newFiles]);
-        setShowFileOptionsModal(false);
-
-        if (result.assets.length > remainingSlots) {
-          Alert.alert(
-            'Some files not added',
-            `Only ${filesToAdd.length} files were added due to the 5-file limit. ${result.assets.length - remainingSlots} files were skipped.`
-          );
-        }
-      }
-    } catch (error) {
-      console.error('Error picking document:', error);
-      Alert.alert('Error', 'Failed to pick document');
-    }
-  };
-
-  const handleUrlOptionClick = (type: 'url' | 'webpage') => {
-    if (files.length >= 5) {
-      Alert.alert('Limit Reached', 'Maximum 5 files can be uploaded.');
-      return;
-    }
-    setActiveUrlInput(type);
-    setUrlInput('');
-  };
-
-  const handleAddUrl = () => {
-    if (urlInput.trim() && activeUrlInput) {
-      // Map frontend types to backend expected types
-      const backendType = activeUrlInput === 'url' ? 'from_url' : 'webpage';
-
-      const newFile: FileItem = {
-        id: Date.now().toString(),
-        name: urlInput.trim(),
-        type: backendType, // 'from_url' or 'webpage'
-        source: urlInput.trim(),
-        isUrl: true,
-      };
-      setFiles([...files, newFile]);
-      setUrlInput('');
-      // Don't reset activeUrlInput to keep the input section open
+  const handleUploadModalFiles = (fileItems: any) => {
+    if (Array.isArray(fileItems)) {
+      // Handle multiple files from UploadModal
+      setFiles(prevFiles => [...prevFiles, ...fileItems]);
     } else {
-      Alert.alert('Error', 'Please enter a valid URL');
+      // Handle single file object
+      setFiles(prevFiles => [...prevFiles, fileItems]);
     }
+    setShowUploadModal(false);
   };
+
 
   const handleRemoveFile = (fileId: string) => {
     setFiles(files.filter(f => f.id !== fileId));
@@ -289,7 +226,7 @@ export default function WorkspaceModal({
           <View style={styles.addFileSection}>
             <TouchableOpacity
               style={styles.addFileButton}
-              onPress={() => setShowFileOptionsModal(true)}
+              onPress={() => setShowUploadModal(true)}
             >
               <IconSymbol size={16} name="plus" color="#8B5CF6" />
               <Text style={styles.addFileText}>Add File</Text>
@@ -324,9 +261,7 @@ export default function WorkspaceModal({
     </View>
   );
 
-  const modalTransform = Platform.OS === 'ios' && activeUrlInput
-    ? modalPosition
-    : 0;
+  const modalTransform = Platform.OS === 'ios' ? modalPosition : 0;
 
   return (
     <Modal visible={isVisible} transparent animationType="slide">
@@ -345,100 +280,17 @@ export default function WorkspaceModal({
         </View>
       </View>
 
-      {/* File Options Modal */}
-      <Modal visible={showFileOptionsModal} transparent animationType="fade">
-        <View style={styles.fileOptionsModalOverlay}>
-          <View style={styles.fileOptionsModal}>
-            <View style={styles.fileOptionsHeader}>
-              <Text style={styles.fileOptionsTitle}>Add File</Text>
-              <TouchableOpacity
-                style={styles.closeOptionsButton}
-                onPress={() => {
-                  setShowFileOptionsModal(false);
-                  setActiveUrlInput(null);
-                  setUrlInput('');
-                }}
-              >
-                <IconSymbol size={16} name="xmark" color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.fileOptionsContent}>
-              <TouchableOpacity
-                style={styles.fileOptionModal}
-                onPress={handleAddFromDevice}
-              >
-                <IconSymbol size={20} name="phone" color="#4B5563" />
-                <Text style={styles.fileOptionModalText}>From Device</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.fileOptionModal}
-                onPress={() => handleUrlOptionClick('url')}
-              >
-                <IconSymbol size={20} name="link" color="#4B5563" />
-                <Text style={styles.fileOptionModalText}>From Internet</Text>
-              </TouchableOpacity>
-
-              {activeUrlInput === 'url' && (
-                <View style={styles.urlInputModalSection}>
-                  <View style={styles.urlInputModalContainer}>
-                    <TextInput
-                      style={styles.urlInputModal}
-                      value={urlInput}
-                      onChangeText={setUrlInput}
-                      placeholder="Enter URL..."
-                      placeholderTextColor="#999999"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="url"
-                      autoFocus={true}
-                    />
-                    <TouchableOpacity
-                      style={styles.sendButtonModal}
-                      onPress={handleAddUrl}
-                    >
-                      <IconSymbol size={16} name="arrow.right" color="#8B5CF6" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-
-              <TouchableOpacity
-                style={styles.fileOptionModal}
-                onPress={() => handleUrlOptionClick('webpage')}
-              >
-                <IconSymbol size={20} name="globe" color="#4B5563" />
-                <Text style={styles.fileOptionModalText}>Add Webpage</Text>
-              </TouchableOpacity>
-
-              {activeUrlInput === 'webpage' && (
-                <View style={styles.urlInputModalSection}>
-                  <View style={styles.urlInputModalContainer}>
-                    <TextInput
-                      style={styles.urlInputModal}
-                      value={urlInput}
-                      onChangeText={setUrlInput}
-                      placeholder="Enter webpage URL..."
-                      placeholderTextColor="#999999"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="url"
-                      autoFocus={true}
-                    />
-                    <TouchableOpacity
-                      style={styles.sendButtonModal}
-                      onPress={handleAddUrl}
-                    >
-                      <IconSymbol size={16} name="arrow.right" color="#8B5CF6" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Upload Modal */}
+      <UploadModal
+        isVisible={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onUpload={handleUploadModalFiles}
+        isBackendConnected={isBackendConnected}
+        isLoading={isLoading}
+        mode="workspace"
+        maxFiles={5}
+        currentFileCount={files.length}
+      />
     </Modal>
   );
 }

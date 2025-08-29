@@ -10,6 +10,9 @@ interface UploadModalProps {
   onUpload: (fileItem: any) => void;
   isBackendConnected: boolean;
   isLoading: boolean;
+  mode?: 'singleFile' | 'workspace' | 'chatInterface';
+  maxFiles?: number;
+  currentFileCount?: number;
 }
 
 export default function UploadModal({
@@ -17,7 +20,10 @@ export default function UploadModal({
   onClose,
   onUpload,
   isBackendConnected,
-  isLoading
+  isLoading,
+  mode = 'singleFile',
+  maxFiles = 5,
+  currentFileCount = 0
 }: UploadModalProps) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [uploadMode, setUploadMode] = useState<'phone' | 'url' | 'webpage'>('phone');
@@ -36,19 +42,45 @@ export default function UploadModal({
 
   const handlePhoneUpload = async () => {
     try {
+      // For singleFile mode, only allow single file selection
+      // For workspace and chatInterface modes, allow multiple files with limits
+      const allowMultiple = mode !== 'singleFile';
+      const remainingSlots = allowMultiple ? maxFiles - currentFileCount : 1;
+
+      if (remainingSlots <= 0) {
+        console.log('File limit reached');
+        return;
+      }
+
       const result = await DocumentPicker.getDocumentAsync({
         type: 'application/pdf',
         copyToCacheDirectory: true,
+        multiple: allowMultiple,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const file = result.assets[0];
-        // Format for uploadWorkspaceMixed
-        const fileItem = {
-          type: 'device',
-          file: file
-        };
-        onUpload(fileItem);
+        if (mode === 'singleFile') {
+          // Single file mode - original behavior
+          const file = result.assets[0];
+          const fileItem = {
+            type: 'device',
+            file: file
+          };
+          onUpload(fileItem);
+        } else {
+          // Workspace modes - handle multiple files
+          const filesToAdd = result.assets.slice(0, remainingSlots);
+          const fileItems = filesToAdd.map((file, index) => ({
+            id: (Date.now() + index).toString(),
+            name: file.name,
+            type: 'device',
+            source: file.name,
+            file: file
+          }));
+          
+          // For workspace modes, pass array of files
+          onUpload(fileItems);
+        }
       }
     } catch (error) {
       console.error('Error picking document:', error);
@@ -57,12 +89,23 @@ export default function UploadModal({
 
   const handleUrlUpload = () => {
     if (urlInput.trim()) {
-      // Format for uploadWorkspaceMixed
-      const fileItem = {
-        type: uploadMode === 'webpage' ? 'webpage' : 'from_url',
-        source: urlInput.trim()
-      };
-      onUpload(fileItem);
+      if (mode === 'singleFile') {
+        // Single file mode - original behavior
+        const fileItem = {
+          type: uploadMode === 'webpage' ? 'webpage' : 'from_url',
+          source: urlInput.trim()
+        };
+        onUpload(fileItem);
+      } else {
+        // Workspace modes - format as array with file structure
+        const fileItem = {
+          id: Date.now().toString(),
+          name: urlInput.trim(),
+          type: uploadMode === 'webpage' ? 'webpage' : 'from_url',
+          source: urlInput.trim()
+        };
+        onUpload([fileItem]);
+      }
     }
   };
 
@@ -98,6 +141,22 @@ export default function UploadModal({
     return uploadMode === 'webpage' ? 'Enter webpage URL...' : 'Enter PDF URL...';
   };
 
+  const getStatusText = () => {
+    if (mode === 'singleFile') {
+      return isBackendConnected 
+        ? 'Select a PDF file to upload and chat with AI'
+        : 'Backend is offline. File will be stored locally.';
+    } else {
+      const remaining = maxFiles - currentFileCount;
+      if (remaining <= 0) {
+        return 'File limit reached. Remove files to add more.';
+      }
+      return isBackendConnected 
+        ? `Add up to ${remaining} more files to your workspace`
+        : `Backend offline. Add up to ${remaining} files locally.`;
+    }
+  };
+
   return (
     <Modal visible={isVisible} transparent animationType="fade">
       <View style={styles.modalOverlay}>
@@ -124,9 +183,7 @@ export default function UploadModal({
 
             {/* Status Text */}
             <Text style={styles.statusText}>
-              {isBackendConnected 
-                ? 'Select a PDF file to upload and chat with AI'
-                : 'Backend is offline. File will be stored locally.'}
+              {getStatusText()}
             </Text>
 
             {/* Upload Button with Dropdown */}

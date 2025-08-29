@@ -184,22 +184,17 @@ export default function ChatInterface({
     setIsFilePreviewVisible(true);
   };
 
-  const handleUploadFile = (file: any) => {
+  const handleUploadFile = (fileItems: any) => {
     if (selectedWorkspace && onAddWorkspaceFile) {
-      onAddWorkspaceFile(selectedWorkspace.id, file);
-    }
-    setShowUploadModal(false);
-  };
-
-  const handleUploadFromUrl = (url: string) => {
-    if (selectedWorkspace && onAddWorkspaceFile) {
-      // Create a file object with URL info for workspace processing
-      const urlFile = {
-        uri: url,
-        name: url,
-        type: 'url'
-      };
-      onAddWorkspaceFile(selectedWorkspace.id, urlFile);
+      if (Array.isArray(fileItems)) {
+        // Handle multiple files from UploadModal
+        fileItems.forEach(fileItem => {
+          onAddWorkspaceFile(selectedWorkspace.id, fileItem);
+        });
+      } else {
+        // Handle single file object
+        onAddWorkspaceFile(selectedWorkspace.id, fileItems);
+      }
     }
     setShowUploadModal(false);
   };
@@ -821,9 +816,11 @@ export default function ChatInterface({
         isVisible={showUploadModal}
         onClose={() => setShowUploadModal(false)}
         onUpload={handleUploadFile}
-        onUploadFromUrl={handleUploadFromUrl}
         isBackendConnected={true}
-        isLoading={isLoading}
+        isLoading={isLoading || false}
+        mode="chatInterface"
+        maxFiles={5}
+        currentFileCount={selectedWorkspace?.files?.length || 0}
       />
     </SafeAreaView>
   );

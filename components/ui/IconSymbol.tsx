@@ -22,7 +22,22 @@ type IconSymbolName =
   | 'gearshape'
   | 'gear'
   | 'document.badge.plus'
-  | 'line.horizontal.3';
+  | 'line.horizontal.3'
+  | 'mic'
+  | 'xmark'
+  | 'arrow.up'
+  | 'arrow.up.circle'
+  | 'chevron.down'
+  | 'chevron.up'
+  | 'chevron.left'
+  | 'phone'
+  | 'link'
+  | 'globe'
+  | 'plus'
+  | 'trash'
+  | 'arrow.right'
+  | 'checkmark'
+  | 'folder';
 
 /**
  * Add your SF Symbols to Ionicons mappings here.
@@ -35,11 +50,26 @@ const MAPPING: IconMapping = {
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code-slash',
   'chevron.right': 'chevron-forward',
+  'chevron.left': 'chevron-back',
+  'chevron.up': 'chevron-up',
+  'chevron.down': 'chevron-down',
   'magnifyingglass': 'search',
   'line.horizontal.3': 'menu',
   'note.text': 'document-text',
+  'doc.text': 'document',
   'mic': 'mic',
   'mic.fill': 'mic',
+  'xmark': 'close',
+  'arrow.up': 'arrow-up',
+  'arrow.up.circle': 'arrow-up-circle',
+  'arrow.right': 'arrow-forward',
+  'phone': 'phone-portrait',
+  'link': 'link',
+  'globe': 'globe',
+  'plus': 'add',
+  'trash': 'trash',
+  'checkmark': 'checkmark',
+  'folder': 'folder',
 } as const;
 
 /**
