@@ -11,13 +11,20 @@ const getWebSocketUrl = () => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const hostname = window.location.hostname;
     
-    if (hostname.includes('replit.dev')) {
-      return `${protocol}//${hostname}:5000/ws/summary`;
+    // Check if we're in Expo tunnel environment (mobile/Expo Go)
+    if (hostname.includes('.exp.direct')) {
+      // For Expo Go/tunnel, use the hardcoded Replit domain for backend
+      return 'wss://5d1b2ccf-1ca9-4483-91c0-e3cdaa2485ed-00-1z2pee6icazdw.picard.replit.dev:8000/ws/summary';
+    }
+    // For Replit web, the Python backend runs on port 8000
+    else if (hostname.includes('replit.dev')) {
+      return `${protocol}//${hostname}:8000/ws/summary`;
     } else {
-      return `${protocol}//${hostname}:5000/ws/summary`;
+      // For local development (Python backend on port 8000)
+      return `${protocol}//${hostname}:8000/ws/summary`;
     }
   }
-  return 'ws://0.0.0.0:5000/ws/summary';
+  return 'ws://0.0.0.0:8000/ws/summary';
 };
 
 class SummaryService {
@@ -115,7 +122,25 @@ class SummaryService {
 
   async requestSummary(fileId: string, workspaceId?: string): Promise<void> {
     try {
-      const response = await fetch(`${getWebSocketUrl().replace('/ws/summary', '')}/rag/summary/${fileId}`, {
+      // Use the API_BASE_URL logic to get the correct backend URL
+      const getApiBaseUrl = () => {
+        if (typeof window !== 'undefined') {
+          const protocol = window.location.protocol;
+          const hostname = window.location.hostname;
+          
+          if (hostname.includes('.exp.direct')) {
+            return 'https://5d1b2ccf-1ca9-4483-91c0-e3cdaa2485ed-00-1z2pee6icazdw.picard.replit.dev:8000';
+          } else if (hostname.includes('replit.dev')) {
+            return `${protocol}//${hostname}:8000`;
+          } else {
+            return `${protocol}//${hostname}:8000`;
+          }
+        }
+        return 'http://0.0.0.0:8000';
+      };
+      
+      const apiBase = getApiBaseUrl();
+      const response = await fetch(`${apiBase}/rag/summary/${fileId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

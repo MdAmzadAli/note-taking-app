@@ -93,6 +93,7 @@ export default function ChatInterface({
   const [summaries, setSummaries] = useState<{[fileId: string]: string}>({});
   const [selectedSummaryFile, setSelectedSummaryFile] = useState<SingleFile | null>(null);
   const [showSummaryDropdown, setShowSummaryDropdown] = useState(false);
+  const [activeTab, setActiveTab] = useState<'chat' | 'summary' | 'quiz'>('chat');
   const scrollViewRef = useRef<ScrollView>(null);
 
   const getFileSize = (file: SingleFile) => {
@@ -396,14 +397,23 @@ export default function ChatInterface({
 
         {/* Tab Options */}
         <View style={styles.pdfChatTabs}>
-          <TouchableOpacity style={[styles.pdfChatTab, styles.activePdfChatTab]}>
-            <Text style={[styles.pdfChatTabText, styles.activePdfChatTabText]}>Chat</Text>
+          <TouchableOpacity 
+            style={[styles.pdfChatTab, activeTab === 'chat' && styles.activePdfChatTab]}
+            onPress={() => setActiveTab('chat')}
+          >
+            <Text style={[styles.pdfChatTabText, activeTab === 'chat' && styles.activePdfChatTabText]}>Chat</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.pdfChatTab}>
-            <Text style={styles.pdfChatTabText}>Summary</Text>
+          <TouchableOpacity 
+            style={[styles.pdfChatTab, activeTab === 'summary' && styles.activePdfChatTab]}
+            onPress={() => setActiveTab('summary')}
+          >
+            <Text style={[styles.pdfChatTabText, activeTab === 'summary' && styles.activePdfChatTabText]}>Summary</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.pdfChatTab}>
-            <Text style={styles.pdfChatTabText}>Quiz</Text>
+          <TouchableOpacity 
+            style={[styles.pdfChatTab, activeTab === 'quiz' && styles.activePdfChatTab]}
+            onPress={() => setActiveTab('quiz')}
+          >
+            <Text style={[styles.pdfChatTabText, activeTab === 'quiz' && styles.activePdfChatTabText]}>Quiz</Text>
           </TouchableOpacity>
         </View>
 
@@ -517,158 +527,183 @@ export default function ChatInterface({
           </View>
         )}
 
-        {/* Chat Messages Container */}
-        <ScrollView 
-          style={styles.pdfChatMessagesContainer}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.pdfChatMessagesContent}
-        >
-          {/* Welcome Message */}
-          {chatMessages.length === 0 && (
-            <View style={styles.pdfWelcomeMessage}>
-              <Text style={styles.pdfWelcomeText}>Ask me anything</Text>
-            </View>
-          )}
+        {/* Tab Content Container */}
+        <View style={styles.tabContentContainer}>
+          {/* Chat Tab */}
+          {activeTab === 'chat' && (
+            <>
+              {/* Chat Messages Container */}
+              <ScrollView 
+                ref={scrollViewRef}
+                style={styles.pdfChatMessagesContainer}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.pdfChatMessagesContent}
+              >
+                {/* Welcome Message */}
+                {chatMessages.length === 0 && (
+                  <View style={styles.pdfWelcomeMessage}>
+                    <Text style={styles.pdfWelcomeText}>Ask me anything</Text>
+                  </View>
+                )}
 
-          {/* Chat Messages */}
-          {chatMessages.map((msg, index) => (
-            <View key={index} style={styles.pdfMessageGroup}>
-              {/* User Message */}
-              <View style={styles.pdfUserMessageContainer}>
-                <View style={styles.pdfUserMessage}>
-                  <Text style={styles.pdfUserMessageText}>{msg.user}</Text>
-                </View>
-              </View>
-
-              {/* AI Response */}
-              <View style={styles.pdfAiMessageContainer}>
-                <View style={styles.pdfAiMessage}>
-                  {msg.isLoading ? (
-                    <View style={styles.loadingContainer}>
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                      <Text style={styles.loadingText}>Analyzing documents...</Text>
+                {/* Chat Messages */}
+                {chatMessages.map((msg, index) => (
+                  <View key={index} style={styles.pdfMessageGroup}>
+                    {/* User Message */}
+                    <View style={styles.pdfUserMessageContainer}>
+                      <View style={styles.pdfUserMessage}>
+                        <Text style={styles.pdfUserMessageText}>{msg.user}</Text>
+                      </View>
                     </View>
-                  ) : (
-                    <>
-                      {renderFormattedText(msg.ai)}
-                      {msg.sources && msg.sources.length > 0 && (
-                        <TouchableOpacity 
-                          style={styles.pdfSourceButton}
-                          onPress={() => handleSourceClick(msg.sources!)}
-                        >
-                          <IconSymbol size={12} name="link" color="#007AFF" />
-                          <Text style={styles.pdfSourceText}>
-                            {msg.sources.length} Source{msg.sources.length > 1 ? 's' : ''}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </>
-                  )}
-                </View>
+
+                    {/* AI Response */}
+                    <View style={styles.pdfAiMessageContainer}>
+                      <View style={styles.pdfAiMessage}>
+                        {msg.isLoading ? (
+                          <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                            <Text style={styles.loadingText}>Analyzing documents...</Text>
+                          </View>
+                        ) : (
+                          <>
+                            {renderFormattedText(msg.ai)}
+                            {msg.sources && msg.sources.length > 0 && (
+                              <TouchableOpacity 
+                                style={styles.pdfSourceButton}
+                                onPress={() => handleSourceClick(msg.sources!)}
+                              >
+                                <IconSymbol size={12} name="link" color="#007AFF" />
+                                <Text style={styles.pdfSourceText}>
+                                  {msg.sources.length} Source{msg.sources.length > 1 ? 's' : ''}
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            </>
+          )}
+
+          {/* Summary Tab */}
+          {activeTab === 'summary' && (
+            <View style={styles.summaryTabContainer}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>📄 Summary</Text>
+                {/* File dropdown for workspace mode */}
+                {files.length > 1 && (
+                  <TouchableOpacity 
+                    style={styles.summaryFileDropdown}
+                    onPress={() => setShowSummaryDropdown(!showSummaryDropdown)}
+                  >
+                    <Text style={styles.summaryFileDropdownText} numberOfLines={1}>
+                      {selectedSummaryFile?.name || 'Select file...'}
+                    </Text>
+                    <IconSymbol 
+                      size={12} 
+                      name={showSummaryDropdown ? "chevron.up" : "chevron.down"} 
+                      color="#8B5CF6" 
+                    />
+                  </TouchableOpacity>
+                )}
               </View>
-            </View>
-          ))}
-        </ScrollView>
 
-        {/* Summary Section */}
-        <View style={styles.summarySection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>📄 Summary</Text>
-            {/* File dropdown for workspace mode */}
-            {files.length > 1 && (
-              <TouchableOpacity 
-                style={styles.summaryFileDropdown}
-                onPress={() => setShowSummaryDropdown(!showSummaryDropdown)}
-              >
-                <Text style={styles.summaryFileDropdownText} numberOfLines={1}>
-                  {selectedSummaryFile?.name || 'Select file...'}
-                </Text>
-                <IconSymbol 
-                  size={12} 
-                  name={showSummaryDropdown ? "chevron.up" : "chevron.down"} 
-                  color="#8B5CF6" 
-                />
-              </TouchableOpacity>
-            )}
-          </View>
+              {/* Dropdown options for workspace mode */}
+              {showSummaryDropdown && files.length > 1 && (
+                <View style={styles.summaryDropdownOptions}>
+                  {files.map((file) => (
+                    <TouchableOpacity
+                      key={file.id}
+                      style={styles.summaryDropdownOption}
+                      onPress={() => {
+                        setSelectedSummaryFile(file);
+                        setSummary(summaries[file.id] || '');
+                        setShowSummaryDropdown(false);
+                      }}
+                    >
+                      <IconSymbol size={12} name="doc.text" color="#8B5CF6" />
+                      <Text style={styles.summaryDropdownOptionText} numberOfLines={1}>
+                        {file.name}
+                      </Text>
+                      {summaries[file.id] && (
+                        <IconSymbol size={10} name="checkmark" color="#10B981" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
 
-          {/* Dropdown options for workspace mode */}
-          {showSummaryDropdown && files.length > 1 && (
-            <View style={styles.summaryDropdownOptions}>
-              {files.map((file) => (
-                <TouchableOpacity
-                  key={file.id}
-                  style={styles.summaryDropdownOption}
-                  onPress={() => {
-                    setSelectedSummaryFile(file);
-                    setSummary(summaries[file.id] || '');
-                    setShowSummaryDropdown(false);
-                  }}
-                >
-                  <IconSymbol size={12} name="doc.text" color="#8B5CF6" />
-                  <Text style={styles.summaryDropdownOptionText} numberOfLines={1}>
-                    {file.name}
+              <View style={styles.summaryContent}>
+                {isSummaryLoading ? (
+                  <View style={styles.summaryLoading}>
+                    <ActivityIndicator size="small" color="#8B5CF6" />
+                    <Text style={styles.summaryLoadingText}>
+                      {files.length > 1 ? 'Generating summaries...' : 'Generating summary...'}
+                    </Text>
+                  </View>
+                ) : summary ? (
+                  <ScrollView style={styles.summaryScrollView} showsVerticalScrollIndicator={false}>
+                    <Text style={styles.summaryText}>{summary}</Text>
+                  </ScrollView>
+                ) : files.length > 0 ? (
+                  <TouchableOpacity 
+                    style={styles.generateSummaryButton}
+                    onPress={() => {
+                      if (files.length > 0) {
+                        setIsSummaryLoading(true);
+                        if (files.length === 1) {
+                          summaryService.requestSummary(files[0].id, workspaceId).catch(error => {
+                            console.error('❌ Failed to request summary:', error);
+                            setIsSummaryLoading(false);
+                          });
+                        } else {
+                          // Request summaries for all files in workspace
+                          files.forEach((file, index) => {
+                            setTimeout(() => {
+                              summaryService.requestSummary(file.id, workspaceId).catch(error => {
+                                console.error('❌ Failed to request summary for file:', file.id, error);
+                                if (index === 0) setIsSummaryLoading(false);
+                              });
+                            }, index * 500);
+                          });
+                        }
+                      }
+                    }}
+                  >
+                    <IconSymbol name="arrow.clockwise" size={16} color="#8B5CF6" />
+                    <Text style={styles.generateSummaryText}>
+                      {files.length > 1 ? 'Generate All Summaries' : 'Generate Summary'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.summaryText}>
+                    Upload documents to see their summary here.
                   </Text>
-                  {summaries[file.id] && (
-                    <IconSymbol size={10} name="checkmark" color="#10B981" />
-                  )}
-                </TouchableOpacity>
-              ))}
+                )}
+              </View>
             </View>
           )}
 
-          <View style={styles.summaryContent}>
-            {isSummaryLoading ? (
-              <View style={styles.summaryLoading}>
-                <ActivityIndicator size="small" color="#8B5CF6" />
-                <Text style={styles.summaryLoadingText}>
-                  {files.length > 1 ? 'Generating summaries...' : 'Generating summary...'}
+          {/* Quiz Tab */}
+          {activeTab === 'quiz' && (
+            <View style={styles.quizTabContainer}>
+              <View style={styles.comingSoonContainer}>
+                <IconSymbol size={48} name="questionmark.circle" color="#8B5CF6" />
+                <Text style={styles.comingSoonTitle}>Quiz Feature Coming Soon</Text>
+                <Text style={styles.comingSoonText}>
+                  Interactive quizzes based on your documents will be available in a future update.
                 </Text>
               </View>
-            ) : summary ? (
-              <ScrollView style={styles.summaryScrollView} showsVerticalScrollIndicator={false}>
-                <Text style={styles.summaryText}>{summary}</Text>
-              </ScrollView>
-            ) : files.length > 0 ? (
-              <TouchableOpacity 
-                style={styles.generateSummaryButton}
-                onPress={() => {
-                  if (files.length > 0) {
-                    setIsSummaryLoading(true);
-                    if (files.length === 1) {
-                      summaryService.requestSummary(files[0].id, workspaceId).catch(error => {
-                        console.error('❌ Failed to request summary:', error);
-                        setIsSummaryLoading(false);
-                      });
-                    } else {
-                      // Request summaries for all files in workspace
-                      files.forEach((file, index) => {
-                        setTimeout(() => {
-                          summaryService.requestSummary(file.id, workspaceId).catch(error => {
-                            console.error('❌ Failed to request summary for file:', file.id, error);
-                            if (index === 0) setIsSummaryLoading(false);
-                          });
-                        }, index * 500);
-                      });
-                    }
-                  }
-                }}
-              >
-                <IconSymbol name="arrow.clockwise" size={16} color="#8B5CF6" />
-                <Text style={styles.generateSummaryText}>
-                  {files.length > 1 ? 'Generate All Summaries' : 'Generate Summary'}
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <Text style={styles.summaryText}>
-                Upload documents to see their summary here.
-              </Text>
-            )}
-          </View>
+            </View>
+          )}
         </View>
 
-        {/* Chat Input Section */}
-        <View style={styles.pdfChatInputContainer}>
+        {/* Chat Input Section - Only show for chat tab */}
+        {activeTab === 'chat' && (
+          <View style={styles.pdfChatInputContainer}>
           <View style={styles.pdfChatInputWrapper}>
             <TextInput
               style={styles.pdfChatInput}
@@ -702,6 +737,7 @@ export default function ChatInterface({
             <Text style={styles.pdfStrictlyFromFileText}>Strictly from file (Faster)</Text>
           </View>
         </View>
+        )}
       </KeyboardAvoidingView>
 
       {/* Delete Confirmation Modal */}
@@ -1414,5 +1450,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8B5CF6',
     fontWeight: '500',
+  },
+  // Tab content container styles
+  tabContentContainer: {
+    flex: 1,
+  },
+  summaryTabContainer: {
+    flex: 1,
+    backgroundColor: '#1A1A1A',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  quizTabContainer: {
+    flex: 1,
+    backgroundColor: '#1A1A1A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  comingSoonContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  comingSoonTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  comingSoonText: {
+    fontSize: 16,
+    color: '#CCCCCC',
+    textAlign: 'center',
+    lineHeight: 24,
+    maxWidth: 300,
   },
 });
