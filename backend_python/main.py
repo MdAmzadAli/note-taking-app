@@ -80,8 +80,8 @@ print("🔧 All imports completed")
 
 app = FastAPI(title="Document Management API")
 
-# Configuration
-PORT = int(os.getenv("PORT", 5000))
+# Configuration - Use port 8000 for backend to avoid conflicts
+PORT = int(os.getenv("PORT", 8000))
 UPLOADS_DIR = Path("uploads")
 PREVIEWS_DIR = Path("previews")
 METADATA_DIR = Path("metadata") # Added for metadata storage
@@ -120,6 +120,13 @@ app.add_middleware(
 
 # Initialize services with logging
 print("🔧 Initializing backend services...")
+
+# Initialize with fallback to None if import fails
+csv_service = None
+file_service = None
+rag_service = None
+url_download_service = None
+webpage_text_extractor_service = None
 
 try:
     csv_service = CSVService()
@@ -202,7 +209,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-async def generate_file_summary_background(file_id: str, file_name: str, workspace_id: str = None):
+async def generate_file_summary_background(file_id: str, file_name: str, workspace_id: Optional[str] = None):
     """
     Generate file summary in background without blocking other operations
     """
@@ -215,6 +222,9 @@ async def generate_file_summary_background(file_id: str, file_name: str, workspa
         print(f"🔍 Running summary search for: {file_id}")
 
         # Use RAG service to generate summary
+        if not rag_service:
+            print(f"❌ RAG service not available for summary generation")
+            return
         summary_result = await rag_service.generate_answer(
             query=summary_query,
             file_ids=[file_id],
@@ -277,7 +287,7 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "rag_initialized": rag_service.is_initialized if 'rag_service' in globals() else False
+        "rag_initialized": rag_service.is_initialized if rag_service else False
     }
 
 # List all files
@@ -285,6 +295,8 @@ async def health_check():
 async def list_files():
     try:
         print("📋 Listing all files...")
+        if not file_service:
+            raise HTTPException(status_code=500, detail="File service not available")
         files = await file_service.list_files()
 
         response = {

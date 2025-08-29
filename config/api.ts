@@ -5,20 +5,20 @@ const getApiBaseUrl = () => {
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
 
-    // For Replit, the Python backend runs on port 5000
+    // For Replit, the Python backend runs on port 8000
     if (hostname.includes('replit.dev')) {
-      // Use the same domain with port 5000 (Python backend)
-      const baseUrl = `${protocol}//${hostname}:5000`;
+      // Use the same domain with port 8000 (Python backend)
+      const baseUrl = `${protocol}//${hostname}:8000`;
       console.log('🔗 API Base URL (Replit - Python Backend):', baseUrl);
       return baseUrl;
     } else {
       // For local development (Python backend)
-      const baseUrl = `${protocol}//${hostname}:5000`;
+      const baseUrl = `${protocol}//${hostname}:8000`;
       console.log('🔗 API Base URL (Local - Python Backend):', baseUrl);
       return baseUrl;
     }
   }
-  return 'http://0.0.0.0:5000';
+  return 'http://0.0.0.0:8000';
 };
 
 const API_BASE_URL = getApiBaseUrl();

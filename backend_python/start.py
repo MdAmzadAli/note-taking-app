@@ -48,7 +48,7 @@ def start_server():
         print("🚀 Starting Python backend server...")
         # Note: os.execv replaces the current process.
         # Ensure all necessary initializations are done before this.
-        os.execv(sys.executable, [sys.executable, "main.py"])
+        os.execv(sys.executable, [sys.executable, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"])
     except Exception as e:
         print(f"❌ Failed to start server: {e}")
         sys.exit(1)
