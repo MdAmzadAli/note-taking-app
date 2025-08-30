@@ -298,7 +298,7 @@ export default function ChatInterface({
     const getSocketUrl = () => {
       if (typeof window !== 'undefined') {
         const hostname = window.location.hostname;
-        
+
         // Check if we're in Expo tunnel environment (mobile/Expo Go)
         if (hostname.includes('.exp.direct')) {
           // For Expo Go/tunnel, use the same Replit domain as API base URL
@@ -312,7 +312,7 @@ export default function ChatInterface({
           return `http://${hostname}:8000`;
         }
       }
-      return 'http://0.0.0.0:8000';
+      return 'https://4039270b-5003-46d5-8738-f71302f8ef1e-00-2bd8dwfrl5uow.riker.replit.dev:8000';
     };
 
     const handleSummaryNotification = (notification: any) => {
@@ -333,7 +333,7 @@ export default function ChatInterface({
           // Get current files from the files state
           const currentFiles = files;
           const isRelevantFile = currentFiles.some(file => file.id === notification.fileId);
-          
+
           if (!isRelevantFile) {
             return currentSummary;
           }
@@ -343,7 +343,7 @@ export default function ChatInterface({
             console.log('✅ Single file summary updated:', notification.fileId);
             return notification.summary;
           }
-          
+
           // For workspace mode
           if (currentFiles.length > 1) {
             // If no file is selected yet, select this one
@@ -361,20 +361,20 @@ export default function ChatInterface({
               return notification.summary;
             }
           }
-          
+
           return currentSummary;
         });
-        
+
         return currentSelected;
       });
-      
+
       console.log('✅ Summary processed for file:', notification.fileId);
     };
 
     // Connect to Socket.IO
     const socketUrl = getSocketUrl();
     console.log('🔌 Connecting to Socket.IO:', socketUrl);
-    
+
     socketRef.current = io(socketUrl, {
       transports: ['websocket', 'polling'],
       autoConnect: true,
@@ -409,11 +409,11 @@ export default function ChatInterface({
   // Clear summary when files change - summaries are now automatically generated via WebSocket
   useEffect(() => {
     console.log('📋 Summary state reset for new files:', files.map(f => ({ id: f.id, name: f.name })));
-    
+
     // Only reset if files actually changed
     const fileIds = files.map(f => f.id).sort().join(',');
     const currentFileIds = Object.keys(summaries).sort().join(',');
-    
+
     if (fileIds !== currentFileIds) {
       setSummary(''); // Clear previous summary
       setSummaries({}); // Clear all summaries
@@ -422,7 +422,7 @@ export default function ChatInterface({
       if (files.length > 0) {
         // Set loading state - summaries will arrive via WebSocket automatically
         setIsSummaryLoading(true);
-        
+
         if (files.length === 1) {
           // Single file mode - summary will be received via WebSocket
           console.log('📄 Single file mode - waiting for automatic summary for:', files[0].id);
@@ -432,13 +432,13 @@ export default function ChatInterface({
           // Set first file as selected for initial display
           setSelectedSummaryFile(files[0]);
         }
-        
+
         // Set a timeout to stop loading state if no summary arrives within reasonable time
         const summaryTimeout = setTimeout(() => {
           setIsSummaryLoading(false);
           console.log('⚠️ Summary loading timeout - summaries may still arrive via WebSocket');
         }, 30000); // 30 second timeout
-        
+
         // Cleanup timeout on unmount or when files change
         return () => {
           clearTimeout(summaryTimeout);
