@@ -364,39 +364,45 @@ export default function ChatInterface({
   useEffect(() => {
     console.log('📋 Summary state reset for new files:', files.map(f => ({ id: f.id, name: f.name })));
     
-    setSummary(''); // Clear previous summary
-    setSummaries({}); // Clear all summaries
-    setSelectedSummaryFile(null);
+    // Only reset if files actually changed
+    const fileIds = files.map(f => f.id).sort().join(',');
+    const currentFileIds = Object.keys(summaries).sort().join(',');
+    
+    if (fileIds !== currentFileIds) {
+      setSummary(''); // Clear previous summary
+      setSummaries({}); // Clear all summaries
+      setSelectedSummaryFile(null);
 
-    if (files.length > 0) {
-      // Set loading state - summaries will arrive via WebSocket automatically
-      setIsSummaryLoading(true);
-      
-      if (files.length === 1) {
-        // Single file mode - summary will be received via WebSocket
-        console.log('📄 Single file mode - waiting for automatic summary for:', files[0].id);
+      if (files.length > 0) {
+        // Set loading state - summaries will arrive via WebSocket automatically
+        setIsSummaryLoading(true);
+        
+        if (files.length === 1) {
+          // Single file mode - summary will be received via WebSocket
+          console.log('📄 Single file mode - waiting for automatic summary for:', files[0].id);
+        } else {
+          // Workspace mode - summaries will be received via WebSocket
+          console.log('📁 Workspace mode - waiting for automatic summaries for', files.length, 'files');
+          // Set first file as selected for initial display
+          setSelectedSummaryFile(files[0]);
+        }
+        
+        // Set a timeout to stop loading state if no summary arrives within reasonable time
+        const summaryTimeout = setTimeout(() => {
+          setIsSummaryLoading(false);
+          console.log('⚠️ Summary loading timeout - summaries may still arrive via WebSocket');
+        }, 30000); // 30 second timeout
+        
+        // Cleanup timeout on unmount or when files change
+        return () => {
+          clearTimeout(summaryTimeout);
+        };
       } else {
-        // Workspace mode - summaries will be received via WebSocket
-        console.log('📁 Workspace mode - waiting for automatic summaries for', files.length, 'files');
-        // Set first file as selected for initial display
-        setSelectedSummaryFile(files[0]);
-      }
-      
-      // Set a timeout to stop loading state if no summary arrives within reasonable time
-      const summaryTimeout = setTimeout(() => {
+        // No files, clear loading state
         setIsSummaryLoading(false);
-        console.log('⚠️ Summary loading timeout - summaries may still arrive via WebSocket');
-      }, 30000); // 30 second timeout
-      
-      // Cleanup timeout on unmount or when files change
-      return () => {
-        clearTimeout(summaryTimeout);
-      };
-    } else {
-      // No files, clear loading state
-      setIsSummaryLoading(false);
+      }
     }
-  }, [files, workspaceId]); // Remove isSummaryLoading from dependencies to prevent infinite loop
+  }, [files, workspaceId]); // Only depend on files and workspaceId
 
   return (
     <SafeAreaView style={styles.pdfChatContainer}>
