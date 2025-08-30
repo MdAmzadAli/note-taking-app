@@ -444,7 +444,7 @@ export default function ChatInterface({
       // No files, clear loading state
       setIsSummaryLoading(false);
     }
-  }, [files, selectedWorkspace?.id]); // Properly depend on files and workspace changes
+  }, []); // Properly depend on files and workspace changes
 
   return (
     <SafeAreaView style={styles.pdfChatContainer}>
