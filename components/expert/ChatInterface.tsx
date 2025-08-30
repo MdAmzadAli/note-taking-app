@@ -441,7 +441,7 @@ export default function ChatInterface({
         clearTimeout(summaryTimeout);
       };
     } else {
-      // No files, clear loading state
+      // No files, clear loading state just checking
       setIsSummaryLoading(false);
     }
   }, []); // Properly depend on files and workspace changes
