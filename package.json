@@ -72,6 +72,7 @@
     "react-native-voice": "^0.3.0",
     "react-native-web": "~0.20.0",
     "react-native-webview": "^13.13.5",
+    "socket.io-client": "^4.8.1",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

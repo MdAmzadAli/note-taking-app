@@ -6,12 +6,12 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 import aiofiles
 import uvicorn
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-import websockets
+
 import mimetypes
 from dotenv import load_dotenv
 import time
@@ -45,6 +45,12 @@ print(f"   GEMINI_CHAT_API_KEY: {'✅ Set' if os.getenv('GEMINI_CHAT_API_KEY') e
 
 # Import services with logging AFTER environment variables are loaded
 print("🔧 Starting Python backend imports...")
+
+try:
+    import socketio
+    print("✅ Socket.IO imported successfully")
+except ImportError as e:
+    print(f"❌ Failed to import Socket.IO: {e}")
 
 try:
     from services.csv_service import CSVService
@@ -172,42 +178,36 @@ except Exception as e:
 
 print("🔧 All services initialization completed")
 
-# WebSocket Connection Manager
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: List[WebSocket] = []
+# Socket.IO setup
+sio = socketio.AsyncServer(
+    async_mode='asgi',
+    cors_allowed_origins="*",
+    logger=True
+)
 
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-        print(f"🔌 WebSocket connected. Total connections: {len(self.active_connections)}")
+socket_app = socketio.ASGIApp(sio, app)
 
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-        print(f"🔌 WebSocket disconnected. Total connections: {len(self.active_connections)}")
+@sio.event
+async def connect(sid, environ):
+    print(f"🔌 Socket.IO client connected: {sid}")
 
-    async def send_summary(self, file_id: str, summary: str):
-        message = {
-            "type": "summary",
-            "fileId": file_id,
-            "summary": summary,
-            "timestamp": datetime.now().isoformat()
-        }
-        disconnected = []
-        for connection in self.active_connections:
-            try:
-                await connection.send_text(json.dumps(message))
-                print(f"📨 Summary sent via WebSocket for file: {file_id}")
-            except Exception as e:
-                print(f"❌ Failed to send summary via WebSocket: {e}")
-                disconnected.append(connection)
+@sio.event
+async def disconnect(sid):
+    print(f"🔌 Socket.IO client disconnected: {sid}")
 
-        # Remove disconnected connections
-        for conn in disconnected:
-            self.disconnect(conn)
-
-manager = ConnectionManager()
+async def send_summary(file_id: str, summary: str):
+    """Send summary to all connected Socket.IO clients"""
+    message = {
+        "type": "summary",
+        "fileId": file_id,
+        "summary": summary,
+        "timestamp": datetime.now().isoformat()
+    }
+    try:
+        await sio.emit('summary_notification', message)
+        print(f"📨 Summary sent via Socket.IO for file: {file_id}")
+    except Exception as e:
+        print(f"❌ Failed to send summary via Socket.IO: {e}")
 
 async def generate_file_summary_background(file_id: str, file_name: str, workspace_id: Optional[str] = None):
     """
@@ -235,15 +235,15 @@ async def generate_file_summary_background(file_id: str, file_name: str, workspa
             summary_text = summary_result['answer']
             print(f"✅ Summary generated for file {file_id} ({len(summary_text)} characters)")
 
-            # Send summary via WebSocket
-            await manager.send_summary(file_id, summary_text)
+            # Send summary via Socket.IO
+            await send_summary(file_id, summary_text)
         else:
             print(f"⚠️ No summary generated for file: {file_id}")
 
     except Exception as error:
         print(f"❌ Background summary generation failed for {file_id}: {error}")
-        # Send error notification via WebSocket
-        await manager.send_summary(file_id, f"Failed to generate summary: {str(error)}")
+        # Send error notification via Socket.IO
+        await send_summary(file_id, f"Failed to generate summary: {str(error)}")
 
 try:
     url_download_service = URLDownloadService()
@@ -1040,19 +1040,7 @@ async def not_found_handler(request: Request, exc: HTTPException):
     print(f"❌ 404 Not Found for: {request.method} {request.url.path}")
     return JSONResponse(status_code=404, content={"error": "Endpoint not found"})
 
-# WebSocket endpoint for summary notifications
-@app.websocket("/ws/summary")
-async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
-    try:
-        while True:
-            # Keep connection alive
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-    except Exception as e:
-        print(f"❌ WebSocket error: {e}")
-        manager.disconnect(websocket)
+# Socket.IO is handled by the socket_app wrapper
 
 # Error handling
 @app.exception_handler(Exception)
@@ -1178,5 +1166,5 @@ async def start_server():
 
 if __name__ == "__main__":
     # Running Uvicorn directly. For more complex deployments, consider using an entrypoint script.
-    print("🚀 Starting Python backend server on port 5000...")
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    print("🚀 Starting Python backend server with Socket.IO on port 8000...")
+    uvicorn.run(socket_app, host="0.0.0.0", port=PORT)

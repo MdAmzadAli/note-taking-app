@@ -17,7 +17,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import FilePreviewModal from './FilePreviewModal';
 import UploadModal from './UploadModal';
 import { ragService, RAGSource } from '@/services/ragService';
-import { summaryService, SummaryNotification } from '../../services/summaryService';
+import io, { Socket } from 'socket.io-client';
 
 interface SingleFile {
   id: string;
@@ -95,6 +95,7 @@ export default function ChatInterface({
   const [showSummaryDropdown, setShowSummaryDropdown] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'summary' | 'quiz'>('chat');
   const scrollViewRef = useRef<ScrollView>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   const getFileSize = (file: SingleFile) => {
     if (!file.size) return 'Unknown';
@@ -292,10 +293,30 @@ export default function ChatInterface({
     }
   }, [chatMessages]);
 
-  // WebSocket connection for summary notifications
+  // Socket.IO connection for summary notifications
   useEffect(() => {
-    const handleSummaryNotification = (notification: SummaryNotification) => {
-      console.log('📨 Received summary notification:', notification);
+    const getSocketUrl = () => {
+      if (typeof window !== 'undefined') {
+        const hostname = window.location.hostname;
+        
+        // Check if we're in Expo tunnel environment (mobile/Expo Go)
+        if (hostname.includes('.exp.direct')) {
+          // For Expo Go/tunnel, use the same Replit domain as API base URL
+          return 'https://4039270b-5003-46d5-8738-f71302f8ef1e-00-2bd8dwfrl5uow.riker.replit.dev:8000';
+        }
+        // For Replit web, the Python backend runs on port 8000
+        else if (hostname.includes('replit.dev')) {
+          return `https://${hostname}:8000`;
+        } else {
+          // For local development (Python backend on port 8000)
+          return `http://${hostname}:8000`;
+        }
+      }
+      return 'http://0.0.0.0:8000';
+    };
+
+    const handleSummaryNotification = (notification: any) => {
+      console.log('📨 Received summary notification via Socket.IO:', notification);
 
       // Check if this summary is for one of our files using current state
       setIsSummaryLoading(false); // Always stop loading when any summary arrives
@@ -350,13 +371,38 @@ export default function ChatInterface({
       console.log('✅ Summary processed for file:', notification.fileId);
     };
 
-    // Connect to WebSocket and add listener
-    summaryService.connect();
-    summaryService.addListener(handleSummaryNotification);
+    // Connect to Socket.IO
+    const socketUrl = getSocketUrl();
+    console.log('🔌 Connecting to Socket.IO:', socketUrl);
+    
+    socketRef.current = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 3,
+      reconnectionDelay: 2000
+    });
+
+    socketRef.current.on('connect', () => {
+      console.log('✅ Socket.IO connected for summary notifications');
+    });
+
+    socketRef.current.on('disconnect', (reason) => {
+      console.log('🔌 Socket.IO disconnected:', reason);
+    });
+
+    socketRef.current.on('summary_notification', handleSummaryNotification);
+
+    socketRef.current.on('connect_error', (error) => {
+      console.error('❌ Socket.IO connection error:', error);
+    });
 
     // Cleanup on unmount
     return () => {
-      summaryService.removeListener(handleSummaryNotification);
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
     };
   }, []); // Only connect once - don't include files as dependency to avoid reconnections
 
