@@ -279,7 +279,8 @@ def create_chunks(words2d, avg, page_num):
             prev_word = word
 
     if len(current_chunk)>0:
-        if len(current_chunk) >= config.minimum_tokens:
+    
+        if len(current_chunk) >= config.minimum_tokens or len(chunks)==0:
             chunks.append(
                 create_single_chunkObject(current_chunk, page_num, heading))
         else:
