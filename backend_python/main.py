@@ -178,15 +178,19 @@ except Exception as e:
 
 print("🔧 All services initialization completed")
 
-# Socket.IO setup
+# Socket.IO setup with proper CORS configuration
 sio = socketio.AsyncServer(
     async_mode='asgi',
     cors_allowed_origins="*",
+    cors_credentials=True,
     logger=True,
-    engineio_logger=True
+    engineio_logger=True,
+    allow_upgrades=True,
+    transports=['websocket', 'polling']
 )
 
-socket_app = socketio.ASGIApp(sio, app)
+# Mount Socket.IO app with proper path
+socket_app = socketio.ASGIApp(sio, app, other_asgi_app=app)
 
 @sio.event
 async def connect(sid, environ):

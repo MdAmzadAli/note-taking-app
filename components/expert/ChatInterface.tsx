@@ -376,11 +376,15 @@ export default function ChatInterface({
     console.log('🔌 Connecting to Socket.IO:', socketUrl);
 
     socketRef.current = io(socketUrl, {
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: 3,
-      reconnectionDelay: 2000
+      reconnectionAttempts: 5,
+      reconnectionDelay: 2000,
+      forceNew: true,
+      upgrade: true,
+      rememberUpgrade: false,
+      timeout: 20000
     });
 
     socketRef.current.on('connect', () => {
