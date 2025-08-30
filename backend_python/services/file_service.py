@@ -140,7 +140,17 @@ class FileService:
             if not file_info:
                 raise Exception('File not found')
 
-            # Step 1: Delete from local uploads folder
+            # Step 1: Remove from vector database (RAG index) first
+            try:
+                # Import RAG service dynamically to avoid circular imports
+                from services.rag_service import rag_service_instance
+                await rag_service_instance.remove_document(file_id)
+                print(f"✅ Removed from vector database: {file_id}")
+            except Exception as rag_error:
+                print(f"⚠️ Vector database removal failed (continuing): {rag_error}")
+                # Don't fail the entire deletion if vector DB removal fails
+
+            # Step 2: Delete from local uploads folder
             if file_info.get('path'):
                 uploads_file_path = Path(file_info['path'])
                 if uploads_file_path.exists():

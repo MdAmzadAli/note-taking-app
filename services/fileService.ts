@@ -420,29 +420,14 @@ class FileService {
 
   async deleteFile(fileId: string): Promise<boolean> {
     try {
-      console.log('🗑️ Starting file deletion process for:', fileId);
+      console.log('🗑️ Starting complete file deletion for:', fileId);
+      console.log('🗑️ Making single API call for complete deletion from all sources...');
 
-      // Step 1: Remove from vector database (RAG index)
-      console.log('🗑️ Step 1: Removing from vector database...');
-      try {
-        const ragResponse = await fetch(API_ENDPOINTS.ragRemove(fileId), {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        
-        if (ragResponse.ok) {
-          console.log('✅ File removed from vector database successfully');
-        } else {
-          console.warn('⚠️ Failed to remove from vector database, continuing with file deletion');
-        }
-      } catch (ragError) {
-        console.warn('⚠️ Vector database removal failed, continuing with file deletion:', ragError.message);
-      }
-
-      // Step 2: Delete file and metadata from backend
-      console.log('🗑️ Step 2: Deleting file from backend...');
+      // Single call to backend - it handles ALL deletions:
+      // - Vector database (Qdrant) removal
+      // - Local uploads folder cleanup  
+      // - Metadata file deletion
+      // - Cloudinary cleanup (if configured)
       const response = await fetch(API_ENDPOINTS.deleteFile(fileId), {
         method: 'DELETE',
         headers: {
@@ -452,16 +437,17 @@ class FileService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ Backend file deletion failed:', response.status, errorText);
-        throw new Error(`Backend deletion failed: ${response.status} - ${errorText}`);
+        console.error('❌ Complete file deletion failed:', response.status, errorText);
+        throw new Error(`Complete deletion failed: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
-      console.log('✅ File deleted successfully from backend:', result);
+      console.log('✅ Complete file deletion successful:', result);
+      console.log('✅ File removed from: Vector DB + Uploads + Metadata + Cloudinary');
       return true;
 
     } catch (error) {
-      console.error('❌ File deletion failed:');
+      console.error('❌ Complete file deletion failed:');
       console.error('❌ Error type:', error.constructor.name);
       console.error('❌ Error message:', error.message);
       console.error('❌ Error stack:', error.stack);
