@@ -14,7 +14,7 @@ const getWebSocketUrl = () => {
     // Check if we're in Expo tunnel environment (mobile/Expo Go)
     if (hostname.includes('.exp.direct')) {
       // For Expo Go/tunnel, use the same Replit domain as API base URL
-      return 'wss://ab87c67e-e1ff-4d83-be2c-72863bef1adc-00-2wj5a3az3fxuu.riker.replit.dev:8000/ws/summary';
+      return 'wss://4039270b-5003-46d5-8738-f71302f8ef1e-00-2bd8dwfrl5uow.riker.replit.dev:8000/ws/summary';
     }
     // For Replit web, the Python backend runs on port 8000
     else if (hostname.includes('replit.dev')) {
