@@ -321,7 +321,7 @@ export default function ChatInterface({
       // Check if this summary is for one of our files using current state
       setIsSummaryLoading(false); // Always stop loading when any summary arrives
 
-      // Store summary for specific file
+      // Store summary for specific file using backend file ID
       setSummaries(prev => ({
         ...prev,
         [notification.fileId]: notification.summary
@@ -332,32 +332,29 @@ export default function ChatInterface({
         setSummary(currentSummary => {
           // Get current files from the files state
           const currentFiles = files;
-          const isRelevantFile = currentFiles.some(file => file.id === notification.fileId);
-
-          if (!isRelevantFile) {
-            return currentSummary;
-          }
-
-          // For single file mode, always set the summary
-          if (currentFiles.length === 1 && currentFiles[0].id === notification.fileId) {
-            console.log('✅ Single file summary updated:', notification.fileId);
+          
+          // For file ID matching, we need to check if this notification is for any of our current files
+          // The notification.fileId is the actual backend file ID, but our display files might have different IDs
+          // We'll try to match based on the file being recently uploaded or being the only file
+          
+          // For single file mode, if we have exactly one file, assume it's for that file
+          if (currentFiles.length === 1) {
+            console.log('✅ Single file summary received - applying to current file:', currentFiles[0].name);
+            console.log('🔍 Backend file ID:', notification.fileId, 'Frontend file ID:', currentFiles[0].id);
             return notification.summary;
           }
 
-          // For workspace mode
+          // For workspace mode with multiple files, try to match by name or assume it's for the latest file
           if (currentFiles.length > 1) {
-            // If no file is selected yet, select this one
+            // If no file is selected yet, select the first one
             if (!currentSelected) {
-              const file = currentFiles.find(f => f.id === notification.fileId);
-              if (file) {
-                setSelectedSummaryFile(file);
-                console.log('✅ First workspace summary - selected file:', file.name);
-                return notification.summary;
-              }
+              setSelectedSummaryFile(currentFiles[0]);
+              console.log('✅ First workspace summary - selected first file:', currentFiles[0].name);
+              return notification.summary;
             }
-            // If this is the currently selected file's summary
-            else if (currentSelected.id === notification.fileId) {
-              console.log('✅ Selected file summary updated:', notification.fileId);
+            // If we have a selected file, apply the summary to it
+            else {
+              console.log('✅ Workspace summary applied to selected file:', currentSelected.name);
               return notification.summary;
             }
           }
@@ -414,45 +411,40 @@ export default function ChatInterface({
   useEffect(() => {
     console.log('📋 Summary state reset for new files:', files.map(f => ({ id: f.id, name: f.name })));
 
-    // Only reset if files actually changed
-    const fileIds = files.map(f => f.id).sort().join(',');
-    const currentFileIds = Object.keys(summaries).sort().join(',');
+    // Always reset when files change
+    setSummary(''); // Clear previous summary
+    setSummaries({}); // Clear all summaries
+    setSelectedSummaryFile(null);
 
-    if (fileIds !== currentFileIds) {
-      setSummary(''); // Clear previous summary
-      setSummaries({}); // Clear all summaries
-      setSelectedSummaryFile(null);
+    if (files.length > 0) {
+      // Set loading state - summaries will arrive via WebSocket automatically
+      setIsSummaryLoading(true);
 
-      if (files.length > 0) {
-        // Set loading state - summaries will arrive via WebSocket automatically
-        setIsSummaryLoading(true);
-
-        if (files.length === 1) {
-          // Single file mode - summary will be received via WebSocket
-          console.log('📄 Single file mode - waiting for automatic summary for:', files[0].id);
-        } else {
-          // Workspace mode - summaries will be received via WebSocket
-          console.log('📁 Workspace mode - waiting for automatic summaries for', files.length, 'files');
-          // Set first file as selected for initial display
-          setSelectedSummaryFile(files[0]);
-        }
-
-        // Set a timeout to stop loading state if no summary arrives within reasonable time
-        const summaryTimeout = setTimeout(() => {
-          setIsSummaryLoading(false);
-          console.log('⚠️ Summary loading timeout - summaries may still arrive via WebSocket');
-        }, 30000); // 30 second timeout
-
-        // Cleanup timeout on unmount or when files change
-        return () => {
-          clearTimeout(summaryTimeout);
-        };
+      if (files.length === 1) {
+        // Single file mode - summary will be received via WebSocket
+        console.log('📄 Single file mode - waiting for automatic summary for:', files[0].id);
       } else {
-        // No files, clear loading state
-        setIsSummaryLoading(false);
+        // Workspace mode - summaries will be received via WebSocket
+        console.log('📁 Workspace mode - waiting for automatic summaries for', files.length, 'files');
+        // Set first file as selected for initial display
+        setSelectedSummaryFile(files[0]);
       }
+
+      // Set a timeout to stop loading state if no summary arrives within reasonable time
+      const summaryTimeout = setTimeout(() => {
+        setIsSummaryLoading(false);
+        console.log('⚠️ Summary loading timeout - summaries may still arrive via WebSocket');
+      }, 30000); // 30 second timeout
+
+      // Cleanup timeout on unmount or when files change
+      return () => {
+        clearTimeout(summaryTimeout);
+      };
+    } else {
+      // No files, clear loading state
+      setIsSummaryLoading(false);
     }
-  }, []); // Only depend on files and workspaceId
+  }, [files, selectedWorkspace?.id]); // Properly depend on files and workspace changes
 
   return (
     <SafeAreaView style={styles.pdfChatContainer}>
