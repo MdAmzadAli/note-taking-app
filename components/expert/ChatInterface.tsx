@@ -402,7 +402,7 @@ export default function ChatInterface({
         setIsSummaryLoading(false);
       }
     }
-  }, [files, workspaceId]); // Only depend on files and workspaceId
+  }, []); // Only depend on files and workspaceId
 
   return (
     <SafeAreaView style={styles.pdfChatContainer}>
