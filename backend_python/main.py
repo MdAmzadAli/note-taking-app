@@ -191,6 +191,8 @@ sio = socketio.AsyncServer(
 
 # Mount Socket.IO app with proper path
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
+print("🔌 Socket.IO ASGI app created successfully")
+print("🔌 Socket.IO will handle routes: /socket.io/*")
 
 @sio.event
 async def connect(sid, environ):
@@ -1170,6 +1172,7 @@ async def start_server():
 
 
 if __name__ == "__main__":
-    # Running Uvicorn directly. For more complex deployments, consider using an entrypoint script.
+    # Running Uvicorn directly with Socket.IO integration
     print("🚀 Starting Python backend server with Socket.IO on port 8000...")
+    print("🔌 Socket.IO endpoints will be available at /socket.io/")
     uvicorn.run(socket_app, host="0.0.0.0", port=PORT)

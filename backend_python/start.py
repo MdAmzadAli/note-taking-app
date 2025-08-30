@@ -43,12 +43,11 @@ def install_requirements():
         # Don't exit, continue anyway
 
 def start_server():
-    """Start the FastAPI server"""
+    """Start the FastAPI server with Socket.IO integration"""
     try:
-        print("🚀 Starting Python backend server...")
-        # Note: os.execv replaces the current process.
-        # Ensure all necessary initializations are done before this.
-        os.execv(sys.executable, [sys.executable, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"])
+        print("🚀 Starting Python backend server with Socket.IO...")
+        # Use socket_app instead of app to enable Socket.IO routes
+        os.execv(sys.executable, [sys.executable, "-m", "uvicorn", "main:socket_app", "--host", "0.0.0.0", "--port", "8000"])
     except Exception as e:
         print(f"❌ Failed to start server: {e}")
         sys.exit(1)
