@@ -297,38 +297,57 @@ export default function ChatInterface({
     const handleSummaryNotification = (notification: SummaryNotification) => {
       console.log('📨 Received summary notification:', notification);
 
-      // Check if this summary is for one of our files
-      const isRelevantFile = files.some(file => file.id === notification.fileId);
+      // Check if this summary is for one of our files using current state
+      setIsSummaryLoading(false); // Always stop loading when any summary arrives
 
-      if (isRelevantFile) {
-        // Store summary for specific file
-        setSummaries(prev => ({
-          ...prev,
-          [notification.fileId]: notification.summary
-        }));
-        
-        // For single file mode, also set the main summary
-        if (files.length === 1 && files[0].id === notification.fileId) {
-          setSummary(notification.summary);
-        }
-        
-        // If this is the first file summary in workspace mode, select it
-        if (files.length > 1 && !selectedSummaryFile) {
-          const file = files.find(f => f.id === notification.fileId);
-          if (file) {
-            setSelectedSummaryFile(file);
-            setSummary(notification.summary);
+      // Store summary for specific file
+      setSummaries(prev => ({
+        ...prev,
+        [notification.fileId]: notification.summary
+      }));
+
+      // Update relevant UI state based on current files
+      setSelectedSummaryFile(currentSelected => {
+        setSummary(currentSummary => {
+          // Get current files from the files state
+          const currentFiles = files;
+          const isRelevantFile = currentFiles.some(file => file.id === notification.fileId);
+          
+          if (!isRelevantFile) {
+            return currentSummary;
           }
-        }
+
+          // For single file mode, always set the summary
+          if (currentFiles.length === 1 && currentFiles[0].id === notification.fileId) {
+            console.log('✅ Single file summary updated:', notification.fileId);
+            return notification.summary;
+          }
+          
+          // For workspace mode
+          if (currentFiles.length > 1) {
+            // If no file is selected yet, select this one
+            if (!currentSelected) {
+              const file = currentFiles.find(f => f.id === notification.fileId);
+              if (file) {
+                setSelectedSummaryFile(file);
+                console.log('✅ First workspace summary - selected file:', file.name);
+                return notification.summary;
+              }
+            }
+            // If this is the currently selected file's summary
+            else if (currentSelected.id === notification.fileId) {
+              console.log('✅ Selected file summary updated:', notification.fileId);
+              return notification.summary;
+            }
+          }
+          
+          return currentSummary;
+        });
         
-        // If this is the currently selected file's summary, update display
-        if (selectedSummaryFile?.id === notification.fileId) {
-          setSummary(notification.summary);
-        }
-        
-        setIsSummaryLoading(false);
-        console.log('✅ Summary updated for relevant file:', notification.fileId);
-      }
+        return currentSelected;
+      });
+      
+      console.log('✅ Summary processed for file:', notification.fileId);
     };
 
     // Connect to WebSocket and add listener
@@ -339,7 +358,7 @@ export default function ChatInterface({
     return () => {
       summaryService.removeListener(handleSummaryNotification);
     };
-  }, []); // Remove dependencies to prevent infinite loop - only connect once
+  }, []); // Only connect once - don't include files as dependency to avoid reconnections
 
   // Clear summary when files change - summaries are now automatically generated via WebSocket
   useEffect(() => {
@@ -348,7 +367,6 @@ export default function ChatInterface({
     setSummary(''); // Clear previous summary
     setSummaries({}); // Clear all summaries
     setSelectedSummaryFile(null);
-    setIsSummaryLoading(false);
 
     if (files.length > 0) {
       // Set loading state - summaries will arrive via WebSocket automatically
@@ -366,18 +384,19 @@ export default function ChatInterface({
       
       // Set a timeout to stop loading state if no summary arrives within reasonable time
       const summaryTimeout = setTimeout(() => {
-        if (isSummaryLoading) {
-          setIsSummaryLoading(false);
-          console.log('⚠️ Summary loading timeout - summaries may still arrive via WebSocket');
-        }
+        setIsSummaryLoading(false);
+        console.log('⚠️ Summary loading timeout - summaries may still arrive via WebSocket');
       }, 30000); // 30 second timeout
       
       // Cleanup timeout on unmount or when files change
       return () => {
         clearTimeout(summaryTimeout);
       };
+    } else {
+      // No files, clear loading state
+      setIsSummaryLoading(false);
     }
-  }, [files, workspaceId]);
+  }, [files, workspaceId]); // Remove isSummaryLoading from dependencies to prevent infinite loop
 
   return (
     <SafeAreaView style={styles.pdfChatContainer}>
