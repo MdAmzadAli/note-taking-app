@@ -662,10 +662,9 @@ export default function ChatInterface({
           {/* Summary Tab */}
           {activeTab === 'summary' && (
             <View style={styles.summaryTabContainer}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>📄 Summary</Text>
-                {/* File dropdown for workspace mode */}
-                {files.length > 1 && (
+              {/* File dropdown for workspace mode */}
+              {files.length > 1 && (
+                <View style={styles.sectionHeader}>
                   <TouchableOpacity 
                     style={styles.summaryFileDropdown}
                     onPress={() => setShowSummaryDropdown(!showSummaryDropdown)}
@@ -679,8 +678,8 @@ export default function ChatInterface({
                       color="#8B5CF6" 
                     />
                   </TouchableOpacity>
-                )}
-              </View>
+                </View>
+              )}
 
               {/* Dropdown options for workspace mode */}
               {showSummaryDropdown && files.length > 1 && (
@@ -707,36 +706,36 @@ export default function ChatInterface({
                 </View>
               )}
 
-              <View style={styles.summaryContent}>
-                {isSummaryLoading ? (
-                  <View style={styles.summaryLoading}>
-                    <ActivityIndicator size="small" color="#8B5CF6" />
-                    <Text style={styles.summaryLoadingText}>
-                      {files.length > 1 ? 'Generating summaries...' : 'Generating summary...'}
-                    </Text>
+              {isSummaryLoading ? (
+                <View style={styles.summaryLoading}>
+                  <ActivityIndicator size="small" color="#8B5CF6" />
+                  <Text style={styles.summaryLoadingText}>
+                    {files.length > 1 ? 'Generating summaries...' : 'Generating summary...'}
+                  </Text>
+                </View>
+              ) : summary ? (
+                <ScrollView style={styles.summaryScrollView} showsVerticalScrollIndicator={false}>
+                  <View style={styles.summaryFormattedContainer}>
+                    {renderFormattedText(summary)}
                   </View>
-                ) : summary ? (
-                  <ScrollView style={styles.summaryScrollView} showsVerticalScrollIndicator={false}>
-                    <View style={styles.summaryFormattedContainer}>
-                      {renderFormattedText(summary)}
-                    </View>
-                  </ScrollView>
-                ) : files.length > 0 ? (
-                  <View style={styles.summaryWaitingContainer}>
-                    <IconSymbol name="clock" size={20} color="#8B5CF6" />
-                    <Text style={styles.summaryWaitingText}>
-                      {files.length > 1 ? 'Summaries are being generated automatically...' : 'Summary is being generated automatically...'}
-                    </Text>
-                    <Text style={styles.summaryWaitingSubtext}>
-                      Summaries will appear here once ready
-                    </Text>
-                  </View>
-                ) : (
+                </ScrollView>
+              ) : files.length > 0 ? (
+                <View style={styles.summaryWaitingContainer}>
+                  <IconSymbol name="clock" size={20} color="#8B5CF6" />
+                  <Text style={styles.summaryWaitingText}>
+                    {files.length > 1 ? 'Summaries are being generated automatically...' : 'Summary is being generated automatically...'}
+                  </Text>
+                  <Text style={styles.summaryWaitingSubtext}>
+                    Summaries will appear here once ready
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.summaryWaitingContainer}>
                   <Text style={styles.summaryText}>
                     Upload documents to see their summary here.
                   </Text>
-                )}
-              </View>
+                </View>
+              )}
             </View>
           )}
 
@@ -1460,18 +1459,11 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     marginRight: 4,
   },
-  summaryContent: {
-    backgroundColor: '#F8F9FA',
-    padding: 12,
-    borderRadius: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#8B5CF6',
-    minHeight: 100,
-  },
   summaryText: {
-    fontSize: 14,
-    color: '#4B5563',
-    lineHeight: 20,
+    fontSize: 16,
+    color: '#FFFFFF',
+    lineHeight: 22,
+    textAlign: 'center',
   },
   summaryLoading: {
     flexDirection: 'row',
@@ -1485,7 +1477,8 @@ const styles = StyleSheet.create({
     color: '#8B5CF6',
   },
   summaryScrollView: {
-    maxHeight: 150,
+    flex: 1,
+    paddingHorizontal: 16,
   },
   generateSummaryButton: {
     flexDirection: 'row',
@@ -1507,11 +1500,7 @@ const styles = StyleSheet.create({
   summaryWaitingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    padding: 20,
     gap: 8,
   },
   summaryWaitingText: {
@@ -1526,7 +1515,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   summaryFormattedContainer: {
-    padding: 4,
+    paddingVertical: 8,
   },
   // Tab content container styles
   tabContentContainer: {
