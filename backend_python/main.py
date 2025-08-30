@@ -566,6 +566,17 @@ async def upload_workspace(
         if not uploaded_files_metadata:
             raise HTTPException(status_code=400, detail="No files or URLs were provided for upload")
 
+        # Include file details for frontend to match WebSocket notifications
+        file_details = []
+        for item in uploaded_files_metadata:
+            file_details.append({
+                "id": item['id'],
+                "originalName": item['originalName'],
+                "mimetype": item.get('mimetype', 'application/pdf'),
+                "size": item.get('size', 0),
+                "uploadDate": item.get('uploadDate', datetime.now().isoformat())
+            })
+
         response = {
             "success": True,
             "mode": mode,
@@ -573,6 +584,7 @@ async def upload_workspace(
             "filesProcessed": len(uploaded_files_metadata),
             "filesIndexed": indexed_count,
             "totalItems": len(files) + len(parsed_urls),
+            "files": file_details,  # Include actual file IDs for WebSocket matching
             "errors": errors if errors else None
         }
 

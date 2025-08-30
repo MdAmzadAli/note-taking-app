@@ -92,15 +92,29 @@ class FileService {
         // For single file mode, return a mock response since backend doesn't return file details in this endpoint
         const uploadedFiles: FileUploadResponse[] = [];
         
-        // Create a mock file entry for each processed file
-        for (let i = 0; i < result.filesProcessed; i++) {
-          uploadedFiles.push({
-            id: `${Date.now()}_${i}`, // Temporary ID
-            originalName: 'uploaded_file.pdf', // Placeholder
-            mimetype: 'application/pdf',
-            size: 0,
-            uploadDate: new Date().toISOString()
+        // Use actual file details from backend response if available
+        if (result.files && result.files.length > 0) {
+          // Backend provided actual file details with real IDs
+          result.files.forEach((backendFile: any) => {
+            uploadedFiles.push({
+              id: backendFile.id,
+              originalName: backendFile.originalName || backendFile.name,
+              mimetype: backendFile.mimetype || 'application/pdf',
+              size: backendFile.size || 0,
+              uploadDate: backendFile.uploadDate || new Date().toISOString()
+            });
           });
+        } else {
+          // Fallback to temporary IDs if backend doesn't provide details
+          for (let i = 0; i < result.filesProcessed; i++) {
+            uploadedFiles.push({
+              id: `${Date.now()}_${i}`, // Temporary ID
+              originalName: 'uploaded_file.pdf', // Placeholder
+              mimetype: 'application/pdf',
+              size: 0,
+              uploadDate: new Date().toISOString()
+            });
+          }
         }
         
         console.log('✅ Mixed files uploaded successfully:', uploadedFiles.length, 'files');
@@ -161,15 +175,40 @@ class FileService {
       if (result.success && result.filesProcessed > 0) {
         const uploadedFiles: FileUploadResponse[] = [];
         
-        // Create mock file entries for each processed file
-        for (let i = 0; i < result.filesProcessed; i++) {
-          uploadedFiles.push({
-            id: `${Date.now()}_${i}`,
-            originalName: 'uploaded_file.pdf',
-            mimetype: 'application/pdf', 
-            size: 0,
-            uploadDate: new Date().toISOString()
+        // Use actual file details from backend response if available
+        if (result.files && result.files.length > 0) {
+          // Backend provided actual file details with real IDs
+          result.files.forEach((backendFile: any) => {
+            uploadedFiles.push({
+              id: backendFile.id,
+              originalName: backendFile.originalName || backendFile.name,
+              mimetype: backendFile.mimetype || 'application/pdf',
+              size: backendFile.size || 0,
+              uploadDate: backendFile.uploadDate || new Date().toISOString()
+            });
           });
+        } else {
+          // Fallback to workspace ID for single files
+          if (result.mode === 'single' && result.workspaceId) {
+            uploadedFiles.push({
+              id: result.workspaceId,
+              originalName: files[0]?.name || 'uploaded_file.pdf',
+              mimetype: files[0]?.type || 'application/pdf',
+              size: 0,
+              uploadDate: new Date().toISOString()
+            });
+          } else {
+            // Create generic entries for multiple files
+            for (let i = 0; i < result.filesProcessed; i++) {
+              uploadedFiles.push({
+                id: `${result.workspaceId}_file_${i}`,
+                originalName: files[i]?.name || 'uploaded_file.pdf',
+                mimetype: files[i]?.type || 'application/pdf',
+                size: 0,
+                uploadDate: new Date().toISOString()
+              });
+            }
+          }
         }
         
         console.log('✅ Batch files uploaded successfully:', uploadedFiles.length, 'files');

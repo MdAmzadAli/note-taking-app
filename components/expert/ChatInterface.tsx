@@ -339,7 +339,7 @@ export default function ChatInterface({
     return () => {
       summaryService.removeListener(handleSummaryNotification);
     };
-  }, [files, selectedSummaryFile]);
+  }, []); // Remove dependencies to prevent infinite loop - only connect once
 
   // Clear summary when files change - summaries are now automatically generated via WebSocket
   useEffect(() => {
@@ -650,7 +650,9 @@ export default function ChatInterface({
                   </View>
                 ) : summary ? (
                   <ScrollView style={styles.summaryScrollView} showsVerticalScrollIndicator={false}>
-                    <Text style={styles.summaryText}>{summary}</Text>
+                    <View style={styles.summaryFormattedContainer}>
+                      {renderFormattedText(summary)}
+                    </View>
                   </ScrollView>
                 ) : files.length > 0 ? (
                   <View style={styles.summaryWaitingContainer}>
@@ -1455,6 +1457,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     textAlign: 'center',
+  },
+  summaryFormattedContainer: {
+    padding: 4,
   },
   // Tab content container styles
   tabContentContainer: {

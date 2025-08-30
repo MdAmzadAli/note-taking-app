@@ -209,7 +209,8 @@ def create_sequence_from_words(words, labels):
         last_word_index = labels_dict[labels[i]]
         avg_size += words[i]["size"]
         total_word += 1
-    avg_size /= total_word
+    if total_word !=0:
+     avg_size /= total_word
     return reading_order_words, avg_size
 
 
