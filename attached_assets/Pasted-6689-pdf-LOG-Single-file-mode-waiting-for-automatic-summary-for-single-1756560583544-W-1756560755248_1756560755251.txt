@@ -1,0 +1,259 @@
+6689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ ERROR  Warning: Maximum update depth exceeded. This can happen when a component calls setState inside useEffect, but useEffect either doesn't have a dependency array, or one of the dependencies changes on every render.
+
+  66 |
+  67 | export default function ChatInterface({
+> 68 |   selectedFile,
+     |               ^
+  69 |   selectedWorkspace,
+  70 |   chatMessages,
+  71 |   currentMessage,
+
+Call Stack
+  ChatInterface (components/expert/ChatInterface.tsx:68:15)
+  ExpertTab (app/(tabs)/expert.tsx:60:53)
+  RNSScreenContainer (<anonymous>)
+  TabLayout (app/(tabs)/_layout.tsx:12:37)
+  ScreenContentWrapper (<anonymous>)
+  RNSScreenStack (<anonymous>)
+  RootLayout (app/_layout.tsx:13:37)
+  RNCSafeAreaProvider (<anonymous>)
+  App (<anonymous>)
+  ErrorOverlay (<anonymous>)
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ WARN  IconSymbol: No mapping found for "lock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📨 Summary notification received: {"fileId": "175656058289373259c1ac", "summary": "This document is an **Electronic Reservation Slip (ERS)** for a train booking with **PNR 2137486689**.
+
+Here's a comprehensive summary:
+
+**Key Topics:**
+
+*   **Booking Details:** Information about the passenger, train, stations, dates, and class of travel.
+*   **Fare and Payment:** Breakdown of ticket costs, including IRCTC fees and travel insurance.
+*   **Booking Status:** Confirmation of the ticket's status.
+*   **Important Instructions and Advisories:** Guidelines for passengers regarding identity proof, waitlisted tickets, fraudulent practices, and health protocols.
+*   **Indian Railways Information:** Details about IRCTC, GST, and customer support.
+
+**Main Points:**
+
+*   **Passenger Information:**
+    *   Passenger Name: **REYAZUDDIN**
+    *   Age: 64
+    *   Gender: Male
+    *   Booking Status: **CNF/S3/44/LOWER** (Confirmed, Seat 44 in Coach S3, Lower Berth) [Context 1]
+*   **Travel Details:**
+    *   From: **LUCKNOW NR (LKO)**
+    *   To: **CHOPAN (CPU)**
+    *   Start Date: **24-Jun-2025**
+    *   Train Number/Name: **15076/TRIVENI EXP**
+    *   Class: **SLEEPER CLASS (SL)**
+    *   Distance: 425 KM
+    *   Quota: **GENERAL (GN)**
+*   **Financials:**
+    *   Ticket Fare: ₹265.00
+    *   IRCTC Convenience Fee (Incl. GST): ₹11.80
+    *   Travel Insurance Premium (Incl. GST): ₹0.45
+    *   **Total Fare (all inclusive): ₹277.25** [Context 1]
+    *   Indian Railways recovers only 57% of the cost of travel on average [Context 1].
+*   **Booking Information:**
+    *   Booking Date: 24-Jun-2025, 15:06:55 HRS
+    *   Transaction ID: 100005876365905
+*   **Important Instructions and Advisories:**
+    *   **Identity Proof:** Passengers must carry prescribed original ID proofs (e.g., Voter ID, Passport, PAN Card, Driving License, Aadhaar) while traveling. Documents from DigiLocker are also considered valid [Context 3, Context 4].
+    *   **Waitlisted Tickets:** Passengers with fully waitlisted tickets are not allowed to board. Partially waitlisted/confirmed and RAC ticket passengers' names will appear on the chart [Context 4].
+    *   **Fraudulent Practices:** Beware of fraudulent customer care numbers. Use only the official IRCTC e-ticketing Customer care number: **14404** or **1800-11-400** [Context 2, Context 6]. Do not purchase e-tickets from unauthorized agents [Context 5].
+    *   **Timings:** Departure and arrival times are liable to change. Passengers should check correct timings from Railway Station Enquiry or by dialing 139 [Context 2].
+    *   **Health Protocols:** Passengers are advised to read and follow the Health Protocol advisory of the destination state before travel [Context 5, Context 6].
+    *   **Cancellations/Diversions:** If a train is cancelled or diverted, passengers must file an online TDR within 72 hours of the scheduled departure from their boarding station [Context 5].
+    *   **Clerkage Charges:** A clerkage charge of ₹60 per passenger plus GST for AC classes and ₹60 per passenger for Non-AC classes applies for cancellations [Context 4].
+*   **GST Details:**
+    *   Invoice Number: PS25213748668911
+    *   Supplier Information (Indian Railways, New Delhi): GSTIN: 07AAAGM0289C1ZL, SAC Code: 996421 [Context 2]
+
+**Important Information:**
+
+*   The ticket is booked on a personal User ID, and its sale/purchase is an offense under Section 143 of the Railways Act, 1989 [Context 2].
+*   IRCTC Convenience Fee is charged per e-ticket, regardless of the number of passengers [Context 2].
+*   For assistance, the IRCTC e-ticketing Customer care number is **14646** [Context 2].
+*   Meals can be ordered via www.ecatering.irctc.co.in or by calling 1323 [Context 6].
+*   Unreserved tickets can be booked via the UTS APP or ATVMs [Context 6].
+
+CONTEXTS_USED: [1, 2, 3, 4, 5, 6]", "timestamp": "2025-08-30T13:29:49.814020", "type": "summary"}
+ LOG  📨 Received summary notification: {"fileId": "175656058289373259c1ac", "summary": "This document is an **Electronic Reservation Slip (ERS)** for a train booking with **PNR 2137486689**.
+
+Here's a comprehensive summary:
+
+**Key Topics:**
+
+*   **Booking Details:** Information about the passenger, train, stations, dates, and class of travel.
+*   **Fare and Payment:** Breakdown of ticket costs, including IRCTC fees and travel insurance.
+*   **Booking Status:** Confirmation of the ticket's status.
+*   **Important Instructions and Advisories:** Guidelines for passengers regarding identity proof, waitlisted tickets, fraudulent practices, and health protocols.
+*   **Indian Railways Information:** Details about IRCTC, GST, and customer support.
+
+**Main Points:**
+
+*   **Passenger Information:**
+    *   Passenger Name: **REYAZUDDIN**
+    *   Age: 64
+    *   Gender: Male
+    *   Booking Status: **CNF/S3/44/LOWER** (Confirmed, Seat 44 in Coach S3, Lower Berth) [Context 1]
+*   **Travel Details:**
+    *   From: **LUCKNOW NR (LKO)**
+    *   To: **CHOPAN (CPU)**
+    *   Start Date: **24-Jun-2025**
+    *   Train Number/Name: **15076/TRIVENI EXP**
+    *   Class: **SLEEPER CLASS (SL)**
+    *   Distance: 425 KM
+    *   Quota: **GENERAL (GN)**
+*   **Financials:**
+    *   Ticket Fare: ₹265.00
+    *   IRCTC Convenience Fee (Incl. GST): ₹11.80
+    *   Travel Insurance Premium (Incl. GST): ₹0.45
+    *   **Total Fare (all inclusive): ₹277.25** [Context 1]
+    *   Indian Railways recovers only 57% of the cost of travel on average [Context 1].
+*   **Booking Information:**
+    *   Booking Date: 24-Jun-2025, 15:06:55 HRS
+    *   Transaction ID: 100005876365905
+*   **Important Instructions and Advisories:**
+    *   **Identity Proof:** Passengers must carry prescribed original ID proofs (e.g., Voter ID, Passport, PAN Card, Driving License, Aadhaar) while traveling. Documents from DigiLocker are also considered valid [Context 3, Context 4].
+    *   **Waitlisted Tickets:** Passengers with fully waitlisted tickets are not allowed to board. Partially waitlisted/confirmed and RAC ticket passengers' names will appear on the chart [Context 4].
+    *   **Fraudulent Practices:** Beware of fraudulent customer care numbers. Use only the official IRCTC e-ticketing Customer care number: **14404** or **1800-11-400** [Context 2, Context 6]. Do not purchase e-tickets from unauthorized agents [Context 5].
+    *   **Timings:** Departure and arrival times are liable to change. Passengers should check correct timings from Railway Station Enquiry or by dialing 139 [Context 2].
+    *   **Health Protocols:** Passengers are advised to read and follow the Health Protocol advisory of the destination state before travel [Context 5, Context 6].
+    *   **Cancellations/Diversions:** If a train is cancelled or diverted, passengers must file an online TDR within 72 hours of the scheduled departure from their boarding station [Context 5].
+    *   **Clerkage Charges:** A clerkage charge of ₹60 per passenger plus GST for AC classes and ₹60 per passenger for Non-AC classes applies for cancellations [Context 4].
+*   **GST Details:**
+    *   Invoice Number: PS25213748668911
+    *   Supplier Information (Indian Railways, New Delhi): GSTIN: 07AAAGM0289C1ZL, SAC Code: 996421 [Context 2]
+
+**Important Information:**
+
+*   The ticket is booked on a personal User ID, and its sale/purchase is an offense under Section 143 of the Railways Act, 1989 [Context 2].
+*   IRCTC Convenience Fee is charged per e-ticket, regardless of the number of passengers [Context 2].
+*   For assistance, the IRCTC e-ticketing Customer care number is **14646** [Context 2].
+*   Meals can be ordered via www.ecatering.irctc.co.in or by calling 1323 [Context 6].
+*   Unreserved tickets can be booked via the UTS APP or ATVMs [Context 6].
+
+CONTEXTS_USED: [1, 2, 3, 4, 5, 6]", "timestamp": "2025-08-30T13:29:49.814020", "type": "summary"}
+ LOG  ✅ Summary processed for file: 175656058289373259c1ac
+ WARN  IconSymbol: No mapping found for "clock"
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "2137486689.pdf"}]
+ LOG  📄 Single file mode - waiting for automatic summary for: single_1756560583544
+ LOG  📋 Summary state reset for new files: [{"id": "single_1756560583544", "name": "213748
