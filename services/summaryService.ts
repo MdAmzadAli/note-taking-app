@@ -153,6 +153,8 @@ class SummaryService {
 
   async requestSummary(fileId: string, workspaceId?: string): Promise<void> {
     try {
+      console.log('📤 Requesting summary for file:', fileId, 'workspace:', workspaceId);
+      
       // Use the API_BASE_URL logic to get the correct backend URL
       const getApiBaseUrl = () => {
         if (typeof window !== 'undefined') {
@@ -182,12 +184,20 @@ class SummaryService {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to request summary: ${response.statusText}`);
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error(`❌ Summary request failed for ${fileId}: ${response.status} ${response.statusText} - ${errorText}`);
+        
+        // Specific handling for 404 errors
+        if (response.status === 404) {
+          throw new Error(`File not found: ${fileId}. This file may not exist or has not been uploaded properly.`);
+        }
+        
+        throw new Error(`Failed to request summary: ${response.status} ${response.statusText}`);
       }
 
-      console.log('✅ Summary generation requested for file:', fileId);
+      console.log('✅ Summary generation requested successfully for file:', fileId);
     } catch (error) {
-      console.error('❌ Failed to request summary:', error);
+      console.error('❌ Summary request error for file:', fileId, '- Error:', error);
       throw error;
     }
   }

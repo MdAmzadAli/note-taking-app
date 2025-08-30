@@ -349,22 +349,41 @@ export default function ChatInterface({
     setIsSummaryLoading(false);
 
     if (files.length > 0) {
+      console.log('📄 Requesting summaries for files:', files.map(f => ({ id: f.id, name: f.name })));
       setIsSummaryLoading(true);
       
       if (files.length === 1) {
         // Single file mode
         const file = files[0];
+        console.log('📄 Single file mode - requesting summary for:', file.id);
         summaryService.requestSummary(file.id, workspaceId).catch(error => {
-          console.error('❌ Failed to request summary:', error);
+          console.error('❌ Failed to request summary for file:', file.id, 'Error:', error);
           setIsSummaryLoading(false);
+          // Don't retry for the same file to avoid infinite loop
+          console.log('⚠️ Stopping summary requests due to error for file:', file.id);
         });
       } else {
         // Workspace mode - request summaries for all files
+        console.log('📁 Workspace mode - requesting summaries for', files.length, 'files');
+        let successfulRequests = 0;
+        let failedRequests = 0;
+        
         files.forEach((file, index) => {
           setTimeout(() => {
+            console.log('📄 Requesting summary for workspace file:', file.id, file.name);
             summaryService.requestSummary(file.id, workspaceId).catch(error => {
-              console.error('❌ Failed to request summary for file:', file.id, error);
-              if (index === 0) setIsSummaryLoading(false);
+              console.error('❌ Failed to request summary for workspace file:', file.id, file.name, 'Error:', error);
+              failedRequests++;
+              if (failedRequests + successfulRequests === files.length) {
+                setIsSummaryLoading(false);
+                console.log('⚠️ All summary requests completed with errors');
+              }
+            }).then(() => {
+              successfulRequests++;
+              if (failedRequests + successfulRequests === files.length) {
+                setIsSummaryLoading(false);
+                console.log(`✅ All summary requests completed: ${successfulRequests} successful, ${failedRequests} failed`);
+              }
             });
           }, index * 500); // Stagger requests by 500ms
         });
