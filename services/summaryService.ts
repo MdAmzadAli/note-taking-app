@@ -13,8 +13,8 @@ const getWebSocketUrl = () => {
     
     // Check if we're in Expo tunnel environment (mobile/Expo Go)
     if (hostname.includes('.exp.direct')) {
-      // For Expo Go/tunnel, use the hardcoded Replit domain for backend
-      return 'wss://5d1b2ccf-1ca9-4483-91c0-e3cdaa2485ed-00-1z2pee6icazdw.picard.replit.dev:8000/ws/summary';
+      // For Expo Go/tunnel, use the same Replit domain as API base URL
+      return 'wss://ab87c67e-e1ff-4d83-be2c-72863bef1adc-00-2wj5a3az3fxuu.riker.replit.dev:8000/ws/summary';
     }
     // For Replit web, the Python backend runs on port 8000
     else if (hostname.includes('replit.dev')) {
@@ -30,19 +30,32 @@ const getWebSocketUrl = () => {
 class SummaryService {
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectDelay = 1000;
+  private maxReconnectAttempts = 3;
+  private reconnectDelay = 2000;
+  private reconnectTimeoutId: number | null = null;
   private listeners: ((notification: SummaryNotification) => void)[] = [];
 
   connect(): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      console.log('🔌 WebSocket already connected');
+    if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) {
+      console.log('🔌 WebSocket already connected or connecting');
       return;
+    }
+
+    // Clear any pending reconnection timeout
+    if (this.reconnectTimeoutId) {
+      clearTimeout(this.reconnectTimeoutId);
+      this.reconnectTimeoutId = null;
     }
 
     try {
       const wsUrl = getWebSocketUrl();
       console.log('🔌 Connecting to WebSocket:', wsUrl);
+      
+      // Close existing connection if any
+      if (this.ws) {
+        this.ws.close();
+        this.ws = null;
+      }
       
       this.ws = new WebSocket(wsUrl);
 
@@ -69,10 +82,14 @@ class SummaryService {
         }
       };
 
-      this.ws.onclose = () => {
-        console.log('🔌 WebSocket disconnected');
+      this.ws.onclose = (event) => {
+        console.log('🔌 WebSocket disconnected:', event.code, event.reason);
         this.ws = null;
-        this.attemptReconnect();
+        
+        // Only attempt reconnection if not manually closed (code 1000)
+        if (event.code !== 1000) {
+          this.attemptReconnect();
+        }
       };
 
       this.ws.onerror = (error) => {
@@ -91,12 +108,17 @@ class SummaryService {
       return;
     }
 
+    // Clear any existing reconnection timeout
+    if (this.reconnectTimeoutId) {
+      clearTimeout(this.reconnectTimeoutId);
+    }
+
     this.reconnectAttempts++;
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+    const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), 30000); // Cap at 30 seconds
     
-    console.log(`🔄 Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
+    console.log(`🔄 Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
     
-    setTimeout(() => {
+    this.reconnectTimeoutId = setTimeout(() => {
       this.connect();
     }, delay);
   }
@@ -113,8 +135,17 @@ class SummaryService {
   }
 
   disconnect(): void {
+    // Clear any pending reconnection timeout
+    if (this.reconnectTimeoutId) {
+      clearTimeout(this.reconnectTimeoutId);
+      this.reconnectTimeoutId = null;
+    }
+    
+    // Reset reconnection attempts
+    this.reconnectAttempts = 0;
+    
     if (this.ws) {
-      this.ws.close();
+      this.ws.close(1000, 'Manual disconnect'); // Use code 1000 for clean closure
       this.ws = null;
     }
     this.listeners = [];
@@ -129,7 +160,7 @@ class SummaryService {
           const hostname = window.location.hostname;
           
           if (hostname.includes('.exp.direct')) {
-            return 'https://5d1b2ccf-1ca9-4483-91c0-e3cdaa2485ed-00-1z2pee6icazdw.picard.replit.dev:8000';
+            return 'https://ab87c67e-e1ff-4d83-be2c-72863bef1adc-00-2wj5a3az3fxuu.riker.replit.dev:8000';
           } else if (hostname.includes('replit.dev')) {
             return `${protocol}//${hostname}:8000`;
           } else {
