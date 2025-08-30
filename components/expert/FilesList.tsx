@@ -83,22 +83,13 @@ export default function FilesList({
     setIsLoadingSummary(true);
     setFileSummary('');
 
-    try {
-      // Request summary from backend
-      await summaryService.requestSummary(file.id);
-      
-      // For demo purposes, we'll simulate a summary loading
-      // In real implementation, this would come from WebSocket
-      setTimeout(() => {
-        const mockSummary = `This document contains important information about ${file.name.split('.')[0]}. It includes detailed analysis and insights that can help you understand the key concepts and findings presented in the material.`;
-        setFileSummary(mockSummary);
-        setIsLoadingSummary(false);
-      }, 2000);
-    } catch (error) {
-      console.error('Failed to load summary:', error);
-      setFileSummary('Unable to load summary for this file.');
+    // Summaries are automatically generated during upload and sent via WebSocket
+    // For now, show a placeholder message
+    setTimeout(() => {
+      const placeholder = 'File summaries are automatically generated during upload. The summary feature in this file list is being updated to use the new WebSocket-based system.';
+      setFileSummary(placeholder);
       setIsLoadingSummary(false);
-    }
+    }, 1000);
   };
 
   // Truncate summary to 50 words

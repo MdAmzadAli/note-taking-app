@@ -151,55 +151,13 @@ class SummaryService {
     this.listeners = [];
   }
 
+  // Note: Manual summary requests are no longer needed since summaries are automatically
+  // generated during file upload and sent via WebSocket notifications
+  // This method is kept for backward compatibility but should not be used
   async requestSummary(fileId: string, workspaceId?: string): Promise<void> {
-    try {
-      console.log('📤 Requesting summary for file:', fileId, 'workspace:', workspaceId);
-      
-      // Use the API_BASE_URL logic to get the correct backend URL
-      const getApiBaseUrl = () => {
-        if (typeof window !== 'undefined') {
-          const protocol = window.location.protocol;
-          const hostname = window.location.hostname;
-          
-          if (hostname.includes('.exp.direct')) {
-            return 'https://ab87c67e-e1ff-4d83-be2c-72863bef1adc-00-2wj5a3az3fxuu.riker.replit.dev:8000';
-          } else if (hostname.includes('replit.dev')) {
-            return `${protocol}//${hostname}:8000`;
-          } else {
-            return `${protocol}//${hostname}:8000`;
-          }
-        }
-        return 'http://0.0.0.0:8000';
-      };
-      
-      const apiBase = getApiBaseUrl();
-      const response = await fetch(`${apiBase}/rag/summary/${fileId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          workspaceId: workspaceId || null
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        console.error(`❌ Summary request failed for ${fileId}: ${response.status} ${response.statusText} - ${errorText}`);
-        
-        // Specific handling for 404 errors
-        if (response.status === 404) {
-          throw new Error(`File not found: ${fileId}. This file may not exist or has not been uploaded properly.`);
-        }
-        
-        throw new Error(`Failed to request summary: ${response.status} ${response.statusText}`);
-      }
-
-      console.log('✅ Summary generation requested successfully for file:', fileId);
-    } catch (error) {
-      console.error('❌ Summary request error for file:', fileId, '- Error:', error);
-      throw error;
-    }
+    console.warn('⚠️ Manual summary request is deprecated. Summaries are now automatically generated during file upload and sent via WebSocket.');
+    console.log('📋 File summaries are automatically generated in the background after upload for file:', fileId);
+    // No actual request is made - summaries come automatically via WebSocket
   }
 }
 

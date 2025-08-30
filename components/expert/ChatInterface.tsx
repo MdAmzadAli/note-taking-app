@@ -341,56 +341,41 @@ export default function ChatInterface({
     };
   }, [files, selectedSummaryFile]);
 
-  // Clear summary when files change and request new ones
+  // Clear summary when files change - summaries are now automatically generated via WebSocket
   useEffect(() => {
+    console.log('📋 Summary state reset for new files:', files.map(f => ({ id: f.id, name: f.name })));
+    
     setSummary(''); // Clear previous summary
     setSummaries({}); // Clear all summaries
     setSelectedSummaryFile(null);
     setIsSummaryLoading(false);
 
     if (files.length > 0) {
-      console.log('📄 Requesting summaries for files:', files.map(f => ({ id: f.id, name: f.name })));
+      // Set loading state - summaries will arrive via WebSocket automatically
       setIsSummaryLoading(true);
       
       if (files.length === 1) {
-        // Single file mode
-        const file = files[0];
-        console.log('📄 Single file mode - requesting summary for:', file.id);
-        summaryService.requestSummary(file.id, workspaceId).catch(error => {
-          console.error('❌ Failed to request summary for file:', file.id, 'Error:', error);
-          setIsSummaryLoading(false);
-          // Don't retry for the same file to avoid infinite loop
-          console.log('⚠️ Stopping summary requests due to error for file:', file.id);
-        });
+        // Single file mode - summary will be received via WebSocket
+        console.log('📄 Single file mode - waiting for automatic summary for:', files[0].id);
       } else {
-        // Workspace mode - request summaries for all files
-        console.log('📁 Workspace mode - requesting summaries for', files.length, 'files');
-        let successfulRequests = 0;
-        let failedRequests = 0;
-        
-        files.forEach((file, index) => {
-          setTimeout(() => {
-            console.log('📄 Requesting summary for workspace file:', file.id, file.name);
-            summaryService.requestSummary(file.id, workspaceId).catch(error => {
-              console.error('❌ Failed to request summary for workspace file:', file.id, file.name, 'Error:', error);
-              failedRequests++;
-              if (failedRequests + successfulRequests === files.length) {
-                setIsSummaryLoading(false);
-                console.log('⚠️ All summary requests completed with errors');
-              }
-            }).then(() => {
-              successfulRequests++;
-              if (failedRequests + successfulRequests === files.length) {
-                setIsSummaryLoading(false);
-                console.log(`✅ All summary requests completed: ${successfulRequests} successful, ${failedRequests} failed`);
-              }
-            });
-          }, index * 500); // Stagger requests by 500ms
-        });
-        
+        // Workspace mode - summaries will be received via WebSocket
+        console.log('📁 Workspace mode - waiting for automatic summaries for', files.length, 'files');
         // Set first file as selected for initial display
         setSelectedSummaryFile(files[0]);
       }
+      
+      // Set a timeout to stop loading state if no summary arrives within reasonable time
+      const summaryTimeout = setTimeout(() => {
+        if (isSummaryLoading) {
+          setIsSummaryLoading(false);
+          console.log('⚠️ Summary loading timeout - summaries may still arrive via WebSocket');
+        }
+      }, 30000); // 30 second timeout
+      
+      // Cleanup timeout on unmount or when files change
+      return () => {
+        clearTimeout(summaryTimeout);
+      };
     }
   }, [files, workspaceId]);
 
@@ -668,35 +653,15 @@ export default function ChatInterface({
                     <Text style={styles.summaryText}>{summary}</Text>
                   </ScrollView>
                 ) : files.length > 0 ? (
-                  <TouchableOpacity 
-                    style={styles.generateSummaryButton}
-                    onPress={() => {
-                      if (files.length > 0) {
-                        setIsSummaryLoading(true);
-                        if (files.length === 1) {
-                          summaryService.requestSummary(files[0].id, workspaceId).catch(error => {
-                            console.error('❌ Failed to request summary:', error);
-                            setIsSummaryLoading(false);
-                          });
-                        } else {
-                          // Request summaries for all files in workspace
-                          files.forEach((file, index) => {
-                            setTimeout(() => {
-                              summaryService.requestSummary(file.id, workspaceId).catch(error => {
-                                console.error('❌ Failed to request summary for file:', file.id, error);
-                                if (index === 0) setIsSummaryLoading(false);
-                              });
-                            }, index * 500);
-                          });
-                        }
-                      }
-                    }}
-                  >
-                    <IconSymbol name="arrow.clockwise" size={16} color="#8B5CF6" />
-                    <Text style={styles.generateSummaryText}>
-                      {files.length > 1 ? 'Generate All Summaries' : 'Generate Summary'}
+                  <View style={styles.summaryWaitingContainer}>
+                    <IconSymbol name="clock" size={20} color="#8B5CF6" />
+                    <Text style={styles.summaryWaitingText}>
+                      {files.length > 1 ? 'Summaries are being generated automatically...' : 'Summary is being generated automatically...'}
                     </Text>
-                  </TouchableOpacity>
+                    <Text style={styles.summaryWaitingSubtext}>
+                      Summaries will appear here once ready
+                    </Text>
+                  </View>
                 ) : (
                   <Text style={styles.summaryText}>
                     Upload documents to see their summary here.
@@ -1469,6 +1434,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8B5CF6',
     fontWeight: '500',
+  },
+  summaryWaitingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 8,
+  },
+  summaryWaitingText: {
+    fontSize: 14,
+    color: '#8B5CF6',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  summaryWaitingSubtext: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
   },
   // Tab content container styles
   tabContentContainer: {

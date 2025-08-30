@@ -645,6 +645,14 @@ async def upload_file(
         except Exception as preview_error:
             print(f"❌ Preview generation failed: {preview_error}")
 
+        # Start background summary generation (non-blocking) for single file upload
+        print(f"📋 Starting background summary generation for single file: {file_id}")
+        asyncio.create_task(generate_file_summary_background(
+            file_id, 
+            file_info['originalName'], 
+            effective_workspace_id
+        ))
+
         response = {
             "success": True,
             "file": processed_file
