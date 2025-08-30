@@ -190,7 +190,7 @@ sio = socketio.AsyncServer(
 )
 
 # Mount Socket.IO app with proper path
-socket_app = socketio.ASGIApp(sio, app, other_asgi_app=app)
+socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 
 @sio.event
 async def connect(sid, environ):
