@@ -245,7 +245,8 @@ class VectorDatabaseService:
         print(f'🗑️ VectorDB: Starting document removal for {file_id}')
         print(f'🔍 VectorDB: Current state - initialized_flag={self.is_initialized_flag}, client_exists={self.client is not None}')
         
-        if not self.is_initialized():
+        # Use direct flag check instead of is_initialized() method to avoid state mismatch
+        if not self.is_initialized_flag or self.client is None:
             error_msg = f'VectorDatabaseService not properly initialized. Flag: {self.is_initialized_flag}, Client: {self.client is not None}'
             print(f'❌ VectorDB: {error_msg}')
             raise Exception(error_msg)

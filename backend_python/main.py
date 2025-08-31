@@ -344,7 +344,7 @@ async def delete_file(file_id: str):
         # Remove from vector database/RAG index first
         try:
             if rag_service:
-                # Get detailed status of RAG service
+                # Get detailed status 
                 detailed_status = rag_service.get_detailed_status()
                 print(f'🔍 RAG Service detailed status for deletion: {detailed_status}')
 
@@ -354,23 +354,6 @@ async def delete_file(file_id: str):
                     print(f'✅ Removed from vector database: {file_id}')
                 else:
                     print(f'⚠️ RAG service not ready for deletion. Status: {detailed_status}')
-
-                    # Try to fix the issue by reinitializing if vector service exists but isn't initialized
-                    if (rag_service.vector_database_service and
-                        not rag_service.vector_database_service.is_initialized()):
-                        print(f'🔄 Attempting to reinitialize vector database service...')
-                        try:
-                            await rag_service.vector_database_service.initialize()
-                            if rag_service.vector_database_service.is_initialized():
-                                print(f'✅ Vector database service reinitialized successfully')
-                                await rag_service.vector_database_service.remove_document(file_id)
-                                print(f'✅ Removed from vector database after reinitializing: {file_id}')
-                            else:
-                                print(f'❌ Failed to reinitialize vector database service')
-                        except Exception as reinit_error:
-                            print(f'❌ Vector database reinitialization failed: {reinit_error}')
-                    else:
-                        print(f'⚠️ Cannot reinitialize - vector database service missing or in unexpected state')
             else:
                 print(f'⚠️ RAG service not available for document {file_id}')
         except Exception as vector_error:
