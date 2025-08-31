@@ -109,6 +109,15 @@ class DocumentIndexingService:
         Remove document from index
         """
         try:
+            # Check if vector database service is initialized before attempting removal
+            if not self.vector_database_service.is_initialized():
+                print(f'⚠️ Vector database service not initialized, cannot remove document {file_id}')
+                return {
+                    'success': False,
+                    'fileId': file_id,
+                    'message': f'Vector database service not initialized for document {file_id}'
+                }
+            
             await self.vector_database_service.remove_document(file_id)
             print(f'✅ Removed document {file_id} from index')
             return {

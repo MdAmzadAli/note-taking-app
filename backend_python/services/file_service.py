@@ -144,8 +144,13 @@ class FileService:
             try:
                 # Import RAG service dynamically to avoid circular imports
                 from services.rag_service import rag_service_instance
-                await rag_service_instance.remove_document(file_id)
-                print(f"✅ Removed from vector database: {file_id}")
+                remove_result = await rag_service_instance.remove_document(file_id)
+                
+                if remove_result.get('success', False):
+                    print(f"✅ Removed from vector database: {file_id}")
+                else:
+                    print(f"⚠️ Vector database removal skipped: {remove_result.get('message', 'Unknown reason')}")
+                    
             except Exception as rag_error:
                 print(f"⚠️ Vector database removal failed (continuing): {rag_error}")
                 # Don't fail the entire deletion if vector DB removal fails

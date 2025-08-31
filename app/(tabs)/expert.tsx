@@ -212,13 +212,14 @@ export default function ExpertTab() {
       console.log('📨 Upload response:', uploadResponse);
 
       if (uploadResponse && uploadResponse.length > 0) {
-        // Since the backend returns mock data, create a proper file object using the original file info
+        // Use the actual file details returned by the backend
+        const backendFile = uploadResponse[0]; // Get the first uploaded file
         const processedFile: SingleFile = {
-          id: `single_${Date.now()}`, // Generate a unique ID for single file
-          name: fileItem.type === 'device' ? fileItem.file?.name || 'uploaded_file.pdf' : fileItem.source || 'uploaded_file.pdf',
-          uploadDate: new Date().toLocaleDateString(),
-          mimetype: fileItem.type === 'device' ? fileItem.file?.mimeType || 'application/pdf' : 'application/pdf',
-          size: fileItem.type === 'device' ? fileItem.file?.size || 0 : 0,
+          id: backendFile.id, // Use the ACTUAL file ID from backend, not a fake one
+          name: backendFile.originalName || fileItem.file?.name || 'uploaded_file.pdf',
+          uploadDate: new Date(backendFile.uploadDate).toLocaleDateString(),
+          mimetype: backendFile.mimetype || 'application/pdf',
+          size: backendFile.size || 0,
           isUploaded: true,
           source: fileItem.type === 'device' ? 'device' : fileItem.type, // Store the source type
         };

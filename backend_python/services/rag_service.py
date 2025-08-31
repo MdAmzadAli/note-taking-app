@@ -214,7 +214,17 @@ class RAGService:
             file_id, source, file_name, workspace_id, cloudinary_data, content_type)
 
     async def remove_document(self, file_id):
-        return await self.document_indexing_service.remove_document(file_id)
+        """Remove a document from the RAG index"""
+        try:
+            result = await self.document_indexing_service.remove_document(file_id)
+            return result
+        except Exception as error:
+            print(f"❌ RAG: Failed to remove document {file_id}: {error}")
+            return {
+                'success': False,
+                'fileId': file_id,
+                'message': f'Document removal failed: {str(error)}'
+            }
 
     # Delegate to SearchService
     async def search_relevant_chunks(self, query, file_ids=None, workspace_id=None, limit=5):
