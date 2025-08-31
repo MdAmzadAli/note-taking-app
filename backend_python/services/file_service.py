@@ -132,6 +132,48 @@ class FileService:
         except Exception as error:
             print(f"⚠️ Failed to cleanup local file: {file_path} {error}")
 
+    async def delete_local_file_only(self, file_id):
+        """Delete file from local storage only (uploads, metadata, Cloudinary) - excluding vector database"""
+        try:
+            print(f"🗑️ Starting local file deletion for: {file_id}")
+            file_info = await self.get_file_metadata(file_id)
+            if not file_info:
+                raise Exception('File not found')
+
+            # Step 1: Delete physical file from uploads directory
+            file_path = file_info.get('path')
+            if file_path and os.path.exists(file_path):
+                os.unlink(file_path)
+                print(f"✅ Deleted from uploads folder: {file_path}")
+            else:
+                print(f"⚠️ Physical file not found: {file_path}")
+
+            # Step 2: Delete from Cloudinary if exists
+            try:
+                cloudinary_data = file_info.get('cloudinary')
+                if cloudinary_data and cloudinary_data.get('publicId'):
+                    await self.cloudinary_service.delete_file(cloudinary_data['publicId'])
+                    print(f"✅ Deleted from Cloudinary: {cloudinary_data['publicId']}")
+                else:
+                    print("ℹ️ No Cloudinary data found for file")
+            except Exception as cloudinary_error:
+                print(f"⚠️ Cloudinary deletion failed (continuing): {cloudinary_error}")
+
+            # Step 3: Delete metadata file
+            metadata_file_path = os.path.join('metadata', f'{file_id}.json')
+            if os.path.exists(metadata_file_path):
+                os.unlink(metadata_file_path)
+                print(f"✅ Deleted metadata file: {os.path.abspath(metadata_file_path)}")
+            else:
+                print(f"⚠️ Metadata file not found: {metadata_file_path}")
+
+            original_name = file_info.get('originalName', file_id)
+            print(f"✅ Complete local file deletion successful: {original_name}")
+            
+        except Exception as error:
+            print(f"❌ Local file deletion failed: {error}")
+            raise error
+
     async def delete_file(self, file_id):
         """Delete file completely from all storage locations"""
         try:

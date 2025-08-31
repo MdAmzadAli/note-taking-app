@@ -341,7 +341,7 @@ async def delete_file(file_id: str):
     try:
         print(f'🗑️ Starting complete file deletion for: {file_id}')
 
-        # Remove from vector database/RAG index first
+        # Remove from vector database/RAG index first, then delete local files
         try:
             if rag_service:
                 # Get detailed status 
@@ -359,8 +359,8 @@ async def delete_file(file_id: str):
         except Exception as vector_error:
             print(f'⚠️ Vector database removal failed: {vector_error} for document {file_id}')
 
-        # Now delete the local file and metadata
-        await file_service.delete_file(file_id)
+        # Now delete only the local file and metadata (without vector DB deletion)
+        await file_service.delete_local_file_only(file_id)
         print(f"✅ Local file and metadata deleted successfully: {file_id}")
 
         return {"success": True, "message": "File deleted successfully"}
