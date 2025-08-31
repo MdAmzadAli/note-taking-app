@@ -105,16 +105,12 @@ class FileService {
             });
           });
         } else {
-          // Fallback to temporary IDs if backend doesn't provide details
-          for (let i = 0; i < result.filesProcessed; i++) {
-            uploadedFiles.push({
-              id: `${Date.now()}_${i}`, // Temporary ID
-              originalName: 'uploaded_file.pdf', // Placeholder
-              mimetype: 'application/pdf',
-              size: 0,
-              uploadDate: new Date().toISOString()
-            });
-          }
+          // This fallback should not happen as backend now always returns file details
+          console.error('❌ Backend did not return file details, this is unexpected');
+          console.error('❌ Backend response:', JSON.stringify(result, null, 2));
+          
+          // Don't create fake entries with temporary IDs - this causes deletion issues
+          throw new Error('Backend did not return proper file details after upload');
         }
         
         console.log('✅ Mixed files uploaded successfully:', uploadedFiles.length, 'files');
@@ -188,27 +184,13 @@ class FileService {
             });
           });
         } else {
-          // Fallback to workspace ID for single files
-          if (result.mode === 'single' && result.workspaceId) {
-            uploadedFiles.push({
-              id: result.workspaceId,
-              originalName: files[0]?.name || 'uploaded_file.pdf',
-              mimetype: files[0]?.type || 'application/pdf',
-              size: 0,
-              uploadDate: new Date().toISOString()
-            });
-          } else {
-            // Create generic entries for multiple files
-            for (let i = 0; i < result.filesProcessed; i++) {
-              uploadedFiles.push({
-                id: `${result.workspaceId}_file_${i}`,
-                originalName: files[i]?.name || 'uploaded_file.pdf',
-                mimetype: files[i]?.type || 'application/pdf',
-                size: 0,
-                uploadDate: new Date().toISOString()
-              });
-            }
-          }
+          // This fallback should not happen as backend now always returns file details
+          // But if it does, we need to log this issue for debugging
+          console.error('❌ Backend did not return file details, this is unexpected');
+          console.error('❌ Backend response:', JSON.stringify(result, null, 2));
+          
+          // Don't create fake entries with workspace IDs - this causes deletion issues
+          throw new Error('Backend did not return proper file details after upload');
         }
         
         console.log('✅ Batch files uploaded successfully:', uploadedFiles.length, 'files');
