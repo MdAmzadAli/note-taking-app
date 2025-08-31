@@ -39,7 +39,9 @@ export default function FilesList({
   onDeleteFile 
 }: FilesListProps) {
   const [selectedFile, setSelectedFile] = useState<SingleFile | null>(null);
-  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [showSummaryDropdown, setShowSummaryDropdown] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState<SingleFile | null>(null);
   const [fileSummary, setFileSummary] = useState<string>('');
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
@@ -76,10 +78,15 @@ export default function FilesList({
     return uploaded.toLocaleDateString();
   };
 
-  // Handle file name click to show summary
+  // Handle file name click to show summary dropdown
   const handleFileNameClick = async (file: SingleFile) => {
+    if (showSummaryDropdown === file.id) {
+      setShowSummaryDropdown(null);
+      return;
+    }
+
+    setShowSummaryDropdown(file.id);
     setSelectedFile(file);
-    setShowSummaryModal(true);
     setIsLoadingSummary(true);
     setFileSummary('');
 
@@ -102,26 +109,8 @@ export default function FilesList({
   // Handle long press delete functionality
   const handleLongPressStart = (file: SingleFile) => {
     const timer = setTimeout(() => {
-      // Show delete confirmation
-      Alert.alert(
-        'Delete File',
-        `Are you sure you want to delete "${file.name}"? This action cannot be undone.`,
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: () => {
-              if (onDeleteFile) {
-                onDeleteFile(file.id);
-              }
-            }
-          }
-        ]
-      );
+      setFileToDelete(file);
+      setShowDeleteModal(true);
     }, 800); // 800ms long press duration
     setLongPressTimer(timer);
   };
@@ -131,6 +120,19 @@ export default function FilesList({
       clearTimeout(longPressTimer);
       setLongPressTimer(null);
     }
+  };
+
+  const handleDeleteConfirm = () => {
+    if (fileToDelete && onDeleteFile) {
+      onDeleteFile(fileToDelete.id);
+    }
+    setShowDeleteModal(false);
+    setFileToDelete(null);
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false);
+    setFileToDelete(null);
   };
 
   const renderFileCard = ({ item }: { item: SingleFile }) => (
@@ -143,9 +145,16 @@ export default function FilesList({
         onPressOut={handleLongPressEnd}
         activeOpacity={0.7}
       >
-        <Text style={styles.fileName} numberOfLines={1}>
-          {item.name}
-        </Text>
+        <View style={styles.fileNameContainer}>
+          <Text style={styles.fileName} numberOfLines={1}>
+            {item.name}
+          </Text>
+          <IconSymbol 
+            size={16} 
+            name={showSummaryDropdown === item.id ? "chevron.up" : "chevron.down"} 
+            color="#8E8E93" 
+          />
+        </View>
         <View style={styles.fileMetaContainer}>
           <Text style={styles.fileType}>
             {getFileTypeText(item)}
@@ -165,6 +174,32 @@ export default function FilesList({
       >
         <IconSymbol size={20} name="chevron.right" color="#8E8E93" />
       </TouchableOpacity>
+
+      {/* Summary Dropdown */}
+      {showSummaryDropdown === item.id && (
+        <View style={styles.summaryDropdown}>
+          {isLoadingSummary ? (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Generating summary...</Text>
+            </View>
+          ) : (
+            <>
+              <Text style={styles.summaryText}>
+                {truncateSummary(fileSummary)}
+              </Text>
+              <TouchableOpacity 
+                style={styles.chatButton}
+                onPress={() => {
+                  setShowSummaryDropdown(null);
+                  onFileChat(item);
+                }}
+              >
+                <Text style={styles.chatButtonText}>Open Chat</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      )}
     </View>
   );
 
@@ -199,50 +234,33 @@ export default function FilesList({
         />
       )}
 
-      {/* Summary Modal */}
+      {/* Delete Confirmation Modal */}
       <Modal
-        visible={showSummaryModal}
+        visible={showDeleteModal}
         transparent
-        animationType="slide"
-        onRequestClose={() => setShowSummaryModal(false)}
+        animationType="fade"
+        onRequestClose={handleDeleteCancel}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.summaryModal}>
-            <View style={styles.summaryHeader}>
-              <Text style={styles.summaryTitle} numberOfLines={1}>
-                {selectedFile?.name}
-              </Text>
+          <View style={styles.deleteModal}>
+            <Text style={styles.deleteTitle}>Delete File</Text>
+            <Text style={styles.deleteText}>
+              Are you sure you want to delete "{fileToDelete?.name}"? This action cannot be undone.
+            </Text>
+            <View style={styles.deleteButtons}>
               <TouchableOpacity 
-                style={styles.closeButton}
-                onPress={() => setShowSummaryModal(false)}
+                style={[styles.deleteButton, styles.cancelButton]}
+                onPress={handleDeleteCancel}
               >
-                <IconSymbol size={24} name="xmark" color="#FFFFFF" />
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.deleteButton, styles.confirmButton]}
+                onPress={handleDeleteConfirm}
+              >
+                <Text style={styles.confirmButtonText}>Delete</Text>
               </TouchableOpacity>
             </View>
-
-            <ScrollView style={styles.summaryContent}>
-              {isLoadingSummary ? (
-                <View style={styles.loadingContainer}>
-                  <Text style={styles.loadingText}>Generating summary...</Text>
-                </View>
-              ) : (
-                <Text style={styles.summaryText}>
-                  {truncateSummary(fileSummary)}
-                </Text>
-              )}
-            </ScrollView>
-
-            <TouchableOpacity 
-              style={styles.chatButton}
-              onPress={() => {
-                setShowSummaryModal(false);
-                if (selectedFile) {
-                  onFileChat(selectedFile);
-                }
-              }}
-            >
-              <Text style={styles.chatButtonText}>Open Chat</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -281,7 +299,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
   fileCard: {
-    flexDirection: 'row',
     backgroundColor: '#2C2C2E',
     borderRadius: 12,
     marginBottom: 8,
@@ -294,12 +311,18 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     justifyContent: 'center',
   },
+  fileNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   fileName: {
     fontSize: 16,
     fontWeight: '500',
     color: '#FFFFFF',
-    marginBottom: 4,
     fontFamily: 'Inter',
+    flex: 1,
   },
   fileMetaContainer: {
     flexDirection: 'row',
@@ -322,10 +345,50 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
   rightSection: {
-    flex: 0.3,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: '30%',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
+  },
+  summaryDropdown: {
+    backgroundColor: '#1C1C1E',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#3C3C3E',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#8E8E93',
+    fontFamily: 'Inter',
+  },
+  summaryText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    lineHeight: 20,
+    fontFamily: 'Inter',
+    marginBottom: 12,
+  },
+  chatButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  chatButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    fontFamily: 'Inter',
   },
   emptyState: {
     flex: 1,
@@ -354,70 +417,56 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'flex-end',
-  },
-  summaryModal: {
-    backgroundColor: '#1C1C1E',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '70%',
-    paddingBottom: 34, // For safe area
-  },
-  summaryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2C2C2E',
   },
-  summaryTitle: {
+  deleteModal: {
+    backgroundColor: '#2C2C2E',
+    borderRadius: 16,
+    padding: 24,
+    marginHorizontal: 32,
+    maxWidth: 300,
+    width: '100%',
+  },
+  deleteTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#FFFFFF',
-    flex: 1,
-    marginRight: 16,
+    marginBottom: 12,
+    textAlign: 'center',
     fontFamily: 'Inter',
   },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#2C2C2E',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  summaryContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  loadingText: {
+  deleteText: {
     fontSize: 16,
     color: '#8E8E93',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
     fontFamily: 'Inter',
   },
-  summaryText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    lineHeight: 24,
-    fontFamily: 'Inter',
+  deleteButtons: {
+    flexDirection: 'row',
+    gap: 12,
   },
-  chatButton: {
-    backgroundColor: '#007AFF',
-    marginHorizontal: 20,
-    marginVertical: 16,
-    paddingVertical: 16,
-    borderRadius: 12,
+  deleteButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
     alignItems: 'center',
   },
-  chatButtonText: {
+  cancelButton: {
+    backgroundColor: '#3C3C3E',
+  },
+  confirmButton: {
+    backgroundColor: '#FF3B30',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    fontFamily: 'Inter',
+  },
+  confirmButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
