@@ -41,6 +41,8 @@ export default function WorkspaceModal({
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [modalPosition, setModalPosition] = useState(0);
+  const [activeUrlInput, setActiveUrlInput] = useState<string | null>(null);
+  const [urlInput, setUrlInput] = useState('');
 
   const modalContentRef = useRef<View>(null);
 
@@ -65,8 +67,7 @@ export default function WorkspaceModal({
     };
   }, [modalPosition]);
 
-  const handleClose = () => {
-    onClose();
+  const resetModalState = () => {
     setWorkspaceName('');
     setDescription('');
     setFiles([]);
@@ -78,6 +79,11 @@ export default function WorkspaceModal({
     setIsKeyboardVisible(false);
     setShowUploadModal(false);
     setModalPosition(0);
+  };
+
+  const handleClose = () => {
+    resetModalState();
+    onClose();
   };
 
   const handleNext = () => {
@@ -118,6 +124,7 @@ export default function WorkspaceModal({
       files: files
     };
     onCreate(workspaceData);
+    resetModalState();
   };
 
   const renderStep1 = () => (
@@ -262,6 +269,13 @@ export default function WorkspaceModal({
   );
 
   const modalTransform = Platform.OS === 'ios' ? modalPosition : 0;
+
+  // Reset modal state when modal becomes invisible
+  useEffect(() => {
+    if (!isVisible) {
+      resetModalState();
+    }
+  }, [isVisible]);
 
   return (
     <Modal visible={isVisible} transparent animationType="slide">
