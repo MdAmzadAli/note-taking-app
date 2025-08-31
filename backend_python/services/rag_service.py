@@ -301,19 +301,66 @@ class RAGService:
 
     def is_ready_for_indexing(self) -> bool:
         """Check if RAG service is ready for document indexing"""
+        vector_ready = (self.vector_database_service is not None and 
+                       self.vector_database_service.is_initialized() and
+                       self.vector_database_service.client is not None)
+        embedding_ready = (self.embedding_service is not None and 
+                          self.embedding_service.is_initialized())
+        
+        print(f'🔍 RAG indexing readiness check: vector_ready={vector_ready}, embedding_ready={embedding_ready}')
+        
         return (self.document_indexing_service is not None and
-                self.vector_database_service is not None and
-                self.vector_database_service.is_initialized() and
-                self.embedding_service is not None and
-                self.embedding_service.is_initialized())
+                vector_ready and embedding_ready)
 
     def is_ready_for_search(self) -> bool:
         """Check if RAG service is ready for searching"""
+        vector_ready = (self.vector_database_service is not None and 
+                       self.vector_database_service.is_initialized() and
+                       self.vector_database_service.client is not None)
+        embedding_ready = (self.embedding_service is not None and 
+                          self.embedding_service.is_initialized())
+        
+        print(f'🔍 RAG search readiness check: vector_ready={vector_ready}, embedding_ready={embedding_ready}')
+        
         return (self.search_service is not None and
-                self.vector_database_service is not None and
-                self.vector_database_service.is_initialized() and
-                self.embedding_service is not None and
-                self.embedding_service.is_initialized())
+                vector_ready and embedding_ready)
+
+    def is_ready_for_deletion(self) -> bool:
+        """Check if RAG service is ready for document deletion"""
+        vector_ready = (self.vector_database_service is not None and 
+                       self.vector_database_service.is_initialized() and
+                       self.vector_database_service.client is not None)
+        
+        print(f'🔍 RAG deletion readiness check: vector_ready={vector_ready}')
+        
+        return vector_ready
+
+    def get_detailed_status(self) -> dict:
+        """Get detailed status of all RAG service components"""
+        status = {
+            'rag_initialized': self.is_initialized,
+            'vector_service_exists': self.vector_database_service is not None,
+            'vector_initialized': False,
+            'vector_client_exists': False,
+            'embedding_service_exists': self.embedding_service is not None,
+            'embedding_initialized': False,
+            'ready_for_indexing': False,
+            'ready_for_search': False,
+            'ready_for_deletion': False
+        }
+        
+        if self.vector_database_service:
+            status['vector_initialized'] = self.vector_database_service.is_initialized()
+            status['vector_client_exists'] = self.vector_database_service.client is not None
+        
+        if self.embedding_service:
+            status['embedding_initialized'] = self.embedding_service.is_initialized()
+        
+        status['ready_for_indexing'] = self.is_ready_for_indexing()
+        status['ready_for_search'] = self.is_ready_for_search()
+        status['ready_for_deletion'] = self.is_ready_for_deletion()
+        
+        return status
 
     async def search_query(self, query: str, limit: int = 5, workspace_id: str = None) -> Dict[str, Any]:
         """

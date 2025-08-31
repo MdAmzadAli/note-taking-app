@@ -289,12 +289,26 @@ async def log_requests(request: Request, call_next):
 # Health check endpoint
 @app.get("/health")
 async def health_check():
-    print("💗 Health check requested")
-    # A more realistic health check would involve checking service dependencies
+    print('💗 Health check requested')
+
+    # Check RAG service health
+    rag_health = {'status': 'unknown', 'initialized': False}
+    detailed_status = {}
+
+    if rag_service:
+        try:
+            rag_health = await rag_service.health_check()
+            detailed_status = rag_service.get_detailed_status()
+            print(f'🔍 RAG detailed status in health check: {detailed_status}')
+        except Exception as e:
+            rag_health = {'status': 'error', 'error': str(e), 'initialized': False}
+            print(f'❌ Error getting RAG health status: {e}')
+
     return {
         "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
-        "rag_initialized": rag_service.is_initialized if rag_service else False
+        "rag": rag_health,
+        "rag_detailed": detailed_status,
+        "timestamp": datetime.now().isoformat()
     }
 
 # List all files
@@ -321,13 +335,55 @@ async def list_files():
 # Delete file
 @app.delete("/file/{file_id}")
 async def delete_file(file_id: str):
+    print(f'🌐 DELETE /file/{file_id} - Content-Type: application/json - Origin: None')
+    print(f'🗑️ Deleting file: {file_id}')
+
     try:
-        print(f"🗑️ Deleting file: {file_id}")
+        print(f'🗑️ Starting complete file deletion for: {file_id}')
 
+        # Remove from vector database/RAG index first
+        try:
+            if rag_service:
+                # Get detailed status of RAG service
+                detailed_status = rag_service.get_detailed_status()
+                print(f'🔍 RAG Service detailed status for deletion: {detailed_status}')
+
+                if rag_service.is_ready_for_deletion():
+                    print(f'🗑️ Removing from vector database: {file_id}')
+                    await rag_service.vector_database_service.remove_document(file_id)
+                    print(f'✅ Removed from vector database: {file_id}')
+                else:
+                    print(f'⚠️ RAG service not ready for deletion. Status: {detailed_status}')
+
+                    # Try to fix the issue by reinitializing if vector service exists but isn't initialized
+                    if (rag_service.vector_database_service and
+                        not rag_service.vector_database_service.is_initialized()):
+                        print(f'🔄 Attempting to reinitialize vector database service...')
+                        try:
+                            await rag_service.vector_database_service.initialize()
+                            if rag_service.vector_database_service.is_initialized():
+                                print(f'✅ Vector database service reinitialized successfully')
+                                await rag_service.vector_database_service.remove_document(file_id)
+                                print(f'✅ Removed from vector database after reinitializing: {file_id}')
+                            else:
+                                print(f'❌ Failed to reinitialize vector database service')
+                        except Exception as reinit_error:
+                            print(f'❌ Vector database reinitialization failed: {reinit_error}')
+                    else:
+                        print(f'⚠️ Cannot reinitialize - vector database service missing or in unexpected state')
+            else:
+                print(f'⚠️ RAG service not available for document {file_id}')
+        except Exception as vector_error:
+            print(f'⚠️ Vector database removal failed: {vector_error} for document {file_id}')
+
+        # Now delete the local file and metadata
         await file_service.delete_file(file_id)
+        print(f"✅ Local file and metadata deleted successfully: {file_id}")
 
-        print(f"✅ File deleted successfully: {file_id}")
         return {"success": True, "message": "File deleted successfully"}
+    except HTTPException as http_exc:
+        # Re-raise HTTP exceptions to be handled by FastAPI's exception handler
+        raise http_exc
     except Exception as error:
         print(f"❌ Failed to delete file: {error}")
         raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(error)}")
@@ -556,8 +612,8 @@ async def upload_workspace(
 
                 # Start background summary generation (non-blocking)
                 asyncio.create_task(generate_file_summary_background(
-                    item_metadata['id'], 
-                    item_metadata['originalName'], 
+                    item_metadata['id'],
+                    item_metadata['originalName'],
                     effective_workspace_id
                 ))
             except Exception as rag_index_error:
@@ -598,6 +654,9 @@ async def upload_workspace(
         print(f"📤 Mixed upload completed ({mode} mode): {len(uploaded_files_metadata)} items processed, {indexed_count} indexed.")
         return response
 
+    except HTTPException as http_exc:
+        # Re-raise HTTP exceptions to be handled by FastAPI's exception handler
+        raise http_exc
     except Exception as error:
         print(f"❌ Workspace mixed upload error: {error}")
         raise HTTPException(status_code=500, detail=f"Workspace mixed upload failed: {str(error)}")
@@ -667,8 +726,8 @@ async def upload_file(
         # Start background summary generation (non-blocking) for single file upload
         print(f"📋 Starting background summary generation for single file: {file_id}")
         asyncio.create_task(generate_file_summary_background(
-            file_id, 
-            file_info['originalName'], 
+            file_id,
+            file_info['originalName'],
             effective_workspace_id
         ))
 
@@ -680,6 +739,9 @@ async def upload_file(
         print(f"📤 Sending success response: {response}")
         return response
 
+    except HTTPException as http_exc:
+        # Re-raise HTTP exceptions to be handled by FastAPI's exception handler
+        raise http_exc
     except Exception as error:
         print(f"❌ Upload error: {error}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(error)}")
@@ -718,6 +780,9 @@ async def get_preview(file_id: str):
             print(f"❌ No preview available for file: {file_id}")
             raise HTTPException(status_code=404, detail="Preview not found")
 
+    except HTTPException as http_exc:
+        # Re-raise HTTP exceptions to be handled by FastAPI's exception handler
+        raise http_exc
     except Exception as error:
         print(f"❌ Preview error: {error}")
         raise HTTPException(status_code=500, detail="Failed to serve preview")
@@ -759,6 +824,9 @@ async def get_file(file_id: str):
             filename=file_info["originalName"]
         )
 
+    except HTTPException as http_exc:
+        # Re-raise HTTP exceptions to be handled by FastAPI's exception handler
+        raise http_exc
     except Exception as error:
         print(f"❌ File serving error: {error}")
         raise HTTPException(status_code=500, detail="Failed to serve file")
@@ -777,6 +845,9 @@ async def download_file(file_id: str):
             media_type="application/octet-stream",
             filename=file_info["originalName"]
         )
+    except HTTPException as http_exc:
+        # Re-raise HTTP exceptions to be handled by FastAPI's exception handler
+        raise http_exc
     except Exception as error:
         print(f"❌ Download error: {error}")
         raise HTTPException(status_code=500, detail=f"Download failed: {str(error)}")
@@ -805,6 +876,9 @@ async def get_csv_page(file_id: str, page_number: int, limit: int = 20):
                 "hasPrev": page_number > 1
             }
         }
+    except HTTPException as http_exc:
+        # Re-raise HTTP exceptions to be handled by FastAPI's exception handler
+        raise http_exc
     except Exception as error:
         print(f"❌ CSV pagination error: {error}")
         raise HTTPException(status_code=500, detail=f"CSV pagination failed: {str(error)}")
@@ -821,6 +895,9 @@ async def get_metadata(file_id: str):
         # Don't expose internal paths
         public_metadata = {k: v for k, v in file_info.items() if k != "path"}
         return public_metadata
+    except HTTPException as http_exc:
+        # Re-raise HTTP exceptions to be handled by FastAPI's exception handler
+        raise http_exc
     except Exception as error:
         print(f"❌ Metadata error: {error}")
         raise HTTPException(status_code=500, detail=f"Metadata retrieval failed: {str(error)}")
@@ -883,6 +960,9 @@ async def rag_index(file_id: str, request: RAGIndexRequest):
             "processingTime": processing_time
         }
 
+    except HTTPException as http_exc:
+        # Re-raise HTTP exceptions to be handled by FastAPI's exception handler
+        raise http_exc
     except Exception as error:
         processing_time = (time.time() - start_time) * 1000
         print(f"❌ RAG indexing error after {processing_time:.2f}ms")
@@ -910,6 +990,9 @@ async def rag_remove(file_id: str):
             "message": "Document removed from index"
         }
 
+    except HTTPException as http_exc:
+        # Re-raise HTTP exceptions to be handled by FastAPI's exception handler
+        raise http_exc
     except Exception as error:
         print(f"❌ RAG removal error: {error}")
         raise HTTPException(
@@ -950,6 +1033,9 @@ async def rag_query(request: RAGQueryRequest):
             "processingTime": processing_time
         }
 
+    except HTTPException as http_exc:
+        # Re-raise HTTP exceptions to be handled by FastAPI's exception handler
+        raise http_exc
     except Exception as error:
         processing_time = (time.time() - start_time) * 1000
         print(f"❌ RAG query error after {processing_time:.2f}ms")
@@ -980,8 +1066,8 @@ async def generate_summary(file_id: str, request: RAGIndexRequest):
 
         # Start background summary generation
         asyncio.create_task(generate_file_summary_background(
-            file_id, 
-            file_info['originalName'], 
+            file_id,
+            file_info['originalName'],
             request.workspaceId
         ))
 
@@ -991,6 +1077,9 @@ async def generate_summary(file_id: str, request: RAGIndexRequest):
             "fileId": file_id
         }
 
+    except HTTPException as http_exc:
+        # Re-raise HTTP exceptions to be handled by FastAPI's exception handler
+        raise http_exc
     except Exception as error:
         print(f"❌ Manual summary generation failed: {error}")
         raise HTTPException(status_code=500, detail=f"Failed to start summary generation: {str(error)}")
@@ -1069,7 +1158,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 async def startup_event():
     print("🚀 FastAPI application starting up...")
     # Ensure RAG service is initialized if not already done or if startup is called again
-    if 'rag_service' in globals() and not rag_service.is_initialized:
+    if 'rag_service' in globals() and rag_service and not rag_service.is_initialized:
         print("🔄 Initializing RAG service on startup...")
         try:
             await rag_service.initialize()
@@ -1167,7 +1256,7 @@ async def start_server():
     if replit_domain:
         print(f"🌐 Replit external URL: https://{replit_domain}:{PORT}")
     print(f"🛡️ Environment: {os.getenv('NODE_ENV', 'development')}")
-    print(f"🔧 RAG Service initialized: {'Yes' if 'rag_service' in globals() and rag_service.is_initialized else 'No'}")
+    print(f"🔧 RAG Service initialized: {'Yes' if 'rag_service' in globals() and rag_service and rag_service.is_initialized else 'No'}")
     print("🎯 All APIs and services status logged above")
 
 

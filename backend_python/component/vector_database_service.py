@@ -242,10 +242,16 @@ class VectorDatabaseService:
 
     async def remove_document(self, file_id: str):
         """Remove document by file ID (matching JavaScript)"""
-        if not self.is_initialized_flag:
-            raise Exception('VectorDatabaseService not initialized')
+        print(f'🗑️ VectorDB: Starting document removal for {file_id}')
+        print(f'🔍 VectorDB: Current state - initialized_flag={self.is_initialized_flag}, client_exists={self.client is not None}')
+        
+        if not self.is_initialized():
+            error_msg = f'VectorDatabaseService not properly initialized. Flag: {self.is_initialized_flag}, Client: {self.client is not None}'
+            print(f'❌ VectorDB: {error_msg}')
+            raise Exception(error_msg)
         
         try:
+            print(f'🔄 VectorDB: Executing deletion for file_id={file_id} from collection={self.collection_name}')
             await asyncio.to_thread(
                 self.client.delete,
                 collection_name=self.collection_name,
@@ -253,10 +259,11 @@ class VectorDatabaseService:
                     must=[FieldCondition(key="fileId", match=MatchValue(value=file_id))]
                 )
             )
-            print(f'✅ Removed document {file_id} from index')
+            print(f'✅ VectorDB: Successfully removed document {file_id} from index')
             
         except Exception as error:
-            print(f'❌ Failed to remove document {file_id}: {error}')
+            print(f'❌ VectorDB: Failed to remove document {file_id}: {error}')
+            print(f'❌ VectorDB: Error type: {type(error).__name__}')
             raise error
 
     async def check_document_exists(self, file_id: str) -> bool:
@@ -351,7 +358,11 @@ class VectorDatabaseService:
             return {'status': 'unhealthy', 'qdrant': False, 'error': str(error)}
 
     def is_initialized(self) -> bool:
-        return self.is_initialized_flag
+        # Double-check actual state vs flag
+        actual_state = self.is_initialized_flag and self.client is not None
+        if self.is_initialized_flag != actual_state:
+            print(f'⚠️ VectorDB: State mismatch - flag={self.is_initialized_flag}, actual={actual_state}')
+        return actual_state
 
     # Legacy methods for backward compatibility
     async def store_chunks(self, chunks: List[Dict[str, Any]]) -> List[str]:
