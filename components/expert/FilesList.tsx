@@ -66,11 +66,22 @@ export default function FilesList({
     }
   };
 
-  // Get time display (simplified for demo)
+  // Get time display with proper local timezone handling
   const getTimeDisplay = (uploadDate: string) => {
     const now = new Date();
     const uploaded = new Date(uploadDate);
-    const diffInDays = Math.floor((now.getTime() - uploaded.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Ensure valid date
+    if (isNaN(uploaded.getTime())) {
+      return 'Unknown date';
+    }
+    
+    // Get local timezone dates (start of day)
+    const nowLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const uploadedLocal = new Date(uploaded.getFullYear(), uploaded.getMonth(), uploaded.getDate());
+    
+    const diffInMs = nowLocal.getTime() - uploadedLocal.getTime();
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
     
     if (diffInDays === 0) return 'Today';
     if (diffInDays === 1) return 'Yesterday';
@@ -137,43 +148,48 @@ export default function FilesList({
 
   const renderFileCard = ({ item }: { item: SingleFile }) => (
     <View style={styles.fileCard}>
-      {/* Left Section (70% width) */}
-      <TouchableOpacity 
-        style={[styles.leftSection, { borderLeftColor: getBorderColor(item) }]}
-        onPress={() => handleFileNameClick(item)}
-        onPressIn={() => handleLongPressStart(item)}
-        onPressOut={handleLongPressEnd}
-        activeOpacity={0.7}
-      >
-        <View style={styles.fileNameContainer}>
-          <Text style={styles.fileName} numberOfLines={1}>
-            {item.name}
-          </Text>
-          <IconSymbol 
-            size={16} 
-            name={showSummaryDropdown === item.id ? "chevron.up" : "chevron.down"} 
-            color="#8E8E93" 
-          />
-        </View>
-        <View style={styles.fileMetaContainer}>
-          <Text style={styles.fileType}>
-            {getFileTypeText(item)}
-          </Text>
-          <Text style={styles.fileDot}>•</Text>
-          <Text style={styles.fileDate}>
-            {getTimeDisplay(item.uploadDate)}
-          </Text>
-        </View>
-      </TouchableOpacity>
+      <View style={styles.cardContent}>
+        {/* Left Section */}
+        <TouchableOpacity 
+          style={[styles.leftSection, { borderLeftColor: getBorderColor(item) }]}
+          onPress={() => handleFileNameClick(item)}
+          onPressIn={() => handleLongPressStart(item)}
+          onPressOut={handleLongPressEnd}
+          activeOpacity={0.7}
+        >
+          <View style={styles.fileNameContainer}>
+            <Text style={styles.fileName} numberOfLines={1}>
+              {item.name}
+            </Text>
+            <IconSymbol 
+              size={16} 
+              name={showSummaryDropdown === item.id ? "chevron.up" : "chevron.down"} 
+              color="#8E8E93" 
+            />
+          </View>
+          <View style={styles.fileMetaContainer}>
+            <Text style={styles.fileType}>
+              {getFileTypeText(item)}
+            </Text>
+            <Text style={styles.fileDot}>•</Text>
+            <Text style={styles.fileDate}>
+              {getTimeDisplay(item.uploadDate)}
+            </Text>
+          </View>
+        </TouchableOpacity>
 
-      {/* Right Section (30% width) */}
-      <TouchableOpacity 
-        style={styles.rightSection}
-        onPress={() => onFileChat(item)}
-        activeOpacity={0.7}
-      >
-        <IconSymbol size={20} name="chevron.right" color="#8E8E93" />
-      </TouchableOpacity>
+        {/* Gray Separator */}
+        <View style={styles.separator} />
+
+        {/* Right Section */}
+        <TouchableOpacity 
+          style={styles.rightSection}
+          onPress={() => onFileChat(item)}
+          activeOpacity={0.7}
+        >
+          <IconSymbol size={20} name="chevron.right" color="#8E8E93" />
+        </TouchableOpacity>
+      </View>
 
       {/* Summary Dropdown */}
       {showSummaryDropdown === item.id && (
@@ -304,12 +320,21 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     overflow: 'hidden',
   },
+  cardContent: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
   leftSection: {
-    flex: 0.7,
+    flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderLeftWidth: 4,
     justifyContent: 'center',
+  },
+  separator: {
+    width: 1,
+    backgroundColor: '#48484A',
+    marginVertical: 8,
   },
   fileNameContainer: {
     flexDirection: 'row',
@@ -345,11 +370,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
   rightSection: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: '30%',
+    width: 60,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
