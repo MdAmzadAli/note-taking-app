@@ -145,7 +145,9 @@ export default function FilesList({
     setShowDeleteModal(false);
     setFileToDelete(null);
   };
-
+//  onPressIn={() => handleLongPressStart(item)}
+//  onPressOut={handleLongPressEnd}
+ 
   const renderFileCard = ({ item }: { item: SingleFile }) => (
     <View style={styles.fileCard}>
       <View style={styles.cardContent}>
@@ -153,8 +155,12 @@ export default function FilesList({
         <TouchableOpacity 
           style={[styles.leftSection, { borderLeftColor: getBorderColor(item) }]}
           onPress={() => handleFileNameClick(item)}
-          onPressIn={() => handleLongPressStart(item)}
-          onPressOut={handleLongPressEnd}
+         
+          onLongPress={() => {
+            setFileToDelete(item);
+            setShowDeleteModal(true);
+          }}
+          delayLongPress={500}
           activeOpacity={0.7}
         >
           <View style={styles.fileNameContainer}>
