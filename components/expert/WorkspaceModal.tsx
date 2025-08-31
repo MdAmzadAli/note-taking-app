@@ -117,14 +117,20 @@ export default function WorkspaceModal({
     setFiles(files.filter(f => f.id !== fileId));
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     const workspaceData = {
       name: workspaceName.trim(),
       description: description.trim(),
       files: files
     };
-    onCreate(workspaceData);
-    resetModalState();
+    
+    try {
+      await onCreate(workspaceData);
+      // Only reset after successful creation
+    } catch (error) {
+      console.error('Failed to create workspace:', error);
+      // Don't reset on error, let user try again
+    }
   };
 
   const renderStep1 = () => (

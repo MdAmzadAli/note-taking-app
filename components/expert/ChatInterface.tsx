@@ -856,23 +856,23 @@ export default function ChatInterface({
         onRequestClose={cancelWorkspaceDelete}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.confirmationModal}>
-            <Text style={styles.confirmationTitle}>Delete Workspace</Text>
-            <Text style={styles.confirmationText}>
-              Are you sure you want to delete the workspace "{selectedWorkspace?.name}"? This will remove all files and data permanently.
+          <View style={styles.deleteModal}>
+            <Text style={styles.deleteTitle}>Delete Workspace</Text>
+            <Text style={styles.deleteText}>
+              Are you sure you want to delete "{selectedWorkspace?.name}"? This action cannot be undone.
             </Text>
-            <View style={styles.confirmationButtons}>
+            <View style={styles.deleteButtons}>
               <TouchableOpacity 
-                style={[styles.confirmationButton, styles.cancelButton]}
+                style={[styles.deleteButton, styles.cancelButton]}
                 onPress={cancelWorkspaceDelete}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.confirmationButton, styles.deleteButton]}
+                style={[styles.deleteButton, styles.confirmButton]}
                 onPress={confirmWorkspaceDelete}
               >
-                <Text style={styles.deleteButtonText}>Delete</Text>
+                <Text style={styles.confirmButtonText}>Delete</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1329,21 +1329,57 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
-  cancelButton: {
-    backgroundColor: '#333333',
+  deleteModal: {
+    backgroundColor: '#2C2C2E',
+    borderRadius: 16,
+    padding: 24,
+    marginHorizontal: 32,
+    maxWidth: 300,
+    width: '100%',
+  },
+  deleteTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 12,
+    textAlign: 'center',
+    fontFamily: 'Inter',
+  },
+  deleteText: {
+    fontSize: 16,
+    color: '#8E8E93',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+    fontFamily: 'Inter',
+  },
+  deleteButtons: {
+    flexDirection: 'row',
+    gap: 12,
   },
   deleteButton: {
-    backgroundColor: '#FF4444',
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#3C3C3E',
+  },
+  confirmButton: {
+    backgroundColor: '#FF3B30',
   },
   cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '500',
+    fontFamily: 'Inter',
   },
-  deleteButtonText: {
+  confirmButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '500',
+    fontFamily: 'Inter',
   },
   loadingContainer: {
     flexDirection: 'row',
