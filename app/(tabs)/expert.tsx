@@ -314,11 +314,11 @@ export default function ExpertTab() {
   const handleCreateWorkspace = async (workspaceData: any) => {
     if (!workspaceData.name.trim()) {
       Alert.alert('Error', 'Workspace name is mandatory.');
-      throw new Error('Workspace name is mandatory.');
+      return;
     }
     if (workspaceData.files.length > 5) {
       Alert.alert('Error', 'Maximum of 5 files can be uploaded.');
-      throw new Error('Maximum of 5 files can be uploaded.');
+      return;
     }
 
     setIsLoading(true);
@@ -407,7 +407,6 @@ export default function ExpertTab() {
     } catch (error) {
       console.error('❌ Error creating workspace:', error);
       Alert.alert('Error', `Failed to create workspace: ${error.message}`);
-      throw error; // Re-throw so WorkspaceModal knows creation failed
     } finally {
       setIsLoading(false);
     }
@@ -727,7 +726,6 @@ export default function ExpertTab() {
         onClose={closeMenu}
         onWorkspacePress={openWorkspaceChat}
         onCreateWorkspace={() => setIsWorkspaceModalVisible(true)}
-        onDeleteWorkspace={handleDeleteWorkspace}
         isBackendConnected={isBackendConnected}
         isLoading={isLoading}
       />
