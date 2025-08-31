@@ -37,8 +37,7 @@ type IconSymbolName =
   | 'trash'
   | 'arrow.right'
   | 'checkmark'
-  | 'folder'
-  | 'ellipsis';
+  | 'folder';
 
 /**
  * Add your SF Symbols to Ionicons mappings here.
@@ -71,7 +70,6 @@ const MAPPING: IconMapping = {
   'trash': 'trash',
   'checkmark': 'checkmark',
   'folder': 'folder',
-  'ellipsis': '⋯',
 } as const;
 
 /**
