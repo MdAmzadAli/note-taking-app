@@ -524,7 +524,7 @@ export default function ExpertTab() {
   const handleDeleteSingleFile = async (fileId: string) => {
     try {
       console.log('🗑️ Deleting single file:', fileId);
-      
+
       // Delete from backend if connected
       if (isBackendConnected) {
         await fileService.deleteFile(fileId);
@@ -534,7 +534,7 @@ export default function ExpertTab() {
       const updatedFiles = singleFiles.filter(file => file.id !== fileId);
       setSingleFiles(updatedFiles);
       await AsyncStorage.setItem('expert_single_files', JSON.stringify(updatedFiles));
-      
+
       console.log('✅ Single file deleted successfully');
       Alert.alert('Success', 'File deleted successfully');
     } catch (error) {
@@ -546,7 +546,7 @@ export default function ExpertTab() {
   const handleDeleteWorkspaceFile = async (workspaceId: string, fileId: string) => {
     try {
       console.log('🗑️ Deleting workspace file:', fileId, 'from workspace:', workspaceId);
-      
+
       // Delete from backend if connected
       if (isBackendConnected) {
         await fileService.deleteFile(fileId);
@@ -571,11 +571,36 @@ export default function ExpertTab() {
       }
 
       await saveData(singleFiles, updatedWorkspaces);
-      console.log('✅ Workspace file deleted successfully');
-      Alert.alert('Success', 'File removed from workspace');
+      Alert.alert('Success', 'File removed from workspace successfully!');
     } catch (error) {
       console.error('❌ Error deleting workspace file:', error);
-      Alert.alert('Error', 'Failed to delete file from workspace');
+      Alert.alert('Error', 'Failed to remove file from workspace');
+    }
+  };
+
+  const handleDeleteWorkspace = async (workspaceId: string) => {
+    try {
+      console.log('🗑️ Deleting workspace:', workspaceId);
+
+      // Delete all files in workspace from backend if connected
+      const workspaceToDelete = workspaces.find(w => w.id === workspaceId);
+      if (workspaceToDelete && isBackendConnected) {
+        for (const file of workspaceToDelete.files) {
+          try {
+            await fileService.deleteFile(file.id);
+          } catch (error) {
+            console.error('Error deleting file:', file.id, error);
+          }
+        }
+      }
+
+      const updatedWorkspaces = workspaces.filter(workspace => workspace.id !== workspaceId);
+      setWorkspaces(updatedWorkspaces);
+      await saveData(singleFiles, updatedWorkspaces);
+      Alert.alert('Success', 'Workspace deleted successfully!');
+    } catch (error) {
+      console.error('❌ Error deleting workspace:', error);
+      Alert.alert('Error', 'Failed to delete workspace');
     }
   };
 
@@ -689,6 +714,7 @@ export default function ExpertTab() {
         onCreateWorkspace={() => setIsWorkspaceModalVisible(true)}
         isBackendConnected={isBackendConnected}
         isLoading={isLoading}
+        onDeleteWorkspace={handleDeleteWorkspace}
       />
 
       <UploadModal

@@ -61,6 +61,8 @@ interface ChatInterfaceProps {
   onFilePreview?: (file: SingleFile) => void;
   onDeleteWorkspaceFile?: (workspaceId: string, fileId: string) => void;
   onAddWorkspaceFile?: (workspaceId: string, file?: any) => void;
+  onDeleteWorkspace?: (workspaceId: string) => void;
+  onMenuPress?: () => void;
   isLoading?: boolean;
 }
 
@@ -76,11 +78,15 @@ export default function ChatInterface({
   onFilePreview,
   onDeleteWorkspaceFile,
   onAddWorkspaceFile,
+  onDeleteWorkspace,
+  onMenuPress,
   isLoading = false
 }: ChatInterfaceProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
-  const [fileToDelete, setFileToDelete] = useState<{workspaceId: string, fileId: string} | null>(null);
+  const [fileToDelete, setFileToDelete] = useState<{workspaceId: string, fileId: string, fileName: string} | null>(null);
+  const [showWorkspaceOptionsModal, setShowWorkspaceOptionsModal] = useState(false);
+  const [showWorkspaceDeleteModal, setShowWorkspaceDeleteModal] = useState(false);
   const [isFilePreviewVisible, setIsFilePreviewVisible] = useState(false);
   const [previewFile, setPreviewFile] = useState<SingleFile | null>(null);
   const [showSourceModal, setShowSourceModal] = useState(false);
@@ -107,8 +113,8 @@ export default function ChatInterface({
     return 'Small File';
   };
 
-  const handleDeletePress = (workspaceId: string, fileId: string) => {
-    setFileToDelete({ workspaceId, fileId });
+  const handleDeletePress = (workspaceId: string, fileId: string, fileName: string) => {
+    setFileToDelete({ workspaceId, fileId, fileName });
     setShowDeleteConfirmation(true);
   };
 
@@ -123,6 +129,31 @@ export default function ChatInterface({
   const cancelDelete = () => {
     setShowDeleteConfirmation(false);
     setFileToDelete(null);
+  };
+
+  const handleWorkspaceOptionsPress = () => {
+    setShowWorkspaceOptionsModal(true);
+  };
+
+  const handleDeleteWorkspace = () => {
+    setShowWorkspaceOptionsModal(false);
+    setShowWorkspaceDeleteModal(true);
+  };
+
+  const confirmWorkspaceDelete = () => {
+    if (selectedWorkspace && onDeleteWorkspace) {
+      onDeleteWorkspace(selectedWorkspace.id);
+    }
+    setShowWorkspaceDeleteModal(false);
+    onBack(); // Navigate back after deletion
+  };
+
+  const cancelWorkspaceDelete = () => {
+    setShowWorkspaceDeleteModal(false);
+  };
+
+  const closeWorkspaceOptionsModal = () => {
+    setShowWorkspaceOptionsModal(false);
   };
 
   // Check RAG health on mount (no indexing - that's done during upload)
@@ -461,9 +492,23 @@ export default function ChatInterface({
           <Text style={styles.pdfChatHeaderTitle} numberOfLines={1}>
             {selectedFile ? selectedFile.name : selectedWorkspace?.name}
           </Text>
-          <TouchableOpacity>
-            <IconSymbol size={24} name="line.horizontal.3" color="#FFFFFF" />
-          </TouchableOpacity>
+          <View style={styles.headerRightSection}>
+            {selectedWorkspace && onMenuPress && (
+              <TouchableOpacity onPress={onMenuPress} style={styles.headerButton}>
+                <IconSymbol size={24} name="line.horizontal.3" color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
+            {selectedWorkspace && (
+              <TouchableOpacity onPress={handleWorkspaceOptionsPress} style={styles.headerButton}>
+                <IconSymbol size={24} name="ellipsis" color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
+            {selectedFile && (
+              <TouchableOpacity style={styles.headerButton}>
+                <IconSymbol size={24} name="line.horizontal.3" color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Tab Options */}
@@ -568,7 +613,7 @@ export default function ChatInterface({
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={styles.deleteFileButton}
-                      onPress={() => handleDeletePress(selectedWorkspace.id, file.id)}
+                      onPress={() => handleDeletePress(selectedWorkspace.id, file.id, file.name)}
                     >
                       <IconSymbol size={16} name="trash" color="#FF4444" />
                     </TouchableOpacity>
@@ -803,7 +848,7 @@ export default function ChatInterface({
           <View style={styles.confirmationModal}>
             <Text style={styles.confirmationTitle}>Delete File</Text>
             <Text style={styles.confirmationText}>
-              Are you sure you want to remove this file from the workspace?
+              Are you sure you want to remove "{fileToDelete?.fileName}" from the workspace?
             </Text>
             <View style={styles.confirmationButtons}>
               <TouchableOpacity 
@@ -910,6 +955,64 @@ export default function ChatInterface({
         maxFiles={5}
         currentFileCount={selectedWorkspace?.files?.length || 0}
       />
+
+      {/* Workspace Options Modal */}
+      <Modal
+        visible={showWorkspaceOptionsModal}
+        transparent
+        animationType="fade"
+        onRequestClose={closeWorkspaceOptionsModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.workspaceOptionsModal}>
+            <Text style={styles.workspaceOptionsTitle}>Workspace Options</Text>
+            <TouchableOpacity 
+              style={styles.workspaceOptionButton}
+              onPress={handleDeleteWorkspace}
+            >
+              <IconSymbol size={20} name="trash" color="#FF4444" />
+              <Text style={styles.workspaceOptionText}>Delete Workspace</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.workspaceOptionButton, styles.cancelWorkspaceOption]}
+              onPress={closeWorkspaceOptionsModal}
+            >
+              <Text style={styles.cancelWorkspaceOptionText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Workspace Delete Confirmation Modal */}
+      <Modal
+        visible={showWorkspaceDeleteModal}
+        transparent
+        animationType="fade"
+        onRequestClose={cancelWorkspaceDelete}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmationModal}>
+            <Text style={styles.confirmationTitle}>Delete Workspace</Text>
+            <Text style={styles.confirmationText}>
+              Are you sure you want to delete "{selectedWorkspace?.name}"? This will remove all files and cannot be undone.
+            </Text>
+            <View style={styles.confirmationButtons}>
+              <TouchableOpacity 
+                style={[styles.confirmationButton, styles.cancelButton]}
+                onPress={cancelWorkspaceDelete}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.confirmationButton, styles.deleteButton]}
+                onPress={confirmWorkspaceDelete}
+              >
+                <Text style={styles.deleteButtonText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -938,6 +1041,13 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     marginHorizontal: 16,
+  },
+  headerRightSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    marginLeft: 8,
   },
   pdfChatTabs: {
     flexDirection: 'row',
@@ -1552,5 +1662,43 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
     maxWidth: 300,
+  },
+  workspaceOptionsModal: {
+    backgroundColor: '#2C2C2E',
+    borderRadius: 16,
+    padding: 20,
+    marginHorizontal: 32,
+    minWidth: 280,
+  },
+  workspaceOptionsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  workspaceOptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  workspaceOptionText: {
+    fontSize: 16,
+    color: '#FF4444',
+    marginLeft: 12,
+    fontWeight: '500',
+  },
+  cancelWorkspaceOption: {
+    backgroundColor: '#48484A',
+    justifyContent: 'center',
+  },
+  cancelWorkspaceOptionText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });
