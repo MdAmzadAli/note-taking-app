@@ -8,7 +8,7 @@ import { ComponentProps } from 'react';
 import { OpaqueColorValue, type StyleProp, type TextStyle } from 'react-native';
 
 type IconMapping = Record<SymbolViewProps['name'], ComponentProps<typeof Ionicons>['name']>;
-type IconSymbolName = 
+type IconSymbolName =
   | 'house.fill'
   | 'paperplane.fill'
   | 'chevron.left.forwardslash.chevron.right'
@@ -70,6 +70,9 @@ const MAPPING: IconMapping = {
   'trash': 'trash',
   'checkmark': 'checkmark',
   'folder': 'folder',
+  'envelope.fill': 'mail',
+  'envelope.open': 'mail-open',
+  'ellipsis': 'ellipsis-vertical',
 } as const;
 
 /**

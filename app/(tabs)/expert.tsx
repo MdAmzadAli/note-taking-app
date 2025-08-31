@@ -58,6 +58,7 @@ interface ChatMessage {
 
 export default function ExpertTab() {
   const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const [preserveMenuState, setPreserveMenuState] = useState(false);
   const [isUploadModalVisible, setIsUploadModalVisible] = useState(false);
   const [isWorkspaceModalVisible, setIsWorkspaceModalVisible] = useState(false);
   const [isChatVisible, setIsChatVisible] = useState(false);
@@ -430,6 +431,7 @@ export default function ExpertTab() {
     setSelectedWorkspace(null);
     setChatMessages([]);
     setIsChatVisible(true);
+    setPreserveMenuState(false); // Don't preserve menu for single files
   };
 
   const openWorkspaceChat = (workspace: Workspace) => {
@@ -444,6 +446,7 @@ export default function ExpertTab() {
     setSelectedFile(null);
     setChatMessages([]);
     setIsChatVisible(true);
+    setPreserveMenuState(true); // Mark that menu should be preserved
     closeMenu();
   };
 
@@ -579,6 +582,35 @@ export default function ExpertTab() {
     }
   };
 
+  const handleDeleteWorkspace = async (workspaceId: string) => {
+    try {
+      console.log('🗑️ Deleting workspace:', workspaceId);
+      
+      // Delete all files in the workspace from backend if connected
+      const workspaceToDelete = workspaces.find(w => w.id === workspaceId);
+      if (isBackendConnected && workspaceToDelete) {
+        for (const file of workspaceToDelete.files) {
+          try {
+            await fileService.deleteFile(file.id);
+          } catch (error) {
+            console.warn('⚠️ Failed to delete file from backend:', file.id, error);
+          }
+        }
+      }
+
+      // Remove workspace from local storage
+      const updatedWorkspaces = workspaces.filter(workspace => workspace.id !== workspaceId);
+      setWorkspaces(updatedWorkspaces);
+      await saveData(singleFiles, updatedWorkspaces);
+      
+      console.log('✅ Workspace deleted successfully');
+      Alert.alert('Success', 'Workspace deleted successfully');
+    } catch (error) {
+      console.error('❌ Error deleting workspace:', error);
+      Alert.alert('Error', 'Failed to delete workspace');
+    }
+  };
+
   const handleAddWorkspaceFile = async (workspaceId: string) => {
     if (!isBackendConnected) {
       Alert.alert('Backend Not Available', 'Backend server is not connected. Please check the connection.');
@@ -635,6 +667,12 @@ export default function ExpertTab() {
     setSelectedWorkspace(null);
     setChatMessages([]);
     setIsChatVisible(false);
+    
+    // Restore menu state if it was preserved
+    if (preserveMenuState) {
+      setPreserveMenuState(false);
+      openMenu();
+    }
   };
 
   const handleFilePreview = (file: SingleFile) => {
@@ -657,6 +695,7 @@ export default function ExpertTab() {
         onFilePreview={handleFilePreview}
         onDeleteWorkspaceFile={handleDeleteWorkspaceFile}
         onAddWorkspaceFile={handleAddWorkspaceFile}
+        onDeleteWorkspace={handleDeleteWorkspace}
         isLoading={isLoading}
       />
     );
