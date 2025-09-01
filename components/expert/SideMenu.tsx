@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, TouchableWithoutFeedback, FlatList, Modal } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, TouchableWithoutFeedback, FlatList, Modal, TextInput } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 
 interface Workspace {
@@ -48,6 +48,38 @@ export default function SideMenu({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [workspaceToDelete, setWorkspaceToDelete] = useState<Workspace | null>(null);
   const [showOptionsForWorkspace, setShowOptionsForWorkspace] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [filteredWorkspaces, setFilteredWorkspaces] = useState<Workspace[]>(workspaces);
+  // Filter workspaces based on search query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredWorkspaces(workspaces);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const filtered = workspaces.filter(workspace => {
+      // Search in workspace name
+      const nameMatch = workspace.name.toLowerCase().includes(query);
+      
+      // Search in file names within the workspace
+      const fileMatch = workspace.files.some(file => 
+        file.name && file.name.toLowerCase().includes(query)
+      );
+      
+      return nameMatch || fileMatch;
+    });
+    
+    setFilteredWorkspaces(filtered);
+  }, [searchQuery, workspaces]);
+
+  // Clear search when menu closes
+  useEffect(() => {
+    if (!isVisible) {
+      setSearchQuery('');
+    }
+  }, [isVisible]);
+
   const handleDeleteWorkspace = (workspace: Workspace) => {
     setWorkspaceToDelete(workspace);
     setShowDeleteModal(true);
@@ -131,11 +163,53 @@ export default function SideMenu({
               </TouchableOpacity>
             </View>
 
+            {/* Search Bar */}
+            <View style={styles.searchContainer}>
+              <IconSymbol size={18} name="magnifyingglass" color="#8E8E93" />
+              <TextInput
+                style={styles.searchInput}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search workspaces and files..."
+                placeholderTextColor="#8E8E93"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity 
+                  onPress={() => setSearchQuery('')} 
+                  style={styles.clearButton}
+                >
+                  <IconSymbol size={16} name="xmark.circle.fill" color="#8E8E93" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Search Results Info */}
+            {searchQuery.length > 0 && (
+              <View style={styles.searchResultsInfo}>
+                <Text style={styles.searchResultsText}>
+                  {filteredWorkspaces.length} result{filteredWorkspaces.length !== 1 ? 's' : ''} for "{searchQuery}"
+                </Text>
+              </View>
+            )}
+
             <FlatList
-              data={workspaces}
+              data={filteredWorkspaces}
               renderItem={renderWorkspaceItem}
               keyExtractor={(item) => item.id}
               style={styles.workspaceList}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                searchQuery.length > 0 ? (
+                  <View style={styles.emptySearchResults}>
+                    <Text style={styles.emptySearchText}>No workspaces or files found</Text>
+                    <Text style={styles.emptySearchSubtext}>
+                      Try adjusting your search terms
+                    </Text>
+                  </View>
+                ) : null
+              }
             />
 
             <View style={styles.menuFooter}>
@@ -229,6 +303,60 @@ const styles = StyleSheet.create({
     backgroundColor: '#333333',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#FFFFFF',
+    marginLeft: 12,
+    fontFamily: 'Inter',
+    outlineStyle: 'none',
+  },
+  clearButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  searchResultsInfo: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  searchResultsText: {
+    fontSize: 13,
+    color: '#8E8E93',
+    fontFamily: 'Inter',
+  },
+  emptySearchResults: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  emptySearchText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontFamily: 'Inter',
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySearchSubtext: {
+    fontSize: 14,
+    color: '#8E8E93',
+    fontFamily: 'Inter',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   workspaceList: {
     flex: 1,
