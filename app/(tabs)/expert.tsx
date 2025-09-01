@@ -544,6 +544,26 @@ export default function ExpertTab() {
     }
   };
 
+  const handleRenameSingleFile = async (fileId: string, newName: string) => {
+    try {
+      console.log('✏️ Renaming single file:', fileId, 'to:', newName);
+      
+      // Update file name in local storage (frontend only as requested)
+      const updatedFiles = singleFiles.map(file => 
+        file.id === fileId ? { ...file, name: newName } : file
+      );
+      
+      setSingleFiles(updatedFiles);
+      await AsyncStorage.setItem('expert_single_files', JSON.stringify(updatedFiles));
+      
+      console.log('✅ Single file renamed successfully');
+      Alert.alert('Success', `File renamed to "${newName}"`);
+    } catch (error) {
+      console.error('❌ Error renaming single file:', error);
+      Alert.alert('Error', 'Failed to rename file');
+    }
+  };
+
   const handleDeleteWorkspaceFile = async (workspaceId: string, fileId: string) => {
     try {
       console.log('🗑️ Deleting workspace file:', fileId, 'from workspace:', workspaceId);
@@ -715,6 +735,7 @@ export default function ExpertTab() {
         onRefreshConnection={checkBackendConnection}
         isBackendConnected={isBackendConnected}
         onDeleteFile={handleDeleteSingleFile}
+        onRenameFile={handleRenameSingleFile}
       />
 
       <SideMenu

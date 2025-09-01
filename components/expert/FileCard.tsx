@@ -116,7 +116,7 @@ export default function FileCard({ file, onPreview, onChat, isBackendConnected }
         onPress={() => onChat(file)}
         activeOpacity={0.7}
       >
-        <IconSymbol size={20} name="chatbubble.left.ellipsis.fill" color="#FFFFFF" />
+        <IconSymbol size={20} name="play" color="#FFFFFF" />
       </TouchableOpacity>
     </View>
   );

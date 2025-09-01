@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ScrollView, Alert, TextInput } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { summaryService } from '../../services/summaryService';
+import FileActionsModal from './FileActionsModal';
+import RenameModal from './RenameModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface SingleFile {
   id: string;
@@ -27,6 +30,7 @@ interface FilesListProps {
   onRefreshConnection: () => void;
   isBackendConnected: boolean;
   onDeleteFile?: (fileId: string) => void;
+  onRenameFile?: (fileId: string, newName: string) => void;
 }
 
 export default function FilesList({ 
@@ -35,15 +39,19 @@ export default function FilesList({
   onFileChat, 
   onRefreshConnection, 
   isBackendConnected,
-  onDeleteFile 
+  onDeleteFile,
+  onRenameFile 
 }: FilesListProps) {
   const [selectedFile, setSelectedFile] = useState<SingleFile | null>(null);
   const [showSummaryDropdown, setShowSummaryDropdown] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<SingleFile | null>(null);
+  const [showFileActionsModal, setShowFileActionsModal] = useState(false);
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [fileForActions, setFileForActions] = useState<SingleFile | null>(null);
   const [fileSummary, setFileSummary] = useState<string>('');
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
-  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [longPressTimer, setLongPressTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSearchActive, setIsSearchActive] = useState<boolean>(false);
   const [filteredFiles, setFilteredFiles] = useState<SingleFile[]>(files);
@@ -233,6 +241,40 @@ export default function FilesList({
     setShowDeleteModal(false);
     setFileToDelete(null);
   };
+
+  // Handle file actions modal
+  const handleShowFileActions = (file: SingleFile) => {
+    setFileForActions(file);
+    setShowFileActionsModal(true);
+  };
+
+  const handleCloseFileActions = () => {
+    setShowFileActionsModal(false);
+    setFileForActions(null);
+  };
+
+  // Handle rename functionality
+  const handleShowRename = () => {
+    setShowRenameModal(true);
+  };
+
+  const handleCloseRename = () => {
+    setShowRenameModal(false);
+  };
+
+  const handleRename = async (newName: string) => {
+    if (fileForActions && onRenameFile) {
+      onRenameFile(fileForActions.id, newName);
+    }
+  };
+
+  // Handle delete from actions modal
+  const handleShowDelete = () => {
+    if (fileForActions) {
+      setFileToDelete(fileForActions);
+      setShowDeleteModal(true);
+    }
+  };
 //  onPressIn={() => handleLongPressStart(item)}
 //  onPressOut={handleLongPressEnd}
 
@@ -245,8 +287,7 @@ export default function FilesList({
           onPress={() => handleFileNameClick(item)}
 
           onLongPress={() => {
-            setFileToDelete(item);
-            setShowDeleteModal(true);
+            handleShowFileActions(item);
           }}
           delayLongPress={500}
           activeOpacity={0.7}
@@ -329,7 +370,7 @@ export default function FilesList({
         />
         {isSearchActive && (
           <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
-            <IconSymbol size={16} name="xmark.circle.fill" color="#8E8E93" />
+            <IconSymbol size={16} name="xmark" color="#8E8E93" />
           </TouchableOpacity>
         )}
       </View>
@@ -373,6 +414,27 @@ export default function FilesList({
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.filesList}
+        />
+      )}
+
+      {/* File Actions Modal */}
+      {fileForActions && (
+        <FileActionsModal
+          isVisible={showFileActionsModal}
+          fileName={fileForActions.name}
+          onClose={handleCloseFileActions}
+          onRename={handleShowRename}
+          onDelete={handleShowDelete}
+        />
+      )}
+
+      {/* Rename Modal */}
+      {fileForActions && (
+        <RenameModal
+          isVisible={showRenameModal}
+          currentName={fileForActions.name}
+          onClose={handleCloseRename}
+          onRename={handleRename}
         />
       )}
 
@@ -432,7 +494,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     marginLeft: 12,
     fontFamily: 'Inter',
-    outlineStyle: 'none',
+    // outlineStyle: 'none', // Removed for React Native compatibility
   },
   clearButton: {
     marginLeft: 8,
