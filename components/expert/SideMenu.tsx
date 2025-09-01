@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, TouchableWithoutFeedback, FlatList, Modal } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -21,6 +20,19 @@ interface SideMenuProps {
   isBackendConnected: boolean;
   isLoading: boolean;
 }
+
+// Helper function to format date (assuming ISO string or similar that Date can parse)
+const formatDate = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    // Example format: "Jan 1, 2023"
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch (error) {
+    console.error("Error formatting date:", error);
+    return "Invalid Date";
+  }
+};
+
 
 export default function SideMenu({
   isVisible,
@@ -49,10 +61,10 @@ export default function SideMenu({
         console.log('🗑️ Deleting workspace from backend:', workspaceToDelete.id);
         const { default: fileService } = await import('../../services/fileService');
         await fileService.deleteWorkspace(workspaceToDelete.id);
-        
+
         // Then remove from local state
         onDeleteWorkspace(workspaceToDelete.id);
-        
+
         console.log('✅ Workspace deleted successfully:', workspaceToDelete.name);
       } catch (error) {
         console.error('❌ Failed to delete workspace:', error);
@@ -79,7 +91,7 @@ export default function SideMenu({
           <Text style={styles.workspaceName} numberOfLines={1}>{item.name}</Text>
           <Text style={styles.workspaceFileCount}>
             {item.files.length} files
-            {item.files.some(f => f.isUploaded) && ' • Indexed'}
+            {item.files.some(f => f.isUploaded) && ' • Indexed'} • {formatDate(item.createdDate)}
           </Text>
         </View>
       </TouchableOpacity>
@@ -89,7 +101,7 @@ export default function SideMenu({
       >
         <IconSymbol size={16} name="line.horizontal.3" color="#FFFFFF" />
       </TouchableOpacity>
-      
+
       {/* Options Dropdown */}
       {showOptionsForWorkspace === item.id && (
         <View style={styles.optionsDropdown}>
@@ -141,7 +153,7 @@ export default function SideMenu({
             </View>
           </Animated.View>
         </TouchableWithoutFeedback>
-        
+
         {/* Delete Confirmation Modal */}
         <Modal
           visible={showDeleteModal}
@@ -270,8 +282,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
   workspaceFileCount: {
-    fontSize: 13,
-    color: '#8B5CF6',
+    fontSize: 12,
+    color: '#8E8E93',
     fontFamily: 'Inter',
   },
   workspaceOptionsButton: {
