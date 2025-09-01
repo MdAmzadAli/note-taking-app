@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ScrollView, Alert, TextInput } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { summaryService } from '../../services/summaryService';
 
@@ -45,6 +45,45 @@ export default function FilesList({
   const [fileSummary, setFileSummary] = useState<string>('');
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isSearchActive, setIsSearchActive] = useState<boolean>(false);
+  const [filteredFiles, setFilteredFiles] = useState<SingleFile[]>(files);
+
+  // Filter files based on search query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredFiles(files);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const filtered = files.filter(file => 
+      file.name.toLowerCase().includes(query) ||
+      getFileTypeText(file).toLowerCase().includes(query) ||
+      (file.source && file.source.toLowerCase().includes(query))
+    );
+    setFilteredFiles(filtered);
+  }, [searchQuery, files]);
+
+  // Reset search when files change
+  useEffect(() => {
+    if (!isSearchActive) {
+      setFilteredFiles(files);
+    }
+  }, [files, isSearchActive]);
+
+  // Handle search input changes
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
+    setIsSearchActive(text.length > 0);
+  };
+
+  // Clear search
+  const clearSearch = () => {
+    setSearchQuery('');
+    setIsSearchActive(false);
+    setFilteredFiles(files);
+  };
 
   // Get file type display text
   const getFileTypeText = (file: SingleFile) => {
@@ -230,11 +269,33 @@ export default function FilesList({
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <IconSymbol size={20} name="magnifyingglass" color="#8E8E93" />
-        <Text style={styles.searchPlaceholder}>Search</Text>
+        <TextInput
+          style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={handleSearchChange}
+          placeholder="Search files by name, type, or source..."
+          placeholderTextColor="#8E8E93"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {isSearchActive && (
+          <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
+            <IconSymbol size={16} name="xmark.circle.fill" color="#8E8E93" />
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Recent Files Header */}
-      <Text style={styles.sectionHeader}>RECENT FILES</Text>
+      {/* Files Header */}
+      <View style={styles.headerContainer}>
+        <Text style={styles.sectionHeader}>
+          {isSearchActive ? `SEARCH RESULTS (${filteredFiles.length})` : 'RECENT FILES'}
+        </Text>
+        {isSearchActive && searchQuery && (
+          <Text style={styles.searchQueryText}>
+            "{searchQuery}"
+          </Text>
+        )}
+      </View>
 
       {/* Files List */}
       {files.length === 0 ? (
@@ -246,9 +307,19 @@ export default function FilesList({
               : 'Backend is offline. Check connection and try again.'}
           </Text>
         </View>
+      ) : filteredFiles.length === 0 && isSearchActive ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>No files found</Text>
+          <Text style={styles.emptySubtext}>
+            Try adjusting your search terms or clear the search to see all files.
+          </Text>
+          <TouchableOpacity style={styles.clearSearchButton} onPress={clearSearch}>
+            <Text style={styles.clearSearchButtonText}>Clear Search</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
-          data={files}
+          data={filteredFiles}
           renderItem={renderFileCard}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
@@ -306,10 +377,38 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: 24,
   },
-  searchPlaceholder: {
+  searchInput: {
+    flex: 1,
     fontSize: 16,
-    color: '#8E8E93',
+    color: '#FFFFFF',
     marginLeft: 12,
+    fontFamily: 'Inter',
+    outlineStyle: 'none',
+  },
+  clearButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  headerContainer: {
+    marginBottom: 16,
+  },
+  searchQueryText: {
+    fontSize: 12,
+    color: '#007AFF',
+    fontFamily: 'Inter',
+    marginTop: 4,
+  },
+  clearSearchButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  clearSearchButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
     fontFamily: 'Inter',
   },
   sectionHeader: {
