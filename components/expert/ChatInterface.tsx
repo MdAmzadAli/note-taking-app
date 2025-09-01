@@ -16,6 +16,7 @@ import {
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import FilePreviewModal from './FilePreviewModal';
 import UploadModal from './UploadModal';
+import RenameModal from './RenameModal';
 import { ragService, RAGSource } from '@/services/ragService';
 import io, { Socket } from 'socket.io-client';
 
@@ -92,6 +93,8 @@ export default function ChatInterface({
   const [showWorkspaceOptions, setShowWorkspaceOptions] = useState(false);
   const [showWorkspaceDeleteModal, setShowWorkspaceDeleteModal] = useState(false);
   const [showFileOptionsForFile, setShowFileOptionsForFile] = useState<string | null>(null);
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [fileToRename, setFileToRename] = useState<SingleFile | null>(null);
 
   const [summary, setSummary] = useState<string>('');
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
@@ -117,19 +120,39 @@ export default function ChatInterface({
     setShowDeleteConfirmation(true);
   };
 
-  const handleFileRename = (fileId: string, newName: string) => {
+  const handleFileRename = (fileId: string) => {
     if (selectedWorkspace) {
+      const file = selectedWorkspace.files.find(f => f.id === fileId);
+      if (file) {
+        setFileToRename(file);
+        setShowRenameModal(true);
+        setShowFileOptionsForFile(null);
+      }
+    }
+  };
+
+  const handleRenameConfirm = (newName: string) => {
+    if (fileToRename && selectedWorkspace) {
       // Update the file name in the workspace
       const updatedFiles = selectedWorkspace.files.map(file => 
-        file.id === fileId ? { ...file, name: newName } : file
+        file.id === fileToRename.id ? { ...file, name: newName } : file
       );
       
-      // You would typically call an API here to update the file name on the backend
-      console.log('Renaming file:', fileId, 'to:', newName);
+      // Update the workspace with new file names
+      const updatedWorkspace = { ...selectedWorkspace, files: updatedFiles };
       
-      // For now, just close the options
-      setShowFileOptionsForFile(null);
+      // You would typically call an API here to update the file name on the backend
+      console.log('Renaming file:', fileToRename.id, 'from:', fileToRename.name, 'to:', newName);
+      
+      // Close the modal and reset state
+      setShowRenameModal(false);
+      setFileToRename(null);
     }
+  };
+
+  const handleRenameCancel = () => {
+    setShowRenameModal(false);
+    setFileToRename(null);
   };
 
   const handleFileDelete = (fileId: string) => {
@@ -669,11 +692,7 @@ export default function ChatInterface({
                           <View style={styles.fileOptionsDropdown}>
                             <TouchableOpacity 
                               style={styles.fileOption}
-                              onPress={() => {
-                                // Handle rename - you can implement a rename modal similar to workspace rename
-                                console.log('Rename file:', file.id);
-                                setShowFileOptionsForFile(null);
-                              }}
+                              onPress={() => handleFileRename(file.id)}
                             >
                               <IconSymbol size={16} name="square" color="#FFFFFF" />
                               <Text style={styles.fileOptionText}>Rename</Text>
@@ -1061,6 +1080,18 @@ export default function ChatInterface({
         mode="chatInterface"
         maxFiles={5}
         currentFileCount={selectedWorkspace?.files?.length || 0}
+      />
+
+      {/* Rename Modal */}
+      <RenameModal
+        isVisible={showRenameModal}
+        currentName={fileToRename?.name || ''}
+        onClose={handleRenameCancel}
+        onRename={handleRenameConfirm}
+        title="Rename File"
+        label="File Name"
+        placeholder="Enter new file name..."
+        errorMessage="File name cannot be empty"
       />
     </SafeAreaView>
   );
