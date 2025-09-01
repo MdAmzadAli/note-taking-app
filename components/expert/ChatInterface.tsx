@@ -1290,7 +1290,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: '#1A1A1A',
     borderRadius: 12,
-    overflow: 'hidden',
+    overflow: 'visible',
   },
   workspaceDropdownHeader: {
     flexDirection: 'row',
@@ -1301,6 +1301,7 @@ const styles = StyleSheet.create({
   workspaceDropdownContent: {
     borderTopWidth: 1,
     borderTopColor: '#333333',
+    overflow: 'visible',
   },
   workspaceFileItem: {
     flexDirection: 'row',
@@ -1339,6 +1340,7 @@ const styles = StyleSheet.create({
   },
   fileOptionsContainer: {
     position: 'relative',
+    zIndex: 1,
   },
   fileOptionsButton: {
     padding: 8,
@@ -1346,12 +1348,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#2A2A2A',
   },
   fileDropdownOverlay: {
-    position: 'absolute',
-    top: -1000,
-    left: -1000,
-    right: -1000,
-    bottom: -1000,
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'transparent',
+    zIndex: 9998,
   },
   fileOptionsDropdown: {
     position: 'absolute',
@@ -1368,7 +1371,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
-    zIndex: 1000,
+    zIndex: 9999,
   },
   fileOption: {
     flexDirection: 'row',
