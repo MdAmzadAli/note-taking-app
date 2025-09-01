@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, Alert, TouchableWithoutFeedback } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -59,41 +60,39 @@ export default function RenameModal({
       <TouchableWithoutFeedback onPress={handleCancel}>
         <View style={styles.modalOverlay}>
           <TouchableWithoutFeedback onPress={() => {}}>
-            <View style={styles.modal}></View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
-          <View style={styles.header}>
-            <Text style={styles.title}>{title}</Text>
-            <TouchableOpacity style={styles.closeButton} onPress={handleCancel}>
-              <IconSymbol size={16} name="xmark" color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
+            <View style={styles.modal}>
+              <View style={styles.header}>
+                <Text style={styles.title}>{title}</Text>
+                <TouchableOpacity style={styles.closeButton} onPress={handleCancel}>
+                  <IconSymbol size={16} name="xmark" color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
 
-          <View style={styles.content}>
-            <Text style={styles.label}>{label}</Text>
-            <TextInput
-              style={styles.textInput}
-              value={newName}
-              onChangeText={setNewName}
-              placeholder={placeholder}
-              placeholderTextColor="#666666"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoFocus={true}
-              selectTextOnFocus={true}
-            />
-            
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.renameButton} onPress={handleRename}>
-                <Text style={styles.renameButtonText}>Rename</Text>
-              </TouchableOpacity>
+              <View style={styles.content}>
+                <Text style={styles.label}>{label}</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={newName}
+                  onChangeText={setNewName}
+                  placeholder={placeholder}
+                  placeholderTextColor="#666666"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoFocus={true}
+                  selectTextOnFocus={true}
+                />
+                
+                <View style={styles.buttonContainer}>
+                  <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity style={styles.renameButton} onPress={handleRename}>
+                    <Text style={styles.renameButtonText}>Rename</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
-          </View>
           </TouchableWithoutFeedback>
         </View>
       </TouchableWithoutFeedback>
