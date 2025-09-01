@@ -210,9 +210,27 @@ export default function ChatInterface({
     setShowWorkspaceOptions(false);
   };
 
-  const confirmWorkspaceDelete = () => {
-    if (selectedWorkspace && onDeleteWorkspace) {
-      onDeleteWorkspace(selectedWorkspace.id);
+  const confirmWorkspaceDelete = async () => {
+    if (selectedWorkspace) {
+      try {
+        // First delete from backend
+        console.log('🗑️ Deleting workspace from backend:', selectedWorkspace.id);
+        const { default: fileService } = await import('../../services/fileService');
+        await fileService.deleteWorkspace(selectedWorkspace.id);
+        
+        // Then remove from local state
+        if (onDeleteWorkspace) {
+          onDeleteWorkspace(selectedWorkspace.id);
+        }
+        
+        console.log('✅ Workspace deleted successfully:', selectedWorkspace.name);
+      } catch (error) {
+        console.error('❌ Failed to delete workspace:', error);
+        // Still remove from local state even if backend deletion fails
+        if (onDeleteWorkspace) {
+          onDeleteWorkspace(selectedWorkspace.id);
+        }
+      }
     }
     setShowWorkspaceDeleteModal(false);
     onBack();
@@ -483,9 +501,31 @@ export default function ChatInterface({
             {selectedFile ? selectedFile.name : selectedWorkspace?.name}
           </Text>
           {selectedWorkspace ? (
-            <TouchableOpacity onPress={() => setShowWorkspaceOptions(true)}>
-              <IconSymbol size={24} name="ellipsis" color="#FFFFFF" />
-            </TouchableOpacity>
+            <View style={styles.workspaceOptionsContainer}>
+              <TouchableOpacity 
+                onPress={() => setShowWorkspaceOptions(!showWorkspaceOptions)}
+                style={styles.workspaceOptionsButton}
+              >
+                <IconSymbol size={24} name="ellipsis" color="#FFFFFF" />
+              </TouchableOpacity>
+              {showWorkspaceOptions && (
+                <>
+                  <TouchableOpacity 
+                    style={styles.workspaceDropdownOverlay}
+                    onPress={() => setShowWorkspaceOptions(false)}
+                  />
+                  <View style={styles.workspaceOptionsDropdown}>
+                    <TouchableOpacity 
+                      style={styles.workspaceDeleteOption}
+                      onPress={handleWorkspaceDelete}
+                    >
+                      <IconSymbol size={16} name="trash" color="#FF4444" />
+                      <Text style={styles.workspaceDeleteText}>Delete Workspace</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </View>
           ) : (
             <TouchableOpacity>
               <IconSymbol size={24} name="line.horizontal.3" color="#FFFFFF" />
@@ -506,12 +546,6 @@ export default function ChatInterface({
             onPress={() => setActiveTab('summary')}
           >
             <Text style={[styles.pdfChatTabText, activeTab === 'summary' && styles.activePdfChatTabText]}>Summary</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.pdfChatTab, activeTab === 'quiz' && styles.activePdfChatTab]}
-            onPress={() => setActiveTab('quiz')}
-          >
-            <Text style={[styles.pdfChatTabText, activeTab === 'quiz' && styles.activePdfChatTabText]}>Quiz</Text>
           </TouchableOpacity>
         </View>
 
@@ -819,34 +853,6 @@ export default function ChatInterface({
         )}
       </KeyboardAvoidingView>
 
-      {/* Workspace Options Modal */}
-      <Modal
-        visible={showWorkspaceOptions}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowWorkspaceOptions(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.workspaceOptionsModal}>
-            <View style={styles.workspaceOptionsHeader}>
-              <Text style={styles.workspaceOptionsTitle}>Workspace Options</Text>
-              <TouchableOpacity 
-                style={styles.workspaceOptionsClose}
-                onPress={() => setShowWorkspaceOptions(false)}
-              >
-                <IconSymbol size={20} name="xmark" color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity 
-              style={styles.workspaceDeleteOption}
-              onPress={handleWorkspaceDelete}
-            >
-              <IconSymbol size={20} name="trash" color="#FF4444" />
-              <Text style={styles.workspaceDeleteText}>Delete Workspace</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       {/* Workspace Delete Confirmation Modal */}
       <Modal
@@ -1640,40 +1646,42 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     maxWidth: 300,
   },
-  workspaceOptionsModal: {
+  workspaceOptionsContainer: {
+    position: 'relative',
+  },
+  workspaceOptionsButton: {
+    padding: 4,
+  },
+  workspaceDropdownOverlay: {
+    position: 'absolute',
+    top: -1000,
+    left: -1000,
+    right: -1000,
+    bottom: -1000,
+    backgroundColor: 'transparent',
+  },
+  workspaceOptionsDropdown: {
+    position: 'absolute',
+    top: 32,
+    right: 0,
     backgroundColor: '#1A1A1A',
-    borderRadius: 12,
-    marginHorizontal: 20,
-    minWidth: 200,
-  },
-  workspaceOptionsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333333',
-  },
-  workspaceOptionsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  workspaceOptionsClose: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#333333',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#333333',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 1000,
+    minWidth: 160,
   },
   workspaceDeleteOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
   },
   workspaceDeleteText: {
     fontSize: 16,

@@ -42,9 +42,23 @@ export default function SideMenu({
     setShowOptionsForWorkspace(null);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (workspaceToDelete) {
-      onDeleteWorkspace(workspaceToDelete.id);
+      try {
+        // First delete from backend
+        console.log('🗑️ Deleting workspace from backend:', workspaceToDelete.id);
+        const { default: fileService } = await import('../../services/fileService');
+        await fileService.deleteWorkspace(workspaceToDelete.id);
+        
+        // Then remove from local state
+        onDeleteWorkspace(workspaceToDelete.id);
+        
+        console.log('✅ Workspace deleted successfully:', workspaceToDelete.name);
+      } catch (error) {
+        console.error('❌ Failed to delete workspace:', error);
+        // Still remove from local state even if backend deletion fails
+        onDeleteWorkspace(workspaceToDelete.id);
+      }
     }
     setShowDeleteModal(false);
     setWorkspaceToDelete(null);

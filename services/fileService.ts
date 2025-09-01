@@ -437,6 +437,44 @@ class FileService {
     }
   }
 
+  async deleteWorkspace(workspaceId: string): Promise<boolean> {
+    try {
+      console.log('🗑️ Starting complete workspace deletion for:', workspaceId);
+      console.log('🗑️ Making single API call for complete workspace deletion from all sources...');
+
+      // Single call to backend - it handles ALL deletions:
+      // - All files in the workspace
+      // - Vector database (Qdrant) removal for all files and workspace metadata
+      // - Local uploads folder cleanup for all files
+      // - Metadata file deletion for all files
+      // - Cloudinary cleanup (if configured)
+      const response = await fetch(API_ENDPOINTS.deleteWorkspace(workspaceId), {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Complete workspace deletion failed:', response.status, errorText);
+        throw new Error(`Complete workspace deletion failed: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Complete workspace deletion successful:', result);
+      console.log(`✅ Workspace removed: ${result.deleted_count} files deleted from Vector DB + Uploads + Metadata + Cloudinary`);
+      return true;
+
+    } catch (error) {
+      console.error('❌ Complete workspace deletion failed:');
+      console.error('❌ Error type:', error.constructor.name);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error stack:', error.stack);
+      throw error;
+    }
+  }
+
   async checkHealth(): Promise<boolean> {
     try {
       console.log('🔍 Checking Python backend health at:', API_ENDPOINTS.health);

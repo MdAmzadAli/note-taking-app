@@ -35,6 +35,7 @@ export const API_ENDPOINTS = {
   upload: `${API_BASE_URL}/upload`,
   uploadWorkspace: `${API_BASE_URL}/upload/workspace`,
   deleteFile: (id: string) => `${API_BASE_URL}/file/${id}`,
+  deleteWorkspace: (id: string) => `${API_BASE_URL}/workspace/${id}`,
   preview: (id: string) => `${API_BASE_URL}/preview/${id}`,
   file: (id: string) => `${API_BASE_URL}/file/${id}`,
   metadata: (id: string) => `${API_BASE_URL}/metadata/${id}`,

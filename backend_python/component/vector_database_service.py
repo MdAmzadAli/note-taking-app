@@ -267,6 +267,33 @@ class VectorDatabaseService:
             print(f'❌ VectorDB: Error type: {type(error).__name__}')
             raise error
 
+    async def remove_workspace_metadata(self, workspace_id: str):
+        """Remove all documents in a workspace by workspace ID"""
+        print(f'🗑️ VectorDB: Starting workspace metadata removal for {workspace_id}')
+        print(f'🔍 VectorDB: Current state - initialized_flag={self.is_initialized_flag}, client_exists={self.client is not None}')
+        
+        # Use direct flag check instead of is_initialized() method to avoid state mismatch
+        if not self.is_initialized_flag or self.client is None:
+            error_msg = f'VectorDatabaseService not properly initialized. Flag: {self.is_initialized_flag}, Client: {self.client is not None}'
+            print(f'❌ VectorDB: {error_msg}')
+            raise Exception(error_msg)
+        
+        try:
+            print(f'🔄 VectorDB: Executing workspace deletion for workspace_id={workspace_id} from collection={self.collection_name}')
+            await asyncio.to_thread(
+                self.client.delete,
+                collection_name=self.collection_name,
+                points_selector=Filter(
+                    must=[FieldCondition(key="workspaceId", match=MatchValue(value=workspace_id))]
+                )
+            )
+            print(f'✅ VectorDB: Successfully removed all documents for workspace {workspace_id} from index')
+            
+        except Exception as error:
+            print(f'❌ VectorDB: Failed to remove workspace {workspace_id}: {error}')
+            print(f'❌ VectorDB: Error type: {type(error).__name__}')
+            raise error
+
     async def check_document_exists(self, file_id: str) -> bool:
         """Check if document exists (matching JavaScript)"""
         if not self.is_initialized_flag:
