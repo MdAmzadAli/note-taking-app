@@ -37,7 +37,8 @@ type IconSymbolName =
   | 'trash'
   | 'arrow.right'
   | 'checkmark'
-  | 'folder';
+  | 'folder'
+  | 'ellipsis';
 
 /**
  * Add your SF Symbols to Ionicons mappings here.

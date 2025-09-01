@@ -323,7 +323,7 @@ export default function ChatInterface({
         // Check if we're in Expo tunnel environment (mobile/Expo Go)
         if (hostname.includes('.exp.direct')) {
           // For Expo Go/tunnel, use the same Replit domain as API base URL
-          return 'https://2b6cbe18-5566-405a-871f-850534ac993a-00-yybuowqsjuvc.spock.replit.dev:8000';
+          return 'https://d7800040-45c6-48c2-96b5-ea8d657c43a1-00-qg4nfr9twd08.spock.replit.dev:8000';
         }
         // For Replit web, the Python backend runs on port 8000
         else if (hostname.includes('replit.dev')) {

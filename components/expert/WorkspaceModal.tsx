@@ -6,7 +6,7 @@ import UploadModal from './UploadModal';
 interface WorkspaceModalProps {
   isVisible: boolean;
   onClose: () => void;
-  onCreate: (workspaceData: any) => void;
+  onCreate: (workspaceData: any) => Promise<void>;
   workspaceName: string;
   setWorkspaceName: (name: string) => void;
   isBackendConnected: boolean;
@@ -117,14 +117,22 @@ export default function WorkspaceModal({
     setFiles(files.filter(f => f.id !== fileId));
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     const workspaceData = {
       name: workspaceName.trim(),
       description: description.trim(),
       files: files
     };
-    onCreate(workspaceData);
-    resetModalState();
+    
+    try {
+      await onCreate(workspaceData);
+      // Only reset modal state and close after successful creation
+      resetModalState();
+      onClose();
+    } catch (error) {
+      console.error('Error creating workspace:', error);
+      // Don't reset modal state on error, let user try again
+    }
   };
 
   const renderStep1 = () => (

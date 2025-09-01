@@ -392,9 +392,7 @@ export default function ExpertTab() {
       console.log('✅ Workspace created successfully:', newWorkspace.name);
       console.log('📄 Files processed:', processedFiles.length);
 
-      // Step 6: Clean up and navigate
-      setIsWorkspaceModalVisible(false);
-      setWorkspaceName('');
+      // Step 6: Navigate to the new workspace (modal cleanup handled by WorkspaceModal)
       setSelectedWorkspace(newWorkspace);
 
       if (processedFiles.length > 0) {
@@ -726,6 +724,7 @@ export default function ExpertTab() {
         onClose={closeMenu}
         onWorkspacePress={openWorkspaceChat}
         onCreateWorkspace={() => setIsWorkspaceModalVisible(true)}
+        onDeleteWorkspace={handleDeleteWorkspace}
         isBackendConnected={isBackendConnected}
         isLoading={isLoading}
       />
