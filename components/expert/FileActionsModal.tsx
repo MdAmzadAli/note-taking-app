@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 
 interface FileActionsModalProps {
@@ -28,10 +28,8 @@ export default function FileActionsModal({
 
   return (
     <Modal visible={isVisible} transparent animationType="fade">
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.modalOverlay}>
-          <TouchableWithoutFeedback onPress={() => {}}>
-            <View style={styles.modal}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modal}>
           <View style={styles.header}>
             <Text style={styles.title}>File Actions</Text>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
@@ -58,10 +56,8 @@ export default function FileActionsModal({
               <IconSymbol size={16} name="chevron.right" color="#8E8E93" />
             </TouchableOpacity>
           </View>
-            </View>
-          </TouchableWithoutFeedback>
         </View>
-      </TouchableWithoutFeedback>
+      </View>
     </Modal>
   );
 }
