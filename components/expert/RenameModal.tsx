@@ -7,9 +7,22 @@ interface RenameModalProps {
   currentName: string;
   onClose: () => void;
   onRename: (newName: string) => void;
+  title?: string;
+  label?: string;
+  placeholder?: string;
+  errorMessage?: string;
 }
 
-export default function RenameModal({ isVisible, currentName, onClose, onRename }: RenameModalProps) {
+export default function RenameModal({ 
+  isVisible, 
+  currentName, 
+  onClose, 
+  onRename,
+  title = "Rename File",
+  label = "File Name", 
+  placeholder = "Enter new file name...",
+  errorMessage = "Name cannot be empty"
+}: RenameModalProps) {
   const [newName, setNewName] = useState('');
 
   // Initialize with current name when modal opens
@@ -23,7 +36,7 @@ export default function RenameModal({ isVisible, currentName, onClose, onRename 
     const trimmedName = newName.trim();
     
     if (!trimmedName) {
-      Alert.alert('Error', 'File name cannot be empty');
+      Alert.alert('Error', errorMessage);
       return;
     }
     
@@ -46,19 +59,19 @@ export default function RenameModal({ isVisible, currentName, onClose, onRename 
       <View style={styles.modalOverlay}>
         <View style={styles.modal}>
           <View style={styles.header}>
-            <Text style={styles.title}>Rename File</Text>
+            <Text style={styles.title}>{title}</Text>
             <TouchableOpacity style={styles.closeButton} onPress={handleCancel}>
               <IconSymbol size={16} name="xmark" color="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
           <View style={styles.content}>
-            <Text style={styles.label}>File Name</Text>
+            <Text style={styles.label}>{label}</Text>
             <TextInput
               style={styles.textInput}
               value={newName}
               onChangeText={setNewName}
-              placeholder="Enter new file name..."
+              placeholder={placeholder}
               placeholderTextColor="#666666"
               autoCapitalize="none"
               autoCorrect={false}

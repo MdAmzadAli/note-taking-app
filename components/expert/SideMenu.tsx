@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, TouchableWithoutFeedback, FlatList, Modal, TextInput } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import RenameModal from './RenameModal';
 
 interface Workspace {
   id: string;
@@ -17,6 +18,7 @@ interface SideMenuProps {
   onWorkspacePress: (workspace: Workspace) => void;
   onCreateWorkspace: () => void;
   onDeleteWorkspace: (workspaceId: string) => void;
+  onRenameWorkspace?: (workspaceId: string, newName: string) => void;
   isBackendConnected: boolean;
   isLoading: boolean;
 }
@@ -42,11 +44,14 @@ export default function SideMenu({
   onWorkspacePress,
   onCreateWorkspace,
   onDeleteWorkspace,
+  onRenameWorkspace,
   isBackendConnected,
   isLoading
 }: SideMenuProps) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showRenameModal, setShowRenameModal] = useState(false);
   const [workspaceToDelete, setWorkspaceToDelete] = useState<Workspace | null>(null);
+  const [workspaceToRename, setWorkspaceToRename] = useState<Workspace | null>(null);
   const [showOptionsForWorkspace, setShowOptionsForWorkspace] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filteredWorkspaces, setFilteredWorkspaces] = useState<Workspace[]>(workspaces);
@@ -84,6 +89,25 @@ export default function SideMenu({
     setWorkspaceToDelete(workspace);
     setShowDeleteModal(true);
     setShowOptionsForWorkspace(null);
+  };
+
+  const handleRenameWorkspace = (workspace: Workspace) => {
+    setWorkspaceToRename(workspace);
+    setShowRenameModal(true);
+    setShowOptionsForWorkspace(null);
+  };
+
+  const handleRenameConfirm = (newName: string) => {
+    if (workspaceToRename && onRenameWorkspace) {
+      onRenameWorkspace(workspaceToRename.id, newName);
+    }
+    setShowRenameModal(false);
+    setWorkspaceToRename(null);
+  };
+
+  const handleRenameCancel = () => {
+    setShowRenameModal(false);
+    setWorkspaceToRename(null);
   };
 
   const confirmDelete = async () => {
@@ -138,11 +162,21 @@ export default function SideMenu({
       {showOptionsForWorkspace === item.id && (
         <View style={styles.optionsDropdown}>
           <TouchableOpacity 
+            style={styles.option}
+            onPress={() => handleRenameWorkspace(item)}
+          >
+            <IconSymbol size={16} name="square" color="#FFFFFF" />
+            <Text style={styles.optionText}>Rename</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.separator} />
+          
+          <TouchableOpacity 
             style={styles.deleteOption}
             onPress={() => handleDeleteWorkspace(item)}
           >
             <IconSymbol size={16} name="trash" color="#FF4444" />
-            <Text style={styles.deleteOptionText}>Delete Workspace</Text>
+            <Text style={styles.deleteOptionText}>Delete</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -227,6 +261,20 @@ export default function SideMenu({
             </View>
           </Animated.View>
         </TouchableWithoutFeedback>
+
+        {/* Rename Modal */}
+        {workspaceToRename && (
+          <RenameModal
+            isVisible={showRenameModal}
+            currentName={workspaceToRename.name}
+            onClose={handleRenameCancel}
+            onRename={handleRenameConfirm}
+            title="Rename Workspace"
+            label="Workspace Name"
+            placeholder="Enter new workspace name..."
+            errorMessage="Workspace name cannot be empty"
+          />
+        )}
 
         {/* Delete Confirmation Modal */}
         <Modal
@@ -441,6 +489,24 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
     zIndex: 1000,
+  },
+  option: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  optionText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#444444',
+    marginHorizontal: 8,
   },
   deleteOption: {
     flexDirection: 'row',

@@ -600,6 +600,42 @@ export default function ExpertTab() {
     }
   };
 
+  const handleRenameWorkspace = async (workspaceId: string, newName: string) => {
+    try {
+      console.log('✏️ Renaming workspace:', workspaceId, 'to:', newName);
+      
+      // Update workspace name in local state
+      const updatedWorkspaces = workspaces.map(workspace => {
+        if (workspace.id === workspaceId) {
+          return {
+            ...workspace,
+            name: newName
+          };
+        }
+        return workspace;
+      });
+
+      setWorkspaces(updatedWorkspaces);
+
+      // Update selected workspace if it's the current one
+      if (selectedWorkspace && selectedWorkspace.id === workspaceId) {
+        setSelectedWorkspace({
+          ...selectedWorkspace,
+          name: newName
+        });
+      }
+
+      // Save to AsyncStorage
+      await saveData(singleFiles, updatedWorkspaces);
+      
+      console.log('✅ Workspace renamed successfully');
+      Alert.alert('Success', `Workspace renamed to "${newName}"`);
+    } catch (error) {
+      console.error('❌ Error renaming workspace:', error);
+      Alert.alert('Error', 'Failed to rename workspace');
+    }
+  };
+
   const handleDeleteWorkspace = async (workspaceId: string) => {
     try {
       console.log('🗑️ Deleting workspace:', workspaceId);
@@ -746,6 +782,7 @@ export default function ExpertTab() {
         onWorkspacePress={openWorkspaceChat}
         onCreateWorkspace={() => setIsWorkspaceModalVisible(true)}
         onDeleteWorkspace={handleDeleteWorkspace}
+        onRenameWorkspace={handleRenameWorkspace}
         isBackendConnected={isBackendConnected}
         isLoading={isLoading}
       />
