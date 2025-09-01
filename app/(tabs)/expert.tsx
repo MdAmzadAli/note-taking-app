@@ -600,6 +600,47 @@ export default function ExpertTab() {
     }
   };
 
+  const handleRenameWorkspaceFile = async (workspaceId: string, fileId: string, newName: string) => {
+    try {
+      console.log('✏️ Renaming workspace file:', fileId, 'in workspace:', workspaceId, 'to:', newName);
+      
+      // Update file name in the workspace
+      const updatedWorkspaces = workspaces.map(workspace => {
+        if (workspace.id === workspaceId) {
+          const updatedFiles = workspace.files.map(file => 
+            file.id === fileId ? { ...file, name: newName } : file
+          );
+          return {
+            ...workspace,
+            files: updatedFiles
+          };
+        }
+        return workspace;
+      });
+
+      setWorkspaces(updatedWorkspaces);
+
+      // Update selected workspace if it's the current one
+      if (selectedWorkspace && selectedWorkspace.id === workspaceId) {
+        const updatedFiles = selectedWorkspace.files.map(file => 
+          file.id === fileId ? { ...file, name: newName } : file
+        );
+        setSelectedWorkspace({
+          ...selectedWorkspace,
+          files: updatedFiles
+        });
+      }
+
+      // Save to AsyncStorage
+      await saveData(singleFiles, updatedWorkspaces);
+      
+      console.log('✅ Workspace file renamed successfully');
+    } catch (error) {
+      console.error('❌ Error renaming workspace file:', error);
+      Alert.alert('Error', 'Failed to rename file');
+    }
+  };
+
   const handleRenameWorkspace = async (workspaceId: string, newName: string) => {
     try {
       console.log('✏️ Renaming workspace:', workspaceId, 'to:', newName);
@@ -750,6 +791,7 @@ export default function ExpertTab() {
         onDeleteWorkspaceFile={handleDeleteWorkspaceFile}
         onAddWorkspaceFile={handleAddWorkspaceFile}
         onDeleteWorkspace={handleDeleteWorkspace}
+        onRenameWorkspaceFile={handleRenameWorkspaceFile}
         isLoading={isLoading}
       />
     );

@@ -63,6 +63,7 @@ interface ChatInterfaceProps {
   onDeleteWorkspaceFile?: (workspaceId: string, fileId: string) => void;
   onAddWorkspaceFile?: (workspaceId: string, file?: any) => void;
   onDeleteWorkspace?: (workspaceId: string) => void;
+  onRenameWorkspaceFile?: (workspaceId: string, fileId: string, newName: string) => void;
   isLoading?: boolean;
 }
 
@@ -79,6 +80,7 @@ export default function ChatInterface({
   onDeleteWorkspaceFile,
   onAddWorkspaceFile,
   onDeleteWorkspace,
+  onRenameWorkspaceFile,
   isLoading = false
 }: ChatInterfaceProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -132,17 +134,11 @@ export default function ChatInterface({
   };
 
   const handleRenameConfirm = (newName: string) => {
-    if (fileToRename && selectedWorkspace) {
-      // Update the file name in the workspace
-      const updatedFiles = selectedWorkspace.files.map(file => 
-        file.id === fileToRename.id ? { ...file, name: newName } : file
-      );
-      
-      // Update the workspace with new file names
-      const updatedWorkspace = { ...selectedWorkspace, files: updatedFiles };
-      
-      // You would typically call an API here to update the file name on the backend
+    if (fileToRename && selectedWorkspace && onRenameWorkspaceFile) {
       console.log('Renaming file:', fileToRename.id, 'from:', fileToRename.name, 'to:', newName);
+      
+      // Call the parent rename handler to properly update the workspace
+      onRenameWorkspaceFile(selectedWorkspace.id, fileToRename.id, newName);
       
       // Close the modal and reset state
       setShowRenameModal(false);
