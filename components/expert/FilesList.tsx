@@ -107,25 +107,61 @@ export default function FilesList({
 
   // Get time display with proper local timezone handling
   const getTimeDisplay = (uploadDate: string) => {
-    const now = new Date();
-    const uploaded = new Date(uploadDate);
-    
-    // Ensure valid date
-    if (isNaN(uploaded.getTime())) {
-      return 'Unknown date';
+    try {
+      // Handle both ISO format and already formatted dates
+      let dateToProcess = uploadDate;
+      
+      // If it's already formatted (like "1/9/2025"), parse it correctly
+      if (uploadDate.includes('/') && !uploadDate.includes('T')) {
+        const parts = uploadDate.split('/');
+        if (parts.length === 3) {
+          // Assume format is M/D/YYYY or MM/DD/YYYY
+          const month = parseInt(parts[0]) - 1; // Month is 0-based
+          const day = parseInt(parts[1]);
+          const year = parseInt(parts[2]);
+          dateToProcess = new Date(year, month, day).toISOString();
+        }
+      }
+      
+      const now = new Date();
+      const uploaded = new Date(dateToProcess);
+      
+      // Debug logging
+      console.log('🕐 Date parsing debug:', {
+        original: uploadDate,
+        processed: dateToProcess,
+        parsed: uploaded.toISOString(),
+        isValid: !isNaN(uploaded.getTime())
+      });
+      
+      // Ensure valid date
+      if (isNaN(uploaded.getTime())) {
+        console.error('❌ Invalid date detected:', uploadDate);
+        return 'Invalid date';
+      }
+      
+      // Get local timezone dates (start of day)
+      const nowLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const uploadedLocal = new Date(uploaded.getFullYear(), uploaded.getMonth(), uploaded.getDate());
+      
+      const diffInMs = nowLocal.getTime() - uploadedLocal.getTime();
+      const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+      
+      if (diffInDays === 0) return 'Today';
+      if (diffInDays === 1) return 'Yesterday';
+      if (diffInDays < 7) return `${diffInDays} days ago`;
+      if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} weeks ago`;
+      
+      // Return formatted date for older files
+      return uploaded.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: uploaded.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+      });
+    } catch (error) {
+      console.error('❌ Error processing date:', uploadDate, error);
+      return 'Date error';
     }
-    
-    // Get local timezone dates (start of day)
-    const nowLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const uploadedLocal = new Date(uploaded.getFullYear(), uploaded.getMonth(), uploaded.getDate());
-    
-    const diffInMs = nowLocal.getTime() - uploadedLocal.getTime();
-    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-    
-    if (diffInDays === 0) return 'Today';
-    if (diffInDays === 1) return 'Yesterday';
-    if (diffInDays < 7) return `${diffInDays} days ago`;
-    return uploaded.toLocaleDateString();
   };
 
   // Handle file name click to show summary dropdown
