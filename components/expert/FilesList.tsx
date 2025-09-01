@@ -111,11 +111,11 @@ export default function FilesList({
 
       // Handle different date formats
       if (uploadDate.includes('/') && !uploadDate.includes('T')) {
-        // Format like "1/9/2025" - parse as local date without timezone conversion
+        // Format like "1/9/2025" where 1=day, 9=month, 2025=year (D/M/YYYY format)
         const parts = uploadDate.split('/');
         if (parts.length === 3) {
-          const month = parseInt(parts[0]) - 1; // Month is 0-based
-          const day = parseInt(parts[1]);
+          const day = parseInt(parts[0]);     // First number is day
+          const month = parseInt(parts[1]) - 1; // Second number is month (0-based in JavaScript)
           const year = parseInt(parts[2]);
 
           // Create date in local timezone to avoid UTC conversion
@@ -137,10 +137,12 @@ export default function FilesList({
       // Debug logging
       console.log('🕐 Date parsing debug:', {
         original: uploadDate,
-        parsedLocalDate: uploadedDate.toLocaleDateString(),
-        year: uploadedDate.getFullYear(),
-        month: uploadedDate.getMonth() + 1,
-        day: uploadedDate.getDate(),
+        interpretation: 'D/M/YYYY format',
+        parsedDay: uploadedDate.getDate(),
+        parsedMonth: uploadedDate.getMonth() + 1, // Convert back to 1-based for display
+        parsedYear: uploadedDate.getFullYear(),
+        monthName: uploadedDate.toLocaleDateString('en-US', { month: 'short' }),
+        finalDate: uploadedDate.toLocaleDateString(),
         isValid: !isNaN(uploadedDate.getTime())
       });
 
