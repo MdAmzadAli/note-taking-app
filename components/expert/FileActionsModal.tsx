@@ -19,13 +19,11 @@ export default function FileActionsModal({
 }: FileActionsModalProps) {
   
   const handleRename = () => {
-    onRename();
-    onClose();
+    onRename(); // This will handle closing actions modal and opening rename modal
   };
 
   const handleDelete = () => {
-    onDelete();
-    onClose();
+    onDelete(); // This will handle closing actions modal and opening delete modal
   };
 
   return (

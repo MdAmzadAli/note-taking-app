@@ -255,11 +255,18 @@ export default function FilesList({
 
   // Handle rename functionality
   const handleShowRename = () => {
-    setShowRenameModal(true);
+    // First close the actions modal completely
+    setShowFileActionsModal(false);
+    // Then open rename modal after a brief delay to ensure clean state transition
+    setTimeout(() => {
+      setShowRenameModal(true);
+    }, 100);
   };
 
   const handleCloseRename = () => {
     setShowRenameModal(false);
+    // Clear the file selection to ensure clean state for next interaction
+    setFileForActions(null);
   };
 
   const handleRename = async (newName: string) => {
@@ -271,8 +278,13 @@ export default function FilesList({
   // Handle delete from actions modal
   const handleShowDelete = () => {
     if (fileForActions) {
+      // First close the actions modal
+      setShowFileActionsModal(false);
       setFileToDelete(fileForActions);
-      setShowDeleteModal(true);
+      // Then show delete modal after brief delay
+      setTimeout(() => {
+        setShowDeleteModal(true);
+      }, 100);
     }
   };
 //  onPressIn={() => handleLongPressStart(item)}
