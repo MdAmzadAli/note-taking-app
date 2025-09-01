@@ -11,7 +11,8 @@ import {
   KeyboardAvoidingView,
   Modal,
   ActivityIndicator,
-  Alert
+  Alert,
+  TouchableWithoutFeedback // Import TouchableWithoutFeedback
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import FilePreviewModal from './FilePreviewModal';
@@ -136,10 +137,10 @@ export default function ChatInterface({
   const handleRenameConfirm = (newName: string) => {
     if (fileToRename && selectedWorkspace && onRenameWorkspaceFile) {
       console.log('Renaming file:', fileToRename.id, 'from:', fileToRename.name, 'to:', newName);
-      
+
       // Call the parent rename handler to properly update the workspace
       onRenameWorkspaceFile(selectedWorkspace.id, fileToRename.id, newName);
-      
+
       // Close the modal and reset state
       setShowRenameModal(false);
       setFileToRename(null);
@@ -260,12 +261,12 @@ export default function ChatInterface({
         console.log('🗑️ Deleting workspace from backend:', selectedWorkspace.id);
         const { default: fileService } = await import('../../services/fileService');
         await fileService.deleteWorkspace(selectedWorkspace.id);
-        
+
         // Then remove from local state
         if (onDeleteWorkspace) {
           onDeleteWorkspace(selectedWorkspace.id);
         }
-        
+
         console.log('✅ Workspace deleted successfully:', selectedWorkspace.name);
       } catch (error) {
         console.error('❌ Failed to delete workspace:', error);
@@ -414,11 +415,11 @@ export default function ChatInterface({
         setSummary(currentSummary => {
           // Get current files from the files state
           const currentFiles = files;
-          
+
           // For file ID matching, we need to check if this notification is for any of our current files
           // The notification.fileId is the actual backend file ID, but our display files might have different IDs
           // We'll try to match based on the file being recently uploaded or being the only file
-          
+
           // For single file mode, if we have exactly one file, assume it's for that file
           if (currentFiles.length === 1) {
             console.log('✅ Single file summary received - applying to current file:', currentFiles[0].name);
@@ -693,9 +694,9 @@ export default function ChatInterface({
                               <IconSymbol size={16} name="square" color="#FFFFFF" />
                               <Text style={styles.fileOptionText}>Rename</Text>
                             </TouchableOpacity>
-                            
+
                             <View style={styles.fileOptionSeparator} />
-                            
+
                             <TouchableOpacity 
                               style={styles.fileDeleteOption}
                               onPress={() => handleFileDelete(file.id)}
@@ -936,26 +937,32 @@ export default function ChatInterface({
         onRequestClose={cancelWorkspaceDelete}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.confirmationModal}>
-            <Text style={styles.confirmationTitle}>Delete Workspace</Text>
-            <Text style={styles.confirmationText}>
-              Are you sure you want to delete the workspace "{selectedWorkspace?.name}"? This will remove all files and data permanently.
-            </Text>
-            <View style={styles.confirmationButtons}>
-              <TouchableOpacity 
-                style={[styles.confirmationButton, styles.cancelButton]}
-                onPress={cancelWorkspaceDelete}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.confirmationButton, styles.deleteButton]}
-                onPress={confirmWorkspaceDelete}
-              >
-                <Text style={styles.deleteButtonText}>Delete</Text>
-              </TouchableOpacity>
+          <TouchableWithoutFeedback onPress={cancelWorkspaceDelete}>
+            <View style={styles.modalInnerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}> {/* Prevent closing on content touch */}
+                <View style={styles.confirmationModal}>
+                  <Text style={styles.confirmationTitle}>Delete Workspace</Text>
+                  <Text style={styles.confirmationText}>
+                    Are you sure you want to delete the workspace "{selectedWorkspace?.name}"? This will remove all files and data permanently.
+                  </Text>
+                  <View style={styles.confirmationButtons}>
+                    <TouchableOpacity 
+                      style={[styles.confirmationButton, styles.cancelButton]}
+                      onPress={cancelWorkspaceDelete}
+                    >
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.confirmationButton, styles.deleteButton]}
+                      onPress={confirmWorkspaceDelete}
+                    >
+                      <Text style={styles.deleteButtonText}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableWithoutFeedback>
             </View>
-          </View>
+          </TouchableWithoutFeedback>
         </View>
       </Modal>
 
@@ -967,26 +974,32 @@ export default function ChatInterface({
         onRequestClose={cancelDelete}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.confirmationModal}>
-            <Text style={styles.confirmationTitle}>Delete File</Text>
-            <Text style={styles.confirmationText}>
-              Are you sure you want to remove "{selectedWorkspace?.files.find(f => f.id === fileToDelete?.fileId)?.name || 'this file'}" from the workspace?
-            </Text>
-            <View style={styles.confirmationButtons}>
-              <TouchableOpacity 
-                style={[styles.confirmationButton, styles.cancelButton]}
-                onPress={cancelDelete}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.confirmationButton, styles.deleteButton]}
-                onPress={confirmDelete}
-              >
-                <Text style={styles.deleteButtonText}>Delete</Text>
-              </TouchableOpacity>
+          <TouchableWithoutFeedback onPress={cancelDelete}>
+            <View style={styles.modalInnerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}> {/* Prevent closing on content touch */}
+                <View style={styles.confirmationModal}>
+                  <Text style={styles.confirmationTitle}>Delete File</Text>
+                  <Text style={styles.confirmationText}>
+                    Are you sure you want to remove "{selectedWorkspace?.files.find(f => f.id === fileToDelete?.fileId)?.name || 'this file'}" from the workspace?
+                  </Text>
+                  <View style={styles.confirmationButtons}>
+                    <TouchableOpacity 
+                      style={[styles.confirmationButton, styles.cancelButton]}
+                      onPress={cancelDelete}
+                    >
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.confirmationButton, styles.deleteButton]}
+                      onPress={confirmDelete}
+                    >
+                      <Text style={styles.deleteButtonText}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableWithoutFeedback>
             </View>
-          </View>
+          </TouchableWithoutFeedback>
         </View>
       </Modal>
 
@@ -998,61 +1011,67 @@ export default function ChatInterface({
         onRequestClose={() => setShowSourceModal(false)}
       >
         <View style={styles.sourceModalOverlay}>
-          <View style={styles.sourceModalContent}>
-            <View style={styles.sourceModalHeader}>
-              <Text style={styles.sourceModalTitle}>Source Citations</Text>
-              <TouchableOpacity 
-                style={styles.sourceCloseButton}
-                onPress={() => setShowSourceModal(false)}
-              >
-                <IconSymbol size={24} name="xmark" color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.sourceScrollView}>
-              {selectedSources.map((source, index) => (
-                <View key={source.id} style={styles.sourceItem}>
-                  <View style={styles.sourceHeader}>
-                    <Text style={styles.sourceFileName}>
-                      📄 {source.fileName}
-                      {source.pageNumber && ` (Page ${source.pageNumber}`}
-                      {source.lineRange && source.pageNumber && `, ${source.lineRange}`}
-                      {source.lineRange && !source.pageNumber && ` (${source.lineRange}`}
-                      {(source.pageNumber || source.lineRange) && ')'}
-                    </Text>
-                    <Text style={styles.sourceScore}>
-                      {Math.round(source.relevanceScore * 100)}% match
-                    </Text>
-                  </View>
-                  {(source.startLine && source.endLine) && (
-                    <View style={styles.sourceLineInfo}>
-                      <Text style={styles.sourceLineText}>
-                        📍 Lines {source.startLine}-{source.endLine}
-                        {source.totalLinesOnPage && ` of ${source.totalLinesOnPage} total lines`}
-                        {source.pageNumber && ' on page'}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={styles.sourceTextContainer}>
-                    <Text style={styles.sourceText}>
-                      {source.originalText}
-                    </Text>
-                  </View>
-                  {source.pageUrl && (
+          <TouchableWithoutFeedback onPress={() => setShowSourceModal(false)}>
+            <View style={styles.sourceModalInnerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}> {/* Prevent closing on content touch */}
+                <View style={styles.sourceModalContent}>
+                  <View style={styles.sourceModalHeader}>
+                    <Text style={styles.sourceModalTitle}>Source Citations</Text>
                     <TouchableOpacity 
-                      style={styles.viewPageButton}
-                      onPress={() => {
-                        // You can implement page viewing here
-                        console.log('View page:', source.pageUrl);
-                      }}
+                      style={styles.sourceCloseButton}
+                      onPress={() => setShowSourceModal(false)}
                     >
-                      <Text style={styles.viewPageText}>View Page</Text>
+                      <IconSymbol size={24} name="xmark" color="#FFFFFF" />
                     </TouchableOpacity>
-                  )}
+                  </View>
+
+                  <ScrollView style={styles.sourceScrollView}>
+                    {selectedSources.map((source, index) => (
+                      <View key={source.id} style={styles.sourceItem}>
+                        <View style={styles.sourceHeader}>
+                          <Text style={styles.sourceFileName}>
+                            📄 {source.fileName}
+                            {source.pageNumber && ` (Page ${source.pageNumber}`}
+                            {source.lineRange && source.pageNumber && `, ${source.lineRange}`}
+                            {source.lineRange && !source.pageNumber && ` (${source.lineRange}`}
+                            {(source.pageNumber || source.lineRange) && ')'}
+                          </Text>
+                          <Text style={styles.sourceScore}>
+                            {Math.round(source.relevanceScore * 100)}% match
+                          </Text>
+                        </View>
+                        {(source.startLine && source.endLine) && (
+                          <View style={styles.sourceLineInfo}>
+                            <Text style={styles.sourceLineText}>
+                              📍 Lines {source.startLine}-{source.endLine}
+                              {source.totalLinesOnPage && ` of ${source.totalLinesOnPage} total lines`}
+                              {source.pageNumber && ' on page'}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={styles.sourceTextContainer}>
+                          <Text style={styles.sourceText}>
+                            {source.originalText}
+                          </Text>
+                        </View>
+                        {source.pageUrl && (
+                          <TouchableOpacity 
+                            style={styles.viewPageButton}
+                            onPress={() => {
+                              // You can implement page viewing here
+                              console.log('View page:', source.pageUrl);
+                            }}
+                          >
+                            <Text style={styles.viewPageText}>View Page</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    ))}
+                  </ScrollView>
                 </View>
-              ))}
-            </ScrollView>
-          </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
         </View>
       </Modal>
 
@@ -1449,6 +1468,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  modalInnerOverlay: { // Added for nested TouchableWithoutFeedback
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
   confirmationModal: {
     backgroundColor: '#1A1A1A',
     borderRadius: 12,
@@ -1512,6 +1537,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'flex-end',
+  },
+  sourceModalInnerOverlay: { // Added for nested TouchableWithoutFeedback
+    flex: 1,
+    justifyContent: 'flex-end',
+    width: '100%',
   },
   sourceModalContent: {
     backgroundColor: '#1A1A1A',

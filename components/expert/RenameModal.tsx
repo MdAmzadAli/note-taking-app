@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, Alert, TouchableWithoutFeedback } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 
 interface RenameModalProps {
@@ -56,8 +56,13 @@ export default function RenameModal({
 
   return (
     <Modal visible={isVisible} transparent animationType="fade">
-      <View style={styles.modalOverlay}>
-        <View style={styles.modal}>
+      <TouchableWithoutFeedback onPress={handleCancel}>
+        <View style={styles.modalOverlay}>
+          <TouchableWithoutFeedback onPress={() => {}}>
+            <View style={styles.modal}></View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
           <View style={styles.header}>
             <Text style={styles.title}>{title}</Text>
             <TouchableOpacity style={styles.closeButton} onPress={handleCancel}>
@@ -89,8 +94,9 @@ export default function RenameModal({
               </TouchableOpacity>
             </View>
           </View>
+          </TouchableWithoutFeedback>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 }
