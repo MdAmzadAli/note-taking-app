@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ScrollView, Alert, TextInput } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -108,55 +107,67 @@ export default function FilesList({
   // Get time display with proper local timezone handling
   const getTimeDisplay = (uploadDate: string) => {
     try {
-      // Handle both ISO format and already formatted dates
-      let dateToProcess = uploadDate;
-      
-      // If it's already formatted (like "1/9/2025"), parse it correctly
+      let uploadedDate: Date;
+
+      // Handle different date formats
       if (uploadDate.includes('/') && !uploadDate.includes('T')) {
+        // Format like "1/9/2025" - parse as local date without timezone conversion
         const parts = uploadDate.split('/');
         if (parts.length === 3) {
-          // Assume format is M/D/YYYY or MM/DD/YYYY
           const month = parseInt(parts[0]) - 1; // Month is 0-based
           const day = parseInt(parts[1]);
           const year = parseInt(parts[2]);
-          dateToProcess = new Date(year, month, day).toISOString();
+
+          // Create date in local timezone to avoid UTC conversion
+          uploadedDate = new Date(year, month, day);
+        } else {
+          return 'Invalid date format';
+        }
+      } else {
+        // ISO format or other standard formats - parse and extract date parts to avoid timezone issues
+        const tempDate = new Date(uploadDate);
+        if (!isNaN(tempDate.getTime())) {
+          // Extract the date parts and create a new local date to avoid timezone conversion
+          uploadedDate = new Date(tempDate.getFullYear(), tempDate.getMonth(), tempDate.getDate());
+        } else {
+          return 'Invalid date';
         }
       }
-      
-      const now = new Date();
-      const uploaded = new Date(dateToProcess);
-      
+
       // Debug logging
       console.log('🕐 Date parsing debug:', {
         original: uploadDate,
-        processed: dateToProcess,
-        parsed: uploaded.toISOString(),
-        isValid: !isNaN(uploaded.getTime())
+        parsedLocalDate: uploadedDate.toLocaleDateString(),
+        year: uploadedDate.getFullYear(),
+        month: uploadedDate.getMonth() + 1,
+        day: uploadedDate.getDate(),
+        isValid: !isNaN(uploadedDate.getTime())
       });
-      
+
       // Ensure valid date
-      if (isNaN(uploaded.getTime())) {
+      if (isNaN(uploadedDate.getTime())) {
         console.error('❌ Invalid date detected:', uploadDate);
         return 'Invalid date';
       }
-      
-      // Get local timezone dates (start of day)
-      const nowLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const uploadedLocal = new Date(uploaded.getFullYear(), uploaded.getMonth(), uploaded.getDate());
-      
-      const diffInMs = nowLocal.getTime() - uploadedLocal.getTime();
+
+      // Get current date (without time for comparison)
+      const now = new Date();
+      const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const uploadedDateOnly = new Date(uploadedDate.getFullYear(), uploadedDate.getMonth(), uploadedDate.getDate());
+
+      const diffInMs = nowDate.getTime() - uploadedDateOnly.getTime();
       const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-      
+
       if (diffInDays === 0) return 'Today';
       if (diffInDays === 1) return 'Yesterday';
       if (diffInDays < 7) return `${diffInDays} days ago`;
       if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} weeks ago`;
-      
+
       // Return formatted date for older files
-      return uploaded.toLocaleDateString('en-US', {
+      return uploadedDate.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
-        year: uploaded.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+        year: uploadedDate.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
       });
     } catch (error) {
       console.error('❌ Error processing date:', uploadDate, error);
@@ -222,7 +233,7 @@ export default function FilesList({
   };
 //  onPressIn={() => handleLongPressStart(item)}
 //  onPressOut={handleLongPressEnd}
- 
+
   const renderFileCard = ({ item }: { item: SingleFile }) => (
     <View style={styles.fileCard}>
       <View style={styles.cardContent}>
@@ -230,7 +241,7 @@ export default function FilesList({
         <TouchableOpacity 
           style={[styles.leftSection, { borderLeftColor: getBorderColor(item) }]}
           onPress={() => handleFileNameClick(item)}
-         
+
           onLongPress={() => {
             setFileToDelete(item);
             setShowDeleteModal(true);
