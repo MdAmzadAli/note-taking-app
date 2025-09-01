@@ -91,6 +91,7 @@ export default function ChatInterface({
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showWorkspaceOptions, setShowWorkspaceOptions] = useState(false);
   const [showWorkspaceDeleteModal, setShowWorkspaceDeleteModal] = useState(false);
+  const [showFileOptionsForFile, setShowFileOptionsForFile] = useState<string | null>(null);
 
   const [summary, setSummary] = useState<string>('');
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
@@ -114,6 +115,29 @@ export default function ChatInterface({
   const handleDeletePress = (workspaceId: string, fileId: string) => {
     setFileToDelete({ workspaceId, fileId });
     setShowDeleteConfirmation(true);
+  };
+
+  const handleFileRename = (fileId: string, newName: string) => {
+    if (selectedWorkspace) {
+      // Update the file name in the workspace
+      const updatedFiles = selectedWorkspace.files.map(file => 
+        file.id === fileId ? { ...file, name: newName } : file
+      );
+      
+      // You would typically call an API here to update the file name on the backend
+      console.log('Renaming file:', fileId, 'to:', newName);
+      
+      // For now, just close the options
+      setShowFileOptionsForFile(null);
+    }
+  };
+
+  const handleFileDelete = (fileId: string) => {
+    if (selectedWorkspace) {
+      setFileToDelete({ workspaceId: selectedWorkspace.id, fileId });
+      setShowDeleteConfirmation(true);
+      setShowFileOptionsForFile(null);
+    }
   };
 
   const confirmDelete = () => {
@@ -627,12 +651,47 @@ export default function ChatInterface({
                         </Text>
                       </View>
                     </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={styles.deleteFileButton}
-                      onPress={() => handleDeletePress(selectedWorkspace.id, file.id)}
-                    >
-                      <IconSymbol size={16} name="trash" color="#FF4444" />
-                    </TouchableOpacity>
+                    <View style={styles.fileOptionsContainer}>
+                      <TouchableOpacity 
+                        style={styles.fileOptionsButton}
+                        onPress={() => setShowFileOptionsForFile(showFileOptionsForFile === file.id ? null : file.id)}
+                      >
+                        <IconSymbol size={16} name="line.horizontal.3" color="#FFFFFF" />
+                      </TouchableOpacity>
+
+                      {/* File Options Dropdown */}
+                      {showFileOptionsForFile === file.id && (
+                        <>
+                          <TouchableOpacity 
+                            style={styles.fileDropdownOverlay}
+                            onPress={() => setShowFileOptionsForFile(null)}
+                          />
+                          <View style={styles.fileOptionsDropdown}>
+                            <TouchableOpacity 
+                              style={styles.fileOption}
+                              onPress={() => {
+                                // Handle rename - you can implement a rename modal similar to workspace rename
+                                console.log('Rename file:', file.id);
+                                setShowFileOptionsForFile(null);
+                              }}
+                            >
+                              <IconSymbol size={16} name="square" color="#FFFFFF" />
+                              <Text style={styles.fileOptionText}>Rename</Text>
+                            </TouchableOpacity>
+                            
+                            <View style={styles.fileOptionSeparator} />
+                            
+                            <TouchableOpacity 
+                              style={styles.fileDeleteOption}
+                              onPress={() => handleFileDelete(file.id)}
+                            >
+                              <IconSymbol size={16} name="trash" color="#FF4444" />
+                              <Text style={styles.fileDeleteOptionText}>Delete</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </>
+                      )}
+                    </View>
                   </View>
                 ))}
 
@@ -1278,10 +1337,67 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#10B981',
   },
-  deleteFileButton: {
+  fileOptionsContainer: {
+    position: 'relative',
+  },
+  fileOptionsButton: {
     padding: 8,
     borderRadius: 6,
     backgroundColor: '#2A2A2A',
+  },
+  fileDropdownOverlay: {
+    position: 'absolute',
+    top: -1000,
+    left: -1000,
+    right: -1000,
+    bottom: -1000,
+    backgroundColor: 'transparent',
+  },
+  fileOptionsDropdown: {
+    position: 'absolute',
+    top: 32,
+    right: 0,
+    backgroundColor: '#333333',
+    borderRadius: 8,
+    minWidth: 150,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 1000,
+  },
+  fileOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  fileOptionText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  fileOptionSeparator: {
+    height: 1,
+    backgroundColor: '#444444',
+    marginHorizontal: 8,
+  },
+  fileDeleteOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  fileDeleteOptionText: {
+    fontSize: 14,
+    color: '#FF4444',
+    fontWeight: '500',
   },
   addFileButton: {
     flexDirection: 'row',
