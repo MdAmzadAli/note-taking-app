@@ -40,6 +40,7 @@ interface NoteCardProps {
 export default function NoteCard({ note, onPress, onLongPress }: NoteCardProps) {
   const [showFullImage, setShowFullImage] = useState(false);
   const [fullImageUri, setFullImageUri] = useState<string | null>(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
   const hasImages = note.images && note.images.length > 0;
   const isImageNote = note.content.includes('data:image') || 
@@ -48,8 +49,26 @@ export default function NoteCard({ note, onPress, onLongPress }: NoteCardProps) 
                      hasImages;
 
   const handleImagePress = (imageUri: string) => {
+    const imageIndex = note.images!.findIndex(img => img.uri === imageUri);
+    setCurrentImageIndex(imageIndex);
     setFullImageUri(imageUri);
     setShowFullImage(true);
+  };
+
+  const handlePreviousImage = () => {
+    if (currentImageIndex > 0) {
+      const prevIndex = currentImageIndex - 1;
+      setCurrentImageIndex(prevIndex);
+      setFullImageUri(note.images![prevIndex].uri);
+    }
+  };
+
+  const handleNextImage = () => {
+    if (currentImageIndex < note.images!.length - 1) {
+      const nextIndex = currentImageIndex + 1;
+      setCurrentImageIndex(nextIndex);
+      setFullImageUri(note.images![nextIndex].uri);
+    }
   };
   
   // Use fixed width for pinned cards (200px) and calculated width for others
@@ -148,11 +167,32 @@ export default function NoteCard({ note, onPress, onLongPress }: NoteCardProps) 
           </TouchableOpacity>
           
           {fullImageUri && (
-            <Image
-              source={{ uri: fullImageUri }}
-              style={styles.fullImage}
-              resizeMode="contain"
-            />
+            <View style={styles.fullImageContainer}>
+              {/* Navigation Buttons */}
+              {currentImageIndex > 0 && (
+                <TouchableOpacity
+                  style={styles.navButtonLeft}
+                  onPress={handlePreviousImage}
+                >
+                  <Ionicons name="chevron-back" size={30} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+              
+              {currentImageIndex < note.images!.length - 1 && (
+                <TouchableOpacity
+                  style={styles.navButtonRight}
+                  onPress={handleNextImage}
+                >
+                  <Ionicons name="chevron-forward" size={30} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+
+              <Image
+                source={{ uri: fullImageUri }}
+                style={styles.fullImage}
+                resizeMode="contain"
+              />
+            </View>
           )}
         </View>
       </Modal>
@@ -242,8 +282,34 @@ const styles = StyleSheet.create({
     zIndex: 1,
     padding: 10,
   },
+  fullImageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
   fullImage: {
     width: Dimensions.get('window').width - 40,
     height: Dimensions.get('window').height - 200,
+  },
+  navButtonLeft: {
+    position: 'absolute',
+    left: 20,
+    top: '50%',
+    transform: [{ translateY: -25 }],
+    zIndex: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    padding: 15,
+    borderRadius: 25,
+  },
+  navButtonRight: {
+    position: 'absolute',
+    right: 20,
+    top: '50%',
+    transform: [{ translateY: -25 }],
+    zIndex: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    padding: 15,
+    borderRadius: 25,
   },
 });

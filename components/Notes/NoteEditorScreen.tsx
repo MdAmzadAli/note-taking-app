@@ -68,6 +68,7 @@ export default function NoteEditorScreen({
   const [showMediaModal, setShowMediaModal] = useState(false);
   const [fullImageUri, setFullImageUri] = useState<string | null>(null);
   const [showFullImage, setShowFullImage] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   useEffect(() => {
     setInitialTitle(noteTitle);
@@ -204,8 +205,26 @@ export default function NoteEditorScreen({
   };
 
   const handleImagePress = (imageUri: string) => {
+    const imageIndex = noteImages.findIndex(img => img.uri === imageUri);
+    setCurrentImageIndex(imageIndex);
     setFullImageUri(imageUri);
     setShowFullImage(true);
+  };
+
+  const handlePreviousImage = () => {
+    if (currentImageIndex > 0) {
+      const prevIndex = currentImageIndex - 1;
+      setCurrentImageIndex(prevIndex);
+      setFullImageUri(noteImages[prevIndex].uri);
+    }
+  };
+
+  const handleNextImage = () => {
+    if (currentImageIndex < noteImages.length - 1) {
+      const nextIndex = currentImageIndex + 1;
+      setCurrentImageIndex(nextIndex);
+      setFullImageUri(noteImages[nextIndex].uri);
+    }
   };
 
   const handleDrawing = () => {
@@ -381,6 +400,25 @@ export default function NoteEditorScreen({
           
           {fullImageUri && (
             <View style={styles.fullImageContainer}>
+              {/* Navigation Buttons */}
+              {currentImageIndex > 0 && (
+                <TouchableOpacity
+                  style={styles.navButtonLeft}
+                  onPress={handlePreviousImage}
+                >
+                  <Ionicons name="chevron-back" size={30} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+              
+              {currentImageIndex < noteImages.length - 1 && (
+                <TouchableOpacity
+                  style={styles.navButtonRight}
+                  onPress={handleNextImage}
+                >
+                  <Ionicons name="chevron-forward" size={30} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+
               <Image
                 source={{ uri: fullImageUri }}
                 style={styles.fullImage}
@@ -553,5 +591,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  navButtonLeft: {
+    position: 'absolute',
+    left: 20,
+    top: '50%',
+    transform: [{ translateY: -25 }],
+    zIndex: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    padding: 15,
+    borderRadius: 25,
+  },
+  navButtonRight: {
+    position: 'absolute',
+    right: 20,
+    top: '50%',
+    transform: [{ translateY: -25 }],
+    zIndex: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    padding: 15,
+    borderRadius: 25,
   },
 });
