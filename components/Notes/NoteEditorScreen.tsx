@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,11 +14,12 @@ import {
   Alert,
   Image,
   Dimensions,
+  PanResponder,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
-import { PanGestureHandler, State } from 'react-native-gesture-handler';
+import { PanGestureHandler, State, GestureHandlerGestureEvent, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import ColorThemePicker from './ColorThemePicker';
 import MediaAttachmentModal from './MediaAttachmentModal';
 
@@ -228,19 +229,54 @@ export default function NoteEditorScreen({
     }
   };
 
-  const onSwipeGesture = (event: any) => {
-    if (event.nativeEvent.state === State.END) {
-      const { translationX } = event.nativeEvent;
-      
-      if (translationX > 100) {
-        // Swiped right, go to previous image
-        handlePreviousImage();
-      } else if (translationX < -100) {
-        // Swiped left, go to next image
-        handleNextImage();
+  // PanGestureHandler approach
+  const onSwipeGesture = (event: PanGestureHandlerGestureEvent) => {
+    'worklet';
+    console.log('Gesture event:', event.nativeEvent.state, event.nativeEvent.translationX);
+  };
+
+  const onSwipeGestureStateChange = (event: PanGestureHandlerGestureEvent) => {
+    const { state, translationX } = event.nativeEvent;
+    console.log('Gesture state change:', state, translationX);
+    
+    if (state === State.END) {
+      if (Math.abs(translationX) > 50) {
+        if (translationX > 0) {
+          // Swiped right, go to previous image
+          console.log('Swiping to previous image');
+          handlePreviousImage();
+        } else {
+          // Swiped left, go to next image
+          console.log('Swiping to next image');
+          handleNextImage();
+        }
       }
     }
   };
+
+  // Alternative PanResponder approach as fallback
+  const panResponder = PanResponder.create({
+    onMoveShouldSetPanResponder: (evt, gestureState) => {
+      return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dy) < 50;
+    },
+    onPanResponderMove: (evt, gestureState) => {
+      console.log('PanResponder move:', gestureState.dx);
+    },
+    onPanResponderRelease: (evt, gestureState) => {
+      console.log('PanResponder release:', gestureState.dx);
+      if (Math.abs(gestureState.dx) > 50) {
+        if (gestureState.dx > 0) {
+          // Swiped right, go to previous image
+          console.log('PanResponder: Swiping to previous image');
+          handlePreviousImage();
+        } else {
+          // Swiped left, go to next image
+          console.log('PanResponder: Swiping to next image');
+          handleNextImage();
+        }
+      }
+    },
+  });
 
   const handleDrawing = () => {
     Alert.alert('Drawing', 'Drawing feature coming soon!');
@@ -414,28 +450,26 @@ export default function NoteEditorScreen({
           </TouchableOpacity>
           
           {fullImageUri && (
-            <PanGestureHandler onHandlerStateChange={onSwipeGesture}>
-              <View style={styles.fullImageContainer}>
-                <Image
-                  source={{ uri: fullImageUri }}
-                  style={styles.fullImage}
-                  resizeMode="contain"
-                />
-                
-                <TouchableOpacity
-                  style={styles.deleteImageButton}
-                  onPress={() => {
-                    const imageToDelete = noteImages.find(img => img.uri === fullImageUri);
-                    if (imageToDelete) {
-                      handleDeleteImage(imageToDelete.id);
-                    }
-                  }}
-                >
-                  <Ionicons name="trash" size={24} color="#FF4444" />
-                  <Text style={styles.deleteButtonText}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            </PanGestureHandler>
+            <View style={styles.fullImageContainer} {...panResponder.panHandlers}>
+              <Image
+                source={{ uri: fullImageUri }}
+                style={styles.fullImage}
+                resizeMode="contain"
+              />
+              
+              <TouchableOpacity
+                style={styles.deleteImageButton}
+                onPress={() => {
+                  const imageToDelete = noteImages.find(img => img.uri === fullImageUri);
+                  if (imageToDelete) {
+                    handleDeleteImage(imageToDelete.id);
+                  }
+                }}
+              >
+                <Ionicons name="trash" size={24} color="#FF4444" />
+                <Text style={styles.deleteButtonText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
       </Modal>

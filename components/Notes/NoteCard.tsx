@@ -8,10 +8,11 @@ import {
   Image,
   ScrollView,
   Modal,
+  PanResponder,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { PanGestureHandler, State } from 'react-native-gesture-handler';
+import { PanGestureHandler, State, GestureHandlerGestureEvent, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 
 interface ImageAttachment {
   id: string;
@@ -72,19 +73,54 @@ export default function NoteCard({ note, onPress, onLongPress }: NoteCardProps) 
     }
   };
 
-  const onSwipeGesture = (event: any) => {
-    if (event.nativeEvent.state === State.END) {
-      const { translationX } = event.nativeEvent;
-      
-      if (translationX > 100) {
-        // Swiped right, go to previous image
-        handlePreviousImage();
-      } else if (translationX < -100) {
-        // Swiped left, go to next image
-        handleNextImage();
+  // PanGestureHandler approach
+  const onSwipeGesture = (event: PanGestureHandlerGestureEvent) => {
+    'worklet';
+    console.log('NoteCard Gesture event:', event.nativeEvent.state, event.nativeEvent.translationX);
+  };
+
+  const onSwipeGestureStateChange = (event: PanGestureHandlerGestureEvent) => {
+    const { state, translationX } = event.nativeEvent;
+    console.log('NoteCard Gesture state change:', state, translationX);
+    
+    if (state === State.END) {
+      if (Math.abs(translationX) > 50) {
+        if (translationX > 0) {
+          // Swiped right, go to previous image
+          console.log('NoteCard: Swiping to previous image');
+          handlePreviousImage();
+        } else {
+          // Swiped left, go to next image
+          console.log('NoteCard: Swiping to next image');
+          handleNextImage();
+        }
       }
     }
   };
+
+  // Alternative PanResponder approach as fallback
+  const panResponder = PanResponder.create({
+    onMoveShouldSetPanResponder: (evt, gestureState) => {
+      return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dy) < 50;
+    },
+    onPanResponderMove: (evt, gestureState) => {
+      console.log('NoteCard PanResponder move:', gestureState.dx);
+    },
+    onPanResponderRelease: (evt, gestureState) => {
+      console.log('NoteCard PanResponder release:', gestureState.dx);
+      if (Math.abs(gestureState.dx) > 50) {
+        if (gestureState.dx > 0) {
+          // Swiped right, go to previous image
+          console.log('NoteCard PanResponder: Swiping to previous image');
+          handlePreviousImage();
+        } else {
+          // Swiped left, go to next image
+          console.log('NoteCard PanResponder: Swiping to next image');
+          handleNextImage();
+        }
+      }
+    },
+  });
   
   // Use fixed width for pinned cards (200px) and calculated width for others
   const cardStyle = [
@@ -182,15 +218,13 @@ export default function NoteCard({ note, onPress, onLongPress }: NoteCardProps) 
           </TouchableOpacity>
           
           {fullImageUri && (
-            <PanGestureHandler onHandlerStateChange={onSwipeGesture}>
-              <View style={styles.fullImageContainer}>
-                <Image
-                  source={{ uri: fullImageUri }}
-                  style={styles.fullImage}
-                  resizeMode="contain"
-                />
-              </View>
-            </PanGestureHandler>
+            <View style={styles.fullImageContainer} {...panResponder.panHandlers}>
+              <Image
+                source={{ uri: fullImageUri }}
+                style={styles.fullImage}
+                resizeMode="contain"
+              />
+            </View>
           )}
         </View>
       </Modal>
