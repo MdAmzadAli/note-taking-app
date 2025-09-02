@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,10 @@ import {
   Dimensions,
   Image,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 interface ImageAttachment {
   id: string;
@@ -36,11 +38,19 @@ interface NoteCardProps {
 }
 
 export default function NoteCard({ note, onPress, onLongPress }: NoteCardProps) {
+  const [showFullImage, setShowFullImage] = useState(false);
+  const [fullImageUri, setFullImageUri] = useState<string | null>(null);
+  
   const hasImages = note.images && note.images.length > 0;
   const isImageNote = note.content.includes('data:image') || 
                      note.content.includes('.png') || 
                      note.content.includes('.jpg') ||
                      hasImages;
+
+  const handleImagePress = (imageUri: string) => {
+    setFullImageUri(imageUri);
+    setShowFullImage(true);
+  };
   
   // Use fixed width for pinned cards (200px) and calculated width for others
   const cardStyle = [
@@ -73,38 +83,38 @@ export default function NoteCard({ note, onPress, onLongPress }: NoteCardProps) 
     >
       {renderBackground()}
       <View style={styles.cardInner}>
-        {/* Image Preview */}
+        {/* Image Gallery - Exactly matching Note Editor style */}
         {hasImages && (
-          <View style={styles.imagePreview}>
+          <View style={styles.imageGallery}>
             <ScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false}
               style={styles.imageScrollView}
             >
-              {note.images!.slice(0, 3).map((image, index) => (
-                <View
+              {note.images!.map((image, index) => (
+                <TouchableOpacity
                   key={image.id}
                   style={[
                     styles.imageCard,
                     {
-                      marginLeft: index * 5,
                       zIndex: note.images!.length - index,
-                      transform: [{ rotate: `${(index % 3 - 1) * 3}deg` }],
+                      transform: [
+                        { rotate: `${(index % 3 - 1) * 3}deg` },
+                        { translateY: index * 2 },
+                        { translateX: index * -8 },
+                      ],
                     },
                   ]}
+                  onPress={() => handleImagePress(image.uri)}
+                  activeOpacity={0.8}
                 >
                   <Image
                     source={{ uri: image.uri }}
-                    style={styles.previewImage}
+                    style={styles.attachedImage}
                     resizeMode="cover"
                   />
-                </View>
+                </TouchableOpacity>
               ))}
-              {note.images!.length > 3 && (
-                <View style={styles.moreImagesIndicator}>
-                  <Text style={styles.moreImagesText}>+{note.images!.length - 3}</Text>
-                </View>
-              )}
             </ScrollView>
           </View>
         )}
@@ -121,6 +131,31 @@ export default function NoteCard({ note, onPress, onLongPress }: NoteCardProps) 
           {new Date(note.createdAt).toLocaleDateString()}
         </Text>
       </View>
+
+      {/* Full Image View Modal */}
+      <Modal
+        visible={showFullImage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFullImage(false)}
+      >
+        <View style={styles.fullImageOverlay}>
+          <TouchableOpacity
+            style={styles.fullImageCloseButton}
+            onPress={() => setShowFullImage(false)}
+          >
+            <Ionicons name="close" size={30} color="#FFFFFF" />
+          </TouchableOpacity>
+          
+          {fullImageUri && (
+            <Image
+              source={{ uri: fullImageUri }}
+              style={styles.fullImage}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
     </TouchableOpacity>
   );
 }
@@ -165,16 +200,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 'auto',
   },
-  imagePreview: {
-    marginBottom: 8,
-    height: 60,
+  imageGallery: {
+    marginBottom: 12,
+    paddingVertical: 8,
+    height: 80,
+    alignItems: 'center',
   },
   imageScrollView: {
-    flexDirection: 'row',
+    paddingLeft: 8,
+    paddingRight: 20,
   },
   imageCard: {
-    width: 54,
-    height: 54,
+    width: 60,
+    height: 60,
     borderRadius: 8,
     backgroundColor: '#F8F8F8',
     borderWidth: 1.5,
@@ -185,25 +223,27 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 6,
     overflow: 'hidden',
+    marginRight: -8,
   },
-  previewImage: {
+  attachedImage: {
     width: '100%',
     height: '100%',
   },
-  moreImagesIndicator: {
-    width: 54,
-    height: 54,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  fullImageOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 15,
-    borderWidth: 1.5,
-    borderColor: '#E0E0E0',
   },
-  moreImagesText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#666666',
+  fullImageCloseButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 1,
+    padding: 10,
+  },
+  fullImage: {
+    width: Dimensions.get('window').width - 40,
+    height: Dimensions.get('window').height - 200,
   },
 });
