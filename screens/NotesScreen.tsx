@@ -27,6 +27,7 @@ import TemplateEntriesScreen from './TemplateEntriesScreen';
 import { eventBus, EVENTS } from '@/utils/eventBus';
 import NoteEditorScreen from '@/components/Notes/NoteEditorScreen';
 import NotesGrid from '@/components/Notes/NotesGrid';
+import SlideMenu from '@/components/Notes/SlideMenu';
 
 import WritingStyleSelector from '@/components/WritingStyleSelector';
 import WritingStyleEditor from '@/components/WritingStyleEditor';
@@ -485,31 +486,15 @@ export default function NotesScreen() {
         <Ionicons name="add" size={28} color="#000000" />
       </TouchableOpacity>
 
-      <Modal
-        transparent={true}
-        animationType="none"
+      <SlideMenu
         visible={isMenuVisible}
-        onRequestClose={closeMenu}
-      >
-        <TouchableWithoutFeedback onPress={closeMenu}>
-          <View style={styles.menuOverlay}>
-            <TouchableWithoutFeedback>
-              <Animated.View style={[styles.slideMenu, { transform: [{ translateX: slideAnim }] }]}>
-                <Text style={styles.menuTitle}>Menu</Text>
-                <TouchableOpacity style={styles.menuItem} onPress={() => {
-                  closeMenu();
-                  setCurrentView('create-template');
-                }}>
-                  <Text style={styles.menuItemText}>Create Template</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.menuItem} onPress={closeMenu}>
-                  <Text style={styles.menuItemText}>Settings</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+        onClose={closeMenu}
+        slideAnim={slideAnim}
+        onCreateTemplate={() => {
+          closeMenu();
+          setCurrentView('create-template');
+        }}
+      />
     </View>
   );
 }
@@ -594,35 +579,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 8,
   },
-  // Menu styles
-  menuOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  slideMenu: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: Dimensions.get('window').width * 0.75,
-    backgroundColor: '#2A2A2A',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-  },
-  menuTitle: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '600',
-    marginBottom: 30,
-  },
-  menuItem: {
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#3A3A3A',
-  },
-  menuItemText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-  },
+  
   
 });
