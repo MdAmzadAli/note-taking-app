@@ -29,7 +29,7 @@ export default function MediaAttachmentModal({
   onRecording,
   onTickBoxes,
 }: MediaAttachmentModalProps) {
-  const slideAnim = React.useRef(new Animated.Value(300)).current;
+  const slideAnim = React.useRef(new Animated.Value(350)).current;
 
   React.useEffect(() => {
     if (visible) {
@@ -41,7 +41,7 @@ export default function MediaAttachmentModal({
       }).start();
     } else {
       Animated.spring(slideAnim, {
-        toValue: 300,
+        toValue: 350,
         useNativeDriver: true,
         tension: 50,
         friction: 8,
@@ -140,6 +140,10 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 40,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   handle: {
     width: 40,

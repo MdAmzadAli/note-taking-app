@@ -288,9 +288,12 @@ export default function NoteEditorScreen({
                   style={[
                     styles.imageCard,
                     {
-                      marginLeft: index * 10,
                       zIndex: noteImages.length - index,
-                      transform: [{ rotate: `${(index % 3 - 1) * 5}deg` }],
+                      transform: [
+                        { rotate: `${(index % 3 - 1) * 3}deg` },
+                        { translateY: index * 2 },
+                        { translateX: index * -8 },
+                      ],
                     },
                   ]}
                   onPress={() => handleImagePress(image.uri)}
@@ -483,25 +486,27 @@ const styles = StyleSheet.create({
   },
   imageGallery: {
     marginBottom: 20,
-    paddingVertical: 10,
+    paddingVertical: 16,
+    height: 150,
   },
   imageScrollView: {
     paddingLeft: 20,
+    paddingRight: 40,
   },
   imageCard: {
     width: 120,
     height: 120,
-    borderRadius: 16,
-    backgroundColor: '#F0F0F0',
-    borderWidth: 2,
-    borderColor: '#D0D0D0',
+    borderRadius: 12,
+    backgroundColor: '#F8F8F8',
+    borderWidth: 1.5,
+    borderColor: '#E0E0E0',
     shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
+    shadowOffset: { width: 1, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 6,
     overflow: 'hidden',
-    marginRight: 8,
+    marginRight: -15,
   },
   attachedImage: {
     width: '100%',
