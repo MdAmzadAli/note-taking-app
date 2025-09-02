@@ -414,39 +414,12 @@ export default function NotesScreen() {
   }
 
   const renderNotesGrid = () => {
-    const pinnedNotes = filteredNotes.filter(note => note.isPinned);
-    const otherNotes = filteredNotes.filter(note => !note.isPinned);
-
     return (
-      <View>
-        {pinnedNotes.length > 0 && (
-          <View>
-            <Text style={styles.sectionTitle}>Pinned Notes</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.pinnedNotesRow}>
-                {pinnedNotes.map(note => (
-                  <View key={note.id} style={styles.pinnedNoteCard}>
-                    <TouchableOpacity onPress={() => editNote(note)}>
-                      <Text style={styles.pinnedNoteTitle}>{note.title || 'Untitled'}</Text>
-                      <Text style={styles.pinnedNoteContent}>{note.content.substring(0, 50)}{note.content.length > 50 ? '...' : ''}</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            </ScrollView>
-          </View>
-        )}
-        {otherNotes.length > 0 && (
-          <View>
-            <Text style={styles.sectionTitle}>All Notes</Text>
-            <NotesGrid
-              notes={otherNotes}
-              onEditNote={editNote}
-              onDeleteNote={deleteNoteHandler}
-            />
-          </View>
-        )}
-      </View>
+      <NotesGrid
+        notes={filteredNotes}
+        onEditNote={editNote}
+        onDeleteNote={deleteNoteHandler}
+      />
     );
   };
 
@@ -626,28 +599,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
   },
-  pinnedNotesRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  pinnedNoteCard: {
-    backgroundColor: '#2A2A2A',
-    borderRadius: 12,
-    padding: 16,
-    marginRight: 12,
-    width: 200, // Adjust width as needed
-    height: 150, // Adjust height as needed
-    justifyContent: 'center',
-  },
-  pinnedNoteTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  pinnedNoteContent: {
-    color: '#CCCCCC',
-    fontSize: 14,
-  },
+  
 });

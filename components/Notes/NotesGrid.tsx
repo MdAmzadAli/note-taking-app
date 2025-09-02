@@ -144,6 +144,7 @@ const styles = StyleSheet.create({
   pinnedCardWrapper: {
     marginRight: 12,
     width: 200,
+    minHeight: 150,
   },
   emptyState: {
     flex: 1,

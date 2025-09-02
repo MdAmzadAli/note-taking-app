@@ -30,12 +30,11 @@ export default function NoteCard({ note, onPress, onLongPress }: NoteCardProps) 
                      note.content.includes('.png') || 
                      note.content.includes('.jpg');
   
-  // Use flex: 1 for pinned cards (in horizontal scroll), fixed width for others
+  // Use fixed width for pinned cards (200px) and calculated width for others
   const cardStyle = [
     styles.card, 
     { 
-      width: note.isPinned ? undefined : (Dimensions.get('window').width - 60) / 3,
-      flex: note.isPinned ? 1 : undefined,
+      width: note.isPinned ? 200 : (Dimensions.get('window').width - 60) / 3,
       backgroundColor: note.gradient ? 'transparent' : (note.theme || '#2A2A2A')
     }
   ];
