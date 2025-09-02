@@ -5,9 +5,10 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Alert,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { router } from 'expo-router';
@@ -121,7 +122,8 @@ export default function LabelsEditScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#202124" />
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -214,7 +216,7 @@ export default function LabelsEditScreen() {
           ))}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -228,6 +230,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    paddingTop: Platform.OS === 'ios' ? 50 : 24,
     borderBottomWidth: 1,
     borderBottomColor: '#3C4043',
   },
