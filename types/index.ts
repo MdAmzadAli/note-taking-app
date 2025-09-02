@@ -6,6 +6,13 @@ export interface NoteSection {
   content: string;
 }
 
+export interface ImageAttachment {
+  id: string;
+  uri: string;
+  type: 'photo' | 'image';
+  createdAt: string;
+}
+
 export interface Note {
   id: string;
   title: string;
@@ -16,6 +23,7 @@ export interface Note {
   checkedItems?: boolean[]; // For checklist style
   theme?: string;
   gradient?: string[];
+  images?: ImageAttachment[];
   createdAt: string;
   updatedAt: string;
 }

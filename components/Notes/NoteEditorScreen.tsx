@@ -12,10 +12,21 @@ import {
   StatusBar,
   Platform,
   Alert,
+  Image,
+  Dimensions,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
 import ColorThemePicker from './ColorThemePicker';
+import MediaAttachmentModal from './MediaAttachmentModal';
+
+interface ImageAttachment {
+  id: string;
+  uri: string;
+  type: 'photo' | 'image';
+  createdAt: string;
+}
 
 interface NoteEditorScreenProps {
   isEditing: boolean;
@@ -24,10 +35,12 @@ interface NoteEditorScreenProps {
   noteTheme?: string;
   noteGradient?: string[] | null;
   isPinned?: boolean;
-  onSave: (theme?: string, gradient?: string[], isPinned?: boolean) => void;
+  images?: ImageAttachment[];
+  onSave: (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[]) => void;
   onBack: () => void;
   onTitleChange: (title: string) => void;
   onContentChange: (content: string) => void;
+  onImagesChange?: (images: ImageAttachment[]) => void;
 }
 
 export default function NoteEditorScreen({ 
@@ -37,10 +50,12 @@ export default function NoteEditorScreen({
   noteTheme = '#1C1C1C',
   noteGradient = null,
   isPinned = false,
+  images = [],
   onSave, 
   onBack, 
   onTitleChange, 
-  onContentChange 
+  onContentChange,
+  onImagesChange 
 }: NoteEditorScreenProps) {
   const [isNotePinned, setIsNotePinned] = useState(isPinned);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -49,6 +64,10 @@ export default function NoteEditorScreen({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [initialTitle, setInitialTitle] = useState(noteTitle);
   const [initialContent, setInitialContent] = useState(noteContent);
+  const [noteImages, setNoteImages] = useState<ImageAttachment[]>(images);
+  const [showMediaModal, setShowMediaModal] = useState(false);
+  const [fullImageUri, setFullImageUri] = useState<string | null>(null);
+  const [showFullImage, setShowFullImage] = useState(false);
 
   useEffect(() => {
     setInitialTitle(noteTitle);
@@ -91,7 +110,8 @@ export default function NoteEditorScreen({
           {
             text: 'Save',
             onPress: () => {
-              onSave(selectedTheme, selectedGradient || undefined, isNotePinned);
+              onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages);
+              onImagesChange && onImagesChange(noteImages);
               onBack();
             },
           },
@@ -103,10 +123,102 @@ export default function NoteEditorScreen({
   };
 
   const handleSave = () => {
-    onSave(selectedTheme, selectedGradient || undefined, isNotePinned);
+    onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages);
+    onImagesChange && onImagesChange(noteImages);
     setInitialTitle(noteTitle);
     setInitialContent(noteContent);
     setHasUnsavedChanges(false);
+  };
+
+  const requestPermission = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+    
+    if (status !== 'granted' || cameraStatus.status !== 'granted') {
+      Alert.alert('Permission required', 'Please grant camera and photo library permissions to add images.');
+      return false;
+    }
+    return true;
+  };
+
+  const handleTakePhoto = async () => {
+    const hasPermission = await requestPermission();
+    if (!hasPermission) return;
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const newImage: ImageAttachment = {
+        id: Date.now().toString(),
+        uri: result.assets[0].uri,
+        type: 'photo',
+        createdAt: new Date().toISOString(),
+      };
+      setNoteImages([...noteImages, newImage]);
+    }
+  };
+
+  const handleAddImage = async () => {
+    const hasPermission = await requestPermission();
+    if (!hasPermission) return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+      allowsMultipleSelection: false,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const newImage: ImageAttachment = {
+        id: Date.now().toString(),
+        uri: result.assets[0].uri,
+        type: 'image',
+        createdAt: new Date().toISOString(),
+      };
+      setNoteImages([...noteImages, newImage]);
+    }
+  };
+
+  const handleDeleteImage = (imageId: string) => {
+    Alert.alert(
+      'Delete Image',
+      'Are you sure you want to delete this image?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            setNoteImages(noteImages.filter(img => img.id !== imageId));
+            setShowFullImage(false);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleImagePress = (imageUri: string) => {
+    setFullImageUri(imageUri);
+    setShowFullImage(true);
+  };
+
+  const handleDrawing = () => {
+    Alert.alert('Drawing', 'Drawing feature coming soon!');
+  };
+
+  const handleRecording = () => {
+    Alert.alert('Recording', 'Recording feature coming soon!');
+  };
+
+  const handleTickBoxes = () => {
+    Alert.alert('Tick Boxes', 'Tick boxes feature coming soon!');
   };
 
   const renderBackground = () => {
@@ -163,6 +275,39 @@ export default function NoteEditorScreen({
 
       {/* Main Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Image Gallery */}
+        {noteImages.length > 0 && (
+          <View style={styles.imageGallery}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.imageScrollView}
+            >
+              {noteImages.map((image, index) => (
+                <TouchableOpacity
+                  key={image.id}
+                  style={[
+                    styles.imageCard,
+                    {
+                      marginLeft: index * 10,
+                      zIndex: noteImages.length - index,
+                      transform: [{ rotate: `${(index % 3 - 1) * 5}deg` }],
+                    },
+                  ]}
+                  onPress={() => handleImagePress(image.uri)}
+                  activeOpacity={0.8}
+                >
+                  <Image
+                    source={{ uri: image.uri }}
+                    style={styles.attachedImage}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+        
         <TextInput
           style={styles.titleInput}
           placeholder="Title"
@@ -186,7 +331,10 @@ export default function NoteEditorScreen({
       {/* Bottom Toolbar */}
       <View style={styles.bottomBar}>
         <View style={styles.bottomLeft}>
-          <TouchableOpacity style={styles.bottomButton}>
+          <TouchableOpacity 
+            style={styles.bottomButton}
+            onPress={() => setShowMediaModal(true)}
+          >
             <Ionicons name="add" size={20} color="#FFFFFF" />
           </TouchableOpacity>
           
@@ -202,6 +350,57 @@ export default function NoteEditorScreen({
           <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
+
+      {/* Media Attachment Modal */}
+      <MediaAttachmentModal
+        visible={showMediaModal}
+        onClose={() => setShowMediaModal(false)}
+        onTakePhoto={handleTakePhoto}
+        onAddImage={handleAddImage}
+        onDrawing={handleDrawing}
+        onRecording={handleRecording}
+        onTickBoxes={handleTickBoxes}
+      />
+
+      {/* Full Image View Modal */}
+      <Modal
+        visible={showFullImage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFullImage(false)}
+      >
+        <View style={styles.fullImageOverlay}>
+          <TouchableOpacity
+            style={styles.fullImageCloseButton}
+            onPress={() => setShowFullImage(false)}
+          >
+            <Ionicons name="close" size={30} color="#FFFFFF" />
+          </TouchableOpacity>
+          
+          {fullImageUri && (
+            <View style={styles.fullImageContainer}>
+              <Image
+                source={{ uri: fullImageUri }}
+                style={styles.fullImage}
+                resizeMode="contain"
+              />
+              
+              <TouchableOpacity
+                style={styles.deleteImageButton}
+                onPress={() => {
+                  const imageToDelete = noteImages.find(img => img.uri === fullImageUri);
+                  if (imageToDelete) {
+                    handleDeleteImage(imageToDelete.id);
+                  }
+                }}
+              >
+                <Ionicons name="trash" size={24} color="#FF4444" />
+                <Text style={styles.deleteButtonText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </Modal>
 
       {/* Color Theme Picker Modal */}
       <ColorThemePicker
@@ -282,5 +481,71 @@ const styles = StyleSheet.create({
     marginRight: 16,
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 8,
+  },
+  imageGallery: {
+    marginBottom: 20,
+    paddingVertical: 10,
+  },
+  imageScrollView: {
+    paddingLeft: 20,
+  },
+  imageCard: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    backgroundColor: '#F0F0F0',
+    borderWidth: 2,
+    borderColor: '#D0D0D0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  attachedImage: {
+    width: '100%',
+    height: '100%',
+  },
+  fullImageOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullImageCloseButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 1,
+    padding: 10,
+  },
+  fullImageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  fullImage: {
+    width: Dimensions.get('window').width - 40,
+    height: Dimensions.get('window').height - 200,
+  },
+  deleteImageButton: {
+    position: 'absolute',
+    bottom: 100,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 68, 68, 0.2)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: '#FF4444',
+  },
+  deleteButtonText: {
+    color: '#FF4444',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
