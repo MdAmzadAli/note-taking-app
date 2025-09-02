@@ -42,7 +42,7 @@ export default function NoteEditorScreen({
   onTitleChange, 
   onContentChange 
 }: NoteEditorScreenProps) {
-  const [isPinned, setIsPinned] = useState(isPinned);
+  const [isNotePinned, setIsNotePinned] = useState(isPinned);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState(noteTheme);
   const [selectedGradient, setSelectedGradient] = useState<string[] | null>(noteGradient);
@@ -91,7 +91,7 @@ export default function NoteEditorScreen({
           {
             text: 'Save',
             onPress: () => {
-              onSave(selectedTheme, selectedGradient || undefined, isPinned);
+              onSave(selectedTheme, selectedGradient || undefined, isNotePinned);
               onBack();
             },
           },
@@ -103,7 +103,7 @@ export default function NoteEditorScreen({
   };
 
   const handleSave = () => {
-    onSave(selectedTheme, selectedGradient || undefined, isPinned);
+    onSave(selectedTheme, selectedGradient || undefined, isNotePinned);
     setInitialTitle(noteTitle);
     setInitialContent(noteContent);
     setHasUnsavedChanges(false);
@@ -149,12 +149,12 @@ export default function NoteEditorScreen({
             
             <TouchableOpacity 
               style={styles.headerIcon}
-              onPress={() => setIsPinned(!isPinned)}
+              onPress={() => setIsNotePinned(!isNotePinned)}
             >
               <Ionicons 
-                name={isPinned ? "star" : "star-outline"} 
+                name={isNotePinned ? "star" : "star-outline"} 
                 size={24} 
-                color={isPinned ? "#FFD700" : "#FFFFFF"} 
+                color={isNotePinned ? "#FFD700" : "#FFFFFF"} 
               />
             </TouchableOpacity>
           </View>
