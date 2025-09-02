@@ -8,7 +8,6 @@ import {
   Animated,
   TouchableWithoutFeedback,
   Dimensions,
-  SafeAreaView,
 } from 'react-native';
 
 interface SlideMenuProps {
@@ -35,19 +34,16 @@ export default function SlideMenu({
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <Animated.View style={[styles.menu, { transform: [{ translateX: slideAnim }] }]}>
-              <View style={styles.topSpacer} />
-              <SafeAreaView style={styles.safeAreaContent}>
-                <Text style={styles.title}>Menu</Text>
-                <TouchableOpacity style={styles.item} onPress={() => {
-                  onClose();
-                  onCreateTemplate();
-                }}>
-                  <Text style={styles.itemText}>Create Template</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.item} onPress={onClose}>
-                  <Text style={styles.itemText}>Settings</Text>
-                </TouchableOpacity>
-              </SafeAreaView>
+              <Text style={styles.title}>Menu</Text>
+              <TouchableOpacity style={styles.item} onPress={() => {
+                onClose();
+                onCreateTemplate();
+              }}>
+                <Text style={styles.itemText}>Create Template</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.item} onPress={onClose}>
+                <Text style={styles.itemText}>Settings</Text>
+              </TouchableOpacity>
             </Animated.View>
           </TouchableWithoutFeedback>
         </View>
@@ -68,15 +64,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: Dimensions.get('window').width * 0.75,
     backgroundColor: '#2A2A2A',
-    height: '100%',
-  },
-  topSpacer: {
-    height: 0,
-  },
-  safeAreaContent: {
-    flex: 1,
+    paddingTop: 60,
     paddingHorizontal: 20,
-    paddingTop: 20,
   },
   title: {
     color: '#FFFFFF',
