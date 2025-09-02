@@ -38,6 +38,7 @@ interface SimpleNote {
   updatedAt: string;
   theme?: string;
   gradient?: string[];
+  isPinned?: boolean;
 }
 
 export default function NotesScreen() {
@@ -47,6 +48,8 @@ export default function NotesScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [currentNoteText, setCurrentNoteText] = useState('');
+  const [currentNoteTitle, setCurrentNoteTitle] = useState('');
+  const [currentNotePinned, setCurrentNotePinned] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [templates, setTemplates] = useState<CustomTemplate[]>([]);
   const [filteredTemplates, setFilteredTemplates] = useState<CustomTemplate[]>([]);
@@ -83,7 +86,6 @@ export default function NotesScreen() {
   const [currentNoteTheme, setCurrentNoteTheme] = useState<string>('#1C1C1C');
   const [currentNoteGradient, setCurrentNoteGradient] = useState<string[] | null>(null);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
-  const [currentNoteTitle, setCurrentNoteTitle] = useState('');
   const [menuScrollOffset, setMenuScrollOffset] = useState(0);
   const menuFlatListRef = useRef<FlatList>(null);
 
@@ -125,7 +127,6 @@ export default function NotesScreen() {
   const loadNotes = async () => {
     try {
       console.log('[NOTES] Loading notes from storage...');
-      // Convert existing structured notes to simple format for backward compatibility
       const existingNotes = await getNotes();
       console.log('[NOTES] Retrieved notes from storage:', existingNotes.length);
 
@@ -137,21 +138,20 @@ export default function NotesScreen() {
         updatedAt: note.updatedAt,
         theme: note.theme,
         gradient: note.gradient,
+        isPinned: note.isPinned || false,
       }));
 
       const sortedNotes = simpleNotes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       console.log('[NOTES] Setting notes state with', sortedNotes.length, 'notes');
 
-      // Update both notes and filtered notes atomically
       setNotes(sortedNotes);
 
-      // Only update filtered notes if there's no active search
       if (!searchQuery.trim()) {
         setFilteredNotes(sortedNotes);
       } else {
-        // Re-apply search filter
         const filtered = sortedNotes.filter(note => 
-          note.content.toLowerCase().includes(searchQuery.toLowerCase())
+          note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (note.title && note.title.toLowerCase().includes(searchQuery.toLowerCase()))
         );
         setFilteredNotes(filtered);
       }
@@ -167,14 +167,12 @@ export default function NotesScreen() {
       const templatesData = await getCustomTemplates();
       console.log('[NOTES] Loading templates:', templatesData.length);
 
-      // Sort templates by creation date, newest first
       const sortedTemplates = templatesData.sort((a, b) => 
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
 
       setTemplates([...sortedTemplates]);
 
-      // Apply current search filter if exists
       if (searchQuery.trim()) {
         const filtered = sortedTemplates.filter(template =>
           template.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -198,14 +196,13 @@ export default function NotesScreen() {
 
   const handleWritingStyleChange = (style: WritingStyle) => {
     setSelectedWritingStyle(style);
-    // Reset content when changing styles to avoid conflicts
     if (style !== selectedWritingStyle) {
       setNoteSections([]);
       setCheckedItems([]);
     }
   };
 
-  const saveCurrentNote = async (theme?: string, gradient?: string[]) => {
+  const saveCurrentNote = async (theme?: string, gradient?: string[], isPinned?: boolean) => {
     if (!currentNoteText.trim() && noteSections.length === 0) {
       Alert.alert('Error', 'Please enter some content for your note');
       return;
@@ -214,7 +211,6 @@ export default function NotesScreen() {
     try {
       const now = new Date().toISOString();
 
-      // Generate title based on writing style and content
       let title = '';
       if (currentNoteTitle) {
         title = currentNoteTitle;
@@ -232,11 +228,10 @@ export default function NotesScreen() {
       if (!title.trim()) title = `${selectedWritingStyle} note`;
 
       if (isEditing && editingNoteId) {
-        // Update existing note
         const existingNote = notes.find(n => n.id === editingNoteId);
         if (existingNote) {
           const updatedNote: Note = {
-            id: existingNote.id,
+            ...existingNote,
             title,
             content: currentNoteText,
             fields: {},
@@ -245,13 +240,12 @@ export default function NotesScreen() {
             checkedItems: checkedItems.length > 0 ? checkedItems : undefined,
             theme: theme || currentNoteTheme,
             gradient: gradient || currentNoteGradient || undefined,
-            createdAt: existingNote.createdAt,
             updatedAt: now,
+            isPinned: isPinned !== undefined ? isPinned : existingNote.isPinned,
           };
           await saveNote(updatedNote);
         }
       } else {
-        // Create new note
         const newNote: Note = {
           id: Date.now().toString(),
           title,
@@ -264,16 +258,16 @@ export default function NotesScreen() {
           gradient: gradient || currentNoteGradient || undefined,
           createdAt: now,
           updatedAt: now,
+          isPinned: isPinned || false,
         };
         await saveNote(newNote);
       }
 
-      // First reload notes to ensure data persistence
       await loadNotes();
 
-      // Then reset all state after successful reload
       setCurrentNoteText('');
       setCurrentNoteTitle('');
+      setCurrentNotePinned(false);
       setSelectedWritingStyle('mind_dump');
       setNoteSections([]);
       setCheckedItems([]);
@@ -290,7 +284,6 @@ export default function NotesScreen() {
 
   const editNote = async (note: SimpleNote) => {
     try {
-      // Load the full note data to get writing style info
       const fullNotes = await getNotes();
       const fullNote = fullNotes.find(n => n.id === note.id);
 
@@ -302,6 +295,7 @@ export default function NotesScreen() {
         setCheckedItems(fullNote.checkedItems || []);
         setCurrentNoteTheme(fullNote.theme || '#1C1C1C');
         setCurrentNoteGradient(fullNote.gradient || null);
+        setCurrentNotePinned(fullNote.isPinned || false);
       } else {
         setCurrentNoteText(note.content);
         setCurrentNoteTitle('');
@@ -310,6 +304,7 @@ export default function NotesScreen() {
         setCheckedItems([]);
         setCurrentNoteTheme('#1C1C1C');
         setCurrentNoteGradient(null);
+        setCurrentNotePinned(note.isPinned || false);
       }
 
       setEditingNoteId(note.id);
@@ -322,6 +317,7 @@ export default function NotesScreen() {
       setSelectedWritingStyle('mind_dump');
       setNoteSections([]);
       setCheckedItems([]);
+      setCurrentNotePinned(note.isPinned || false);
       setEditingNoteId(note.id);
       setIsEditing(true);
       setIsCreating(true);
@@ -391,43 +387,71 @@ export default function NotesScreen() {
     });
   };
 
-  // Show note creation/editing screen
   if (isCreating) {
-    return <NoteEditorScreen 
-      isEditing={isEditing}
-      noteTitle={currentNoteTitle}
-      noteContent={currentNoteText}
-      noteTheme={currentNoteTheme}
-      noteGradient={currentNoteGradient}
-      onSave={saveCurrentNote}
-      onBack={() => {
-        setIsCreating(false);
-        setIsEditing(false);
-        setEditingNoteId(null);
-        setCurrentNoteText('');
-        setCurrentNoteTitle('');
-        setCurrentNoteTheme('#1C1C1C');
-        setCurrentNoteGradient(null);
-      }}
-      onTitleChange={setCurrentNoteTitle}
-      onContentChange={setCurrentNoteText}
-    />;
+    return (
+      <NoteEditorScreen
+        isEditing={isEditing}
+        noteTitle={currentNoteTitle}
+        noteContent={currentNoteText}
+        noteTheme={currentNoteTheme}
+        noteGradient={currentNoteGradient}
+        isPinned={currentNotePinned}
+        onSave={saveCurrentNote}
+        onBack={() => {
+          setIsCreating(false);
+          setIsEditing(false);
+          setEditingNoteId(null);
+          setCurrentNoteText('');
+          setCurrentNoteTitle('');
+          setCurrentNotePinned(false);
+          setCurrentNoteTheme('#1C1C1C');
+          setCurrentNoteGradient(null);
+        }}
+        onTitleChange={setCurrentNoteTitle}
+        onContentChange={setCurrentNoteText}
+      />
+    );
   }
 
-
   const renderNotesGrid = () => {
+    const pinnedNotes = filteredNotes.filter(note => note.isPinned);
+    const otherNotes = filteredNotes.filter(note => !note.isPinned);
+
     return (
-      <NotesGrid
-        notes={filteredNotes}
-        onEditNote={editNote}
-        onDeleteNote={deleteNoteHandler}
-      />
+      <View>
+        {pinnedNotes.length > 0 && (
+          <View>
+            <Text style={styles.sectionTitle}>Pinned Notes</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.pinnedNotesRow}>
+                {pinnedNotes.map(note => (
+                  <View key={note.id} style={styles.pinnedNoteCard}>
+                    <TouchableOpacity onPress={() => editNote(note)}>
+                      <Text style={styles.pinnedNoteTitle}>{note.title || 'Untitled'}</Text>
+                      <Text style={styles.pinnedNoteContent}>{note.content.substring(0, 50)}{note.content.length > 50 ? '...' : ''}</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        )}
+        {otherNotes.length > 0 && (
+          <View>
+            <Text style={styles.sectionTitle}>All Notes</Text>
+            <NotesGrid
+              notes={otherNotes}
+              onEditNote={editNote}
+              onDeleteNote={deleteNoteHandler}
+            />
+          </View>
+        )}
+      </View>
     );
   };
 
   return (
     <SafeAreaView style={styles.darkContainer}>
-      {/* Header with hamburger, search, and mic */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.hamburgerButton} onPress={openMenu}>
           <Ionicons name="menu" size={24} color="#FFFFFF" />
@@ -452,46 +476,46 @@ export default function NotesScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Notes Grid */}
-      {renderNotesGrid()}
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+        {renderNotesGrid()}
+      </ScrollView>
 
-      {/* Floating Action Button */}
       <TouchableOpacity 
         style={styles.fab}
-        onPress={() => setIsCreating(true)}
+        onPress={() => {
+          setIsCreating(true);
+          setCurrentNotePinned(false);
+        }}
         activeOpacity={0.8}
       >
         <Ionicons name="add" size={28} color="#000000" />
       </TouchableOpacity>
 
-      {/* Slide Menu */}
-      {isMenuVisible && (
-        <Modal
-          transparent={true}
-          animationType="none"
-          visible={isMenuVisible}
-          onRequestClose={closeMenu}
-        >
-          <TouchableWithoutFeedback onPress={closeMenu}>
-            <View style={styles.menuOverlay}>
-              <TouchableWithoutFeedback>
-                <Animated.View style={[styles.slideMenu, { transform: [{ translateX: slideAnim }] }]}>
-                  <Text style={styles.menuTitle}>Menu</Text>
-                  <TouchableOpacity style={styles.menuItem} onPress={() => {
-                    closeMenu();
-                    setCurrentView('create-template');
-                  }}>
-                    <Text style={styles.menuItemText}>Create Template</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.menuItem} onPress={closeMenu}>
-                    <Text style={styles.menuItemText}>Settings</Text>
-                  </TouchableOpacity>
-                </Animated.View>
-              </TouchableWithoutFeedback>
-            </View>
-          </TouchableWithoutFeedback>
-        </Modal>
-      )}
+      <Modal
+        transparent={true}
+        animationType="none"
+        visible={isMenuVisible}
+        onRequestClose={closeMenu}
+      >
+        <TouchableWithoutFeedback onPress={closeMenu}>
+          <View style={styles.menuOverlay}>
+            <TouchableWithoutFeedback>
+              <Animated.View style={[styles.slideMenu, { transform: [{ translateX: slideAnim }] }]}>
+                <Text style={styles.menuTitle}>Menu</Text>
+                <TouchableOpacity style={styles.menuItem} onPress={() => {
+                  closeMenu();
+                  setCurrentView('create-template');
+                }}>
+                  <Text style={styles.menuItemText}>Create Template</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem} onPress={closeMenu}>
+                  <Text style={styles.menuItemText}>Settings</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -538,10 +562,11 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: '#CCCCCC',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     marginBottom: 12,
     marginLeft: 20,
+    marginTop: 10,
   },
   notesGrid: {
     flex: 1,
@@ -600,5 +625,29 @@ const styles = StyleSheet.create({
   menuItemText: {
     color: '#FFFFFF',
     fontSize: 16,
+  },
+  pinnedNotesRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  pinnedNoteCard: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    padding: 16,
+    marginRight: 12,
+    width: 200, // Adjust width as needed
+    height: 150, // Adjust height as needed
+    justifyContent: 'center',
+  },
+  pinnedNoteTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  pinnedNoteContent: {
+    color: '#CCCCCC',
+    fontSize: 14,
   },
 });

@@ -23,7 +23,8 @@ interface NoteEditorScreenProps {
   noteContent: string;
   noteTheme?: string;
   noteGradient?: string[] | null;
-  onSave: (theme?: string, gradient?: string[]) => void;
+  isPinned?: boolean;
+  onSave: (theme?: string, gradient?: string[], isPinned?: boolean) => void;
   onBack: () => void;
   onTitleChange: (title: string) => void;
   onContentChange: (content: string) => void;
@@ -35,12 +36,13 @@ export default function NoteEditorScreen({
   noteContent, 
   noteTheme = '#1C1C1C',
   noteGradient = null,
+  isPinned = false,
   onSave, 
   onBack, 
   onTitleChange, 
   onContentChange 
 }: NoteEditorScreenProps) {
-  const [isPinned, setIsPinned] = useState(false);
+  const [isPinned, setIsPinned] = useState(isPinned);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState(noteTheme);
   const [selectedGradient, setSelectedGradient] = useState<string[] | null>(noteGradient);
@@ -89,7 +91,7 @@ export default function NoteEditorScreen({
           {
             text: 'Save',
             onPress: () => {
-              onSave(selectedTheme, selectedGradient || undefined);
+              onSave(selectedTheme, selectedGradient || undefined, isPinned);
               onBack();
             },
           },
@@ -101,7 +103,7 @@ export default function NoteEditorScreen({
   };
 
   const handleSave = () => {
-    onSave(selectedTheme, selectedGradient || undefined);
+    onSave(selectedTheme, selectedGradient || undefined, isPinned);
     setInitialTitle(noteTitle);
     setInitialContent(noteContent);
     setHasUnsavedChanges(false);

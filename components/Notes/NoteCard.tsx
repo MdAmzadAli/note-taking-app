@@ -16,6 +16,7 @@ interface SimpleNote {
   updatedAt: string;
   theme?: string;
   gradient?: string[];
+  isPinned?: boolean;
 }
 
 interface NoteCardProps {
@@ -29,10 +30,12 @@ export default function NoteCard({ note, onPress, onLongPress }: NoteCardProps) 
                      note.content.includes('.png') || 
                      note.content.includes('.jpg');
   
+  // Use flex: 1 for pinned cards (in horizontal scroll), fixed width for others
   const cardStyle = [
     styles.card, 
     { 
-      width: (Dimensions.get('window').width - 60) / 3,
+      width: note.isPinned ? undefined : (Dimensions.get('window').width - 60) / 3,
+      flex: note.isPinned ? 1 : undefined,
       backgroundColor: note.gradient ? 'transparent' : (note.theme || '#2A2A2A')
     }
   ];

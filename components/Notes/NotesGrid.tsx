@@ -15,6 +15,7 @@ interface SimpleNote {
   updatedAt: string;
   theme?: string; // Theme as string color value
   gradient?: string[]; // Added gradient property
+  isPinned?: boolean; // Added pinned property
 }
 
 interface NotesGridProps {
@@ -33,7 +34,13 @@ export default function NotesGrid({ notes, onEditNote, onDeleteNote }: NotesGrid
     );
   }
 
-  // Distribute notes into 3 columns
+  // Separate pinned and unpinned notes
+  const pinnedNotes = notes.filter(note => note.isPinned).sort((a, b) => 
+    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+  const otherNotes = notes.filter(note => !note.isPinned);
+
+  // Distribute other notes into 3 columns
   const distributeNotesIntoColumns = (notesList: SimpleNote[]) => {
     const columns = [[], [], []] as SimpleNote[][];
 
@@ -45,38 +52,35 @@ export default function NotesGrid({ notes, onEditNote, onDeleteNote }: NotesGrid
     return columns;
   };
 
-  const pinnedNotes = notes.slice(0, 1);
-  const otherNotes = notes.slice(1);
-
-  const pinnedColumns = distributeNotesIntoColumns(pinnedNotes);
   const otherColumns = distributeNotesIntoColumns(otherNotes);
 
   return (
     <ScrollView style={styles.grid} showsVerticalScrollIndicator={false}>
-      {/* Pinned section */}
-      {notes.length > 0 && (
+      {/* Pinned section - Horizontal scroll */}
+      {pinnedNotes.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Pinned</Text>
-          <View style={styles.notesContainer}>
-            {pinnedColumns.map((column, columnIndex) => (
-              <View key={`pinned-column-${columnIndex}`} style={styles.column}>
-                {column.map((note) => (
-                  <View key={note.id} style={styles.noteCardWrapper}>
-                    <NoteCard
-                      note={note}
-                      onPress={() => onEditNote(note)}
-                      onLongPress={() => onDeleteNote(note.id)}
-                    />
-                  </View>
-                ))}
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.pinnedScrollView}
+            contentContainerStyle={styles.pinnedContainer}
+          >
+            {pinnedNotes.map((note) => (
+              <View key={note.id} style={styles.pinnedCardWrapper}>
+                <NoteCard
+                  note={note}
+                  onPress={() => onEditNote(note)}
+                  onLongPress={() => onDeleteNote(note.id)}
+                />
               </View>
             ))}
-          </View>
+          </ScrollView>
         </View>
       )}
 
-      {/* Others section */}
-      {notes.length > 1 && (
+      {/* Others section - Column layout */}
+      {otherNotes.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Others</Text>
           <View style={styles.notesContainer}>
@@ -130,6 +134,16 @@ const styles = StyleSheet.create({
   },
   noteCardWrapper: {
     marginBottom: 16,
+  },
+  pinnedScrollView: {
+    paddingHorizontal: 16,
+  },
+  pinnedContainer: {
+    paddingRight: 20,
+  },
+  pinnedCardWrapper: {
+    marginRight: 12,
+    width: 200,
   },
   emptyState: {
     flex: 1,
