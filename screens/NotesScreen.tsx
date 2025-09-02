@@ -14,6 +14,7 @@ import {
   Dimensions,
   TouchableWithoutFeedback,
   Platform,
+  StatusBar,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -508,6 +509,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 12 : 12,
     backgroundColor: '#1C1C1C',
   },
   hamburgerButton: {
