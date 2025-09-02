@@ -443,12 +443,12 @@ export default function NoteEditorScreen({
               {/* Image navigation indicators */}
               {noteImages.length > 1 && (
                 <View style={styles.imageIndicators}>
-                  <Text style={styles.imageCounter}>
-                    {currentImageIndex + 1} / {noteImages.length}
-                  </Text>
                   <View style={styles.swipeHint}>
                     <Text style={styles.swipeHintText}>Swipe to navigate</Text>
                   </View>
+                  <Text style={styles.imageCounter}>
+                    {currentImageIndex + 1} / {noteImages.length}
+                  </Text>
                 </View>
               )}
               
