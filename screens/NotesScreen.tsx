@@ -36,6 +36,8 @@ interface SimpleNote {
   content: string;
   createdAt: string;
   updatedAt: string;
+  theme?: string;
+  gradient?: string[];
 }
 
 export default function NotesScreen() {
@@ -127,12 +129,14 @@ export default function NotesScreen() {
       const existingNotes = await getNotes();
       console.log('[NOTES] Retrieved notes from storage:', existingNotes.length);
 
-      const simpleNotes: SimpleNote[] = existingNotes.map(note => ({
+      const simpleNotes = existingNotes.map(note => ({
         id: note.id,
         title: note.title,
         content: note.content || Object.values(note.fields || {}).join('\n'),
         createdAt: note.createdAt,
         updatedAt: note.updatedAt,
+        theme: note.theme,
+        gradient: note.gradient,
       }));
 
       const sortedNotes = simpleNotes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -162,14 +166,14 @@ export default function NotesScreen() {
     try {
       const templatesData = await getCustomTemplates();
       console.log('[NOTES] Loading templates:', templatesData.length);
-      
+
       // Sort templates by creation date, newest first
       const sortedTemplates = templatesData.sort((a, b) => 
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-      
+
       setTemplates([...sortedTemplates]);
-      
+
       // Apply current search filter if exists
       if (searchQuery.trim()) {
         const filtered = sortedTemplates.filter(template =>
@@ -179,7 +183,7 @@ export default function NotesScreen() {
       } else {
         setFilteredTemplates([...sortedTemplates]);
       }
-      
+
       console.log('[NOTES] Templates updated successfully');
     } catch (error) {
       console.error('Error loading templates:', error);

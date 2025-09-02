@@ -13,10 +13,7 @@ interface SimpleNote {
   content: string;
   createdAt: string;
   updatedAt: string;
-  theme?: { // Added theme property
-    backgroundColor: string;
-    textColor: string;
-  };
+  theme?: string; // Theme as string color value
   gradient?: string[]; // Added gradient property
 }
 
