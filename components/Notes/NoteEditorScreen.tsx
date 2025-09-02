@@ -137,7 +137,7 @@ export default function NoteEditorScreen({
   const requestPermission = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
-    
+
     if (status !== 'granted' || cameraStatus.status !== 'granted') {
       Alert.alert('Permission required', 'Please grant camera and photo library permissions to add images.');
       return false;
@@ -246,7 +246,7 @@ export default function NoteEditorScreen({
     onPanResponderRelease: (evt, gestureState) => {
       const { dx } = gestureState;
       const swipeThreshold = 50;
-      
+
       if (Math.abs(dx) > swipeThreshold && noteImages.length > 1) {
         if (dx > 0) {
           // Swiped right, go to previous image
@@ -291,14 +291,14 @@ export default function NoteEditorScreen({
     <View style={[styles.container, { backgroundColor: selectedGradient ? 'transparent' : selectedTheme }]}>
       {renderBackground()}
       <StatusBar barStyle="light-content" backgroundColor={selectedTheme} translucent={true} />
-      
+
       {/* Header */}
       <SafeAreaView style={styles.safeAreaHeader}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
-          
+
           <View style={styles.headerIcons}>
             <TouchableOpacity 
               style={[styles.headerIcon, hasUnsavedChanges && styles.saveButtonActive]}
@@ -310,7 +310,7 @@ export default function NoteEditorScreen({
                 color={hasUnsavedChanges ? "#00FF7F" : "#FFFFFF"} 
               />
             </TouchableOpacity>
-            
+
             <TouchableOpacity 
               style={styles.headerIcon}
               onPress={() => setIsNotePinned(!isNotePinned)}
@@ -362,7 +362,7 @@ export default function NoteEditorScreen({
             </ScrollView>
           </View>
         )}
-        
+
         <TextInput
           style={styles.titleInput}
           placeholder="Title"
@@ -371,7 +371,7 @@ export default function NoteEditorScreen({
           onChangeText={onTitleChange}
           multiline={false}
         />
-        
+
         <TextInput
           style={styles.bodyInput}
           placeholder="Note"
@@ -392,7 +392,7 @@ export default function NoteEditorScreen({
           >
             <Ionicons name="add" size={20} color="#FFFFFF" />
           </TouchableOpacity>
-          
+
           <TouchableOpacity 
             style={styles.bottomButton}
             onPress={() => setShowColorPicker(true)}
@@ -400,7 +400,7 @@ export default function NoteEditorScreen({
             <Ionicons name="brush" size={20} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
-        
+
         <TouchableOpacity style={styles.bottomButton}>
           <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
         </TouchableOpacity>
@@ -431,7 +431,7 @@ export default function NoteEditorScreen({
           >
             <Ionicons name="close" size={30} color="#FFFFFF" />
           </TouchableOpacity>
-          
+
           {fullImageUri && (
             <Animated.View style={styles.fullImageContainer} {...panResponder.panHandlers}>
               <Image
@@ -439,7 +439,7 @@ export default function NoteEditorScreen({
                 style={styles.fullImage}
                 resizeMode="contain"
               />
-              
+
               {/* Image navigation indicators */}
               {noteImages.length > 1 && (
                 <View style={styles.imageIndicators}>
@@ -451,7 +451,7 @@ export default function NoteEditorScreen({
                   </Text>
                 </View>
               )}
-              
+
               <TouchableOpacity
                 style={styles.deleteImageButton}
                 onPress={() => {
@@ -586,7 +586,7 @@ const styles = StyleSheet.create({
   },
   fullImageCloseButton: {
     position: 'absolute',
-    top: 50,
+    top: 15,
     right: 20,
     zIndex: 1,
     padding: 10,
