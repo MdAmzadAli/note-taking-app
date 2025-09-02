@@ -79,7 +79,6 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#2A2A2A',
     borderRadius: 12,
-    marginHorizontal: 4,
     borderWidth: 1,
     borderColor: '#D1D5DB',
     elevation: 6,

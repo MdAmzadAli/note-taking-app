@@ -33,59 +33,39 @@ export default function NotesGrid({ notes, onEditNote, onDeleteNote }: NotesGrid
     );
   }
 
-  // Group notes into rows of 3
-  const rows = [];
-  for (let i = 0; i < notes.length; i += 3) {
-    rows.push(notes.slice(i, i + 3));
-  }
-
   return (
     <ScrollView style={styles.grid} showsVerticalScrollIndicator={false}>
       {/* Pinned section */}
       {notes.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Pinned</Text>
-          {rows.slice(0, 1).map((row, rowIndex) => (
-            <View key={`pinned-${rowIndex}`} style={styles.notesRow}>
-              {row.map((note, noteIndex) => (
-                <View key={note.id} style={{ flex: 1 }}>
-                  <NoteCard
-                    note={note}
-                    onPress={() => onEditNote(note)}
-                    onLongPress={() => onDeleteNote(note.id)}
-                  />
-                </View>
-              ))}
-              {/* Fill empty spaces */}
-              {row.length < 3 && Array.from({ length: 3 - row.length }).map((_, emptyIndex) => (
-                <View key={`empty-${emptyIndex}`} style={{ flex: 1 }} />
-              ))}
+          <View style={styles.notesContainer}>
+            <View key={notes[0].id} style={styles.noteCardWrapper}>
+              <NoteCard
+                note={notes[0]}
+                onPress={() => onEditNote(notes[0])}
+                onLongPress={() => onDeleteNote(notes[0].id)}
+              />
             </View>
-          ))}
+          </View>
         </View>
       )}
 
       {/* Others section */}
-      {rows.length > 1 && (
+      {notes.length > 1 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Others</Text>
-          {rows.slice(1).map((row, rowIndex) => (
-            <View key={`others-${rowIndex}`} style={styles.notesRow}>
-              {row.map((note, noteIndex) => (
-                <View key={note.id} style={{ flex: 1 }}>
-                  <NoteCard
-                    note={note}
-                    onPress={() => onEditNote(note)}
-                    onLongPress={() => onDeleteNote(note.id)}
-                  />
-                </View>
-              ))}
-              {/* Fill empty spaces */}
-              {row.length < 3 && Array.from({ length: 3 - row.length }).map((_, emptyIndex) => (
-                <View key={`empty-${emptyIndex}`} style={{ flex: 1 }} />
-              ))}
-            </View>
-          ))}
+          <View style={styles.notesContainer}>
+            {notes.slice(1).map((note) => (
+              <View key={note.id} style={styles.noteCardWrapper}>
+                <NoteCard
+                  note={note}
+                  onPress={() => onEditNote(note)}
+                  onLongPress={() => onDeleteNote(note.id)}
+                />
+              </View>
+            ))}
+          </View>
         </View>
       )}
 
@@ -110,9 +90,15 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginLeft: 20,
   },
-  notesRow: {
+  notesContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingHorizontal: 20,
+    justifyContent: 'flex-start',
+  },
+  noteCardWrapper: {
+    width: '31%', // Slightly less than 33.33% to account for margins
+    marginRight: '3.5%',
     marginBottom: 16,
   },
   emptyState: {
