@@ -486,8 +486,9 @@ const styles = StyleSheet.create({
   },
   imageGallery: {
     marginBottom: 20,
-    paddingVertical: 16,
-    height: 150,
+    paddingVertical: 20,
+    height: 180,
+    alignItems: 'center',
   },
   imageScrollView: {
     paddingLeft: 20,
