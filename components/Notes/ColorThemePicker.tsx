@@ -15,6 +15,7 @@ interface ColorThemePickerProps {
   visible: boolean;
   onClose: () => void;
   onThemeSelect: (color: string) => void;
+  onGradientSelect?: (gradient: string[]) => void;
   selectedTheme: string;
 }
 
@@ -24,27 +25,30 @@ interface ThemeOption {
   gradient?: string[];
 }
 const noteThemes: ThemeOption[] = [
-  { name: 'Default', color: '#1A1A1A' },
-  { name: 'Dark Red', color: '#8B2635' },
-  { name: 'Dark Orange', color: '#CC7A00' },
-  { name: 'Dark Green', color: '#2D5016' },
-  { name: 'Dark Teal', color: '#2C5F5D' },
-  { name: 'Dark Blue', color: '#1B263B' },
-  { name: 'Dark Purple', color: '#4A1A4A' },
-  { name: 'Dark Pink', color: '#7A2048' },
-  { name: 'Dark Brown', color: '#3A2A1A' },
-  { name: 'Dark Gray', color: '#2A2A2A' },
-  { name: 'Sunset', gradient: ['#8B2635', '#CC7A00'] },
-  { name: 'Ocean', gradient: ['#1B263B', '#2C5F5D'] },
-  { name: 'Forest', gradient: ['#2D5016', '#2C5F5D'] },
-  { name: 'Twilight', gradient: ['#4A1A4A', '#7A2048'] },
-  { name: 'Midnight', gradient: ['#1A1A1A', '#2A2A2A'] },
+  { name: 'Charcoal', color: '#1C1C1C' },
+  { name: 'Deep Red', color: '#B91C1C' },
+  { name: 'Forest', color: '#166534' },
+  { name: 'Ocean', color: '#1E40AF' },
+  { name: 'Royal Purple', color: '#7C3AED' },
+  { name: 'Rose Gold', color: '#E11D48' },
+  { name: 'Copper', color: '#EA580C' },
+  { name: 'Emerald', color: '#059669' },
+  { name: 'Sapphire', color: '#2563EB' },
+  { name: 'Amethyst', color: '#9333EA' },
+  { name: 'Ruby', color: '#DC2626' },
+  { name: 'Midnight', color: '#030712' },
+  { name: 'Fire', gradient: ['#DC2626', '#EA580C'] },
+  { name: 'Ocean Depth', gradient: ['#1E40AF', '#059669'] },
+  { name: 'Royal', gradient: ['#7C3AED', '#E11D48'] },
+  { name: 'Aurora', gradient: ['#2563EB', '#9333EA'] },
+  { name: 'Sunset', gradient: ['#E11D48', '#EA580C'] },
 ];
 
 export default function ColorThemePicker({ 
   visible, 
   onClose, 
   onThemeSelect, 
+  onGradientSelect,
   selectedTheme 
 }: ColorThemePickerProps) {
   return (
@@ -85,7 +89,13 @@ export default function ColorThemePicker({
                           overflow: 'hidden'
                         }
                       ]}
-                      onPress={() => onThemeSelect(themeValue)}
+                      onPress={() => {
+                        if (theme.gradient && onGradientSelect) {
+                          onGradientSelect(theme.gradient);
+                        } else {
+                          onThemeSelect(themeValue);
+                        }
+                      }}
                     >
                       {theme.gradient ? (
                         <LinearGradient

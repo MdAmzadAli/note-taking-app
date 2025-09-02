@@ -21,7 +21,9 @@ interface NoteEditorScreenProps {
   isEditing: boolean;
   noteTitle: string;
   noteContent: string;
-  onSave: () => void;
+  noteTheme?: string;
+  noteGradient?: string[] | null;
+  onSave: (theme?: string, gradient?: string[]) => void;
   onBack: () => void;
   onTitleChange: (title: string) => void;
   onContentChange: (content: string) => void;
@@ -31,6 +33,8 @@ export default function NoteEditorScreen({
   isEditing, 
   noteTitle, 
   noteContent, 
+  noteTheme = '#1C1C1C',
+  noteGradient = null,
   onSave, 
   onBack, 
   onTitleChange, 
@@ -38,8 +42,8 @@ export default function NoteEditorScreen({
 }: NoteEditorScreenProps) {
   const [isPinned, setIsPinned] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const [selectedTheme, setSelectedTheme] = useState('#1A1A1A');
-  const [selectedGradient, setSelectedGradient] = useState<string[] | null>(null);
+  const [selectedTheme, setSelectedTheme] = useState(noteTheme);
+  const [selectedGradient, setSelectedGradient] = useState<string[] | null>(noteGradient);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [initialTitle, setInitialTitle] = useState(noteTitle);
   const [initialContent, setInitialContent] = useState(noteContent);
@@ -85,7 +89,7 @@ export default function NoteEditorScreen({
           {
             text: 'Save',
             onPress: () => {
-              onSave();
+              onSave(selectedTheme, selectedGradient || undefined);
               onBack();
             },
           },
@@ -97,7 +101,7 @@ export default function NoteEditorScreen({
   };
 
   const handleSave = () => {
-    onSave();
+    onSave(selectedTheme, selectedGradient || undefined);
     setInitialTitle(noteTitle);
     setInitialContent(noteContent);
     setHasUnsavedChanges(false);
@@ -202,6 +206,7 @@ export default function NoteEditorScreen({
         visible={showColorPicker}
         onClose={() => setShowColorPicker(false)}
         onThemeSelect={handleThemeSelect}
+        onGradientSelect={handleGradientSelect}
         selectedTheme={selectedTheme}
       />
     </View>
@@ -246,16 +251,16 @@ const styles = StyleSheet.create({
   titleInput: {
     fontSize: 24,
     color: '#FFFFFF',
+    fontFamily: 'Inter',
     fontWeight: '400',
     marginBottom: 20,
-    opacity: 0.7,
   },
   bodyInput: {
     fontSize: 18,
     color: '#FFFFFF',
+    fontFamily: 'Inter',
     fontWeight: '400',
     lineHeight: 26,
-    opacity: 0.8,
     minHeight: 400,
   },
   bottomBar: {

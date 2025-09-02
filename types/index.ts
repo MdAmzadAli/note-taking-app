@@ -14,6 +14,8 @@ export interface Note {
   writingStyle: WritingStyle;
   sections?: NoteSection[]; // For Cornell notes
   checkedItems?: boolean[]; // For checklist style
+  theme?: string;
+  gradient?: string[];
   createdAt: string;
   updatedAt: string;
 }

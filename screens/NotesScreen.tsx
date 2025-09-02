@@ -78,6 +78,8 @@ export default function NotesScreen() {
   const [selectedWritingStyle, setSelectedWritingStyle] = useState<WritingStyle>('mind_dump');
   const [noteSections, setNoteSections] = useState<NoteSection[]>([]);
   const [checkedItems, setCheckedItems] = useState<boolean[]>([]);
+  const [currentNoteTheme, setCurrentNoteTheme] = useState<string>('#1C1C1C');
+  const [currentNoteGradient, setCurrentNoteGradient] = useState<string[] | null>(null);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
   const [currentNoteTitle, setCurrentNoteTitle] = useState('');
   const [menuScrollOffset, setMenuScrollOffset] = useState(0);
@@ -199,7 +201,7 @@ export default function NotesScreen() {
     }
   };
 
-  const saveCurrentNote = async () => {
+  const saveCurrentNote = async (theme?: string, gradient?: string[]) => {
     if (!currentNoteText.trim() && noteSections.length === 0) {
       Alert.alert('Error', 'Please enter some content for your note');
       return;
@@ -237,6 +239,8 @@ export default function NotesScreen() {
             writingStyle: selectedWritingStyle,
             sections: noteSections.length > 0 ? noteSections : undefined,
             checkedItems: checkedItems.length > 0 ? checkedItems : undefined,
+            theme: theme || currentNoteTheme,
+            gradient: gradient || currentNoteGradient || undefined,
             createdAt: existingNote.createdAt,
             updatedAt: now,
           };
@@ -252,6 +256,8 @@ export default function NotesScreen() {
           writingStyle: selectedWritingStyle,
           sections: noteSections.length > 0 ? noteSections : undefined,
           checkedItems: checkedItems.length > 0 ? checkedItems : undefined,
+          theme: theme || currentNoteTheme,
+          gradient: gradient || currentNoteGradient || undefined,
           createdAt: now,
           updatedAt: now,
         };
@@ -267,6 +273,8 @@ export default function NotesScreen() {
       setSelectedWritingStyle('mind_dump');
       setNoteSections([]);
       setCheckedItems([]);
+      setCurrentNoteTheme('#1C1C1C');
+      setCurrentNoteGradient(null);
       setIsCreating(false);
       setIsEditing(false);
       setEditingNoteId(null);
@@ -288,12 +296,16 @@ export default function NotesScreen() {
         setSelectedWritingStyle(fullNote.writingStyle || 'mind_dump');
         setNoteSections(fullNote.sections || []);
         setCheckedItems(fullNote.checkedItems || []);
+        setCurrentNoteTheme(fullNote.theme || '#1C1C1C');
+        setCurrentNoteGradient(fullNote.gradient || null);
       } else {
         setCurrentNoteText(note.content);
         setCurrentNoteTitle('');
         setSelectedWritingStyle('mind_dump');
         setNoteSections([]);
         setCheckedItems([]);
+        setCurrentNoteTheme('#1C1C1C');
+        setCurrentNoteGradient(null);
       }
 
       setEditingNoteId(note.id);
@@ -381,6 +393,8 @@ export default function NotesScreen() {
       isEditing={isEditing}
       noteTitle={currentNoteTitle}
       noteContent={currentNoteText}
+      noteTheme={currentNoteTheme}
+      noteGradient={currentNoteGradient}
       onSave={saveCurrentNote}
       onBack={() => {
         setIsCreating(false);
@@ -388,6 +402,8 @@ export default function NotesScreen() {
         setEditingNoteId(null);
         setCurrentNoteText('');
         setCurrentNoteTitle('');
+        setCurrentNoteTheme('#1C1C1C');
+        setCurrentNoteGradient(null);
       }}
       onTitleChange={setCurrentNoteTitle}
       onContentChange={setCurrentNoteText}
@@ -479,14 +495,14 @@ export default function NotesScreen() {
 const styles = StyleSheet.create({
   darkContainer: {
     flex: 1,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#1C1C1C',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#1C1C1C',
   },
   hamburgerButton: {
     padding: 8,
