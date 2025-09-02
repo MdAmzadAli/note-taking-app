@@ -424,30 +424,32 @@ export default function NotesScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.darkContainer}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.hamburgerButton} onPress={openMenu}>
-          <Ionicons name="menu" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
+    <View style={styles.fullScreenContainer}>
+      <SafeAreaView style={styles.safeAreaContainer}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.hamburgerButton} onPress={openMenu}>
+            <Ionicons name="menu" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
 
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search Keep"
-            placeholderTextColor="#999999"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search Keep"
+              placeholderTextColor="#999999"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+
+          <TouchableOpacity style={styles.micButton} onPress={handleVoiceInput}>
+            <Ionicons 
+              name="mic" 
+              size={20} 
+              color={isListening ? "#00FF7F" : "#FFFFFF"} 
+            />
+          </TouchableOpacity>
         </View>
-
-        <TouchableOpacity style={styles.micButton} onPress={handleVoiceInput}>
-          <Ionicons 
-            name="mic" 
-            size={20} 
-            color={isListening ? "#00FF7F" : "#FFFFFF"} 
-          />
-        </TouchableOpacity>
-      </View>
+      </SafeAreaView>
 
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         {renderNotesGrid()}
@@ -489,13 +491,16 @@ export default function NotesScreen() {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  darkContainer: {
+  fullScreenContainer: {
     flex: 1,
+    backgroundColor: '#1C1C1C',
+  },
+  safeAreaContainer: {
     backgroundColor: '#1C1C1C',
   },
   header: {
