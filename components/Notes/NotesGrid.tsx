@@ -33,11 +33,23 @@ export default function NotesGrid({ notes, onEditNote, onDeleteNote }: NotesGrid
     );
   }
 
-  // Group notes into rows of 3
-  const rows = [];
-  for (let i = 0; i < notes.length; i += 3) {
-    rows.push(notes.slice(i, i + 3));
-  }
+  // Distribute notes into 3 columns
+  const distributeNotesIntoColumns = (notesList: SimpleNote[]) => {
+    const columns = [[], [], []] as SimpleNote[][];
+
+    notesList.forEach((note, index) => {
+      const columnIndex = index % 3;
+      columns[columnIndex].push(note);
+    });
+
+    return columns;
+  };
+
+  const pinnedNotes = notes.slice(0, 1);
+  const otherNotes = notes.slice(1);
+
+  const pinnedColumns = distributeNotesIntoColumns(pinnedNotes);
+  const otherColumns = distributeNotesIntoColumns(otherNotes);
 
   return (
     <ScrollView style={styles.grid} showsVerticalScrollIndicator={false}>
@@ -45,47 +57,43 @@ export default function NotesGrid({ notes, onEditNote, onDeleteNote }: NotesGrid
       {notes.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Pinned</Text>
-          {rows.slice(0, 1).map((row, rowIndex) => (
-            <View key={`pinned-${rowIndex}`} style={styles.notesRow}>
-              {row.map((note, noteIndex) => (
-                <View key={note.id} style={{ flex: 1 }}>
-                  <NoteCard
-                    note={note}
-                    onPress={() => onEditNote(note)}
-                    onLongPress={() => onDeleteNote(note.id)}
-                  />
-                </View>
-              ))}
-              {/* Fill empty spaces */}
-              {row.length < 3 && Array.from({ length: 3 - row.length }).map((_, emptyIndex) => (
-                <View key={`empty-${emptyIndex}`} style={{ flex: 1 }} />
-              ))}
-            </View>
-          ))}
+          <View style={styles.notesContainer}>
+            {pinnedColumns.map((column, columnIndex) => (
+              <View key={`pinned-column-${columnIndex}`} style={styles.column}>
+                {column.map((note) => (
+                  <View key={note.id} style={styles.noteCardWrapper}>
+                    <NoteCard
+                      note={note}
+                      onPress={() => onEditNote(note)}
+                      onLongPress={() => onDeleteNote(note.id)}
+                    />
+                  </View>
+                ))}
+              </View>
+            ))}
+          </View>
         </View>
       )}
 
       {/* Others section */}
-      {rows.length > 1 && (
+      {notes.length > 1 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Others</Text>
-          {rows.slice(1).map((row, rowIndex) => (
-            <View key={`others-${rowIndex}`} style={styles.notesRow}>
-              {row.map((note, noteIndex) => (
-                <View key={note.id} style={{ flex: 1 }}>
-                  <NoteCard
-                    note={note}
-                    onPress={() => onEditNote(note)}
-                    onLongPress={() => onDeleteNote(note.id)}
-                  />
-                </View>
-              ))}
-              {/* Fill empty spaces */}
-              {row.length < 3 && Array.from({ length: 3 - row.length }).map((_, emptyIndex) => (
-                <View key={`empty-${emptyIndex}`} style={{ flex: 1 }} />
-              ))}
-            </View>
-          ))}
+          <View style={styles.notesContainer}>
+            {otherColumns.map((column, columnIndex) => (
+              <View key={`others-column-${columnIndex}`} style={styles.column}>
+                {column.map((note) => (
+                  <View key={note.id} style={styles.noteCardWrapper}>
+                    <NoteCard
+                      note={note}
+                      onPress={() => onEditNote(note)}
+                      onLongPress={() => onDeleteNote(note.id)}
+                    />
+                  </View>
+                ))}
+              </View>
+            ))}
+          </View>
         </View>
       )}
 
@@ -110,9 +118,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginLeft: 20,
   },
-  notesRow: {
+  notesContainer: {
     flexDirection: 'row',
     paddingHorizontal: 20,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  column: {
+    flex: 1,
+    paddingHorizontal: 4,
+  },
+  noteCardWrapper: {
     marginBottom: 16,
   },
   emptyState: {
