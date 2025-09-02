@@ -18,6 +18,7 @@ import {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import ColorThemePicker from './ColorThemePicker';
 import MediaAttachmentModal from './MediaAttachmentModal';
 
@@ -227,6 +228,20 @@ export default function NoteEditorScreen({
     }
   };
 
+  const onSwipeGesture = (event: any) => {
+    if (event.nativeEvent.state === State.END) {
+      const { translationX } = event.nativeEvent;
+      
+      if (translationX > 100) {
+        // Swiped right, go to previous image
+        handlePreviousImage();
+      } else if (translationX < -100) {
+        // Swiped left, go to next image
+        handleNextImage();
+      }
+    }
+  };
+
   const handleDrawing = () => {
     Alert.alert('Drawing', 'Drawing feature coming soon!');
   };
@@ -399,45 +414,28 @@ export default function NoteEditorScreen({
           </TouchableOpacity>
           
           {fullImageUri && (
-            <View style={styles.fullImageContainer}>
-              {/* Navigation Buttons */}
-              {currentImageIndex > 0 && (
+            <PanGestureHandler onHandlerStateChange={onSwipeGesture}>
+              <View style={styles.fullImageContainer}>
+                <Image
+                  source={{ uri: fullImageUri }}
+                  style={styles.fullImage}
+                  resizeMode="contain"
+                />
+                
                 <TouchableOpacity
-                  style={styles.navButtonLeft}
-                  onPress={handlePreviousImage}
+                  style={styles.deleteImageButton}
+                  onPress={() => {
+                    const imageToDelete = noteImages.find(img => img.uri === fullImageUri);
+                    if (imageToDelete) {
+                      handleDeleteImage(imageToDelete.id);
+                    }
+                  }}
                 >
-                  <Ionicons name="chevron-back" size={30} color="#FFFFFF" />
+                  <Ionicons name="trash" size={24} color="#FF4444" />
+                  <Text style={styles.deleteButtonText}>Delete</Text>
                 </TouchableOpacity>
-              )}
-              
-              {currentImageIndex < noteImages.length - 1 && (
-                <TouchableOpacity
-                  style={styles.navButtonRight}
-                  onPress={handleNextImage}
-                >
-                  <Ionicons name="chevron-forward" size={30} color="#FFFFFF" />
-                </TouchableOpacity>
-              )}
-
-              <Image
-                source={{ uri: fullImageUri }}
-                style={styles.fullImage}
-                resizeMode="contain"
-              />
-              
-              <TouchableOpacity
-                style={styles.deleteImageButton}
-                onPress={() => {
-                  const imageToDelete = noteImages.find(img => img.uri === fullImageUri);
-                  if (imageToDelete) {
-                    handleDeleteImage(imageToDelete.id);
-                  }
-                }}
-              >
-                <Ionicons name="trash" size={24} color="#FF4444" />
-                <Text style={styles.deleteButtonText}>Delete</Text>
-              </TouchableOpacity>
-            </View>
+              </View>
+            </PanGestureHandler>
           )}
         </View>
       </Modal>
@@ -569,14 +567,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
+    paddingBottom: 120,
   },
   fullImage: {
     width: Dimensions.get('window').width - 40,
-    height: Dimensions.get('window').height - 200,
+    height: Dimensions.get('window').height - 280,
   },
   deleteImageButton: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 40,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 68, 68, 0.2)',
@@ -591,25 +590,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
-  },
-  navButtonLeft: {
-    position: 'absolute',
-    left: 20,
-    top: '50%',
-    transform: [{ translateY: -25 }],
-    zIndex: 2,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    padding: 15,
-    borderRadius: 25,
-  },
-  navButtonRight: {
-    position: 'absolute',
-    right: 20,
-    top: '50%',
-    transform: [{ translateY: -25 }],
-    zIndex: 2,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    padding: 15,
-    borderRadius: 25,
   },
 });

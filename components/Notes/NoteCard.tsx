@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 
 interface ImageAttachment {
   id: string;
@@ -68,6 +69,20 @@ export default function NoteCard({ note, onPress, onLongPress }: NoteCardProps) 
       const nextIndex = currentImageIndex + 1;
       setCurrentImageIndex(nextIndex);
       setFullImageUri(note.images![nextIndex].uri);
+    }
+  };
+
+  const onSwipeGesture = (event: any) => {
+    if (event.nativeEvent.state === State.END) {
+      const { translationX } = event.nativeEvent;
+      
+      if (translationX > 100) {
+        // Swiped right, go to previous image
+        handlePreviousImage();
+      } else if (translationX < -100) {
+        // Swiped left, go to next image
+        handleNextImage();
+      }
     }
   };
   
@@ -167,32 +182,15 @@ export default function NoteCard({ note, onPress, onLongPress }: NoteCardProps) 
           </TouchableOpacity>
           
           {fullImageUri && (
-            <View style={styles.fullImageContainer}>
-              {/* Navigation Buttons */}
-              {currentImageIndex > 0 && (
-                <TouchableOpacity
-                  style={styles.navButtonLeft}
-                  onPress={handlePreviousImage}
-                >
-                  <Ionicons name="chevron-back" size={30} color="#FFFFFF" />
-                </TouchableOpacity>
-              )}
-              
-              {currentImageIndex < note.images!.length - 1 && (
-                <TouchableOpacity
-                  style={styles.navButtonRight}
-                  onPress={handleNextImage}
-                >
-                  <Ionicons name="chevron-forward" size={30} color="#FFFFFF" />
-                </TouchableOpacity>
-              )}
-
-              <Image
-                source={{ uri: fullImageUri }}
-                style={styles.fullImage}
-                resizeMode="contain"
-              />
-            </View>
+            <PanGestureHandler onHandlerStateChange={onSwipeGesture}>
+              <View style={styles.fullImageContainer}>
+                <Image
+                  source={{ uri: fullImageUri }}
+                  style={styles.fullImage}
+                  resizeMode="contain"
+                />
+              </View>
+            </PanGestureHandler>
           )}
         </View>
       </Modal>
@@ -291,25 +289,5 @@ const styles = StyleSheet.create({
   fullImage: {
     width: Dimensions.get('window').width - 40,
     height: Dimensions.get('window').height - 200,
-  },
-  navButtonLeft: {
-    position: 'absolute',
-    left: 20,
-    top: '50%',
-    transform: [{ translateY: -25 }],
-    zIndex: 2,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    padding: 15,
-    borderRadius: 25,
-  },
-  navButtonRight: {
-    position: 'absolute',
-    right: 20,
-    top: '50%',
-    transform: [{ translateY: -25 }],
-    zIndex: 2,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    padding: 15,
-    borderRadius: 25,
   },
 });
