@@ -13,6 +13,11 @@ interface SimpleNote {
   content: string;
   createdAt: string;
   updatedAt: string;
+  theme?: { // Added theme property
+    backgroundColor: string;
+    textColor: string;
+  };
+  gradient?: string[]; // Added gradient property
 }
 
 interface NotesGridProps {
@@ -86,7 +91,7 @@ export default function NotesGrid({ notes, onEditNote, onDeleteNote }: NotesGrid
           ))}
         </View>
       )}
-      
+
       {/* Bottom padding for FAB */}
       <View style={{ height: 100 }} />
     </ScrollView>

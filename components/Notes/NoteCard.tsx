@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Dimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface SimpleNote {
   id: string;
@@ -13,6 +14,8 @@ interface SimpleNote {
   content: string;
   createdAt: string;
   updatedAt: string;
+  theme?: string;
+  gradient?: string[];
 }
 
 interface NoteCardProps {
@@ -26,12 +29,35 @@ export default function NoteCard({ note, onPress, onLongPress }: NoteCardProps) 
                      note.content.includes('.png') || 
                      note.content.includes('.jpg');
   
+  const cardStyle = [
+    styles.card, 
+    { 
+      width: (Dimensions.get('window').width - 60) / 3,
+      backgroundColor: note.gradient ? 'transparent' : (note.theme || '#2A2A2A')
+    }
+  ];
+
+  const renderBackground = () => {
+    if (note.gradient) {
+      return (
+        <LinearGradient
+          colors={note.gradient as any}
+          style={StyleSheet.absoluteFillObject}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+      );
+    }
+    return null;
+  };
+  
   return (
     <TouchableOpacity 
-      style={[styles.card, { width: (Dimensions.get('window').width - 60) / 3 }]}
+      style={cardStyle}
       onPress={onPress}
       onLongPress={onLongPress}
     >
+      {renderBackground()}
       <View style={styles.cardInner}>
         {note.title && (
           <Text style={styles.cardTitle} numberOfLines={2}>
@@ -62,10 +88,12 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.3,
     shadowRadius: 4,
+    overflow: 'hidden',
   },
   cardInner: {
     padding: 12,
     minHeight: 120,
+    backgroundColor: 'transparent',
   },
   cardTitle: {
     color: '#FFFFFF',
