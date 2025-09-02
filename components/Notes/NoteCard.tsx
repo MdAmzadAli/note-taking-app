@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cardDate: {
-    color: '#666666',
+    color: '#FFFFFF',
     fontSize: 10,
     marginTop: 'auto',
   },
