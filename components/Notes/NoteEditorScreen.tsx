@@ -19,7 +19,8 @@ import {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
-import { PanGestureHandler, State, GestureHandlerGestureEvent, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
+import Animated from 'react-native-reanimated';
 import ColorThemePicker from './ColorThemePicker';
 import MediaAttachmentModal from './MediaAttachmentModal';
 
@@ -229,53 +230,35 @@ export default function NoteEditorScreen({
     }
   };
 
-  // PanGestureHandler approach
-  const onSwipeGesture = (event: PanGestureHandlerGestureEvent) => {
-    'worklet';
-    console.log('Gesture event:', event.nativeEvent.state, event.nativeEvent.translationX);
-  };
-
-  const onSwipeGestureStateChange = (event: PanGestureHandlerGestureEvent) => {
-    const { state, translationX } = event.nativeEvent;
-    console.log('Gesture state change:', state, translationX);
-    
-    if (state === State.END) {
-      if (Math.abs(translationX) > 50) {
-        if (translationX > 0) {
-          // Swiped right, go to previous image
-          console.log('Swiping to previous image');
-          handlePreviousImage();
-        } else {
-          // Swiped left, go to next image
-          console.log('Swiping to next image');
-          handleNextImage();
-        }
-      }
-    }
-  };
-
-  // Alternative PanResponder approach as fallback
+  // Fixed PanResponder for swipe gestures
   const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: (evt, gestureState) => {
-      return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dy) < 50;
+      // Only respond to horizontal swipes with minimal vertical movement
+      return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dy) < 80;
+    },
+    onPanResponderGrant: () => {
+      // Grant the responder
     },
     onPanResponderMove: (evt, gestureState) => {
-      console.log('PanResponder move:', gestureState.dx);
+      // Optional: Add visual feedback during swipe
     },
     onPanResponderRelease: (evt, gestureState) => {
-      console.log('PanResponder release:', gestureState.dx);
-      if (Math.abs(gestureState.dx) > 50) {
-        if (gestureState.dx > 0) {
+      const { dx } = gestureState;
+      const swipeThreshold = 50;
+      
+      if (Math.abs(dx) > swipeThreshold && noteImages.length > 1) {
+        if (dx > 0) {
           // Swiped right, go to previous image
-          console.log('PanResponder: Swiping to previous image');
           handlePreviousImage();
         } else {
           // Swiped left, go to next image
-          console.log('PanResponder: Swiping to next image');
           handleNextImage();
         }
       }
     },
+    onPanResponderTerminationRequest: () => false,
+    onShouldBlockNativeResponder: () => false,
   });
 
   const handleDrawing = () => {
@@ -450,12 +433,24 @@ export default function NoteEditorScreen({
           </TouchableOpacity>
           
           {fullImageUri && (
-            <View style={styles.fullImageContainer} {...panResponder.panHandlers}>
+            <Animated.View style={styles.fullImageContainer} {...panResponder.panHandlers}>
               <Image
                 source={{ uri: fullImageUri }}
                 style={styles.fullImage}
                 resizeMode="contain"
               />
+              
+              {/* Image navigation indicators */}
+              {noteImages.length > 1 && (
+                <View style={styles.imageIndicators}>
+                  <Text style={styles.imageCounter}>
+                    {currentImageIndex + 1} / {noteImages.length}
+                  </Text>
+                  <View style={styles.swipeHint}>
+                    <Text style={styles.swipeHintText}>Swipe to navigate</Text>
+                  </View>
+                </View>
+              )}
               
               <TouchableOpacity
                 style={styles.deleteImageButton}
@@ -469,7 +464,7 @@ export default function NoteEditorScreen({
                 <Ionicons name="trash" size={24} color="#FF4444" />
                 <Text style={styles.deleteButtonText}>Delete</Text>
               </TouchableOpacity>
-            </View>
+            </Animated.View>
           )}
         </View>
       </Modal>
@@ -624,5 +619,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  imageIndicators: {
+    position: 'absolute',
+    top: 20,
+    alignSelf: 'center',
+    alignItems: 'center',
+  },
+  imageCounter: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+    marginBottom: 8,
+  },
+  swipeHint: {
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  swipeHintText: {
+    color: '#CCCCCC',
+    fontSize: 12,
+    textAlign: 'center',
   },
 });
