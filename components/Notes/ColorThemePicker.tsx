@@ -8,6 +8,7 @@ import {
   Modal,
   TouchableWithoutFeedback,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 interface ColorThemePickerProps {
@@ -16,23 +17,28 @@ interface ColorThemePickerProps {
   onThemeSelect: (color: string) => void;
   selectedTheme: string;
 }
-//sijidsisjij
-const noteThemes = [
+
+interface ThemeOption {
+  name: string;
+  color?: string;
+  gradient?: string[];
+}
+const noteThemes: ThemeOption[] = [
   { name: 'Default', color: '#1A1A1A' },
-  { name: 'Coral', color: '#FF6B6B' },
-  { name: 'Peach', color: '#FFB366' },
-  { name: 'Yellow', color: '#FFD93D' },
-  { name: 'Green', color: '#6BCF7F' },
-  { name: 'Teal', color: '#4ECDC4' },
-  { name: 'Blue', color: '#4D96FF' },
-  { name: 'Purple', color: '#9B59B6' },
-  { name: 'Pink', color: '#FF69B4' },
-  { name: 'Brown', color: '#8B4513' },
-  { name: 'Gray', color: '#95A5A6' },
-  { name: 'Sunset', color: '#FF6B6B' },
-  { name: 'Ocean', color: '#4ECDC4' },
-  { name: 'Lavender', color: '#9B59B6' },
-  { name: 'Forest', color: '#6BCF7F' },
+  { name: 'Dark Red', color: '#8B2635' },
+  { name: 'Dark Orange', color: '#CC7A00' },
+  { name: 'Dark Green', color: '#2D5016' },
+  { name: 'Dark Teal', color: '#2C5F5D' },
+  { name: 'Dark Blue', color: '#1B263B' },
+  { name: 'Dark Purple', color: '#4A1A4A' },
+  { name: 'Dark Pink', color: '#7A2048' },
+  { name: 'Dark Brown', color: '#3A2A1A' },
+  { name: 'Dark Gray', color: '#2A2A2A' },
+  { name: 'Sunset', gradient: ['#8B2635', '#CC7A00'] },
+  { name: 'Ocean', gradient: ['#1B263B', '#2C5F5D'] },
+  { name: 'Forest', gradient: ['#2D5016', '#2C5F5D'] },
+  { name: 'Twilight', gradient: ['#4A1A4A', '#7A2048'] },
+  { name: 'Midnight', gradient: ['#1A1A1A', '#2A2A2A'] },
 ];
 
 export default function ColorThemePicker({ 
@@ -64,22 +70,40 @@ export default function ColorThemePicker({
                 horizontal={true}
                 showsHorizontalScrollIndicator={false}
               >
-                {noteThemes.map((theme, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.themeItem,
-                      {
-                        backgroundColor: theme.color,
-                        borderWidth: selectedTheme === theme.color ? 3 : 0,
-                        borderColor: '#FFFFFF'
-                      }
-                    ]}
-                    onPress={() => onThemeSelect(theme.color)}
-                  >
-                    <Text style={styles.themeText}>{theme.name}</Text>
-                  </TouchableOpacity>
-                ))}
+                {noteThemes.map((theme, index) => {
+                  const themeValue = theme.color || theme.gradient?.[0] || '#1A1A1A';
+                  const isSelected = selectedTheme === themeValue;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.themeItem,
+                        {
+                          borderWidth: isSelected ? 3 : 0,
+                          borderColor: '#FFFFFF',
+                          overflow: 'hidden'
+                        }
+                      ]}
+                      onPress={() => onThemeSelect(themeValue)}
+                    >
+                      {theme.gradient ? (
+                        <LinearGradient
+                          colors={theme.gradient as any}
+                          style={styles.gradientBackground}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                        >
+                          <Text style={styles.themeText}>{theme.name}</Text>
+                        </LinearGradient>
+                      ) : (
+                        <View style={[styles.solidBackground, { backgroundColor: theme.color }]}>
+                          <Text style={styles.themeText}>{theme.name}</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </ScrollView>
             </View>
           </TouchableWithoutFeedback>
@@ -123,8 +147,6 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 12,
     marginRight: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
     elevation: 4,
     shadowColor: '#000000',
     shadowOffset: {
@@ -133,6 +155,20 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.3,
     shadowRadius: 4,
+  },
+  gradientBackground: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+  },
+  solidBackground: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
   },
   themeText: {
     color: '#FFFFFF',

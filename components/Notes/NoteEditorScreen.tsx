@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,12 @@ import {
   SafeAreaView,
   Modal,
   TouchableWithoutFeedback,
+  StatusBar,
+  Platform,
+  Alert,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 import ColorThemePicker from './ColorThemePicker';
 
 interface NoteEditorScreenProps {
@@ -35,22 +39,108 @@ export default function NoteEditorScreen({
   const [isPinned, setIsPinned] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState('#1A1A1A');
+  const [selectedGradient, setSelectedGradient] = useState<string[] | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [initialTitle, setInitialTitle] = useState(noteTitle);
+  const [initialContent, setInitialContent] = useState(noteContent);
+
+  useEffect(() => {
+    setInitialTitle(noteTitle);
+    setInitialContent(noteContent);
+  }, []);
+
+  useEffect(() => {
+    const titleChanged = noteTitle !== initialTitle;
+    const contentChanged = noteContent !== initialContent;
+    setHasUnsavedChanges(titleChanged || contentChanged);
+  }, [noteTitle, noteContent, initialTitle, initialContent]);
 
   const handleThemeSelect = (color: string) => {
     setSelectedTheme(color);
+    setSelectedGradient(null);
     setShowColorPicker(false);
   };
 
+  const handleGradientSelect = (gradient: string[]) => {
+    setSelectedGradient(gradient);
+    setSelectedTheme(gradient[0]);
+    setShowColorPicker(false);
+  };
+
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      Alert.alert(
+        'Unsaved Changes',
+        'You have unsaved changes. Would you like to save before leaving?',
+        [
+          {
+            text: 'Don\'t Save',
+            style: 'destructive',
+            onPress: onBack,
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Save',
+            onPress: () => {
+              onSave();
+              onBack();
+            },
+          },
+        ]
+      );
+    } else {
+      onBack();
+    }
+  };
+
+  const handleSave = () => {
+    onSave();
+    setInitialTitle(noteTitle);
+    setInitialContent(noteContent);
+    setHasUnsavedChanges(false);
+  };
+
+  const renderBackground = () => {
+    if (selectedGradient) {
+      return (
+        <LinearGradient
+          colors={selectedGradient as any}
+          style={StyleSheet.absoluteFillObject}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+      );
+    }
+    return null;
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: selectedTheme }]}>
+    <View style={[styles.container, { backgroundColor: selectedGradient ? 'transparent' : selectedTheme }]}>
+      {renderBackground()}
+      <StatusBar barStyle="light-content" backgroundColor={selectedTheme} translucent={true} />
+      
       {/* Header */}
-      <SafeAreaView>
+      <SafeAreaView style={styles.safeAreaHeader}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
           
           <View style={styles.headerIcons}>
+            <TouchableOpacity 
+              style={[styles.headerIcon, hasUnsavedChanges && styles.saveButtonActive]}
+              onPress={handleSave}
+            >
+              <Ionicons 
+                name="checkmark" 
+                size={24} 
+                color={hasUnsavedChanges ? "#00FF7F" : "#FFFFFF"} 
+              />
+            </TouchableOpacity>
+            
             <TouchableOpacity 
               style={styles.headerIcon}
               onPress={() => setIsPinned(!isPinned)}
@@ -121,6 +211,10 @@ export default function NoteEditorScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
+  safeAreaHeader: {
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',
@@ -139,6 +233,10 @@ const styles = StyleSheet.create({
   headerIcon: {
     padding: 8,
     marginLeft: 8,
+  },
+  saveButtonActive: {
+    backgroundColor: 'rgba(0, 255, 127, 0.2)',
+    borderRadius: 20,
   },
   content: {
     flex: 1,
