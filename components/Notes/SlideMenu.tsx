@@ -35,6 +35,7 @@ export default function SlideMenu({
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <Animated.View style={[styles.menu, { transform: [{ translateX: slideAnim }] }]}>
+              <View style={styles.topSpacer} />
               <SafeAreaView style={styles.safeAreaContent}>
                 <Text style={styles.title}>Menu</Text>
                 <TouchableOpacity style={styles.item} onPress={() => {
@@ -67,6 +68,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: Dimensions.get('window').width * 0.75,
     backgroundColor: '#2A2A2A',
+    height: '100%',
+  },
+  topSpacer: {
+    height: 0,
   },
   safeAreaContent: {
     flex: 1,
