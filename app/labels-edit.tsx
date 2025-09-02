@@ -124,13 +124,11 @@ export default function LabelsEditScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#202124" />
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#E8EAED" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit labels</Text>
-      </View>
+      
+      {/* Floating Back Button */}
+      <TouchableOpacity style={styles.floatingBackButton} onPress={() => router.back()}>
+        <Ionicons name="arrow-back" size={24} color="#E8EAED" />
+      </TouchableOpacity>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Create New Label Section */}
@@ -222,35 +220,32 @@ export default function LabelsEditScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: '#202124',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: Platform.OS === 'ios' ? 50 : 24,
-    borderBottomWidth: 1,
-    borderBottomColor: '#3C4043',
-  },
-  backButton: {
-    marginRight: 16,
-    padding: 8,
-  },
-  headerTitle: {
-    color: '#E8EAED',
-    fontSize: 20,
-    fontWeight: '400',
   },
   content: {
     flex: 1,
+    paddingTop: Platform.OS === 'ios' ? 44 : 24,
+  },
+  floatingBackButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 44 : 24,
+    left: 16,
+    zIndex: 1000,
+    backgroundColor: 'rgba(32, 33, 36, 0.8)',
+    borderRadius: 20,
+    padding: 8,
   },
   createSection: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    paddingTop: 60,
     borderBottomWidth: 1,
     borderBottomColor: '#3C4043',
   },
