@@ -19,7 +19,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSection } from '@/types';
-import { saveNote, saveTemplate, getNotes, getTemplates, getCustomTemplates, deleteNote, updateNote, getUserSettings, UserSettings, saveCustomTemplate } from '@/utils/storage';
+import { saveNote, saveTemplate, getNotes, getTemplates, getCustomTemplates, deleteNote, updateNote, getUserSettings, saveCustomTemplate, saveTemplateEntry } from '@/utils/storage';
+import { UserSettings } from '@/types';
+import { mockSpeechToText } from '@/utils/speech';
 import TemplateEntriesScreen from './TemplateEntriesScreen';
 import { eventBus, EVENTS } from '@/utils/eventBus';
 
@@ -32,6 +34,166 @@ interface SimpleNote {
   content: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// Note Editor Component
+function NoteEditorScreen({ 
+  isEditing, 
+  noteTitle, 
+  noteContent, 
+  onSave, 
+  onBack, 
+  onTitleChange, 
+  onContentChange 
+}: {
+  isEditing: boolean;
+  noteTitle: string;
+  noteContent: string;
+  onSave: () => void;
+  onBack: () => void;
+  onTitleChange: (title: string) => void;
+  onContentChange: (content: string) => void;
+}) {
+  const [isPinned, setIsPinned] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [selectedTheme, setSelectedTheme] = useState('#1A1A1A');
+  
+  const noteThemes = [
+    { name: 'Default', color: '#1A1A1A' },
+    { name: 'Coral', color: '#FF6B6B' },
+    { name: 'Peach', color: '#FFB366' },
+    { name: 'Yellow', color: '#FFD93D' },
+    { name: 'Green', color: '#6BCF7F' },
+    { name: 'Teal', color: '#4ECDC4' },
+    { name: 'Blue', color: '#4D96FF' },
+    { name: 'Purple', color: '#9B59B6' },
+    { name: 'Pink', color: '#FF69B4' },
+    { name: 'Brown', color: '#8B4513' },
+    { name: 'Gray', color: '#95A5A6' },
+    { name: 'Gradient Sunset', gradient: ['#FF6B6B', '#FFB366'] },
+    { name: 'Gradient Ocean', gradient: ['#4ECDC4', '#4D96FF'] },
+    { name: 'Gradient Purple', gradient: ['#9B59B6', '#FF69B4'] },
+    { name: 'Gradient Forest', gradient: ['#6BCF7F', '#4ECDC4'] },
+  ];
+
+  const handleThemeSelect = (theme: any) => {
+    setSelectedTheme(theme.color || theme.gradient[0]);
+    setShowColorPicker(false);
+  };
+
+  return (
+    <View style={[styles.editorContainer, { backgroundColor: selectedTheme }]}>
+      {/* Header */}
+      <SafeAreaView>
+        <View style={styles.noteEditorHeader}>
+          <TouchableOpacity style={styles.noteEditorBackButton} onPress={onBack}>
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          
+          <View style={styles.noteEditorHeaderIcons}>
+            <TouchableOpacity 
+              style={styles.noteEditorHeaderIcon}
+              onPress={() => setIsPinned(!isPinned)}
+            >
+              <Ionicons 
+                name={isPinned ? "star" : "star-outline"} 
+                size={24} 
+                color={isPinned ? "#FFD700" : "#FFFFFF"} 
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+
+      {/* Main Content */}
+      <ScrollView style={styles.noteEditorContent} showsVerticalScrollIndicator={false}>
+        <TextInput
+          style={styles.noteEditorTitle}
+          placeholder="Title"
+          placeholderTextColor="#888888"
+          value={noteTitle}
+          onChangeText={onTitleChange}
+          multiline={false}
+        />
+        
+        <TextInput
+          style={styles.noteEditorBody}
+          placeholder="Note"
+          placeholderTextColor="#888888"
+          value={noteContent}
+          onChangeText={onContentChange}
+          multiline={true}
+          textAlignVertical="top"
+        />
+      </ScrollView>
+
+      {/* Bottom Toolbar */}
+      <View style={styles.noteEditorBottomBar}>
+        <View style={styles.noteEditorBottomLeft}>
+          <TouchableOpacity style={styles.noteEditorBottomButton}>
+            <Ionicons name="add" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.noteEditorBottomButton}
+            onPress={() => setShowColorPicker(true)}
+          >
+            <Ionicons name="brush" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+        
+        <TouchableOpacity style={styles.noteEditorBottomButton}>
+          <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Color Theme Picker Modal */}
+      <Modal
+        visible={showColorPicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowColorPicker(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowColorPicker(false)}>
+          <View style={styles.colorPickerOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.colorPickerModal}>
+                <View style={styles.colorPickerHeader}>
+                  <Text style={styles.colorPickerTitle}>Choose Theme</Text>
+                  <TouchableOpacity onPress={() => setShowColorPicker(false)}>
+                    <Ionicons name="close" size={24} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+                
+                <ScrollView 
+                  style={styles.colorPickerScroll}
+                  horizontal={true}
+                  showsHorizontalScrollIndicator={false}
+                >
+                  {noteThemes.map((theme, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.colorPickerItem,
+                        {
+                          backgroundColor: theme.color || theme.gradient?.[0],
+                          borderWidth: selectedTheme === (theme.color || theme.gradient?.[0]) ? 3 : 0,
+                          borderColor: '#FFFFFF'
+                        }
+                      ]}
+                      onPress={() => handleThemeSelect(theme)}
+                    >
+                      <Text style={styles.colorPickerItemText}>{theme.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    </View>
+  );
 }
 
 export default function NotesScreen() {
@@ -58,13 +220,11 @@ export default function NotesScreen() {
   const [newFieldName, setNewFieldName] = useState('');
   const [newFieldType, setNewFieldType] = useState<'text' | 'longtext' | 'number'>('text');
   const [settings, setSettings] = useState<UserSettings>({
-    voiceLanguage: 'en-US',
-    voiceRecognitionMethod: 'assemblyai-regex',
-    assemblyAIApiKey: '',
-    geminiApiKey: '',
-    writingStyle: 'professional',
-    notifications: true,
+    speechProvider: 'assemblyai-regex',
+    ringtone: 'default',
+    vibrationEnabled: true,
     darkMode: false,
+    notifications: true,
     notificationsEnabled: true,
     theme: 'auto',
     autoSync: true,
@@ -197,69 +357,6 @@ export default function NotesScreen() {
     }
   };
 
-  const addTemplateField = () => {
-    if (!newFieldName.trim()) {
-      Alert.alert('Error', 'Please enter a field name');
-      return;
-    }
-
-    const newField: FieldType = {
-      id: Date.now().toString(),
-      label: newFieldName.trim(),
-      type: newFieldType,
-      required: false,
-    };
-
-    setTemplateFields([...templateFields, newField]);
-    setNewFieldName('');
-  };
-
-  const removeTemplateField = (fieldId: string) => {
-    setTemplateFields(templateFields.filter(f => f.id !== fieldId));
-  };
-
-  const saveTemplate = async () => {
-    if (!templateName.trim()) {
-      Alert.alert('Error', 'Please enter a template name');
-      return;
-    }
-
-    if (templateFields.length === 0) {
-      Alert.alert('Error', 'Please add at least one field');
-      return;
-    }
-
-    try {
-      const template: CustomTemplate = {
-        id: Date.now().toString(),
-        name: templateName.trim(),
-        description: templateDescription.trim(),
-        fields: templateFields,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      await saveCustomTemplate(template);
-      await loadTemplates();
-
-      // Reset form
-      setTemplateName('');
-      setTemplateDescription('');
-      setTemplateFields([]);
-      setNewFieldName('');
-      
-      // Show the menu with updated templates after creating a new template
-      setCurrentView('notes');
-      setIsMenuVisible(true);
-      openMenu();
-      
-      Alert.alert('Success', 'Template created successfully!');
-    } catch (error) {
-      console.error('Error saving template:', error);
-      Alert.alert('Error', 'Failed to save template');
-    }
-  };
-
   const saveCurrentNote = async () => {
     if (!currentNoteText.trim() && noteSections.length === 0) {
       Alert.alert('Error', 'Please enter some content for your note');
@@ -317,8 +414,6 @@ export default function NotesScreen() {
           updatedAt: now,
         };
         await saveNote(newNote);
-                // Update notes to place the new note at the top
-        setNotes(prevNotes => [newNote, ...prevNotes]);
       }
 
       // First reload notes to ensure data persistence
@@ -397,53 +492,25 @@ export default function NotesScreen() {
     );
   };
 
-  const navigateToTemplate = (template: CustomTemplate) => {
-    setSelectedTemplateId(template.id);
-    setCurrentView('template');
-    closeMenu();
-  };
-
-  const startFillingTemplate = (template: CustomTemplate) => {
-    setSelectedTemplate(template);
-    setTemplateValues({});
-    setIsFillingTemplate(true);
-    setShowTemplateMenu(false);
-    closeMenu();
-  };
-
-  const saveTemplateEntryHandler = async () => {
-    if (!selectedTemplate) return;
-
+  const loadSettings = async () => {
     try {
-      const entry: TemplateEntry = {
-        id: Date.now().toString(),
-        templateId: selectedTemplate.id,
-        templateName: selectedTemplate.name,
-        values: templateValues,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      await saveTemplateEntry(entry);
-      setIsFillingTemplate(false);
-      setSelectedTemplate(null);
-      setTemplateValues({});
-      Alert.alert('Success', 'Template entry saved successfully!');
+      const userSettings = await getUserSettings();
+      setSettings(userSettings);
+      console.log('[NOTES] Settings loaded:', userSettings.speechProvider);
     } catch (error) {
-      console.error('Error saving template entry:', error);
-      Alert.alert('Error', 'Failed to save template entry');
+      console.error('[NOTES] Error loading settings:', error);
     }
   };
 
-  const handleVoiceInputForTemplate = async (fieldId: string) => {
+  const handleVoiceInput = async () => {
     try {
+      setIsListening(true);
       const speechText = await mockSpeechToText();
-      setTemplateValues(prev => ({
-        ...prev,
-        [fieldId]: (prev[fieldId] || '') + (prev[fieldId] ? '\n' : '') + speechText,
-      }));
+      setSearchQuery(speechText);
     } catch (error) {
       Alert.alert('Error', 'Failed to convert speech to text');
+    } finally {
+      setIsListening(false);
     }
   };
 
@@ -453,17 +520,7 @@ export default function NotesScreen() {
       toValue: 0,
       duration: 300,
       useNativeDriver: true,
-    }).start(() => {
-      // Restore scroll position after menu animation completes
-      if (menuFlatListRef.current && menuScrollOffset > 0) {
-        setTimeout(() => {
-          menuFlatListRef.current?.scrollToOffset({ 
-            offset: menuScrollOffset, 
-            animated: false 
-          });
-        }, 100);
-      }
-    });
+    }).start();
   };
 
   const closeMenu = () => {
@@ -476,880 +533,453 @@ export default function NotesScreen() {
     });
   };
 
-  const renderNote = ({ item }: { item: SimpleNote }) => (
-    <TouchableOpacity style={styles.noteCard} onPress={() => editNote(item)}>
-      <View style={styles.noteHeader}>
-        <Text style={styles.noteDate}>
-          {new Date(item.createdAt).toLocaleDateString()} {new Date(item.createdAt).toLocaleTimeString()}
-        </Text>
-        <TouchableOpacity onPress={() => deleteNoteHandler(item.id)} style={styles.deleteButton}>
-          <Text style={styles.deleteButtonText}>Delete</Text>
-        </TouchableOpacity>
-      </View>
-      {item.title && (
-        <Text style={styles.noteTitle} numberOfLines={2}>
-          {item.title}
-        </Text>
-      )}
-      <Text style={styles.noteContent} numberOfLines={item.title ? 2 : 3}>
-        {item.content}
-      </Text>
-    </TouchableOpacity>
-  );
+  // Show note creation/editing screen
+  if (isCreating) {
+    return <NoteEditorScreen 
+      isEditing={isEditing}
+      noteTitle={currentNoteTitle}
+      noteContent={currentNoteText}
+      onSave={saveCurrentNote}
+      onBack={() => {
+        setIsCreating(false);
+        setIsEditing(false);
+        setEditingNoteId(null);
+        setCurrentNoteText('');
+        setCurrentNoteTitle('');
+      }}
+      onTitleChange={setCurrentNoteTitle}
+      onContentChange={setCurrentNoteText}
+    />;
+  }
 
-  const renderTemplateField = (field: FieldType) => (
-    <View key={field.id} style={styles.fieldContainer}>
-      <View style={styles.fieldInputHeader}>
-        <Text style={styles.fieldLabel}>{field.label}</Text>
-        {(field.type === 'text' || field.type === 'longtext') && (
-          <TouchableOpacity
-            style={styles.voiceButton}
-            onPress={() => handleVoiceInputForTemplate(field.id)}
-          >
-            <Text style={styles.voiceButtonText}>🎤</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-      {field.type === 'longtext' ? (
-        <TextInput
-          style={[styles.fieldInput, styles.longTextInput]}
-          value={templateValues[field.id] || ''}
-          onChangeText={(text) => setTemplateValues(prev => ({ ...prev, [field.id]: text }))}
-          placeholder={`Enter ${field.label.toLowerCase()}`}
-          multiline
-          textAlignVertical="top"
-        />
-      ) : (
-        <TextInput
-          style={styles.fieldInput}
-          value={templateValues[field.id] || ''}
-          onChangeText={(text) => setTemplateValues(prev => ({ ...prev, [field.id]: text }))}
-          placeholder={`Enter ${field.label.toLowerCase()}`}
-          keyboardType={field.type === 'number' ? 'numeric' : 'default'}
-        />
-      )}
-    </View>
-  );
-
-  const loadSettings = async () => {
-    try {
-      const userSettings = await getUserSettings();
-      setSettings(userSettings);
-      console.log('[NOTES] Settings loaded:', userSettings.voiceRecognitionMethod);
-    } catch (error) {
-      console.error('[NOTES] Error loading settings:', error);
-    }
+  const renderNoteCard = ({ item, index }: { item: SimpleNote; index: number }) => {
+    const isImageNote = item.content.includes('data:image') || item.content.includes('.png') || item.content.includes('.jpg');
+    
+    return (
+      <TouchableOpacity 
+        style={[styles.noteCard, { width: (Dimensions.get('window').width - 60) / 3 }]}
+        onPress={() => editNote(item)}
+        onLongPress={() => deleteNoteHandler(item.id)}
+      >
+        <View style={styles.noteCardInner}>
+          {item.title && (
+            <Text style={styles.noteCardTitle} numberOfLines={2}>
+              {item.title}
+            </Text>
+          )}
+          <Text style={styles.noteCardContent} numberOfLines={isImageNote ? 2 : 4}>
+            {isImageNote ? 'Image note' : item.content}
+          </Text>
+          <Text style={styles.noteCardDate}>
+            {new Date(item.createdAt).toLocaleDateString()}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
-  useEffect(() => {
-    loadNotes();
-
-    // Subscribe to real-time events from other screens
-    const unsubscribeNoteCreated = eventBus.subscribe(EVENTS.NOTE_CREATED, (newNote: Note) => {
-      console.log('[NOTES] Real-time: Note created from external source');
-      // Ensure new notes created via voice are placed at the top
-      setNotes(prevNotes => [newNote, ...prevNotes]);
-      setFilteredNotes(prevNotes => [newNote, ...prevNotes]);
-    });
-
-    const unsubscribeNoteUpdated = eventBus.subscribe(EVENTS.NOTE_UPDATED, (updatedNote: Note) => {
-      console.log('[NOTES] Real-time: Note updated from external source');
-      setNotes(prevNotes => 
-        prevNotes.map(note => note.id === updatedNote.id ? updatedNote : note)
-      );
-    });
-
-    // Subscribe to template events to refresh the templates menu
-    const unsubscribeTemplateCreated = eventBus.subscribe(EVENTS.TEMPLATE_CREATED, (template: CustomTemplate) => {
-      console.log('[NOTES] Real-time: Template created, reloading templates...');
-      loadTemplates();
-      
-      // Force re-render of filtered templates for search
-      const currentQuery = searchQuery;
-      setSearchQuery('');
-      setTimeout(() => setSearchQuery(currentQuery), 100);
-    });
-
-    const unsubscribeTemplateUpdated = eventBus.subscribe(EVENTS.TEMPLATE_UPDATED, (template: CustomTemplate) => {
-      console.log('[NOTES] Real-time: Template updated, reloading templates...');
-      loadTemplates();
-      
-      // Force re-render of filtered templates for search
-      const currentQuery = searchQuery;
-      setSearchQuery('');
-      setTimeout(() => setSearchQuery(currentQuery), 100);
-    });
-
-    return () => {
-      unsubscribeNoteCreated();
-      unsubscribeNoteUpdated();
-      unsubscribeTemplateCreated();
-      unsubscribeTemplateUpdated();
-    };
-  }, []);
-
-  if (currentView === 'template' && selectedTemplateId) {
-    return (
-      <TemplateEntriesScreen
-        templateId={selectedTemplateId}
-        onBack={() => {
-          setCurrentView('notes');
-          setSelectedTemplateId(null);
-          // Restore the menu state to where the user was before opening the template
-          setIsMenuVisible(true);
-          openMenu();
-        }}
-      />
-    );
-  }
-
-  if (currentView === 'create-template') {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>New Template</Text>
-          <View style={styles.headerButtons}>
-            <TouchableOpacity style={styles.iconButton} onPress={saveTemplate}>
-              <Text style={styles.iconButtonText}>Save</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => {
-                setCurrentView('notes');
-                setTemplateName('');
-                setTemplateDescription('');
-                setTemplateFields([]);
-                setNewFieldName('');
-              }}
-            >
-              <Text style={styles.iconButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
+  const renderNotesGrid = () => {
+    if (filteredNotes.length === 0) {
+      return (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateText}>No notes yet</Text>
+          <Text style={styles.emptyStateSubtext}>Tap + to create your first note</Text>
         </View>
+      );
+    }
 
-        <ScrollView style={styles.editorContainer} contentContainerStyle={styles.templateFormContainer}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.fieldLabel}>Template Name *</Text>
-            <TextInput
-              style={styles.fieldInput}
-              value={templateName}
-              onChangeText={setTemplateName}
-              placeholder="Enter template name"
-              placeholderTextColor="#6B7280"
-            />
-          </View>
+    // Group notes into rows of 3
+    const rows = [];
+    for (let i = 0; i < filteredNotes.length; i += 3) {
+      rows.push(filteredNotes.slice(i, i + 3));
+    }
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.fieldLabel}>Description</Text>
-            <TextInput
-              style={[styles.fieldInput, styles.longTextInput]}
-              value={templateDescription}
-              onChangeText={setTemplateDescription}
-              placeholder="Enter template description (optional)"
-              placeholderTextColor="#6B7280"
-              multiline
-              numberOfLines={3}
-            />
-          </View>
-
-          <View style={styles.fieldsSection}>
-            <Text style={styles.sectionTitle}>Fields</Text>
-
-            <View style={styles.addFieldContainer}>
-              <TextInput
-                style={styles.fieldInput}
-                value={newFieldName}
-                onChangeText={setNewFieldName}
-                placeholder="Field name"
-                placeholderTextColor="#6B7280"
-              />
-              <View style={styles.fieldTypeContainer}>
-                {(['text', 'longtext', 'number'] as const).map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[
-                      styles.typeButton,
-                      newFieldType === type && styles.typeButtonActive,
-                    ]}
-                    onPress={() => setNewFieldType(type)}
-                  >
-                    <Text style={[
-                      styles.typeButtonText,
-                      newFieldType === type && styles.typeButtonTextActive,
-                    ]}>
-                      {type}
-                    </Text>
-                  </TouchableOpacity>
+    return (
+      <ScrollView style={styles.notesGrid} showsVerticalScrollIndicator={false}>
+        {/* Pinned section */}
+        {filteredNotes.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Pinned</Text>
+            {rows.slice(0, 1).map((row, rowIndex) => (
+              <View key={`pinned-${rowIndex}`} style={styles.notesRow}>
+                {row.map((note, noteIndex) => (
+                  <View key={note.id} style={{ flex: 1 }}>
+                    {renderNoteCard({ item: note, index: noteIndex })}
+                  </View>
+                ))}
+                {/* Fill empty spaces */}
+                {row.length < 3 && Array.from({ length: 3 - row.length }).map((_, emptyIndex) => (
+                  <View key={`empty-${emptyIndex}`} style={{ flex: 1 }} />
                 ))}
               </View>
-              <TouchableOpacity style={styles.addFieldButton} onPress={addTemplateField}>
-                <Text style={styles.addFieldButtonText}>Add Field</Text>
-              </TouchableOpacity>
-            </View>
+            ))}
+          </View>
+        )}
 
-            <FlatList
-              data={templateFields}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <View style={styles.fieldItem}>
-                  <View style={styles.fieldInfo}>
-                    <Text style={styles.fieldName}>{item.label}</Text>
-                    <Text style={styles.fieldType}>{item.type}</Text>
+        {/* Others section */}
+        {rows.length > 1 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Others</Text>
+            {rows.slice(1).map((row, rowIndex) => (
+              <View key={`others-${rowIndex}`} style={styles.notesRow}>
+                {row.map((note, noteIndex) => (
+                  <View key={note.id} style={{ flex: 1 }}>
+                    {renderNoteCard({ item: note, index: noteIndex })}
                   </View>
-                  <TouchableOpacity onPress={() => removeTemplateField(item.id)}>
-                    <Text style={styles.removeFieldText}>Remove</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-              style={styles.fieldsList}
-              scrollEnabled={false}
-            />
+                ))}
+                {/* Fill empty spaces */}
+                {row.length < 3 && Array.from({ length: 3 - row.length }).map((_, emptyIndex) => (
+                  <View key={`empty-${emptyIndex}`} style={{ flex: 1 }} />
+                ))}
+              </View>
+            ))}
           </View>
-        </ScrollView>
-      </SafeAreaView>
+        )}
+        
+        {/* Bottom padding for FAB */}
+        <View style={{ height: 100 }} />
+      </ScrollView>
     );
-  }
-
-  if (isFillingTemplate && selectedTemplate) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Fill {selectedTemplate.name}</Text>
-          <View style={styles.headerButtons}>
-            <TouchableOpacity style={styles.iconButton} onPress={saveTemplateEntryHandler}>
-              <Text style={styles.iconButtonText}>Save</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => {
-                setIsFillingTemplate(false);
-                setSelectedTemplate(null);
-                setTemplateValues({});
-              }}
-            >
-              <Text style={styles.iconButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <ScrollView style={styles.editorContainer} contentContainerStyle={styles.templateContentContainer}>
-          {selectedTemplate.fields.map(field => renderTemplateField(field))}
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
-  if (isCreating) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>{isEditing ? 'Edit Note' : 'New Note'}</Text>
-          <View style={styles.headerButtons}>
-            <TouchableOpacity style={styles.iconButton} onPress={saveCurrentNote}>
-              <Text style={styles.iconButtonText}>Save</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => {
-                setIsCreating(false);
-                setIsEditing(false);
-                setEditingNoteId(null);
-                setCurrentNoteText('');
-                setCurrentNoteTitle('');
-                setSelectedWritingStyle('mind_dump');
-                setNoteSections([]);
-                setCheckedItems([]);
-              }}
-            >
-              <Text style={styles.iconButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.editorContainer}>
-          <TextInput
-            style={styles.titleInput}
-            placeholder="Enter title (optional)"
-            value={currentNoteTitle}
-            onChangeText={setCurrentNoteTitle}
-          />
-          <WritingStyleSelector
-            selectedStyle={selectedWritingStyle}
-            onStyleChange={handleWritingStyleChange}
-          />
-          <WritingStyleEditor
-            style={selectedWritingStyle}
-            content={currentNoteText}
-            sections={noteSections}
-            checkedItems={checkedItems}
-            onContentChange={handleContentChange}
-          />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.darkContainer}>
+      {/* Header with hamburger, search, and mic */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Notes</Text>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.iconButton} onPress={openMenu}>
-            <IconSymbol size={24} name="line.horizontal.3" color="#FFFFFF" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton} onPress={() => setIsCreating(true)}>
-            <Text style={styles.iconButtonText}>New Note</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+        <TouchableOpacity style={styles.hamburgerButton} onPress={openMenu}>
+          <Ionicons name="menu" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
 
-      {isSearchVisible && (
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
+            placeholder="Search Keep"
+            placeholderTextColor="#999999"
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Search notes..."
-            autoFocus
           />
-          <TouchableOpacity 
-            style={styles.searchCloseButton} 
-            onPress={() => {
-              setIsSearchVisible(false);
-              setSearchQuery('');
-            }}
-          >
-            <Text style={styles.searchCloseText}>Close</Text>
-          </TouchableOpacity>
         </View>
-      )}
 
-      {notes.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No notes yet.</Text>
-          <Text style={styles.emptySubtext}>Tap "New Note" to get started!</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredNotes}
-          renderItem={renderNote}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.notesList}
-        />
-      )}
+        <TouchableOpacity style={styles.micButton} onPress={handleVoiceInput}>
+          <Ionicons 
+            name="mic" 
+            size={20} 
+            color={isListening ? "#00FF7F" : "#FFFFFF"} 
+          />
+        </TouchableOpacity>
+      </View>
 
+      {/* Notes Grid */}
+      {renderNotesGrid()}
+
+      {/* Floating Action Button */}
+      <TouchableOpacity 
+        style={styles.fab}
+        onPress={() => setIsCreating(true)}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="add" size={28} color="#000000" />
+      </TouchableOpacity>
+
+      {/* Slide Menu */}
       {isMenuVisible && (
-        <TouchableWithoutFeedback onPress={closeMenu}>
-          <View style={styles.menuOverlay}>
-            <TouchableWithoutFeedback>
-              <Animated.View style={[styles.slidingMenu, { transform: [{ translateX: slideAnim }] }]}>
-                <View style={styles.menuHeader}>
-                  <Text style={styles.menuTitle}>Templates</Text>
-                  <TouchableOpacity style={styles.menuCloseButton} onPress={closeMenu}>
-                    <Text style={styles.menuCloseText}>Close</Text>
+        <Modal
+          transparent={true}
+          animationType="none"
+          visible={isMenuVisible}
+          onRequestClose={closeMenu}
+        >
+          <TouchableWithoutFeedback onPress={closeMenu}>
+            <View style={styles.menuOverlay}>
+              <TouchableWithoutFeedback>
+                <Animated.View style={[styles.slideMenu, { transform: [{ translateX: slideAnim }] }]}>
+                  <Text style={styles.menuTitle}>Menu</Text>
+                  <TouchableOpacity style={styles.menuItem} onPress={() => {
+                    closeMenu();
+                    setCurrentView('create-template');
+                  }}>
+                    <Text style={styles.menuItemText}>Create Template</Text>
                   </TouchableOpacity>
-                </View>
-                <View style={styles.menuSearchContainer}>
-                  <TextInput
-                    style={styles.menuSearchInput}
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    placeholder="Search templates..."
-                  />
-                </View>
-                {filteredTemplates.length === 0 ? (
-                  <View style={styles.emptyMenuContainer}>
-                    <Text style={styles.emptyMenuText}>No templates available</Text>
-                    <Text style={styles.emptyMenuSubtext}>Create templates in the Templates tab first</Text>
-                  </View>
-                ) : (
-                  <FlatList
-                    ref={menuFlatListRef}
-                    data={filteredTemplates}
-                    renderItem={({ item }) => (
-                      <TouchableOpacity
-                        style={styles.menuItem}
-                        onPress={() => navigateToTemplate(item)}
-                      >
-                        <Text style={styles.menuItemTitle}>{item.name}</Text>
-                        <Text style={styles.menuItemSubtitle}>{item.fields.length} fields</Text>
-                      </TouchableOpacity>
-                    )}
-                    keyExtractor={(item) => item.id}
-                    style={styles.menuList}
-                    onScroll={(event) => {
-                      setMenuScrollOffset(event.nativeEvent.contentOffset.y);
-                    }}
-                    scrollEventThrottle={16}
-                  />
-                )}
-                <View style={styles.menuFooter}>
-                  <TouchableOpacity
-                    style={styles.newTemplateButton}
-                    onPress={() => {
-                      setCurrentView('create-template');
-                      closeMenu();
-                    }}
-                  >
-                    <Text style={styles.newTemplateButtonText}>+ New Template</Text>
+                  <TouchableOpacity style={styles.menuItem} onPress={closeMenu}>
+                    <Text style={styles.menuItemText}>Settings</Text>
                   </TouchableOpacity>
-                </View>
-              </Animated.View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
+                </Animated.View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
       )}
-
-
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  darkContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1A1A1A',
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    backgroundColor: '#000000',
-    borderBottomWidth: 1,
-    borderBottomColor: '#333333',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    fontFamily: 'Inter',
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  iconButton: {
-    paddingHorizontal: 12,
     paddingVertical: 12,
-    borderRadius: 8,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#1A1A1A',
   },
-  iconButtonText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#FFFFFF',
-    fontFamily: 'Inter',
+  hamburgerButton: {
+    padding: 8,
+    marginRight: 12,
   },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flex: 1,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 24,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    gap: 8,
+    marginRight: 12,
   },
   searchInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
+    color: '#FFFFFF',
     fontSize: 16,
-    fontFamily: 'Inter',
-    color: '#000000',
+    paddingVertical: 12,
   },
-  searchCloseButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    minHeight: 36,
+  micButton: {
+    padding: 8,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  searchCloseText: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '500',
-    fontFamily: 'Inter',
+  section: {
+    marginBottom: 24,
   },
-  notesList: {
-    padding: 16,
+  sectionTitle: {
+    color: '#CCCCCC',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    marginLeft: 20,
+  },
+  notesGrid: {
+    flex: 1,
+    paddingTop: 16,
+  },
+  notesRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginBottom: 16,
   },
   noteCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#2A2A2A',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    marginHorizontal: 4,
+    elevation: 4,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
-  noteHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+  noteCardInner: {
+    padding: 12,
+    minHeight: 120,
   },
-  noteDate: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontFamily: 'Inter',
-    fontWeight: '500',
-  },
-  deleteButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  deleteButtonText: {
-    fontSize: 13,
-    color: '#000000',
-    fontFamily: 'Inter',
-  },
-  noteTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000000',
-    fontFamily: 'Inter',
+  noteCardTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
     marginBottom: 8,
   },
-  noteContent: {
-    fontSize: 16,
-    color: '#000000',
-    lineHeight: 25.6,
-    fontFamily: 'Inter',
-  },
-  menuSearchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  menuSearchInput: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 16,
-    backgroundColor: '#FFFFFF',
-    fontFamily: 'Inter',
-  },
-  voiceButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  voiceButtonText: {
-    fontSize: 13,
-    color: '#000000',
-    fontFamily: 'Inter',
-  },
-  editorContainer: {
+  noteCardContent: {
+    color: '#CCCCCC',
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: 8,
     flex: 1,
-    padding: 16,
-    backgroundColor: '#FFFFFF',
   },
-  noteEditor: {
-    flex: 1,
-    fontSize: 16,
-    lineHeight: 25.6,
-    color: '#000000',
-    textAlignVertical: 'top',
-    fontFamily: 'Inter',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    padding: 16,
-    backgroundColor: '#FFFFFF',
+  noteCardDate: {
+    color: '#666666',
+    fontSize: 10,
+    marginTop: 'auto',
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
   },
-  emptyText: {
-    fontSize: 20,
-    color: '#000000',
-    fontFamily: 'Inter',
-    fontWeight: 'bold',
+  emptyStateText: {
+    color: '#CCCCCC',
+    fontSize: 18,
+    fontWeight: '600',
     marginBottom: 8,
-    textAlign: 'center',
   },
-  emptySubtext: {
-    fontSize: 16,
-    color: '#6B7280',
-    textAlign: 'center',
-    fontFamily: 'Inter',
-    lineHeight: 25.6,
+  emptyStateSubtext: {
+    color: '#666666',
+    fontSize: 14,
   },
-  menuOverlay: {
+  fab: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    zIndex: 1000,
-  },
-  slidingMenu: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    bottom: 0,
-    width: '80%',
-    backgroundColor: '#FFFFFF',
-  },
-  menuHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    bottom: 30,
+    right: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#00FF7F',
     alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: '#00FF7F',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+  },
+  // Note Editor styles
+  editorContainer: {
+    flex: 1,
+  },
+  noteEditorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  noteEditorBackButton: {
+    padding: 8,
+  },
+  noteEditorHeaderIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  noteEditorHeaderIcon: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  noteEditorContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  noteEditorTitle: {
+    fontSize: 24,
+    color: '#FFFFFF',
+    fontWeight: '400',
+    marginBottom: 20,
+    opacity: 0.7,
+  },
+  noteEditorBody: {
+    fontSize: 18,
+    color: '#FFFFFF',
+    fontWeight: '400',
+    lineHeight: 26,
+    opacity: 0.8,
+    minHeight: 400,
+  },
+  noteEditorBottomBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+  },
+  noteEditorBottomLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  noteEditorBottomButton: {
+    padding: 12,
+    marginRight: 16,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 8,
+  },
+  // Color Picker styles
+  colorPickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  colorPickerModal: {
+    backgroundColor: '#2A2A2A',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 40,
+  },
+  colorPickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    borderBottomColor: '#3A3A3A',
+  },
+  colorPickerTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  colorPickerScroll: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  colorPickerItem: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  colorPickerItemText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  // Menu styles
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  slideMenu: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: Dimensions.get('window').width * 0.75,
+    backgroundColor: '#2A2A2A',
+    paddingTop: 60,
+    paddingHorizontal: 20,
   },
   menuTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000000',
-    fontFamily: 'Inter',
-  },
-  menuCloseButton: {
-    padding: 4,
-  },
-  menuCloseText: {
-    fontSize: 13,
-    color: '#000000',
-    fontWeight: '500',
-    fontFamily: 'Inter',
-  },
-  menuList: {
-    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '600',
+    marginBottom: 30,
   },
   menuItem: {
     paddingVertical: 16,
-    paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#3A3A3A',
   },
-  menuItemTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 4,
-    fontFamily: 'Inter',
-  },
-  menuItemSubtitle: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontFamily: 'Inter',
-  },
-  emptyMenuContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
-  },
-  emptyMenuText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 8,
-    fontFamily: 'Inter',
-  },
-  emptyMenuSubtext: {
-    fontSize: 13,
-    color: '#6B7280',
-    textAlign: 'center',
-    fontFamily: 'Inter',
-    lineHeight: 25.6,
-  },
-  fieldContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  fieldInputHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  fieldLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000000',
-    fontFamily: 'Inter',
-  },
-  fieldInput: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#FFFFFF',
-    fontFamily: 'Inter',
-    color: '#000000',
-  },
-  longTextInput: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  templateContentContainer: {
-    padding: 16,
-  },
-  titleInput: {
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#FFFFFF',
-    fontFamily: 'Inter',
-    color: '#000000',
-    marginBottom: 16,
-  },
-  menuFooter: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
-  },
-  newTemplateButton: {
-    backgroundColor: '#000000',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 44,
-  },
-  newTemplateButtonText: {
+  menuItemText: {
     color: '#FFFFFF',
-    fontWeight: '500',
-    fontSize: 14,
-    fontFamily: 'Inter',
-  },
-  templateFormContainer: {
-    padding: 16,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  fieldsSection: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000000',
-    fontFamily: 'Inter',
-    marginBottom: 16,
-  },
-  addFieldContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  fieldTypeContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  typeButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  typeButtonActive: {
-    backgroundColor: '#000000',
-    borderColor: '#000000',
-  },
-  typeButtonText: {
-    fontSize: 13,
-    color: '#000000',
-    fontWeight: '500',
-    fontFamily: 'Inter',
-  },
-  typeButtonTextActive: {
-    color: '#FFFFFF',
-  },
-  addFieldButton: {
-    backgroundColor: '#000000',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  addFieldButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '500',
-    fontSize: 13,
-    fontFamily: 'Inter',
-  },
-  fieldsList: {
-    maxHeight: 300,
-  },
-  fieldItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  fieldInfo: {
-    flex: 1,
-  },
-  fieldName: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#000000',
-    fontFamily: 'Inter',
   },
-  fieldType: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontFamily: 'Inter',
-    marginTop: 2,
-  },
-  removeFieldText: {
-    fontSize: 13,
-    color: '#000000',
-    fontFamily: 'Inter',
-    fontWeight: '500',
-  },
-
 });

@@ -1,5 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Note, Task, Reminder, CustomTemplate, TemplateEntry, UserSettings, Habit } from '@/types';
+
+interface Template {
+  id: string;
+  name: string;
+  description?: string;
+  fields: any[];
+  createdAt: string;
+  updatedAt: string;
+}
 import { eventBus, EVENTS } from './eventBus';
 
 const KEYS = {
@@ -10,17 +19,18 @@ const KEYS = {
 };
 
 const DEFAULT_SETTINGS: UserSettings = {
-  viewMode: 'paragraph',
+  speechProvider: 'assemblyai-regex',
+  ringtone: 'default',
+  vibrationEnabled: true,
+  darkMode: false,
+  notifications: true,
   notificationsEnabled: true,
   theme: 'auto',
   autoSync: true,
+  viewMode: 'paragraph',
   isOnboardingComplete: false,
-  voiceRecognitionMethod: 'assemblyai-regex',
-  voiceLanguage: 'en-US',
   alarmEnabled: true,
   alarmSound: 'default',
-  vibrationEnabled: true,
-  alarmDuration: 5,
 };
 
 // Notes
@@ -385,12 +395,6 @@ export const deleteHabit = async (habitId: string): Promise<void> => {
   }
 };
 
-export interface UserSettings {
-  viewMode?: 'paragraph' | 'bullet';
-  notificationsEnabled?: boolean;
-  theme?: 'light' | 'dark' | 'auto';
-  autoSync?: boolean;
-  isOnboardingComplete?: boolean;
-  voiceRecognitionMethod?: 'assemblyai-regex' | 'assemblyai-gemini';
-  voiceLanguage?: string;
-}
+// Remove duplicate UserSettings interface - using the one from types/index.ts
+export const updateNote = saveNote; // Alias for backward compatibility
+export { mockSpeechToText } from './speech';
