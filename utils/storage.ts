@@ -46,6 +46,8 @@ export const getNotes = async (): Promise<Note[]> => {
         writingStyle: note.writingStyle || 'mind_dump',
         sections: note.sections || undefined,
         checkedItems: note.checkedItems || undefined,
+        images: note.images || [],
+        isPinned: note.isPinned || false,
       }));
     }
     return [];

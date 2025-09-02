@@ -31,6 +31,13 @@ import NotesGrid from '@/components/Notes/NotesGrid';
 import WritingStyleSelector from '@/components/WritingStyleSelector';
 import WritingStyleEditor from '@/components/WritingStyleEditor';
 
+interface ImageAttachment {
+  id: string;
+  uri: string;
+  type: 'photo' | 'image';
+  createdAt: string;
+}
+
 interface SimpleNote {
   id: string;
   title?: string;
@@ -40,6 +47,7 @@ interface SimpleNote {
   theme?: string;
   gradient?: string[];
   isPinned?: boolean;
+  images?: ImageAttachment[];
 }
 
 export default function NotesScreen() {
@@ -86,6 +94,7 @@ export default function NotesScreen() {
   const [checkedItems, setCheckedItems] = useState<boolean[]>([]);
   const [currentNoteTheme, setCurrentNoteTheme] = useState<string>('#1C1C1C');
   const [currentNoteGradient, setCurrentNoteGradient] = useState<string[] | null>(null);
+  const [currentNoteImages, setCurrentNoteImages] = useState<ImageAttachment[]>([]);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
   const [menuScrollOffset, setMenuScrollOffset] = useState(0);
   const menuFlatListRef = useRef<FlatList>(null);
@@ -140,6 +149,7 @@ export default function NotesScreen() {
         theme: note.theme,
         gradient: note.gradient,
         isPinned: note.isPinned || false,
+        images: note.images || [],
       }));
 
       const sortedNotes = simpleNotes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -203,7 +213,7 @@ export default function NotesScreen() {
     }
   };
 
-  const saveCurrentNote = async (theme?: string, gradient?: string[], isPinned?: boolean) => {
+  const saveCurrentNote = async (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[]) => {
     if (!currentNoteText.trim() && noteSections.length === 0) {
       Alert.alert('Error', 'Please enter some content for your note');
       return;
@@ -241,6 +251,7 @@ export default function NotesScreen() {
             checkedItems: checkedItems.length > 0 ? checkedItems : undefined,
             theme: theme || currentNoteTheme,
             gradient: gradient || currentNoteGradient || undefined,
+            images: images || currentNoteImages,
             updatedAt: now,
             isPinned: isPinned !== undefined ? isPinned : existingNote.isPinned,
           };
@@ -257,6 +268,7 @@ export default function NotesScreen() {
           checkedItems: checkedItems.length > 0 ? checkedItems : undefined,
           theme: theme || currentNoteTheme,
           gradient: gradient || currentNoteGradient || undefined,
+          images: images || currentNoteImages,
           createdAt: now,
           updatedAt: now,
           isPinned: isPinned || false,
@@ -274,6 +286,7 @@ export default function NotesScreen() {
       setCheckedItems([]);
       setCurrentNoteTheme('#1C1C1C');
       setCurrentNoteGradient(null);
+      setCurrentNoteImages([]);
       setIsCreating(false);
       setIsEditing(false);
       setEditingNoteId(null);
@@ -296,6 +309,7 @@ export default function NotesScreen() {
         setCheckedItems(fullNote.checkedItems || []);
         setCurrentNoteTheme(fullNote.theme || '#1C1C1C');
         setCurrentNoteGradient(fullNote.gradient || null);
+        setCurrentNoteImages(fullNote.images || []);
         setCurrentNotePinned(fullNote.isPinned || false);
       } else {
         setCurrentNoteText(note.content);
@@ -305,6 +319,7 @@ export default function NotesScreen() {
         setCheckedItems([]);
         setCurrentNoteTheme('#1C1C1C');
         setCurrentNoteGradient(null);
+        setCurrentNoteImages(note.images || []);
         setCurrentNotePinned(note.isPinned || false);
       }
 
@@ -397,7 +412,9 @@ export default function NotesScreen() {
         noteTheme={currentNoteTheme}
         noteGradient={currentNoteGradient}
         isPinned={currentNotePinned}
+        images={currentNoteImages}
         onSave={saveCurrentNote}
+        onImagesChange={setCurrentNoteImages}
         onBack={() => {
           setIsCreating(false);
           setIsEditing(false);
@@ -407,6 +424,7 @@ export default function NotesScreen() {
           setCurrentNotePinned(false);
           setCurrentNoteTheme('#1C1C1C');
           setCurrentNoteGradient(null);
+          setCurrentNoteImages([]);
         }}
         onTitleChange={setCurrentNoteTitle}
         onContentChange={setCurrentNoteText}

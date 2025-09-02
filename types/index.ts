@@ -24,6 +24,7 @@ export interface Note {
   theme?: string;
   gradient?: string[];
   images?: ImageAttachment[];
+  isPinned?: boolean;
   createdAt: string;
   updatedAt: string;
 }
