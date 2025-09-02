@@ -147,8 +147,7 @@ export default function NoteEditorScreen({
 
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
+      allowsEditing: false,
       quality: 0.8,
     });
 
@@ -169,20 +168,20 @@ export default function NoteEditorScreen({
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
+      allowsEditing: false,
       quality: 0.8,
-      allowsMultipleSelection: false,
+      allowsMultipleSelection: true,
+      selectionLimit: 10,
     });
 
-    if (!result.canceled && result.assets[0]) {
-      const newImage: ImageAttachment = {
-        id: Date.now().toString(),
-        uri: result.assets[0].uri,
+    if (!result.canceled && result.assets) {
+      const newImages: ImageAttachment[] = result.assets.map((asset, index) => ({
+        id: (Date.now() + index).toString(),
+        uri: asset.uri,
         type: 'image',
         createdAt: new Date().toISOString(),
-      };
-      setNoteImages([...noteImages, newImage]);
+      }));
+      setNoteImages([...noteImages, ...newImages]);
     }
   };
 
@@ -490,9 +489,9 @@ const styles = StyleSheet.create({
     paddingLeft: 20,
   },
   imageCard: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
+    width: 120,
+    height: 120,
+    borderRadius: 16,
     backgroundColor: '#F0F0F0',
     borderWidth: 2,
     borderColor: '#D0D0D0',
@@ -502,6 +501,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 8,
     overflow: 'hidden',
+    marginRight: 8,
   },
   attachedImage: {
     width: '100%',
