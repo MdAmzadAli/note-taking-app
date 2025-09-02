@@ -96,8 +96,16 @@ export default function SlideMenu({
                 {/* Notes Section - Default Selected */}
                 <TouchableOpacity style={styles.notesSection}>
                   <View style={styles.notesItem}>
-                    <Ionicons name="bulb-outline" size={20} color="#34D399" />
+                    <Ionicons name="bulb-outline" size={20} color="#FFFFFF" />
                     <Text style={styles.notesText}>Notes</Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Reminders Section */}
+                <TouchableOpacity style={styles.remindersSection}>
+                  <View style={styles.remindersItem}>
+                    <Ionicons name="notifications-outline" size={20} color="#9CA3AF" />
+                    <Text style={styles.remindersText}>Reminders</Text>
                   </View>
                 </TouchableOpacity>
 
@@ -184,15 +192,30 @@ const styles = StyleSheet.create({
   notesItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#34D399',
+    backgroundColor: '#1976D2',
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 24,
   },
   notesText: {
-    color: '#000000',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '500',
+    marginLeft: 12,
+  },
+  remindersSection: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  remindersItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  remindersText: {
+    color: '#E8EAED',
+    fontSize: 16,
     marginLeft: 12,
   },
   separator: {
