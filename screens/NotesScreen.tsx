@@ -469,22 +469,22 @@ export default function NotesScreen() {
             />
           </TouchableOpacity>
         </View>
+
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+          {renderNotesGrid()}
+        </ScrollView>
+
+        <TouchableOpacity 
+          style={styles.fab}
+          onPress={() => {
+            setIsCreating(true);
+            setCurrentNotePinned(false);
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="add" size={28} color="#000000" />
+        </TouchableOpacity>
       </SafeAreaView>
-
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        {renderNotesGrid()}
-      </ScrollView>
-
-      <TouchableOpacity 
-        style={styles.fab}
-        onPress={() => {
-          setIsCreating(true);
-          setCurrentNotePinned(false);
-        }}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="add" size={28} color="#000000" />
-      </TouchableOpacity>
 
       <SlideMenu
         visible={isMenuVisible}
@@ -505,7 +505,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#1C1C1C',
   },
   safeAreaContainer: {
-    backgroundColor: '#1C1C1C',
+    flex: 1,
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',

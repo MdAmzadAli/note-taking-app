@@ -292,8 +292,8 @@ export default function NoteEditorScreen({
       {renderBackground()}
       <StatusBar barStyle="light-content" backgroundColor={selectedTheme} translucent={true} />
 
-      {/* Header */}
-      <SafeAreaView style={styles.safeAreaHeader}>
+      <SafeAreaView style={styles.safeAreaContainer}>
+        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
@@ -323,88 +323,88 @@ export default function NoteEditorScreen({
             </TouchableOpacity>
           </View>
         </View>
-      </SafeAreaView>
 
-      {/* Main Content */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Image Gallery */}
-        {noteImages.length > 0 && (
-          <View style={styles.imageGallery}>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              style={styles.imageScrollView}
+        {/* Main Content */}
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Image Gallery */}
+          {noteImages.length > 0 && (
+            <View style={styles.imageGallery}>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                style={styles.imageScrollView}
+              >
+                {noteImages.map((image, index) => (
+                  <TouchableOpacity
+                    key={image.id}
+                    style={[
+                      styles.imageCard,
+                      {
+                        zIndex: noteImages.length - index,
+                        transform: [
+                          { rotate: `${(index % 3 - 1) * 3}deg` },
+                          { translateY: index * 2 },
+                          { translateX: index * -8 },
+                        ],
+                      },
+                    ]}
+                    onPress={() => handleImagePress(image.uri)}
+                    activeOpacity={0.8}
+                  >
+                    <Image
+                      source={{ uri: image.uri }}
+                      style={styles.attachedImage}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          <TextInput
+            style={styles.titleInput}
+            placeholder="Title"
+            placeholderTextColor="#888888"
+            value={noteTitle}
+            onChangeText={onTitleChange}
+            multiline={false}
+          />
+
+          <TextInput
+            style={styles.bodyInput}
+            placeholder="Note"
+            placeholderTextColor="#888888"
+            value={noteContent}
+            onChangeText={onContentChange}
+            multiline={true}
+            textAlignVertical="top"
+          />
+        </ScrollView>
+
+        {/* Bottom Toolbar */}
+        <View style={styles.bottomBar}>
+          <View style={styles.bottomLeft}>
+            <TouchableOpacity 
+              style={styles.bottomButton}
+              onPress={() => setShowMediaModal(true)}
             >
-              {noteImages.map((image, index) => (
-                <TouchableOpacity
-                  key={image.id}
-                  style={[
-                    styles.imageCard,
-                    {
-                      zIndex: noteImages.length - index,
-                      transform: [
-                        { rotate: `${(index % 3 - 1) * 3}deg` },
-                        { translateY: index * 2 },
-                        { translateX: index * -8 },
-                      ],
-                    },
-                  ]}
-                  onPress={() => handleImagePress(image.uri)}
-                  activeOpacity={0.8}
-                >
-                  <Image
-                    source={{ uri: image.uri }}
-                    style={styles.attachedImage}
-                    resizeMode="cover"
-                  />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+              <Ionicons name="add" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.bottomButton}
+              onPress={() => setShowColorPicker(true)}
+            >
+              <Ionicons name="brush" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
           </View>
-        )}
 
-        <TextInput
-          style={styles.titleInput}
-          placeholder="Title"
-          placeholderTextColor="#888888"
-          value={noteTitle}
-          onChangeText={onTitleChange}
-          multiline={false}
-        />
-
-        <TextInput
-          style={styles.bodyInput}
-          placeholder="Note"
-          placeholderTextColor="#888888"
-          value={noteContent}
-          onChangeText={onContentChange}
-          multiline={true}
-          textAlignVertical="top"
-        />
-      </ScrollView>
-
-      {/* Bottom Toolbar */}
-      <View style={styles.bottomBar}>
-        <View style={styles.bottomLeft}>
-          <TouchableOpacity 
-            style={styles.bottomButton}
-            onPress={() => setShowMediaModal(true)}
-          >
-            <Ionicons name="add" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.bottomButton}
-            onPress={() => setShowColorPicker(true)}
-          >
-            <Ionicons name="brush" size={20} color="#FFFFFF" />
+          <TouchableOpacity style={styles.bottomButton}>
+            <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
-
-        <TouchableOpacity style={styles.bottomButton}>
-          <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
+      </SafeAreaView>
 
       {/* Media Attachment Modal */}
       <MediaAttachmentModal
@@ -486,7 +486,8 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
-  safeAreaHeader: {
+  safeAreaContainer: {
+    flex: 1,
     backgroundColor: 'transparent',
   },
   header: {
