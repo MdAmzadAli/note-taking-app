@@ -326,8 +326,8 @@ export default function NoteEditorScreen({
 
         {/* Main Content */}
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Image Gallery */}
-          {noteImages.length > 0 && (
+          {/* Top Image Gallery - only show if no content */}
+          {noteImages.length > 0 && !noteTitle.trim() && !noteContent.trim() && (
             <View style={styles.imageGallery}>
               <ScrollView 
                 horizontal 
@@ -380,6 +380,38 @@ export default function NoteEditorScreen({
             multiline={true}
             textAlignVertical="top"
           />
+
+          {/* Inline Images - show if there's content */}
+          {noteImages.length > 0 && (noteTitle.trim() || noteContent.trim()) && (
+            <View style={styles.inlineImagesContainer}>
+              {noteImages.map((image, index) => {
+                const isEvenRow = Math.floor(index / 2) % 2 === 0;
+                const isFirstInRow = index % 2 === 0;
+                const isLastInRow = index % 2 === 1 || index === noteImages.length - 1;
+                
+                return (
+                  <TouchableOpacity
+                    key={image.id}
+                    style={[
+                      styles.inlineImageCard,
+                      {
+                        marginRight: isLastInRow ? 0 : 8,
+                        marginBottom: index < noteImages.length - 2 ? 8 : 0,
+                      },
+                    ]}
+                    onPress={() => handleImagePress(image.uri)}
+                    activeOpacity={0.8}
+                  >
+                    <Image
+                      source={{ uri: image.uri }}
+                      style={styles.inlineImage}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
         </ScrollView>
 
         {/* Bottom Toolbar */}
@@ -647,5 +679,24 @@ const styles = StyleSheet.create({
     color: '#CCCCCC',
     fontSize: 12,
     textAlign: 'center',
+  },
+  inlineImagesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  inlineImageCard: {
+    width: '48%',
+    aspectRatio: 1,
+    borderRadius: 8,
+    backgroundColor: '#F8F8F8',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    overflow: 'hidden',
+  },
+  inlineImage: {
+    width: '100%',
+    height: '100%',
   },
 });
