@@ -23,6 +23,9 @@ import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import Animated from 'react-native-reanimated';
 import ColorThemePicker from './ColorThemePicker';
 import MediaAttachmentModal from './MediaAttachmentModal';
+import FontFormattingModal from './FontFormattingModal';
+import TextSelectionToolbar from './TextSelectionToolbar';
+import { RichTextEditor } from './RichTextEditor';
 
 interface ImageAttachment {
   id: string;
@@ -72,6 +75,22 @@ export default function NoteEditorScreen({
   const [fullImageUri, setFullImageUri] = useState<string | null>(null);
   const [showFullImage, setShowFullImage] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  
+  // Rich text formatting states
+  const [showFontModal, setShowFontModal] = useState(false);
+  const [showSelectionToolbar, setShowSelectionToolbar] = useState(false);
+  const [selectionPosition, setSelectionPosition] = useState({ x: 0, y: 0 });
+  const [textSelection, setTextSelection] = useState({ start: 0, end: 0 });
+  const [currentFontSize, setCurrentFontSize] = useState(18);
+  const [currentTextColor, setCurrentTextColor] = useState('#FFFFFF');
+  const [currentFontFamily, setCurrentFontFamily] = useState('System');
+  const [selectedTextFormat, setSelectedTextFormat] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    strikethrough: false,
+    highlighted: false,
+  });
 
   useEffect(() => {
     setInitialTitle(noteTitle);
@@ -135,57 +154,94 @@ export default function NoteEditorScreen({
   };
 
   const requestPermission = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+    try {
+      console.log('[IMAGE] Requesting permissions...');
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
 
-    if (status !== 'granted' || cameraStatus.status !== 'granted') {
-      Alert.alert('Permission required', 'Please grant camera and photo library permissions to add images.');
+      console.log('[IMAGE] Media library permission:', status);
+      console.log('[IMAGE] Camera permission:', cameraStatus.status);
+
+      if (status !== 'granted' || cameraStatus.status !== 'granted') {
+        Alert.alert('Permission required', 'Please grant camera and photo library permissions to add images.');
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('[IMAGE] Permission request error:', error);
       return false;
     }
-    return true;
   };
 
   const handleTakePhoto = async () => {
-    const hasPermission = await requestPermission();
-    if (!hasPermission) return;
+    try {
+      console.log('[CAMERA] Starting camera capture...');
+      const hasPermission = await requestPermission();
+      if (!hasPermission) {
+        console.log('[CAMERA] Permission denied');
+        return;
+      }
 
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
-      quality: 0.8,
-    });
+      console.log('[CAMERA] Launching camera...');
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+      });
 
-    if (!result.canceled && result.assets[0]) {
-      const newImage: ImageAttachment = {
-        id: Date.now().toString(),
-        uri: result.assets[0].uri,
-        type: 'photo',
-        createdAt: new Date().toISOString(),
-      };
-      setNoteImages([...noteImages, newImage]);
+      console.log('[CAMERA] Camera result:', result);
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const newImage: ImageAttachment = {
+          id: Date.now().toString(),
+          uri: result.assets[0].uri,
+          type: 'photo',
+          createdAt: new Date().toISOString(),
+        };
+        console.log('[CAMERA] Adding new photo:', newImage);
+        setNoteImages([...noteImages, newImage]);
+        setShowMediaModal(false);
+      }
+    } catch (error) {
+      console.error('[CAMERA] Error taking photo:', error);
+      Alert.alert('Error', 'Failed to take photo. Please try again.');
     }
   };
 
   const handleAddImage = async () => {
-    const hasPermission = await requestPermission();
-    if (!hasPermission) return;
+    try {
+      console.log('[GALLERY] Starting image selection...');
+      const hasPermission = await requestPermission();
+      if (!hasPermission) {
+        console.log('[GALLERY] Permission denied');
+        return;
+      }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
-      quality: 0.8,
-      allowsMultipleSelection: true,
-      selectionLimit: 10,
-    });
+      console.log('[GALLERY] Launching image library...');
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+        allowsMultipleSelection: true,
+        selectionLimit: 10,
+      });
 
-    if (!result.canceled && result.assets) {
-      const newImages: ImageAttachment[] = result.assets.map((asset, index) => ({
-        id: (Date.now() + index).toString(),
-        uri: asset.uri,
-        type: 'image',
-        createdAt: new Date().toISOString(),
-      }));
-      setNoteImages([...noteImages, ...newImages]);
+      console.log('[GALLERY] Gallery result:', result);
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const newImages: ImageAttachment[] = result.assets.map((asset, index) => ({
+          id: (Date.now() + index).toString(),
+          uri: asset.uri,
+          type: 'image',
+          createdAt: new Date().toISOString(),
+        }));
+        console.log('[GALLERY] Adding new images:', newImages);
+        setNoteImages([...noteImages, ...newImages]);
+        setShowMediaModal(false);
+      }
+    } catch (error) {
+      console.error('[GALLERY] Error selecting images:', error);
+      Alert.alert('Error', 'Failed to select images. Please try again.');
     }
   };
 
@@ -271,6 +327,89 @@ export default function NoteEditorScreen({
 
   const handleTickBoxes = () => {
     Alert.alert('Tick Boxes', 'Tick boxes feature coming soon!');
+  };
+
+  // Rich text formatting functions
+  const handleTextSelection = (selection: { start: number; end: number }) => {
+    setTextSelection(selection);
+    if (selection.start !== selection.end) {
+      // Show selection toolbar when text is selected
+      setSelectionPosition({ x: 100, y: 200 }); // You'd calculate actual position
+      setShowSelectionToolbar(true);
+    } else {
+      setShowSelectionToolbar(false);
+    }
+  };
+
+  const applyTextFormatting = (formatType: string) => {
+    const selectedText = noteContent.substring(textSelection.start, textSelection.end);
+    if (!selectedText) return;
+
+    let newContent = noteContent;
+    const beforeText = noteContent.substring(0, textSelection.start);
+    const afterText = noteContent.substring(textSelection.end);
+
+    switch (formatType) {
+      case 'bold':
+        newContent = beforeText + `**${selectedText}**` + afterText;
+        setSelectedTextFormat(prev => ({ ...prev, bold: !prev.bold }));
+        break;
+      case 'italic':
+        newContent = beforeText + `*${selectedText}*` + afterText;
+        setSelectedTextFormat(prev => ({ ...prev, italic: !prev.italic }));
+        break;
+      case 'underline':
+        newContent = beforeText + `__${selectedText}__` + afterText;
+        setSelectedTextFormat(prev => ({ ...prev, underline: !prev.underline }));
+        break;
+      case 'strikethrough':
+        newContent = beforeText + `~~${selectedText}~~` + afterText;
+        setSelectedTextFormat(prev => ({ ...prev, strikethrough: !prev.strikethrough }));
+        break;
+      case 'highlight':
+        newContent = beforeText + `==${selectedText}==` + afterText;
+        setSelectedTextFormat(prev => ({ ...prev, highlighted: !prev.highlighted }));
+        break;
+    }
+
+    onContentChange(newContent);
+    setShowSelectionToolbar(false);
+  };
+
+  const insertLink = () => {
+    Alert.prompt(
+      'Insert Link',
+      'Enter the URL:',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Insert',
+          onPress: (url) => {
+            if (url) {
+              Alert.prompt(
+                'Link Text',
+                'Enter display text (optional):',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Insert',
+                    onPress: (displayText) => {
+                      const linkText = displayText || url;
+                      const beforeText = noteContent.substring(0, textSelection.start);
+                      const afterText = noteContent.substring(textSelection.end);
+                      const newContent = beforeText + `[${linkText}](${url})` + afterText;
+                      onContentChange(newContent);
+                    },
+                  },
+                ],
+                'plain-text'
+              );
+            }
+          },
+        },
+      ],
+      'plain-text'
+    );
   };
 
   const renderBackground = () => {
@@ -371,20 +510,29 @@ export default function NoteEditorScreen({
             multiline={false}
           />
 
-          <TextInput
+          <RichTextEditor
             style={styles.bodyInput}
             placeholder="Note"
             placeholderTextColor="#888888"
             value={noteContent}
             onChangeText={onContentChange}
-            multiline={true}
-            textAlignVertical="top"
+            onSelectionChange={handleTextSelection}
+            fontSize={currentFontSize}
+            textColor={currentTextColor}
+            fontFamily={currentFontFamily}
           />
         </ScrollView>
 
         {/* Bottom Toolbar */}
         <View style={styles.bottomBar}>
           <View style={styles.bottomLeft}>
+            <TouchableOpacity 
+              style={styles.bottomButton}
+              onPress={() => setShowFontModal(true)}
+            >
+              <Text style={styles.fontButtonText}>A</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity 
               style={styles.bottomButton}
               onPress={() => setShowMediaModal(true)}
@@ -469,6 +617,42 @@ export default function NoteEditorScreen({
         </View>
       </Modal>
 
+      {/* Text Selection Toolbar */}
+      <TextSelectionToolbar
+        visible={showSelectionToolbar}
+        position={selectionPosition}
+        onBold={() => applyTextFormatting('bold')}
+        onItalic={() => applyTextFormatting('italic')}
+        onUnderline={() => applyTextFormatting('underline')}
+        onStrikethrough={() => applyTextFormatting('strikethrough')}
+        onHighlight={() => applyTextFormatting('highlight')}
+        onTextColor={() => {
+          setShowSelectionToolbar(false);
+          setShowFontModal(true);
+        }}
+        onFontSize={() => {
+          setShowSelectionToolbar(false);
+          setShowFontModal(true);
+        }}
+        isBold={selectedTextFormat.bold}
+        isItalic={selectedTextFormat.italic}
+        isUnderline={selectedTextFormat.underline}
+        isStrikethrough={selectedTextFormat.strikethrough}
+        isHighlighted={selectedTextFormat.highlighted}
+      />
+
+      {/* Font Formatting Modal */}
+      <FontFormattingModal
+        visible={showFontModal}
+        onClose={() => setShowFontModal(false)}
+        currentFontSize={currentFontSize}
+        currentTextColor={currentTextColor}
+        currentFontFamily={currentFontFamily}
+        onFontSizeChange={setCurrentFontSize}
+        onTextColorChange={setCurrentTextColor}
+        onFontFamilyChange={setCurrentFontFamily}
+      />
+
       {/* Color Theme Picker Modal */}
       <ColorThemePicker
         visible={showColorPicker}
@@ -549,6 +733,11 @@ const styles = StyleSheet.create({
     marginRight: 16,
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 8,
+  },
+  fontButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   imageGallery: {
     marginBottom: 20,
