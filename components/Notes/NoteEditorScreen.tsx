@@ -73,11 +73,28 @@ export default function NoteEditorScreen({
   const [fullImageUri, setFullImageUri] = useState<string | null>(null);
   const [showFullImage, setShowFullImage] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [cursorPosition, setCursorPosition] = useState(0);
+  const [textSegments, setTextSegments] = useState<Array<{type: 'text' | 'image', content: string, imageData?: ImageAttachment}>>([{type: 'text', content: ''}]);
 
   useEffect(() => {
     setInitialTitle(noteTitle);
     setInitialContent(noteContent);
+    // Initialize text segments from existing content
+    if (noteContent) {
+      setTextSegments([{type: 'text', content: noteContent}]);
+    }
   }, []);
+
+  useEffect(() => {
+    // Update the main content when segments change
+    const combinedText = textSegments
+      .filter(segment => segment.type === 'text')
+      .map(segment => segment.content)
+      .join('');
+    if (combinedText !== noteContent) {
+      onContentChange(combinedText);
+    }
+  }, [textSegments]);
 
   useEffect(() => {
     const titleChanged = noteTitle !== initialTitle;
@@ -187,6 +204,7 @@ export default function NoteEditorScreen({
       };
       console.log('Adding new image:', newImage);
       setNoteImages([...noteImages, newImage]);
+      insertImageAtCursor(newImage);
       setShowMediaModal(false);
     }
   };
@@ -216,6 +234,10 @@ export default function NoteEditorScreen({
       }));
       console.log('Adding new images:', newImages);
       setNoteImages([...noteImages, ...newImages]);
+      // Insert each image at cursor position
+      newImages.forEach((image, index) => {
+        setTimeout(() => insertImageAtCursor(image), index * 100);
+      });
       setShowMediaModal(false);
     }
   };
@@ -259,6 +281,62 @@ export default function NoteEditorScreen({
       setCurrentImageIndex(nextIndex);
       setFullImageUri(noteImages[nextIndex].uri);
     }
+  };
+
+  const insertImageAtCursor = (imageData: ImageAttachment) => {
+    setTextSegments(prevSegments => {
+      const newSegments = [...prevSegments];
+      
+      // Find the current text segment and split it at cursor position
+      let totalLength = 0;
+      let targetSegmentIndex = 0;
+      let relativePosition = cursorPosition;
+      
+      for (let i = 0; i < newSegments.length; i++) {
+        if (newSegments[i].type === 'text') {
+          const segmentLength = newSegments[i].content.length;
+          if (totalLength + segmentLength >= cursorPosition) {
+            targetSegmentIndex = i;
+            relativePosition = cursorPosition - totalLength;
+            break;
+          }
+          totalLength += segmentLength;
+        }
+      }
+      
+      const targetSegment = newSegments[targetSegmentIndex];
+      if (targetSegment && targetSegment.type === 'text') {
+        const beforeText = targetSegment.content.substring(0, relativePosition);
+        const afterText = targetSegment.content.substring(relativePosition);
+        
+        // Replace the current segment with: beforeText + image + afterText
+        const newSegmentsList = [
+          ...newSegments.slice(0, targetSegmentIndex),
+          {type: 'text' as const, content: beforeText},
+          {type: 'image' as const, content: '', imageData},
+          {type: 'text' as const, content: afterText},
+          ...newSegments.slice(targetSegmentIndex + 1)
+        ].filter(segment => segment.type === 'image' || segment.content.length > 0);
+        
+        return newSegmentsList;
+      }
+      
+      return newSegments;
+    });
+  };
+
+  const handleSegmentTextChange = (segmentIndex: number, newText: string) => {
+    setTextSegments(prevSegments => {
+      const newSegments = [...prevSegments];
+      if (newSegments[segmentIndex] && newSegments[segmentIndex].type === 'text') {
+        newSegments[segmentIndex] = {...newSegments[segmentIndex], content: newText};
+      }
+      return newSegments;
+    });
+  };
+
+  const handleSelectionChange = (event: any) => {
+    setCursorPosition(event.nativeEvent.selection.start);
   };
 
   // Fixed PanResponder for swipe gestures
@@ -405,47 +483,43 @@ export default function NoteEditorScreen({
             multiline={false}
           />
 
-          <TextInput
-            style={styles.bodyInput}
-            placeholder="Note"
-            placeholderTextColor="#888888"
-            value={noteContent}
-            onChangeText={onContentChange}
-            multiline={true}
-            textAlignVertical="top"
-          />
-
-          {/* Inline Images - show if there's content */}
-          {noteImages.length > 0 && (noteTitle.trim() || noteContent.trim()) && (
-            <View style={styles.inlineImagesContainer}>
-              {noteImages.map((image, index) => {
-                const isEvenRow = Math.floor(index / 2) % 2 === 0;
-                const isFirstInRow = index % 2 === 0;
-                const isLastInRow = index % 2 === 1 || index === noteImages.length - 1;
-                
+          {/* Render content segments with inline images */}
+          <View style={styles.contentContainer}>
+            {textSegments.map((segment, index) => {
+              if (segment.type === 'text') {
                 return (
-                  <TouchableOpacity
-                    key={image.id}
-                    style={[
-                      styles.inlineImageCard,
-                      {
-                        marginRight: isLastInRow ? 0 : 8,
-                        marginBottom: index < noteImages.length - 2 ? 8 : 0,
-                      },
-                    ]}
-                    onPress={() => handleImagePress(image.uri)}
-                    activeOpacity={0.8}
-                  >
-                    <Image
-                      source={{ uri: image.uri }}
-                      style={styles.inlineImage}
-                      resizeMode="cover"
-                    />
-                  </TouchableOpacity>
+                  <TextInput
+                    key={`text-${index}`}
+                    style={[styles.bodyInput, {minHeight: segment.content ? 'auto' : 50}]}
+                    placeholder={index === 0 ? "Note" : ""}
+                    placeholderTextColor="#888888"
+                    value={segment.content}
+                    onChangeText={(text) => handleSegmentTextChange(index, text)}
+                    onSelectionChange={handleSelectionChange}
+                    multiline={true}
+                    textAlignVertical="top"
+                  />
                 );
-              })}
-            </View>
-          )}
+              } else if (segment.type === 'image' && segment.imageData) {
+                return (
+                  <View key={`image-${index}`} style={styles.inlineImageContainer}>
+                    <TouchableOpacity
+                      style={styles.inlineImageCard}
+                      onPress={() => handleImagePress(segment.imageData!.uri)}
+                      activeOpacity={0.8}
+                    >
+                      <Image
+                        source={{ uri: segment.imageData.uri }}
+                        style={styles.inlineImage}
+                        resizeMode="cover"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                );
+              }
+              return null;
+            })}
+          </View>
         </ScrollView>
 
         {/* Bottom Toolbar */}
@@ -599,7 +673,15 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontWeight: '400',
     lineHeight: 26,
-    minHeight: 400,
+    minHeight: 50,
+    paddingVertical: 10,
+  },
+  contentContainer: {
+    flex: 1,
+  },
+  inlineImageContainer: {
+    marginVertical: 10,
+    alignItems: 'center',
   },
   bottomBar: {
     flexDirection: 'row',
@@ -717,15 +799,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
-  inlineImagesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 20,
-    marginBottom: 20,
-  },
   inlineImageCard: {
-    width: '48%',
-    aspectRatio: 1,
+    width: 200,
+    height: 200,
     borderRadius: 8,
     backgroundColor: '#F8F8F8',
     borderWidth: 1,
