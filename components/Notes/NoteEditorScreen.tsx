@@ -135,111 +135,85 @@ export default function NoteEditorScreen({
   };
 
   const requestPermission = async () => {
-    try {
-      console.log('Requesting permissions...', 'Platform:', Platform.OS);
-      
-      // For web, we don't need explicit permissions
-      if (Platform.OS === 'web') {
-        console.log('Web platform detected, skipping permission requests');
-        return true;
-      }
-      
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
-      
-      console.log('Media library permission:', status);
-      console.log('Camera permission:', cameraStatus.status);
-
-      if (status !== 'granted' || cameraStatus.status !== 'granted') {
-        Alert.alert('Permission required', 'Please grant camera and photo library permissions to add images.');
-        return false;
-      }
+    console.log('Requesting permissions...', 'Platform:', Platform.OS);
+    
+    // For web, we don't need explicit permissions
+    if (Platform.OS === 'web') {
+      console.log('Web platform detected, skipping permission requests');
       return true;
-    } catch (error) {
-      console.error('Error requesting permissions:', error);
-      Alert.alert('Permission Error', 'Failed to request permissions. Please check your device settings.');
+    }
+    
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+    
+    console.log('Media library permission:', status);
+    console.log('Camera permission:', cameraStatus.status);
+
+    if (status !== 'granted' || cameraStatus.status !== 'granted') {
+      Alert.alert('Permission required', 'Please grant camera and photo library permissions to add images.');
       return false;
     }
+    return true;
   };
 
   const handleTakePhoto = async () => {
-    try {
-      console.log('Taking photo - starting...', 'Platform:', Platform.OS);
-      
-      // Check if camera is available on this platform
-      if (Platform.OS === 'web') {
-        Alert.alert('Camera Not Available', 'Camera functionality is not available in web browsers. Please use "Add Image" to upload files instead.');
-        return;
-      }
-      
-      const hasPermission = await requestPermission();
-      console.log('Permission result:', hasPermission);
-      if (!hasPermission) return;
+    console.log('Taking photo - starting...', 'Platform:', Platform.OS);
+    
+    // Check if camera is available on this platform
+    if (Platform.OS === 'web') {
+      Alert.alert('Camera Not Available', 'Camera functionality is not available in web browsers. Please use "Add Image" to upload files instead.');
+      return;
+    }
+    
+    const hasPermission = await requestPermission();
+    console.log('Permission result:', hasPermission);
+    if (!hasPermission) return;
 
-      console.log('Launching camera...');
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.8,
-      });
+    console.log('Launching camera...');
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.8,
+    });
 
-      console.log('Camera result:', result);
-      if (!result.canceled && result.assets[0]) {
-        const newImage: ImageAttachment = {
-          id: Date.now().toString(),
-          uri: result.assets[0].uri,
-          type: 'photo',
-          createdAt: new Date().toISOString(),
-        };
-        console.log('Adding new image:', newImage);
-        setNoteImages([...noteImages, newImage]);
-      }
-    } catch (error) {
-      console.error('Error taking photo:', error);
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
+    console.log('Camera result:', result);
+    if (!result.canceled && result.assets[0]) {
+      const newImage: ImageAttachment = {
+        id: Date.now().toString(),
+        uri: result.assets[0].uri,
+        type: 'photo',
+        createdAt: new Date().toISOString(),
+      };
+      console.log('Adding new image:', newImage);
+      setNoteImages([...noteImages, newImage]);
     }
   };
 
   const handleAddImage = async () => {
-    try {
-      console.log('Adding image - starting...', 'Platform:', Platform.OS);
-      const hasPermission = await requestPermission();
-      console.log('Permission result:', hasPermission);
-      if (!hasPermission) return;
+    console.log('Adding image - starting...', 'Platform:', Platform.OS);
+    const hasPermission = await requestPermission();
+    console.log('Permission result:', hasPermission);
+    if (!hasPermission) return;
 
-      console.log('Launching image library...');
-      
-      // Configure options based on platform
-      const options: any = {
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.8,
-      };
-      
-      // Only set multiple selection for non-web platforms
-      if (Platform.OS !== 'web') {
-        options.allowsMultipleSelection = true;
-        options.selectionLimit = 10;
-      }
-      
-      const result = await ImagePicker.launchImageLibraryAsync(options);
+    console.log('Launching image library...');
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.8,
+      allowsMultipleSelection: true,
+      selectionLimit: 10,
+    });
 
-      console.log('Image library result:', result);
-      if (!result.canceled && result.assets) {
-        const newImages: ImageAttachment[] = result.assets.map((asset, index) => ({
-          id: (Date.now() + index).toString(),
-          uri: asset.uri,
-          type: 'image',
-          createdAt: new Date().toISOString(),
-        }));
-        console.log('Adding new images:', newImages);
-        setNoteImages([...noteImages, ...newImages]);
-      } else {
-        console.log('Image selection was canceled or no assets returned');
-      }
-    } catch (error) {
-      console.error('Error adding image:', error);
-      Alert.alert('Error', 'Failed to add image. Please try again.');
+    console.log('Image library result:', result);
+    if (!result.canceled && result.assets) {
+      const newImages: ImageAttachment[] = result.assets.map((asset, index) => ({
+        id: (Date.now() + index).toString(),
+        uri: asset.uri,
+        type: 'image',
+        createdAt: new Date().toISOString(),
+      }));
+      console.log('Adding new images:', newImages);
+      setNoteImages([...noteImages, ...newImages]);
     }
   };
 
