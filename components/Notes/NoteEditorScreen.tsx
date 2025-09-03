@@ -15,6 +15,7 @@ import {
   Image,
   Dimensions,
   PanResponder,
+  KeyboardAvoidingView,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,9 +24,6 @@ import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import Animated from 'react-native-reanimated';
 import ColorThemePicker from './ColorThemePicker';
 import MediaAttachmentModal from './MediaAttachmentModal';
-import FontFormattingModal from './FontFormattingModal';
-import TextSelectionToolbar from './TextSelectionToolbar';
-import { RichTextEditor } from './RichTextEditor';
 
 interface ImageAttachment {
   id: string;
@@ -48,6 +46,39 @@ interface NoteEditorScreenProps {
   onContentChange: (content: string) => void;
   onImagesChange?: (images: ImageAttachment[]) => void;
 }
+
+interface TextFormat {
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  strikethrough: boolean;
+  highlighted: boolean;
+  highlightColor: string;
+  textColor: string;
+  fontSize: number;
+}
+
+const HIGHLIGHT_COLORS = [
+  '#FFFF00', // Yellow
+  '#00FF00', // Green
+  '#00FFFF', // Cyan
+  '#FF00FF', // Magenta
+  '#FFA500', // Orange
+  '#FF69B4', // Hot Pink
+];
+
+const TEXT_COLORS = [
+  '#FFFFFF', // White
+  '#000000', // Black
+  '#FF0000', // Red
+  '#00FF00', // Green
+  '#0000FF', // Blue
+  '#FFFF00', // Yellow
+  '#FF00FF', // Magenta
+  '#00FFFF', // Cyan
+  '#FFA500', // Orange
+  '#800080', // Purple
+];
 
 export default function NoteEditorScreen({ 
   isEditing, 
@@ -77,20 +108,22 @@ export default function NoteEditorScreen({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
   // Rich text formatting states
-  const [showFontModal, setShowFontModal] = useState(false);
+  const [showHighlightColors, setShowHighlightColors] = useState(false);
+  const [showTextColors, setShowTextColors] = useState(false);
   const [showSelectionToolbar, setShowSelectionToolbar] = useState(false);
-  const [selectionPosition, setSelectionPosition] = useState({ x: 0, y: 0 });
   const [textSelection, setTextSelection] = useState({ start: 0, end: 0 });
-  const [currentFontSize, setCurrentFontSize] = useState(18);
-  const [currentTextColor, setCurrentTextColor] = useState('#FFFFFF');
-  const [currentFontFamily, setCurrentFontFamily] = useState('System');
-  const [selectedTextFormat, setSelectedTextFormat] = useState({
+  const [currentFormat, setCurrentFormat] = useState<TextFormat>({
     bold: false,
     italic: false,
     underline: false,
     strikethrough: false,
     highlighted: false,
+    highlightColor: '#FFFF00',
+    textColor: '#FFFFFF',
+    fontSize: 18,
   });
+  
+  const textInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     setInitialTitle(noteTitle);
@@ -153,95 +186,132 @@ export default function NoteEditorScreen({
     setHasUnsavedChanges(false);
   };
 
-  const requestPermission = async () => {
-    try {
-      console.log('[IMAGE] Requesting permissions...');
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
-
-      console.log('[IMAGE] Media library permission:', status);
-      console.log('[IMAGE] Camera permission:', cameraStatus.status);
-
-      if (status !== 'granted' || cameraStatus.status !== 'granted') {
-        Alert.alert('Permission required', 'Please grant camera and photo library permissions to add images.');
-        return false;
-      }
-      return true;
-    } catch (error) {
-      console.error('[IMAGE] Permission request error:', error);
-      return false;
+  const handleTextSelection = (event: any) => {
+    const { selection } = event.nativeEvent;
+    setTextSelection(selection);
+    
+    // Show formatting toolbar if text is selected
+    if (selection.start !== selection.end) {
+      setShowSelectionToolbar(true);
+    } else {
+      setShowSelectionToolbar(false);
+      setShowHighlightColors(false);
+      setShowTextColors(false);
     }
   };
 
+  const toggleBold = () => {
+    setCurrentFormat(prev => ({ ...prev, bold: !prev.bold }));
+  };
+
+  const toggleItalic = () => {
+    setCurrentFormat(prev => ({ ...prev, italic: !prev.italic }));
+  };
+
+  const toggleUnderline = () => {
+    setCurrentFormat(prev => ({ ...prev, underline: !prev.underline }));
+  };
+
+  const toggleStrikethrough = () => {
+    setCurrentFormat(prev => ({ ...prev, strikethrough: !prev.strikethrough }));
+  };
+
+  const handleFontSizeDecrease = () => {
+    if (currentFormat.fontSize > 8) {
+      setCurrentFormat(prev => ({ ...prev, fontSize: prev.fontSize - 2 }));
+    }
+  };
+
+  const handleFontSizeIncrease = () => {
+    if (currentFormat.fontSize < 48) {
+      setCurrentFormat(prev => ({ ...prev, fontSize: prev.fontSize + 2 }));
+    }
+  };
+
+  const handleHighlightColor = (color: string) => {
+    setCurrentFormat(prev => ({ 
+      ...prev, 
+      highlighted: true, 
+      highlightColor: color 
+    }));
+    setShowHighlightColors(false);
+  };
+
+  const handleTextColor = (color: string) => {
+    setCurrentFormat(prev => ({ ...prev, textColor: color }));
+    setShowTextColors(false);
+  };
+
+  const getTextStyle = () => {
+    const decorationLines = [
+      currentFormat.underline ? 'underline' : '',
+      currentFormat.strikethrough ? 'line-through' : ''
+    ].filter(Boolean).join(' ');
+
+    return {
+      fontSize: currentFormat.fontSize,
+      color: currentFormat.textColor,
+      fontWeight: (currentFormat.bold ? 'bold' : 'normal') as 'bold' | 'normal',
+      fontStyle: (currentFormat.italic ? 'italic' : 'normal') as 'italic' | 'normal',
+      textDecorationLine: (decorationLines || 'none') as 'none' | 'underline' | 'line-through' | 'underline line-through',
+      backgroundColor: currentFormat.highlighted ? currentFormat.highlightColor : 'transparent',
+      fontFamily: 'Inter',
+      lineHeight: currentFormat.fontSize * 1.4,
+    };
+  };
+
+  const requestPermission = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (status !== 'granted' || cameraStatus.status !== 'granted') {
+      Alert.alert('Permission required', 'Please grant camera and photo library permissions to add images.');
+      return false;
+    }
+    return true;
+  };
+
   const handleTakePhoto = async () => {
-    try {
-      console.log('[CAMERA] Starting camera capture...');
-      const hasPermission = await requestPermission();
-      if (!hasPermission) {
-        console.log('[CAMERA] Permission denied');
-        return;
-      }
+    const hasPermission = await requestPermission();
+    if (!hasPermission) return;
 
-      console.log('[CAMERA] Launching camera...');
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.8,
-      });
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.8,
+    });
 
-      console.log('[CAMERA] Camera result:', result);
-
-      if (!result.canceled && result.assets && result.assets[0]) {
-        const newImage: ImageAttachment = {
-          id: Date.now().toString(),
-          uri: result.assets[0].uri,
-          type: 'photo',
-          createdAt: new Date().toISOString(),
-        };
-        console.log('[CAMERA] Adding new photo:', newImage);
-        setNoteImages([...noteImages, newImage]);
-        setShowMediaModal(false);
-      }
-    } catch (error) {
-      console.error('[CAMERA] Error taking photo:', error);
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
+    if (!result.canceled && result.assets[0]) {
+      const newImage: ImageAttachment = {
+        id: Date.now().toString(),
+        uri: result.assets[0].uri,
+        type: 'photo',
+        createdAt: new Date().toISOString(),
+      };
+      setNoteImages([...noteImages, newImage]);
     }
   };
 
   const handleAddImage = async () => {
-    try {
-      console.log('[GALLERY] Starting image selection...');
-      const hasPermission = await requestPermission();
-      if (!hasPermission) {
-        console.log('[GALLERY] Permission denied');
-        return;
-      }
+    const hasPermission = await requestPermission();
+    if (!hasPermission) return;
 
-      console.log('[GALLERY] Launching image library...');
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.8,
-        allowsMultipleSelection: true,
-        selectionLimit: 10,
-      });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.8,
+      allowsMultipleSelection: true,
+      selectionLimit: 10,
+    });
 
-      console.log('[GALLERY] Gallery result:', result);
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const newImages: ImageAttachment[] = result.assets.map((asset, index) => ({
-          id: (Date.now() + index).toString(),
-          uri: asset.uri,
-          type: 'image',
-          createdAt: new Date().toISOString(),
-        }));
-        console.log('[GALLERY] Adding new images:', newImages);
-        setNoteImages([...noteImages, ...newImages]);
-        setShowMediaModal(false);
-      }
-    } catch (error) {
-      console.error('[GALLERY] Error selecting images:', error);
-      Alert.alert('Error', 'Failed to select images. Please try again.');
+    if (!result.canceled && result.assets) {
+      const newImages: ImageAttachment[] = result.assets.map((asset, index) => ({
+        id: (Date.now() + index).toString(),
+        uri: asset.uri,
+        type: 'image',
+        createdAt: new Date().toISOString(),
+      }));
+      setNoteImages([...noteImages, ...newImages]);
     }
   };
 
@@ -290,25 +360,18 @@ export default function NoteEditorScreen({
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: (evt, gestureState) => {
-      // Only respond to horizontal swipes with minimal vertical movement
       return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dy) < 80;
     },
-    onPanResponderGrant: () => {
-      // Grant the responder
-    },
-    onPanResponderMove: (evt, gestureState) => {
-      // Optional: Add visual feedback during swipe
-    },
+    onPanResponderGrant: () => {},
+    onPanResponderMove: (evt, gestureState) => {},
     onPanResponderRelease: (evt, gestureState) => {
       const { dx } = gestureState;
       const swipeThreshold = 50;
 
       if (Math.abs(dx) > swipeThreshold && noteImages.length > 1) {
         if (dx > 0) {
-          // Swiped right, go to previous image
           handlePreviousImage();
         } else {
-          // Swiped left, go to next image
           handleNextImage();
         }
       }
@@ -329,89 +392,6 @@ export default function NoteEditorScreen({
     Alert.alert('Tick Boxes', 'Tick boxes feature coming soon!');
   };
 
-  // Rich text formatting functions
-  const handleTextSelection = (selection: { start: number; end: number }) => {
-    setTextSelection(selection);
-    if (selection.start !== selection.end) {
-      // Show selection toolbar when text is selected
-      setSelectionPosition({ x: 100, y: 200 }); // You'd calculate actual position
-      setShowSelectionToolbar(true);
-    } else {
-      setShowSelectionToolbar(false);
-    }
-  };
-
-  const applyTextFormatting = (formatType: string) => {
-    const selectedText = noteContent.substring(textSelection.start, textSelection.end);
-    if (!selectedText) return;
-
-    let newContent = noteContent;
-    const beforeText = noteContent.substring(0, textSelection.start);
-    const afterText = noteContent.substring(textSelection.end);
-
-    switch (formatType) {
-      case 'bold':
-        newContent = beforeText + `**${selectedText}**` + afterText;
-        setSelectedTextFormat(prev => ({ ...prev, bold: !prev.bold }));
-        break;
-      case 'italic':
-        newContent = beforeText + `*${selectedText}*` + afterText;
-        setSelectedTextFormat(prev => ({ ...prev, italic: !prev.italic }));
-        break;
-      case 'underline':
-        newContent = beforeText + `__${selectedText}__` + afterText;
-        setSelectedTextFormat(prev => ({ ...prev, underline: !prev.underline }));
-        break;
-      case 'strikethrough':
-        newContent = beforeText + `~~${selectedText}~~` + afterText;
-        setSelectedTextFormat(prev => ({ ...prev, strikethrough: !prev.strikethrough }));
-        break;
-      case 'highlight':
-        newContent = beforeText + `==${selectedText}==` + afterText;
-        setSelectedTextFormat(prev => ({ ...prev, highlighted: !prev.highlighted }));
-        break;
-    }
-
-    onContentChange(newContent);
-    setShowSelectionToolbar(false);
-  };
-
-  const insertLink = () => {
-    Alert.prompt(
-      'Insert Link',
-      'Enter the URL:',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Insert',
-          onPress: (url) => {
-            if (url) {
-              Alert.prompt(
-                'Link Text',
-                'Enter display text (optional):',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Insert',
-                    onPress: (displayText) => {
-                      const linkText = displayText || url;
-                      const beforeText = noteContent.substring(0, textSelection.start);
-                      const afterText = noteContent.substring(textSelection.end);
-                      const newContent = beforeText + `[${linkText}](${url})` + afterText;
-                      onContentChange(newContent);
-                    },
-                  },
-                ],
-                'plain-text'
-              );
-            }
-          },
-        },
-      ],
-      'plain-text'
-    );
-  };
-
   const renderBackground = () => {
     if (selectedGradient) {
       return (
@@ -424,6 +404,130 @@ export default function NoteEditorScreen({
       );
     }
     return null;
+  };
+
+  const renderSelectionToolbar = () => {
+    if (!showSelectionToolbar) return null;
+
+    return (
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <View style={styles.selectionToolbar}>
+          {/* Bold */}
+          <TouchableOpacity
+            style={[styles.toolbarButton, currentFormat.bold && styles.toolbarButtonActive]}
+            onPress={toggleBold}
+          >
+            <Text style={[styles.toolbarButtonText, { fontWeight: 'bold' }]}>B</Text>
+          </TouchableOpacity>
+
+          {/* Italic */}
+          <TouchableOpacity
+            style={[styles.toolbarButton, currentFormat.italic && styles.toolbarButtonActive]}
+            onPress={toggleItalic}
+          >
+            <Text style={[styles.toolbarButtonText, { fontStyle: 'italic' }]}>I</Text>
+          </TouchableOpacity>
+
+          {/* Underline */}
+          <TouchableOpacity
+            style={[styles.toolbarButton, currentFormat.underline && styles.toolbarButtonActive]}
+            onPress={toggleUnderline}
+          >
+            <Text style={[styles.toolbarButtonText, { textDecorationLine: 'underline' }]}>U</Text>
+          </TouchableOpacity>
+
+          {/* Strikethrough */}
+          <TouchableOpacity
+            style={[styles.toolbarButton, currentFormat.strikethrough && styles.toolbarButtonActive]}
+            onPress={toggleStrikethrough}
+          >
+            <Text style={[styles.toolbarButtonText, { textDecorationLine: 'line-through' }]}>S</Text>
+          </TouchableOpacity>
+
+          {/* Highlighter */}
+          <TouchableOpacity
+            style={[styles.toolbarButton, currentFormat.highlighted && styles.toolbarButtonActive]}
+            onPress={() => setShowHighlightColors(!showHighlightColors)}
+          >
+            <View style={styles.highlighterIcon}>
+              <Text style={[styles.toolbarButtonText, { backgroundColor: currentFormat.highlightColor }]}>A</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Font Color */}
+          <TouchableOpacity
+            style={styles.toolbarButton}
+            onPress={() => setShowTextColors(!showTextColors)}
+          >
+            <View style={styles.fontColorIcon}>
+              <Text style={styles.toolbarButtonText}>A</Text>
+              <View style={[styles.colorUnderline, { backgroundColor: currentFormat.textColor }]} />
+            </View>
+          </TouchableOpacity>
+
+          {/* Font Size Controls */}
+          <TouchableOpacity
+            style={[styles.toolbarButton, currentFormat.fontSize <= 8 && styles.toolbarButtonDisabled]}
+            onPress={handleFontSizeDecrease}
+            disabled={currentFormat.fontSize <= 8}
+          >
+            <Ionicons name="remove" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          <View style={styles.fontSizeDisplay}>
+            <Text style={styles.fontSizeText}>{currentFormat.fontSize}</Text>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.toolbarButton, currentFormat.fontSize >= 48 && styles.toolbarButtonDisabled]}
+            onPress={handleFontSizeIncrease}
+            disabled={currentFormat.fontSize >= 48}
+          >
+            <Ionicons name="add" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Highlight Colors Modal */}
+        {showHighlightColors && (
+          <View style={styles.colorPalette}>
+            <Text style={styles.colorPaletteTitle}>Highlight Color</Text>
+            <View style={styles.colorOptionsRow}>
+              {HIGHLIGHT_COLORS.map((color, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.colorOption, 
+                    { backgroundColor: color },
+                    currentFormat.highlightColor === color && styles.colorOptionSelected
+                  ]}
+                  onPress={() => handleHighlightColor(color)}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Text Colors Modal */}
+        {showTextColors && (
+          <View style={styles.colorPalette}>
+            <Text style={styles.colorPaletteTitle}>Text Color</Text>
+            <View style={styles.colorOptionsRow}>
+              {TEXT_COLORS.map((color, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.colorOption, 
+                    { backgroundColor: color, borderColor: '#333', borderWidth: 1 },
+                    currentFormat.textColor === color && styles.colorOptionSelected
+                  ]}
+                  onPress={() => handleTextColor(color)}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+      </KeyboardAvoidingView>
+    );
   };
 
   return (
@@ -510,48 +614,48 @@ export default function NoteEditorScreen({
             multiline={false}
           />
 
-          <RichTextEditor
-            style={styles.bodyInput}
+          {/* Enhanced Text Editor with formatting */}
+          <TextInput
+            ref={textInputRef}
+            style={[styles.bodyInput, getTextStyle()]}
             placeholder="Note"
             placeholderTextColor="#888888"
             value={noteContent}
             onChangeText={onContentChange}
             onSelectionChange={handleTextSelection}
-            fontSize={currentFontSize}
-            textColor={currentTextColor}
-            fontFamily={currentFontFamily}
+            multiline={true}
+            textAlignVertical="top"
+            selectionColor={currentFormat.textColor}
           />
         </ScrollView>
 
-        {/* Bottom Toolbar */}
-        <View style={styles.bottomBar}>
-          <View style={styles.bottomLeft}>
-            <TouchableOpacity 
-              style={styles.bottomButton}
-              onPress={() => setShowFontModal(true)}
-            >
-              <Text style={styles.fontButtonText}>A</Text>
-            </TouchableOpacity>
+        {/* Selection Toolbar - appears at bottom when text is selected */}
+        {renderSelectionToolbar()}
 
-            <TouchableOpacity 
-              style={styles.bottomButton}
-              onPress={() => setShowMediaModal(true)}
-            >
-              <Ionicons name="add" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
+        {/* Default Bottom Toolbar - only shown when no text is selected */}
+        {!showSelectionToolbar && (
+          <View style={styles.bottomBar}>
+            <View style={styles.bottomLeft}>
+              <TouchableOpacity 
+                style={styles.bottomButton}
+                onPress={() => setShowMediaModal(true)}
+              >
+                <Ionicons name="add" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.bottomButton}
-              onPress={() => setShowColorPicker(true)}
-            >
-              <Ionicons name="brush" size={20} color="#FFFFFF" />
+              <TouchableOpacity 
+                style={styles.bottomButton}
+                onPress={() => setShowColorPicker(true)}
+              >
+                <Ionicons name="brush" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={styles.bottomButton}>
+              <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
-
-          <TouchableOpacity style={styles.bottomButton}>
-            <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
+        )}
       </SafeAreaView>
 
       {/* Media Attachment Modal */}
@@ -588,7 +692,6 @@ export default function NoteEditorScreen({
                 resizeMode="contain"
               />
 
-              {/* Image navigation indicators */}
               {noteImages.length > 1 && (
                 <View style={styles.imageIndicators}>
                   <View style={styles.swipeHint}>
@@ -616,42 +719,6 @@ export default function NoteEditorScreen({
           )}
         </View>
       </Modal>
-
-      {/* Text Selection Toolbar */}
-      <TextSelectionToolbar
-        visible={showSelectionToolbar}
-        position={selectionPosition}
-        onBold={() => applyTextFormatting('bold')}
-        onItalic={() => applyTextFormatting('italic')}
-        onUnderline={() => applyTextFormatting('underline')}
-        onStrikethrough={() => applyTextFormatting('strikethrough')}
-        onHighlight={() => applyTextFormatting('highlight')}
-        onTextColor={() => {
-          setShowSelectionToolbar(false);
-          setShowFontModal(true);
-        }}
-        onFontSize={() => {
-          setShowSelectionToolbar(false);
-          setShowFontModal(true);
-        }}
-        isBold={selectedTextFormat.bold}
-        isItalic={selectedTextFormat.italic}
-        isUnderline={selectedTextFormat.underline}
-        isStrikethrough={selectedTextFormat.strikethrough}
-        isHighlighted={selectedTextFormat.highlighted}
-      />
-
-      {/* Font Formatting Modal */}
-      <FontFormattingModal
-        visible={showFontModal}
-        onClose={() => setShowFontModal(false)}
-        currentFontSize={currentFontSize}
-        currentTextColor={currentTextColor}
-        currentFontFamily={currentFontFamily}
-        onFontSizeChange={setCurrentFontSize}
-        onTextColorChange={setCurrentTextColor}
-        onFontFamilyChange={setCurrentFontFamily}
-      />
 
       {/* Color Theme Picker Modal */}
       <ColorThemePicker
@@ -716,6 +783,92 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     minHeight: 400,
   },
+  selectionToolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginHorizontal: 20,
+    marginBottom: 10,
+    flexWrap: 'wrap',
+  },
+  toolbarButton: {
+    padding: 8,
+    marginHorizontal: 4,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    minWidth: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toolbarButtonActive: {
+    backgroundColor: 'rgba(0, 255, 127, 0.3)',
+  },
+  toolbarButtonDisabled: {
+    opacity: 0.5,
+  },
+  toolbarButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  highlighterIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fontColorIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  colorUnderline: {
+    width: 20,
+    height: 2,
+    marginTop: 2,
+  },
+  fontSizeDisplay: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginHorizontal: 4,
+  },
+  fontSizeText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  colorPalette: {
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    padding: 16,
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginBottom: 10,
+  },
+  colorPaletteTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  colorOptionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  colorOption: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    margin: 4,
+  },
+  colorOptionSelected: {
+    borderWidth: 3,
+    borderColor: '#00FF7F',
+  },
   bottomBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -733,11 +886,6 @@ const styles = StyleSheet.create({
     marginRight: 16,
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 8,
-  },
-  fontButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   imageGallery: {
     marginBottom: 20,
