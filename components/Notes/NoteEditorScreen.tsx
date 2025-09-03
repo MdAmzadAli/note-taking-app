@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -73,28 +72,11 @@ export default function NoteEditorScreen({
   const [fullImageUri, setFullImageUri] = useState<string | null>(null);
   const [showFullImage, setShowFullImage] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [cursorPosition, setCursorPosition] = useState(0);
-  const [textSegments, setTextSegments] = useState<Array<{type: 'text' | 'image', content: string, imageData?: ImageAttachment}>>([{type: 'text', content: ''}]);
 
   useEffect(() => {
     setInitialTitle(noteTitle);
     setInitialContent(noteContent);
-    // Initialize text segments from existing content
-    if (noteContent) {
-      setTextSegments([{type: 'text', content: noteContent}]);
-    }
   }, []);
-
-  useEffect(() => {
-    // Update the main content when segments change
-    const combinedText = textSegments
-      .filter(segment => segment.type === 'text')
-      .map(segment => segment.content)
-      .join('');
-    if (combinedText !== noteContent) {
-      onContentChange(combinedText);
-    }
-  }, [textSegments]);
 
   useEffect(() => {
     const titleChanged = noteTitle !== initialTitle;
@@ -153,19 +135,8 @@ export default function NoteEditorScreen({
   };
 
   const requestPermission = async () => {
-    console.log('Requesting permissions...', 'Platform:', Platform.OS);
-    
-    // For web, we don't need explicit permissions
-    if (Platform.OS === 'web') {
-      console.log('Web platform detected, skipping permission requests');
-      return true;
-    }
-    
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
-    
-    console.log('Media library permission:', status);
-    console.log('Camera permission:', cameraStatus.status);
 
     if (status !== 'granted' || cameraStatus.status !== 'granted') {
       Alert.alert('Permission required', 'Please grant camera and photo library permissions to add images.');
@@ -175,26 +146,15 @@ export default function NoteEditorScreen({
   };
 
   const handleTakePhoto = async () => {
-    console.log('Taking photo - starting...', 'Platform:', Platform.OS);
-    
-    // Check if camera is available on this platform
-    if (Platform.OS === 'web') {
-      Alert.alert('Camera Not Available', 'Camera functionality is not available in web browsers. Please use "Add Image" to upload files instead.');
-      return;
-    }
-    
     const hasPermission = await requestPermission();
-    console.log('Permission result:', hasPermission);
     if (!hasPermission) return;
 
-    console.log('Launching camera...');
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false,
       quality: 0.8,
     });
 
-    console.log('Camera result:', result);
     if (!result.canceled && result.assets[0]) {
       const newImage: ImageAttachment = {
         id: Date.now().toString(),
@@ -202,20 +162,14 @@ export default function NoteEditorScreen({
         type: 'photo',
         createdAt: new Date().toISOString(),
       };
-      console.log('Adding new image:', newImage);
       setNoteImages([...noteImages, newImage]);
-      insertImageAtCursor(newImage);
-      setShowMediaModal(false);
     }
   };
 
   const handleAddImage = async () => {
-    console.log('Adding image - starting...', 'Platform:', Platform.OS);
     const hasPermission = await requestPermission();
-    console.log('Permission result:', hasPermission);
     if (!hasPermission) return;
 
-    console.log('Launching image library...');
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false,
@@ -224,7 +178,6 @@ export default function NoteEditorScreen({
       selectionLimit: 10,
     });
 
-    console.log('Image library result:', result);
     if (!result.canceled && result.assets) {
       const newImages: ImageAttachment[] = result.assets.map((asset, index) => ({
         id: (Date.now() + index).toString(),
@@ -232,13 +185,7 @@ export default function NoteEditorScreen({
         type: 'image',
         createdAt: new Date().toISOString(),
       }));
-      console.log('Adding new images:', newImages);
       setNoteImages([...noteImages, ...newImages]);
-      // Insert each image at cursor position
-      newImages.forEach((image, index) => {
-        setTimeout(() => insertImageAtCursor(image), index * 100);
-      });
-      setShowMediaModal(false);
     }
   };
 
@@ -283,62 +230,6 @@ export default function NoteEditorScreen({
     }
   };
 
-  const insertImageAtCursor = (imageData: ImageAttachment) => {
-    setTextSegments(prevSegments => {
-      const newSegments = [...prevSegments];
-      
-      // Find the current text segment and split it at cursor position
-      let totalLength = 0;
-      let targetSegmentIndex = 0;
-      let relativePosition = cursorPosition;
-      
-      for (let i = 0; i < newSegments.length; i++) {
-        if (newSegments[i].type === 'text') {
-          const segmentLength = newSegments[i].content.length;
-          if (totalLength + segmentLength >= cursorPosition) {
-            targetSegmentIndex = i;
-            relativePosition = cursorPosition - totalLength;
-            break;
-          }
-          totalLength += segmentLength;
-        }
-      }
-      
-      const targetSegment = newSegments[targetSegmentIndex];
-      if (targetSegment && targetSegment.type === 'text') {
-        const beforeText = targetSegment.content.substring(0, relativePosition);
-        const afterText = targetSegment.content.substring(relativePosition);
-        
-        // Replace the current segment with: beforeText + image + afterText
-        const newSegmentsList = [
-          ...newSegments.slice(0, targetSegmentIndex),
-          {type: 'text' as const, content: beforeText},
-          {type: 'image' as const, content: '', imageData},
-          {type: 'text' as const, content: afterText},
-          ...newSegments.slice(targetSegmentIndex + 1)
-        ].filter(segment => segment.type === 'image' || segment.content.length > 0);
-        
-        return newSegmentsList;
-      }
-      
-      return newSegments;
-    });
-  };
-
-  const handleSegmentTextChange = (segmentIndex: number, newText: string) => {
-    setTextSegments(prevSegments => {
-      const newSegments = [...prevSegments];
-      if (newSegments[segmentIndex] && newSegments[segmentIndex].type === 'text') {
-        newSegments[segmentIndex] = {...newSegments[segmentIndex], content: newText};
-      }
-      return newSegments;
-    });
-  };
-
-  const handleSelectionChange = (event: any) => {
-    setCursorPosition(event.nativeEvent.selection.start);
-  };
-
   // Fixed PanResponder for swipe gestures
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
@@ -372,17 +263,14 @@ export default function NoteEditorScreen({
 
   const handleDrawing = () => {
     Alert.alert('Drawing', 'Drawing feature coming soon!');
-    setShowMediaModal(false);
   };
 
   const handleRecording = () => {
     Alert.alert('Recording', 'Recording feature coming soon!');
-    setShowMediaModal(false);
   };
 
   const handleTickBoxes = () => {
     Alert.alert('Tick Boxes', 'Tick boxes feature coming soon!');
-    setShowMediaModal(false);
   };
 
   const renderBackground = () => {
@@ -438,8 +326,8 @@ export default function NoteEditorScreen({
 
         {/* Main Content */}
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Top Image Gallery - only show if no content */}
-          {noteImages.length > 0 && !noteTitle.trim() && !noteContent.trim() && (
+          {/* Image Gallery */}
+          {noteImages.length > 0 && (
             <View style={styles.imageGallery}>
               <ScrollView 
                 horizontal 
@@ -483,43 +371,15 @@ export default function NoteEditorScreen({
             multiline={false}
           />
 
-          {/* Render content segments with inline images */}
-          <View style={styles.contentContainer}>
-            {textSegments.map((segment, index) => {
-              if (segment.type === 'text') {
-                return (
-                  <TextInput
-                    key={`text-${index}`}
-                    style={[styles.bodyInput, {minHeight: segment.content ? 'auto' : 50}]}
-                    placeholder={index === 0 ? "Note" : ""}
-                    placeholderTextColor="#888888"
-                    value={segment.content}
-                    onChangeText={(text) => handleSegmentTextChange(index, text)}
-                    onSelectionChange={handleSelectionChange}
-                    multiline={true}
-                    textAlignVertical="top"
-                  />
-                );
-              } else if (segment.type === 'image' && segment.imageData) {
-                return (
-                  <View key={`image-${index}`} style={styles.inlineImageContainer}>
-                    <TouchableOpacity
-                      style={styles.inlineImageCard}
-                      onPress={() => handleImagePress(segment.imageData!.uri)}
-                      activeOpacity={0.8}
-                    >
-                      <Image
-                        source={{ uri: segment.imageData.uri }}
-                        style={styles.inlineImage}
-                        resizeMode="cover"
-                      />
-                    </TouchableOpacity>
-                  </View>
-                );
-              }
-              return null;
-            })}
-          </View>
+          <TextInput
+            style={styles.bodyInput}
+            placeholder="Note"
+            placeholderTextColor="#888888"
+            value={noteContent}
+            onChangeText={onContentChange}
+            multiline={true}
+            textAlignVertical="top"
+          />
         </ScrollView>
 
         {/* Bottom Toolbar */}
@@ -527,10 +387,7 @@ export default function NoteEditorScreen({
           <View style={styles.bottomLeft}>
             <TouchableOpacity 
               style={styles.bottomButton}
-              onPress={() => {
-                console.log('Add button pressed - opening media modal');
-                setShowMediaModal(true);
-              }}
+              onPress={() => setShowMediaModal(true)}
             >
               <Ionicons name="add" size={20} color="#FFFFFF" />
             </TouchableOpacity>
@@ -673,15 +530,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontWeight: '400',
     lineHeight: 26,
-    minHeight: 50,
-    paddingVertical: 10,
-  },
-  contentContainer: {
-    flex: 1,
-  },
-  inlineImageContainer: {
-    marginVertical: 10,
-    alignItems: 'center',
+    minHeight: 400,
   },
   bottomBar: {
     flexDirection: 'row',
@@ -798,18 +647,5 @@ const styles = StyleSheet.create({
     color: '#CCCCCC',
     fontSize: 12,
     textAlign: 'center',
-  },
-  inlineImageCard: {
-    width: 200,
-    height: 200,
-    borderRadius: 8,
-    backgroundColor: '#F8F8F8',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    overflow: 'hidden',
-  },
-  inlineImage: {
-    width: '100%',
-    height: '100%',
   },
 });

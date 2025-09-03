@@ -130,7 +130,7 @@ export default function NotesScreen() {
       setFilteredTemplates(filteredTemps);
     } else {
       console.log('[NOTES] No search query, showing all notes:', notes.length);
-      setFilteredNotes(notes);
+      setFilteredNotes([...notes]); // Create a new array to ensure re-render
       setFilteredTemplates([...templates]);
     }
   }, [searchQuery, notes, templates]);
@@ -580,6 +580,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 8,
   },
-
-
+  
+  
 });
