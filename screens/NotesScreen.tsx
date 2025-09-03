@@ -130,7 +130,7 @@ export default function NotesScreen() {
       setFilteredTemplates(filteredTemps);
     } else {
       console.log('[NOTES] No search query, showing all notes:', notes.length);
-      setFilteredNotes(sortedNotes); // Use sortedNotes which will be defined later
+      setFilteredNotes(notes);
       setFilteredTemplates([...templates]);
     }
   }, [searchQuery, notes, templates]);
