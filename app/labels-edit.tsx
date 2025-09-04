@@ -9,176 +9,182 @@ import {
   Alert,
   StatusBar,
   Platform,
+  SafeAreaView,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { router } from 'expo-router';
 
-interface Label {
+interface Category {
   id: string;
   name: string;
   createdAt: string;
 }
 
-export default function LabelsEditScreen() {
-  const [labels, setLabels] = useState<Label[]>([]);
-  const [newLabelName, setNewLabelName] = useState('');
-  const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
-  const [editingLabelName, setEditingLabelName] = useState('');
+export default function CategoriesEditScreen() {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState('');
 
   useEffect(() => {
-    loadLabels();
+    loadCategories();
   }, []);
 
-  const loadLabels = async () => {
+  const loadCategories = async () => {
     try {
-      // TODO: Implement actual label loading from AsyncStorage
-      // For now, using mock labels to match the reference image
-      const mockLabels = [
-        { id: '1', name: 'Bbjh', createdAt: new Date().toISOString() },
-        { id: '2', name: 'Dfgt', createdAt: new Date().toISOString() },
-        { id: '3', name: 'Eiekejeh', createdAt: new Date().toISOString() },
-        { id: '4', name: 'Ejekekek', createdAt: new Date().toISOString() },
-        { id: '5', name: 'Emnshe', createdAt: new Date().toISOString() },
-        { id: '6', name: 'Nzznsmsm', createdAt: new Date().toISOString() },
-        { id: '7', name: 'Shsjjs', createdAt: new Date().toISOString() },
-        { id: '8', name: 'Sjsjjs', createdAt: new Date().toISOString() },
-        { id: '9', name: 'Skkwwhyw', createdAt: new Date().toISOString() },
-        { id: '10', name: 'Uwjwjw', createdAt: new Date().toISOString() },
-        { id: '11', name: 'Wjwkekke', createdAt: new Date().toISOString() },
+      // TODO: Implement actual category loading from AsyncStorage
+      // For now, using mock categories to match the reference image
+      const mockCategories = [
+        { id: '1', name: 'Work', createdAt: new Date().toISOString() },
+        { id: '2', name: 'Personal', createdAt: new Date().toISOString() },
+        { id: '3', name: 'Ideas', createdAt: new Date().toISOString() },
+        { id: '4', name: 'Projects', createdAt: new Date().toISOString() },
+        { id: '5', name: 'Shopping', createdAt: new Date().toISOString() },
+        { id: '6', name: 'Health', createdAt: new Date().toISOString() },
+        { id: '7', name: 'Travel', createdAt: new Date().toISOString() },
+        { id: '8', name: 'Finance', createdAt: new Date().toISOString() },
+        { id: '9', name: 'Learning', createdAt: new Date().toISOString() },
+        { id: '10', name: 'Family', createdAt: new Date().toISOString() },
+        { id: '11', name: 'Goals', createdAt: new Date().toISOString() },
       ];
-      setLabels(mockLabels);
+      setCategories(mockCategories);
     } catch (error) {
-      console.error('Error loading labels:', error);
+      console.error('Error loading categories:', error);
     }
   };
 
-  const handleCreateLabel = () => {
-    if (newLabelName.trim() === '') {
-      Alert.alert('Error', 'Please enter a label name');
+  const handleCreateCategory = () => {
+    if (newCategoryName.trim() === '') {
+      Alert.alert('Error', 'Please enter a category name');
       return;
     }
 
-    const newLabel: Label = {
+    const newCategory: Category = {
       id: Date.now().toString(),
-      name: newLabelName.trim(),
+      name: newCategoryName.trim(),
       createdAt: new Date().toISOString(),
     };
 
-    setLabels(prev => [...prev, newLabel]);
-    setNewLabelName('');
+    setCategories(prev => [...prev, newCategory]);
+    setNewCategoryName('');
     
     // TODO: Save to AsyncStorage
-    console.log('Created new label:', newLabel);
+    console.log('Created new category:', newCategory);
   };
 
-  const handleDeleteLabel = (labelId: string) => {
+  const handleDeleteCategory = (categoryId: string) => {
     Alert.alert(
-      'Delete Label',
-      'Are you sure you want to delete this label?',
+      'Delete Category',
+      'Are you sure you want to delete this category?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            setLabels(prev => prev.filter(label => label.id !== labelId));
+            setCategories(prev => prev.filter(category => category.id !== categoryId));
             // TODO: Update AsyncStorage
-            console.log('Deleted label:', labelId);
+            console.log('Deleted category:', categoryId);
           },
         },
       ]
     );
   };
 
-  const handleEditLabel = (labelId: string, currentName: string) => {
-    setEditingLabelId(labelId);
-    setEditingLabelName(currentName);
+  const handleEditCategory = (categoryId: string, currentName: string) => {
+    setEditingCategoryId(categoryId);
+    setEditingCategoryName(currentName);
   };
 
   const handleSaveEdit = () => {
-    if (editingLabelName.trim() === '') {
-      Alert.alert('Error', 'Please enter a label name');
+    if (editingCategoryName.trim() === '') {
+      Alert.alert('Error', 'Please enter a category name');
       return;
     }
 
-    setLabels(prev =>
-      prev.map(label =>
-        label.id === editingLabelId
-          ? { ...label, name: editingLabelName.trim() }
-          : label
+    setCategories(prev =>
+      prev.map(category =>
+        category.id === editingCategoryId
+          ? { ...category, name: editingCategoryName.trim() }
+          : category
       )
     );
 
-    setEditingLabelId(null);
-    setEditingLabelName('');
+    setEditingCategoryId(null);
+    setEditingCategoryName('');
     
     // TODO: Update AsyncStorage
-    console.log('Updated label:', editingLabelId, editingLabelName);
+    console.log('Updated category:', editingCategoryId, editingCategoryName);
   };
 
   const handleCancelEdit = () => {
-    setEditingLabelId(null);
-    setEditingLabelName('');
+    setEditingCategoryId(null);
+    setEditingCategoryName('');
   };
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#202124" />
+      <StatusBar barStyle="light-content" backgroundColor="#202124" translucent />
       
-      {/* Floating Back Button */}
-      <TouchableOpacity style={styles.floatingBackButton} onPress={() => router.back()}>
-        <Ionicons name="arrow-back" size={24} color="#E8EAED" />
-      </TouchableOpacity>
+      {/* Safe Area for Navbar */}
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.navbar}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#E8EAED" />
+          </TouchableOpacity>
+          <Text style={styles.navbarTitle}>Edit Categories</Text>
+        </View>
+      </SafeAreaView>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Create New Label Section */}
+        {/* Create New Category Section */}
         <View style={styles.createSection}>
           <TouchableOpacity 
             style={styles.clearButton}
-            onPress={() => setNewLabelName('')}
+            onPress={() => setNewCategoryName('')}
           >
             <Ionicons name="close" size={20} color="#9AA0A6" />
           </TouchableOpacity>
           
           <TextInput
             style={styles.createInput}
-            placeholder="Create new label"
+            placeholder="Create new category"
             placeholderTextColor="#9AA0A6"
-            value={newLabelName}
-            onChangeText={setNewLabelName}
-            onSubmitEditing={handleCreateLabel}
+            value={newCategoryName}
+            onChangeText={setNewCategoryName}
+            onSubmitEditing={handleCreateCategory}
           />
           
           <TouchableOpacity 
             style={styles.checkButton}
-            onPress={handleCreateLabel}
+            onPress={handleCreateCategory}
           >
             <Ionicons name="checkmark" size={20} color="#9AA0A6" />
           </TouchableOpacity>
         </View>
 
-        {/* Labels List */}
-        <View style={styles.labelsContainer}>
-          {labels.map((label) => (
-            <View key={label.id} style={styles.labelRow}>
-              <View style={styles.labelInfo}>
-                <Ionicons name="pricetag-outline" size={20} color="#9AA0A6" />
+        {/* Categories List */}
+        <View style={styles.categoriesContainer}>
+          {categories.map((category) => (
+            <View key={category.id} style={styles.categoryRow}>
+              <View style={styles.categoryInfo}>
+                <Ionicons name="apps-outline" size={20} color="#9AA0A6" />
                 
-                {editingLabelId === label.id ? (
+                {editingCategoryId === category.id ? (
                   <TextInput
                     style={styles.editInput}
-                    value={editingLabelName}
-                    onChangeText={setEditingLabelName}
+                    value={editingCategoryName}
+                    onChangeText={setEditingCategoryName}
                     onSubmitEditing={handleSaveEdit}
                     autoFocus
                   />
                 ) : (
-                  <Text style={styles.labelName}>{label.name}</Text>
+                  <Text style={styles.categoryName}>{category.name}</Text>
                 )}
               </View>
 
-              <View style={styles.labelActions}>
-                {editingLabelId === label.id ? (
+              <View style={styles.categoryActions}>
+                {editingCategoryId === category.id ? (
                   <>
                     <TouchableOpacity 
                       style={styles.actionButton}
@@ -197,13 +203,13 @@ export default function LabelsEditScreen() {
                   <>
                     <TouchableOpacity 
                       style={styles.actionButton}
-                      onPress={() => handleEditLabel(label.id, label.name)}
+                      onPress={() => handleEditCategory(category.id, category.name)}
                     >
                       <Ionicons name="pencil" size={20} color="#9AA0A6" />
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={styles.actionButton}
-                      onPress={() => handleDeleteLabel(label.id)}
+                      onPress={() => handleDeleteCategory(category.id)}
                     >
                       <Ionicons name="trash-outline" size={20} color="#9AA0A6" />
                     </TouchableOpacity>
@@ -220,32 +226,36 @@ export default function LabelsEditScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
     backgroundColor: '#202124',
+  },
+  safeArea: {
+    backgroundColor: '#202124',
+  },
+  navbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#202124',
+  },
+  backButton: {
+    padding: 8,
+    marginRight: 16,
+  },
+  navbarTitle: {
+    color: '#E8EAED',
+    fontSize: 20,
+    fontWeight: '500',
   },
   content: {
     flex: 1,
-    paddingTop: Platform.OS === 'ios' ? 44 : 24,
-  },
-  floatingBackButton: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 44 : 24,
-    left: 16,
-    zIndex: 1000,
-    backgroundColor: 'rgba(32, 33, 36, 0.8)',
-    borderRadius: 20,
-    padding: 8,
   },
   createSection: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingTop: 60,
     borderBottomWidth: 1,
     borderBottomColor: '#3C4043',
   },
@@ -263,10 +273,10 @@ const styles = StyleSheet.create({
     marginLeft: 16,
     padding: 8,
   },
-  labelsContainer: {
+  categoriesContainer: {
     flex: 1,
   },
-  labelRow: {
+  categoryRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -275,12 +285,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#2E3134',
   },
-  labelInfo: {
+  categoryInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  labelName: {
+  categoryName: {
     color: '#E8EAED',
     fontSize: 16,
     marginLeft: 16,
@@ -294,7 +304,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#8AB4F8',
     paddingBottom: 4,
   },
-  labelActions: {
+  categoryActions: {
     flexDirection: 'row',
     alignItems: 'center',
   },
