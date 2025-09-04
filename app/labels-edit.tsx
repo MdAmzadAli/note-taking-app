@@ -123,18 +123,16 @@ export default function CategoriesEditScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#202124" translucent />
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#202124" />
       
-      {/* Safe Area for Navbar */}
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.navbar}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#E8EAED" />
-          </TouchableOpacity>
-          <Text style={styles.navbarTitle}>Edit Categories</Text>
-        </View>
-      </SafeAreaView>
+      {/* Navbar */}
+      <View style={styles.navbar}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#E8EAED" />
+        </TouchableOpacity>
+        <Text style={styles.navbarTitle}>Edit Categories</Text>
+      </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Create New Category Section */}
@@ -220,7 +218,7 @@ export default function CategoriesEditScreen() {
           ))}
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -229,15 +227,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#202124',
   },
-  safeArea: {
-    backgroundColor: '#202124',
-  },
   navbar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#202124',
+    borderBottomWidth: 1,
+    borderBottomColor: '#3C4043',
   },
   backButton: {
     padding: 8,
