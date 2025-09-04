@@ -47,38 +47,6 @@ interface NoteEditorScreenProps {
   onImagesChange?: (images: ImageAttachment[]) => void;
 }
 
-interface TextFormat {
-  bold: boolean;
-  italic: boolean;
-  underline: boolean;
-  strikethrough: boolean;
-  highlighted: boolean;
-  highlightColor: string;
-  textColor: string;
-  fontSize: number;
-}
-
-const HIGHLIGHT_COLORS = [
-  '#FFFF00', // Yellow
-  '#00FF00', // Green
-  '#00FFFF', // Cyan
-  '#FF00FF', // Magenta
-  '#FFA500', // Orange
-  '#FF69B4', // Hot Pink
-];
-
-const TEXT_COLORS = [
-  '#FFFFFF', // White
-  '#000000', // Black
-  '#FF0000', // Red
-  '#00FF00', // Green
-  '#0000FF', // Blue
-  '#FFFF00', // Yellow
-  '#FF00FF', // Magenta
-  '#00FFFF', // Cyan
-  '#FFA500', // Orange
-  '#800080', // Purple
-];
 
 export default function NoteEditorScreen({ 
   isEditing, 
@@ -106,22 +74,6 @@ export default function NoteEditorScreen({
   const [fullImageUri, setFullImageUri] = useState<string | null>(null);
   const [showFullImage, setShowFullImage] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  
-  // Rich text formatting states
-  const [showHighlightColors, setShowHighlightColors] = useState(false);
-  const [showTextColors, setShowTextColors] = useState(false);
-  const [showSelectionToolbar, setShowSelectionToolbar] = useState(false);
-  const [textSelection, setTextSelection] = useState({ start: 0, end: 0 });
-  const [currentFormat, setCurrentFormat] = useState<TextFormat>({
-    bold: false,
-    italic: false,
-    underline: false,
-    strikethrough: false,
-    highlighted: false,
-    highlightColor: '#FFFF00',
-    textColor: '#FFFFFF',
-    fontSize: 18,
-  });
   
   const textInputRef = useRef<TextInput>(null);
 
@@ -186,79 +138,6 @@ export default function NoteEditorScreen({
     setHasUnsavedChanges(false);
   };
 
-  const handleTextSelection = (event: any) => {
-    const { selection } = event.nativeEvent;
-    setTextSelection(selection);
-    
-    // Show formatting toolbar if text is selected
-    if (selection.start !== selection.end) {
-      setShowSelectionToolbar(true);
-    } else {
-      setShowSelectionToolbar(false);
-      setShowHighlightColors(false);
-      setShowTextColors(false);
-    }
-  };
-
-  const toggleBold = () => {
-    setCurrentFormat(prev => ({ ...prev, bold: !prev.bold }));
-  };
-
-  const toggleItalic = () => {
-    setCurrentFormat(prev => ({ ...prev, italic: !prev.italic }));
-  };
-
-  const toggleUnderline = () => {
-    setCurrentFormat(prev => ({ ...prev, underline: !prev.underline }));
-  };
-
-  const toggleStrikethrough = () => {
-    setCurrentFormat(prev => ({ ...prev, strikethrough: !prev.strikethrough }));
-  };
-
-  const handleFontSizeDecrease = () => {
-    if (currentFormat.fontSize > 8) {
-      setCurrentFormat(prev => ({ ...prev, fontSize: prev.fontSize - 2 }));
-    }
-  };
-
-  const handleFontSizeIncrease = () => {
-    if (currentFormat.fontSize < 48) {
-      setCurrentFormat(prev => ({ ...prev, fontSize: prev.fontSize + 2 }));
-    }
-  };
-
-  const handleHighlightColor = (color: string) => {
-    setCurrentFormat(prev => ({ 
-      ...prev, 
-      highlighted: true, 
-      highlightColor: color 
-    }));
-    setShowHighlightColors(false);
-  };
-
-  const handleTextColor = (color: string) => {
-    setCurrentFormat(prev => ({ ...prev, textColor: color }));
-    setShowTextColors(false);
-  };
-
-  const getTextStyle = () => {
-    const decorationLines = [
-      currentFormat.underline ? 'underline' : '',
-      currentFormat.strikethrough ? 'line-through' : ''
-    ].filter(Boolean).join(' ');
-
-    return {
-      fontSize: currentFormat.fontSize,
-      color: currentFormat.textColor,
-      fontWeight: (currentFormat.bold ? 'bold' : 'normal') as 'bold' | 'normal',
-      fontStyle: (currentFormat.italic ? 'italic' : 'normal') as 'italic' | 'normal',
-      textDecorationLine: (decorationLines || 'none') as 'none' | 'underline' | 'line-through' | 'underline line-through',
-      backgroundColor: currentFormat.highlighted ? currentFormat.highlightColor : 'transparent',
-      fontFamily: 'Inter',
-      lineHeight: currentFormat.fontSize * 1.4,
-    };
-  };
 
   const requestPermission = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -406,129 +285,6 @@ export default function NoteEditorScreen({
     return null;
   };
 
-  const renderSelectionToolbar = () => {
-    if (!showSelectionToolbar) return null;
-
-    return (
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View style={styles.selectionToolbar}>
-          {/* Bold */}
-          <TouchableOpacity
-            style={[styles.toolbarButton, currentFormat.bold && styles.toolbarButtonActive]}
-            onPress={toggleBold}
-          >
-            <Text style={[styles.toolbarButtonText, { fontWeight: 'bold' }]}>B</Text>
-          </TouchableOpacity>
-
-          {/* Italic */}
-          <TouchableOpacity
-            style={[styles.toolbarButton, currentFormat.italic && styles.toolbarButtonActive]}
-            onPress={toggleItalic}
-          >
-            <Text style={[styles.toolbarButtonText, { fontStyle: 'italic' }]}>I</Text>
-          </TouchableOpacity>
-
-          {/* Underline */}
-          <TouchableOpacity
-            style={[styles.toolbarButton, currentFormat.underline && styles.toolbarButtonActive]}
-            onPress={toggleUnderline}
-          >
-            <Text style={[styles.toolbarButtonText, { textDecorationLine: 'underline' }]}>U</Text>
-          </TouchableOpacity>
-
-          {/* Strikethrough */}
-          <TouchableOpacity
-            style={[styles.toolbarButton, currentFormat.strikethrough && styles.toolbarButtonActive]}
-            onPress={toggleStrikethrough}
-          >
-            <Text style={[styles.toolbarButtonText, { textDecorationLine: 'line-through' }]}>S</Text>
-          </TouchableOpacity>
-
-          {/* Highlighter */}
-          <TouchableOpacity
-            style={[styles.toolbarButton, currentFormat.highlighted && styles.toolbarButtonActive]}
-            onPress={() => setShowHighlightColors(!showHighlightColors)}
-          >
-            <View style={styles.highlighterIcon}>
-              <Text style={[styles.toolbarButtonText, { backgroundColor: currentFormat.highlightColor }]}>A</Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* Font Color */}
-          <TouchableOpacity
-            style={styles.toolbarButton}
-            onPress={() => setShowTextColors(!showTextColors)}
-          >
-            <View style={styles.fontColorIcon}>
-              <Text style={styles.toolbarButtonText}>A</Text>
-              <View style={[styles.colorUnderline, { backgroundColor: currentFormat.textColor }]} />
-            </View>
-          </TouchableOpacity>
-
-          {/* Font Size Controls */}
-          <TouchableOpacity
-            style={[styles.toolbarButton, currentFormat.fontSize <= 8 && styles.toolbarButtonDisabled]}
-            onPress={handleFontSizeDecrease}
-            disabled={currentFormat.fontSize <= 8}
-          >
-            <Ionicons name="remove" size={18} color="#FFFFFF" />
-          </TouchableOpacity>
-
-          <View style={styles.fontSizeDisplay}>
-            <Text style={styles.fontSizeText}>{currentFormat.fontSize}</Text>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.toolbarButton, currentFormat.fontSize >= 48 && styles.toolbarButtonDisabled]}
-            onPress={handleFontSizeIncrease}
-            disabled={currentFormat.fontSize >= 48}
-          >
-            <Ionicons name="add" size={18} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Highlight Colors Modal */}
-        {showHighlightColors && (
-          <View style={styles.colorPalette}>
-            <Text style={styles.colorPaletteTitle}>Highlight Color</Text>
-            <View style={styles.colorOptionsRow}>
-              {HIGHLIGHT_COLORS.map((color, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.colorOption, 
-                    { backgroundColor: color },
-                    currentFormat.highlightColor === color && styles.colorOptionSelected
-                  ]}
-                  onPress={() => handleHighlightColor(color)}
-                />
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Text Colors Modal */}
-        {showTextColors && (
-          <View style={styles.colorPalette}>
-            <Text style={styles.colorPaletteTitle}>Text Color</Text>
-            <View style={styles.colorOptionsRow}>
-              {TEXT_COLORS.map((color, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.colorOption, 
-                    { backgroundColor: color, borderColor: '#333', borderWidth: 1 },
-                    currentFormat.textColor === color && styles.colorOptionSelected
-                  ]}
-                  onPress={() => handleTextColor(color)}
-                />
-              ))}
-            </View>
-          </View>
-        )}
-      </KeyboardAvoidingView>
-    );
-  };
 
   return (
     <View style={[styles.container, { backgroundColor: selectedGradient ? 'transparent' : selectedTheme }]}>
@@ -614,48 +370,41 @@ export default function NoteEditorScreen({
             multiline={false}
           />
 
-          {/* Enhanced Text Editor with formatting */}
+          {/* Plain Text Editor */}
           <TextInput
             ref={textInputRef}
-            style={[styles.bodyInput, getTextStyle()]}
+            style={styles.bodyInput}
             placeholder="Note"
             placeholderTextColor="#888888"
             value={noteContent}
             onChangeText={onContentChange}
-            onSelectionChange={handleTextSelection}
             multiline={true}
             textAlignVertical="top"
-            selectionColor={currentFormat.textColor}
           />
         </ScrollView>
 
-        {/* Selection Toolbar - appears at bottom when text is selected */}
-        {renderSelectionToolbar()}
+        {/* Bottom Toolbar */}
+        <View style={styles.bottomBar}>
+          <View style={styles.bottomLeft}>
+            <TouchableOpacity 
+              style={styles.bottomButton}
+              onPress={() => setShowMediaModal(true)}
+            >
+              <Ionicons name="add" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
 
-        {/* Default Bottom Toolbar - only shown when no text is selected */}
-        {!showSelectionToolbar && (
-          <View style={styles.bottomBar}>
-            <View style={styles.bottomLeft}>
-              <TouchableOpacity 
-                style={styles.bottomButton}
-                onPress={() => setShowMediaModal(true)}
-              >
-                <Ionicons name="add" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.bottomButton}
-                onPress={() => setShowColorPicker(true)}
-              >
-                <Ionicons name="brush" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity style={styles.bottomButton}>
-              <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
+            <TouchableOpacity 
+              style={styles.bottomButton}
+              onPress={() => setShowColorPicker(true)}
+            >
+              <Ionicons name="brush" size={20} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
-        )}
+
+          <TouchableOpacity style={styles.bottomButton}>
+            <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
 
       {/* Media Attachment Modal */}
@@ -782,92 +531,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 26,
     minHeight: 400,
-  },
-  selectionToolbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 25,
-    marginHorizontal: 20,
-    marginBottom: 10,
-    flexWrap: 'wrap',
-  },
-  toolbarButton: {
-    padding: 8,
-    marginHorizontal: 4,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    minWidth: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toolbarButtonActive: {
-    backgroundColor: 'rgba(0, 255, 127, 0.3)',
-  },
-  toolbarButtonDisabled: {
-    opacity: 0.5,
-  },
-  toolbarButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  highlighterIcon: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fontColorIcon: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  colorUnderline: {
-    width: 20,
-    height: 2,
-    marginTop: 2,
-  },
-  fontSizeDisplay: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginHorizontal: 4,
-  },
-  fontSizeText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  colorPalette: {
-    backgroundColor: 'rgba(0,0,0,0.9)',
-    padding: 16,
-    borderRadius: 12,
-    marginHorizontal: 20,
-    marginBottom: 10,
-  },
-  colorPaletteTitle: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  colorOptionsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
-  colorOption: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    margin: 4,
-  },
-  colorOptionSelected: {
-    borderWidth: 3,
-    borderColor: '#00FF7F',
   },
   bottomBar: {
     flexDirection: 'row',
