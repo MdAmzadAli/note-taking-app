@@ -10,11 +10,11 @@ import {
   Alert,
   StatusBar,
   Platform,
-  SafeAreaView,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { getCategories, saveCategory, deleteCategory } from '@/utils/storage';
+import AppLayout from './AppLayout';
 
 interface Category {
   id: string;
@@ -159,7 +159,7 @@ export default function CategoriesEditScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <AppLayout backgroundColor="#202124">
       <StatusBar barStyle="light-content" backgroundColor="#202124" />
       
       {/* Navbar */}
@@ -254,7 +254,7 @@ export default function CategoriesEditScreen() {
           ))}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </AppLayout>
   );
 }
 
@@ -267,7 +267,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
     backgroundColor: '#202124',
     borderBottomWidth: 1,
     borderBottomColor: '#3C4043',
