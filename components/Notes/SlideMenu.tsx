@@ -51,7 +51,35 @@ export default function SlideMenu({
   const loadLabels = async () => {
     try {
       const categories = await getCategories();
-      setLabels(categories);
+      
+      // If no categories exist, create default ones
+      if (categories.length === 0) {
+        const defaultCategories = [
+          { id: '1', name: 'Work', createdAt: new Date().toISOString() },
+          { id: '2', name: 'Personal', createdAt: new Date().toISOString() },
+          { id: '3', name: 'Ideas', createdAt: new Date().toISOString() },
+          { id: '4', name: 'Projects', createdAt: new Date().toISOString() },
+          { id: '5', name: 'Shopping', createdAt: new Date().toISOString() },
+          { id: '6', name: 'Health', createdAt: new Date().toISOString() },
+          { id: '7', name: 'Travel', createdAt: new Date().toISOString() },
+          { id: '8', name: 'Finance', createdAt: new Date().toISOString() },
+          { id: '9', name: 'Learning', createdAt: new Date().toISOString() },
+          { id: '10', name: 'Family', createdAt: new Date().toISOString() },
+          { id: '11', name: 'Goals', createdAt: new Date().toISOString() },
+        ];
+        
+        // Import saveCategory function
+        const { saveCategory } = await import('@/utils/storage');
+        
+        // Save default categories to storage
+        for (const category of defaultCategories) {
+          await saveCategory(category);
+        }
+        
+        setLabels(defaultCategories);
+      } else {
+        setLabels(categories);
+      }
     } catch (error) {
       console.error('Error loading categories:', error);
       setLabels([]);
@@ -90,25 +118,6 @@ export default function SlideMenu({
               </View>
 
               <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                {/* Notes Section - Default Selected */}
-                <TouchableOpacity style={styles.notesSection}>
-                  <View style={styles.notesItem}>
-                    <Ionicons name="bulb-outline" size={20} color="#FFFFFF" />
-                    <Text style={styles.notesText}>Notes</Text>
-                  </View>
-                </TouchableOpacity>
-
-                {/* Reminders Section */}
-                <TouchableOpacity style={styles.remindersSection}>
-                  <View style={styles.remindersItem}>
-                    <Ionicons name="notifications-outline" size={20} color="#9CA3AF" />
-                    <Text style={styles.remindersText}>Reminders</Text>
-                  </View>
-                </TouchableOpacity>
-
-                {/* Separation Line */}
-                <View style={styles.separator} />
-
                 {/* Categories Section */}
                 <View style={styles.labelsHeader}>
                   <Text style={styles.labelsTitle}>Categories</Text>
@@ -201,39 +210,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flex: 1,
-  },
-  notesSection: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  notesItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1976D2',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 24,
-  },
-  notesText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 12,
-  },
-  remindersSection: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  remindersItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  remindersText: {
-    color: '#E8EAED',
-    fontSize: 16,
-    marginLeft: 12,
   },
   separator: {
     height: 1,
