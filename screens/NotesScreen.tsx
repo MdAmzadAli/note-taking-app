@@ -117,14 +117,14 @@ export default function NotesScreen() {
   );
 
   useEffect(() => {
-    console.log('[NOTES] Search filter effect triggered - query:', searchQuery, 'notes count:', notes.length);
+    console.log('[NOTES] Search filter effect triggered - query:', searchQuery, 'notes count:', notes.length, 'selectedCategoryId:', selectedCategoryId);
 
-    let notesToFilter = notes;
+    let notesToFilter = [...notes]; // Create a copy to avoid mutations
     
     // First apply category filter if a category is selected
     if (selectedCategoryId) {
       notesToFilter = notes.filter(note => note.categoryId === selectedCategoryId);
-      console.log('[NOTES] Category filtered notes count:', notesToFilter.length);
+      console.log('[NOTES] Category filtered notes count:', notesToFilter.length, 'for category:', selectedCategoryId);
     }
 
     // Then apply search filter if there's a search query
@@ -142,7 +142,7 @@ export default function NotesScreen() {
       setFilteredTemplates(filteredTemps);
     } else {
       console.log('[NOTES] No search query, showing filtered notes:', notesToFilter.length);
-      setFilteredNotes([...notesToFilter]); // Create a new array to ensure re-render
+      setFilteredNotes(notesToFilter);
       setFilteredTemplates([...templates]);
     }
   }, [searchQuery, notes, templates, selectedCategoryId]);
@@ -171,16 +171,7 @@ export default function NotesScreen() {
 
       setNotes(sortedNotes);
 
-      if (!searchQuery.trim()) {
-        setFilteredNotes(sortedNotes);
-      } else {
-        const filtered = sortedNotes.filter(note => 
-          note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (note.title && note.title.toLowerCase().includes(searchQuery.toLowerCase()))
-        );
-        setFilteredNotes(filtered);
-      }
-
+      // Don't manually set filteredNotes here - let the useEffect handle filtering
       console.log('[NOTES] Notes state updated successfully');
     } catch (error) {
       console.error('Error loading notes:', error);
@@ -268,6 +259,7 @@ export default function NotesScreen() {
             images: images || currentNoteImages,
             updatedAt: now,
             isPinned: isPinned !== undefined ? isPinned : existingNote.isPinned,
+            categoryId: selectedCategoryId || existingNote.categoryId,
           };
           await saveNote(updatedNote);
         }
@@ -286,6 +278,7 @@ export default function NotesScreen() {
           createdAt: now,
           updatedAt: now,
           isPinned: isPinned || false,
+          categoryId: selectedCategoryId || undefined,
         };
         await saveNote(newNote);
       }
@@ -418,11 +411,13 @@ export default function NotesScreen() {
   };
 
   const handleCategorySelect = (categoryId: string) => {
+    console.log('[NOTES] Category selected:', categoryId);
     setSelectedCategoryId(categoryId);
     setSearchQuery(''); // Clear search when switching categories
   };
 
   const handleShowAllNotes = () => {
+    console.log('[NOTES] Showing all notes');
     setSelectedCategoryId(null);
     setSearchQuery(''); // Clear search when showing all notes
   };
