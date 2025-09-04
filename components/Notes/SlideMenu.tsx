@@ -110,7 +110,7 @@ export default function SlideMenu({
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <Animated.View style={[styles.menu, { transform: [{ translateX: slideAnim }] }]}>
-              <SafeAreaView style={styles.safeAreaContent} edges={['left', 'right']}>
+              {/* <SafeAreaView style={styles.safeAreaContent} edges={['left', 'right']}> */}
                 {/* Google Keep Header */}
                 <View style={styles.header}>
                 <View style={styles.googleIcon}>
@@ -174,7 +174,7 @@ export default function SlideMenu({
                 {/* Bottom Separator */}
                 <View style={styles.separator} />
               </ScrollView>
-              </SafeAreaView>
+              {/* </SafeAreaView> */}
             </Animated.View>
           </TouchableWithoutFeedback>
         </View>
