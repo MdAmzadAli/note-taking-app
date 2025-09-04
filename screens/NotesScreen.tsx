@@ -16,6 +16,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSection } from '@/types';
@@ -52,6 +53,7 @@ interface SimpleNote {
 }
 
 export default function NotesScreen() {
+  const insets = useSafeAreaInsets();
   const [notes, setNotes] = useState<SimpleNote[]>([]);
   const [filteredNotes, setFilteredNotes] = useState<SimpleNote[]>([]);
   const [isCreating, setIsCreating] = useState(false);
@@ -497,7 +499,10 @@ export default function NotesScreen() {
         </ScrollView>
 
         <TouchableOpacity 
-          style={styles.fab}
+          style={[
+            styles.fab, 
+            { bottom: 64 + Math.max(16, insets.bottom) + 30 } // Tab bar height + safe area + margin
+          ]}
           onPress={() => {
             setIsCreating(true);
             setCurrentNotePinned(false);
@@ -590,7 +595,6 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    bottom: 30,
     right: 30,
     width: 56,
     height: 56,
