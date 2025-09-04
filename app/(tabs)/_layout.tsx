@@ -19,6 +19,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
+        tabBarHideOnKeyboard: Platform.OS === 'android',
         tabBarStyle: Platform.select({
           ios: {
             position: 'absolute',
@@ -35,6 +36,10 @@ export default function TabLayout() {
             height: 64,
           },
           default: {
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
             backgroundColor: colorScheme === 'dark' ? '#1F1F1F' : '#FFFFFF',
             borderTopWidth: 1,
             borderTopColor: colorScheme === 'dark' ? '#374151' : '#E5E7EB',
