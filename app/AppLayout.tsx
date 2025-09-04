@@ -14,20 +14,19 @@ export default function AppLayout({ children, backgroundColor }: AppLayoutProps)
   const defaultBackgroundColor = backgroundColor || Colors[colorScheme ?? 'light'].background;
 
   return (
-    <View style={[styles.container]}>
-      <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.container, { backgroundColor: defaultBackgroundColor }]}>
+      <View style={styles.contentContainer}>
         {children}
-      </SafeAreaView>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1C1C1C'
   },
-  safeArea: {
+  contentContainer: {
     flex: 1,
   },
 });
