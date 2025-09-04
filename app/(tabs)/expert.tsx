@@ -5,7 +5,7 @@ import {
   Dimensions,
   Alert,
 } from 'react-native';
-import AppLayout from '@/components/AppLayout';
+import AppLayout from '@/app/AppLayout';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import fileService, { FileUploadResponse } from '../../services/fileService';

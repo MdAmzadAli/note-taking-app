@@ -1,5 +1,5 @@
 import React from 'react';
-import AppLayout from '@/components/AppLayout';
+import AppLayout from '@/app/AppLayout';
 import TasksScreen from '@/screens/TasksScreen';
 
 export default function TasksTab() {

@@ -14,7 +14,7 @@ export default function AppLayout({ children, backgroundColor }: AppLayoutProps)
   const defaultBackgroundColor = backgroundColor || Colors[colorScheme ?? 'light'].background;
 
   return (
-    <View style={[styles.container, { backgroundColor: defaultBackgroundColor }]}>
+    <View style={[styles.container]}>
       <SafeAreaView style={styles.safeArea}>
         {children}
       </SafeAreaView>
@@ -25,6 +25,7 @@ export default function AppLayout({ children, backgroundColor }: AppLayoutProps)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#1C1C1C'
   },
   safeArea: {
     flex: 1,

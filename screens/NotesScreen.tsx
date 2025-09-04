@@ -467,7 +467,8 @@ export default function NotesScreen() {
 
   return (
     <View style={styles.fullScreenContainer}>
-      <SafeAreaView style={styles.safeAreaContainer}>
+    
+    
         <View style={styles.header}>
           <TouchableOpacity style={styles.hamburgerButton} onPress={openMenu}>
             <Ionicons name="menu" size={24} color="#FFFFFF" />
@@ -506,7 +507,7 @@ export default function NotesScreen() {
         >
           <Ionicons name="add" size={28} color="#000000" />
         </TouchableOpacity>
-      </SafeAreaView>
+    
 
       <SlideMenu
         visible={isMenuVisible}
@@ -521,13 +522,14 @@ export default function NotesScreen() {
         selectedCategoryId={selectedCategoryId}
       />
     </View>
+       
   );
 }
 
 const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
-    backgroundColor: '#1C1C1C',
+    // backgroundColor: '#1C1C1C',
   },
   safeAreaContainer: {
     flex: 1,

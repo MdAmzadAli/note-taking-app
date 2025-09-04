@@ -1,5 +1,5 @@
 import React from 'react';
-import AppLayout from '@/components/AppLayout';
+import AppLayout from '@/app/AppLayout';
 import NotesScreen from '@/screens/NotesScreen';
 
 export default function NotesTab() {
