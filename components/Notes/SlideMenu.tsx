@@ -110,7 +110,7 @@ export default function SlideMenu({
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <Animated.View style={[styles.menu, { transform: [{ translateX: slideAnim }] }]}>
-              <SafeAreaView style={styles.safeAreaContent}>
+              <SafeAreaView style={styles.safeAreaContent} edges={['left', 'right']}>
                 {/* Google Keep Header */}
                 <View style={styles.header}>
                 <View style={styles.googleIcon}>
@@ -204,6 +204,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 20,
+    paddingTop: 60, // Add extra padding for status bar area
     marginTop: 0,
   },
   googleIcon: {
