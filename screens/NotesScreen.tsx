@@ -120,7 +120,7 @@ export default function NotesScreen() {
     console.log('[NOTES] Search filter effect triggered - query:', searchQuery, 'notes count:', notes.length, 'selectedCategoryId:', selectedCategoryId);
 
     let notesToFilter = [...notes]; // Create a copy to avoid mutations
-    
+
     // First apply category filter if a category is selected
     if (selectedCategoryId) {
       notesToFilter = notes.filter(note => note.categoryId === selectedCategoryId);
@@ -605,6 +605,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 8,
   },
-  
-  
+
+
 });

@@ -11,6 +11,7 @@ import {
   StatusBar,
   Platform,
   SafeAreaView,
+  Keyboard,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { router } from 'expo-router';
@@ -27,9 +28,23 @@ export default function CategoriesEditScreen() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState('');
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
     loadCategories();
+    
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+    });
+    
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardVisible(false);
+    });
+
+    return () => {
+      keyboardDidShowListener?.remove();
+      keyboardDidHideListener?.remove();
+    };
   }, []);
 
   const loadCategories = async () => {
@@ -158,13 +173,26 @@ export default function CategoriesEditScreen() {
     setEditingCategoryName('');
   };
 
+  const handleButtonPress = (action: () => void) => {
+    if (keyboardVisible) {
+      Keyboard.dismiss();
+      // Use setTimeout to ensure keyboard dismissal completes before action
+      setTimeout(() => {
+        action();
+      }, 100);
+    } else {
+      action();
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#202124" />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#202124" translucent={false} />
+      <SafeAreaView style={styles.safeAreaContainer}>
       
       {/* Navbar */}
       <View style={styles.navbar}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backButton} onPress={() => handleButtonPress(() => router.back())}>
           <Ionicons name="arrow-back" size={24} color="#E8EAED" />
         </TouchableOpacity>
         <Text style={styles.navbarTitle}>Edit Categories</Text>
@@ -175,7 +203,7 @@ export default function CategoriesEditScreen() {
         <View style={styles.createSection}>
           <TouchableOpacity 
             style={styles.clearButton}
-            onPress={() => setNewCategoryName('')}
+            onPress={() => handleButtonPress(() => setNewCategoryName(''))}
           >
             <Ionicons name="close" size={20} color="#9AA0A6" />
           </TouchableOpacity>
@@ -186,12 +214,12 @@ export default function CategoriesEditScreen() {
             placeholderTextColor="#9AA0A6"
             value={newCategoryName}
             onChangeText={setNewCategoryName}
-            onSubmitEditing={handleCreateCategory}
+            onSubmitEditing={() => handleButtonPress(handleCreateCategory)}
           />
           
           <TouchableOpacity 
             style={styles.checkButton}
-            onPress={handleCreateCategory}
+            onPress={() => handleButtonPress(handleCreateCategory)}
           >
             <Ionicons name="checkmark" size={20} color="#9AA0A6" />
           </TouchableOpacity>
@@ -209,7 +237,7 @@ export default function CategoriesEditScreen() {
                     style={styles.editInput}
                     value={editingCategoryName}
                     onChangeText={setEditingCategoryName}
-                    onSubmitEditing={handleSaveEdit}
+                    onSubmitEditing={() => handleButtonPress(handleSaveEdit)}
                     autoFocus
                   />
                 ) : (
@@ -222,13 +250,13 @@ export default function CategoriesEditScreen() {
                   <>
                     <TouchableOpacity 
                       style={styles.actionButton}
-                      onPress={handleCancelEdit}
+                      onPress={() => handleButtonPress(handleCancelEdit)}
                     >
                       <Ionicons name="close" size={20} color="#9AA0A6" />
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={styles.actionButton}
-                      onPress={handleSaveEdit}
+                      onPress={() => handleButtonPress(handleSaveEdit)}
                     >
                       <Ionicons name="checkmark" size={20} color="#9AA0A6" />
                     </TouchableOpacity>
@@ -237,13 +265,13 @@ export default function CategoriesEditScreen() {
                   <>
                     <TouchableOpacity 
                       style={styles.actionButton}
-                      onPress={() => handleEditCategory(category.id, category.name)}
+                      onPress={() => handleButtonPress(() => handleEditCategory(category.id, category.name))}
                     >
                       <Ionicons name="pencil" size={20} color="#9AA0A6" />
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={styles.actionButton}
-                      onPress={() => handleDeleteCategory(category.id)}
+                      onPress={() => handleButtonPress(() => handleDeleteCategory(category.id))}
                     >
                       <Ionicons name="trash-outline" size={20} color="#9AA0A6" />
                     </TouchableOpacity>
@@ -254,7 +282,8 @@ export default function CategoriesEditScreen() {
           ))}
         </View>
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -262,6 +291,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#202124',
+  },
+  safeAreaContainer: {
+    flex: 1,
   },
   navbar: {
     flexDirection: 'row',
