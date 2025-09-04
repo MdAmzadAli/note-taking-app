@@ -447,6 +447,16 @@ export const getCategories = async (): Promise<Category[]> => {
   }
 };
 
+export const getCategoryById = async (categoryId: string): Promise<Category | null> => {
+  try {
+    const categories = await getCategories();
+    return categories.find(category => category.id === categoryId) || null;
+  } catch (error) {
+    console.error('Error getting category by ID:', error);
+    return null;
+  }
+};
+
 // Remove duplicate UserSettings interface - using the one from types/index.ts
 export const updateNote = saveNote; // Alias for backward compatibility
 export { mockSpeechToText } from './speech';
