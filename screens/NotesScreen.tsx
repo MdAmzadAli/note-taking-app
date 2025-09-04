@@ -218,7 +218,7 @@ export default function NotesScreen() {
     }
   };
 
-  const saveCurrentNote = async (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[]) => {
+  const saveCurrentNote = async (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[], categoryId?: string) => {
     if (!currentNoteText.trim() && noteSections.length === 0) {
       Alert.alert('Error', 'Please enter some content for your note');
       return;
@@ -259,7 +259,7 @@ export default function NotesScreen() {
             images: images || currentNoteImages,
             updatedAt: now,
             isPinned: isPinned !== undefined ? isPinned : existingNote.isPinned,
-            categoryId: selectedCategoryId || existingNote.categoryId,
+            categoryId: categoryId || existingNote.categoryId,
           };
           await saveNote(updatedNote);
         }
@@ -278,7 +278,7 @@ export default function NotesScreen() {
           createdAt: now,
           updatedAt: now,
           isPinned: isPinned || false,
-          categoryId: selectedCategoryId || undefined,
+          categoryId: categoryId || undefined,
         };
         await saveNote(newNote);
       }
@@ -432,6 +432,9 @@ export default function NotesScreen() {
         noteGradient={currentNoteGradient}
         isPinned={currentNotePinned}
         images={currentNoteImages}
+        createdAt={editingNoteId ? notes.find(n => n.id === editingNoteId)?.createdAt : undefined}
+        updatedAt={editingNoteId ? notes.find(n => n.id === editingNoteId)?.updatedAt : undefined}
+        categoryId={editingNoteId ? notes.find(n => n.id === editingNoteId)?.categoryId : selectedCategoryId}
         onSave={saveCurrentNote}
         onImagesChange={setCurrentNoteImages}
         onBack={() => {

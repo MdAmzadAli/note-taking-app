@@ -17,6 +17,7 @@ import {
   PanResponder,
   KeyboardAvoidingView,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
@@ -24,11 +25,18 @@ import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import Animated from 'react-native-reanimated';
 import ColorThemePicker from './ColorThemePicker';
 import MediaAttachmentModal from './MediaAttachmentModal';
+import { getCategories } from '@/utils/storage';
 
 interface ImageAttachment {
   id: string;
   uri: string;
   type: 'photo' | 'image';
+  createdAt: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
   createdAt: string;
 }
 
@@ -40,7 +48,10 @@ interface NoteEditorScreenProps {
   noteGradient?: string[] | null;
   isPinned?: boolean;
   images?: ImageAttachment[];
-  onSave: (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[]) => void;
+  createdAt?: string;
+  updatedAt?: string;
+  categoryId?: string;
+  onSave: (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[], categoryId?: string) => void;
   onBack: () => void;
   onTitleChange: (title: string) => void;
   onContentChange: (content: string) => void;
@@ -56,6 +67,9 @@ export default function NoteEditorScreen({
   noteGradient = null,
   isPinned = false,
   images = [],
+  createdAt,
+  updatedAt,
+  categoryId,
   onSave, 
   onBack, 
   onTitleChange, 
@@ -74,13 +88,26 @@ export default function NoteEditorScreen({
   const [fullImageUri, setFullImageUri] = useState<string | null>(null);
   const [showFullImage, setShowFullImage] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(categoryId || null);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   
   const textInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     setInitialTitle(noteTitle);
     setInitialContent(noteContent);
+    loadCategories();
   }, []);
+
+  const loadCategories = async () => {
+    try {
+      const categoriesData = await getCategories();
+      setCategories(categoriesData);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
 
   useEffect(() => {
     const titleChanged = noteTitle !== initialTitle;
@@ -118,7 +145,7 @@ export default function NoteEditorScreen({
           {
             text: 'Save',
             onPress: () => {
-              onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages);
+              onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages, selectedCategoryId || undefined);
               onImagesChange && onImagesChange(noteImages);
               onBack();
             },
@@ -131,7 +158,7 @@ export default function NoteEditorScreen({
   };
 
   const handleSave = () => {
-    onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages);
+    onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages, selectedCategoryId || undefined);
     onImagesChange && onImagesChange(noteImages);
     setInitialTitle(noteTitle);
     setInitialContent(noteContent);
@@ -271,6 +298,11 @@ export default function NoteEditorScreen({
     Alert.alert('Tick Boxes', 'Tick boxes feature coming soon!');
   };
 
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   const renderBackground = () => {
     if (selectedGradient) {
       return (
@@ -325,6 +357,32 @@ export default function NoteEditorScreen({
 
         {/* Main Content */}
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Date/Time and Category Row */}
+          <View style={styles.metaInfoRow}>
+            <View style={styles.dateTimeInfo}>
+              {createdAt && (
+                <Text style={styles.dateTimeText}>
+                  Created: {formatDateTime(createdAt)}
+                </Text>
+              )}
+              {updatedAt && createdAt !== updatedAt && (
+                <Text style={styles.dateTimeText}>
+                  Modified: {formatDateTime(updatedAt)}
+                </Text>
+              )}
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.categoryDropdownButton}
+              onPress={() => setShowCategoryDropdown(true)}
+            >
+              <Text style={styles.categoryButtonText}>
+                {categories.find(cat => cat.id === selectedCategoryId)?.name || 'No Category'}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+
           {/* Image Gallery */}
           {noteImages.length > 0 && (
             <View style={styles.imageGallery}>
@@ -477,6 +535,64 @@ export default function NoteEditorScreen({
         onGradientSelect={handleGradientSelect}
         selectedTheme={selectedTheme}
       />
+
+      {/* Category Dropdown Modal */}
+      <Modal
+        visible={showCategoryDropdown}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCategoryDropdown(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowCategoryDropdown(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.categoryModal}>
+                <Text style={styles.categoryModalTitle}>Select Category</Text>
+                <ScrollView style={styles.categoryList}>
+                  <TouchableOpacity
+                    style={[
+                      styles.categoryOption,
+                      selectedCategoryId === null && styles.selectedCategoryOption
+                    ]}
+                    onPress={() => {
+                      setSelectedCategoryId(null);
+                      setShowCategoryDropdown(false);
+                    }}
+                  >
+                    <Text style={[
+                      styles.categoryOptionText,
+                      selectedCategoryId === null && styles.selectedCategoryText
+                    ]}>
+                      No Category
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  {categories.map((category) => (
+                    <TouchableOpacity
+                      key={category.id}
+                      style={[
+                        styles.categoryOption,
+                        selectedCategoryId === category.id && styles.selectedCategoryOption
+                      ]}
+                      onPress={() => {
+                        setSelectedCategoryId(category.id);
+                        setShowCategoryDropdown(false);
+                      }}
+                    >
+                      <Text style={[
+                        styles.categoryOptionText,
+                        selectedCategoryId === category.id && styles.selectedCategoryText
+                      ]}>
+                        {category.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 }
@@ -647,5 +763,79 @@ const styles = StyleSheet.create({
     color: '#CCCCCC',
     fontSize: 12,
     textAlign: 'center',
+  },
+  metaInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  dateTimeInfo: {
+    flex: 1,
+  },
+  dateTimeText: {
+    color: '#888888',
+    fontSize: 12,
+    lineHeight: 16,
+    fontFamily: 'Inter',
+  },
+  categoryDropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  categoryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    marginRight: 4,
+    fontFamily: 'Inter',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  categoryModal: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 16,
+    padding: 20,
+    width: '80%',
+    maxHeight: '60%',
+  },
+  categoryModalTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+    textAlign: 'center',
+    fontFamily: 'Inter',
+  },
+  categoryList: {
+    maxHeight: 300,
+  },
+  categoryOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  selectedCategoryOption: {
+    backgroundColor: '#00FF7F',
+  },
+  categoryOptionText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Inter',
+  },
+  selectedCategoryText: {
+    color: '#000000',
+    fontWeight: '600',
   },
 });
