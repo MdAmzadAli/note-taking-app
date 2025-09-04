@@ -40,9 +40,10 @@ interface NoteCardProps {
   note: SimpleNote;
   onPress: () => void;
   onLongPress: () => void;
+  selectedCategoryId?: string | null;
 }
 
-export default function NoteCard({ note, onPress, onLongPress }: NoteCardProps) {
+export default function NoteCard({ note, onPress, onLongPress, selectedCategoryId }: NoteCardProps) {
   const [showFullImage, setShowFullImage] = useState(false);
   const [fullImageUri, setFullImageUri] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -204,7 +205,7 @@ export default function NoteCard({ note, onPress, onLongPress }: NoteCardProps) 
         </Text>
         <Text style={styles.cardDate}>
           {new Date(note.createdAt).toLocaleDateString()}
-          {categoryName && <Text style={styles.categoryName}> • {categoryName}</Text>}
+          {categoryName && !selectedCategoryId && <Text style={styles.categoryName}> • {categoryName}</Text>}
         </Text>
       </View>
 

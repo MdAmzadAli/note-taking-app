@@ -22,9 +22,10 @@ interface NotesGridProps {
   notes: SimpleNote[];
   onEditNote: (note: SimpleNote) => void;
   onDeleteNote: (noteId: string) => void;
+  selectedCategoryId?: string; // Added selectedCategoryId prop
 }
 
-export default function NotesGrid({ notes, onEditNote, onDeleteNote }: NotesGridProps) {
+export default function NotesGrid({ notes, onEditNote, onDeleteNote, selectedCategoryId }: NotesGridProps) {
   if (notes.length === 0) {
     return (
       <View style={styles.emptyState}>
@@ -72,6 +73,7 @@ export default function NotesGrid({ notes, onEditNote, onDeleteNote }: NotesGrid
                   note={note}
                   onPress={() => onEditNote(note)}
                   onLongPress={() => onDeleteNote(note.id)}
+                  selectedCategoryId={selectedCategoryId}
                 />
               </View>
             ))}
@@ -92,6 +94,7 @@ export default function NotesGrid({ notes, onEditNote, onDeleteNote }: NotesGrid
                       note={note}
                       onPress={() => onEditNote(note)}
                       onLongPress={() => onDeleteNote(note.id)}
+                      selectedCategoryId={selectedCategoryId}
                     />
                   </View>
                 ))}

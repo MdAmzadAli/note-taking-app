@@ -457,6 +457,7 @@ export default function NotesScreen() {
         notes={filteredNotes}
         onEditNote={editNote}
         onDeleteNote={deleteNoteHandler}
+        selectedCategoryId={selectedCategoryId}
       />
     );
   };
