@@ -27,6 +27,7 @@ interface SlideMenuProps {
   onCreateTemplate: () => void;
   onCategorySelect?: (categoryId: string) => void;
   onShowAllNotes?: () => void;
+  selectedCategoryId?: string | null;
 }
 
 export default function SlideMenu({ 
@@ -35,7 +36,8 @@ export default function SlideMenu({
   slideAnim, 
   onCreateTemplate,
   onCategorySelect,
-  onShowAllNotes
+  onShowAllNotes,
+  selectedCategoryId
 }: SlideMenuProps) {
   const [labels, setLabels] = useState<Label[]>([]);
 
@@ -117,7 +119,10 @@ export default function SlideMenu({
 
                 {/* All Notes Option */}
                 <TouchableOpacity
-                  style={styles.labelItem}
+                  style={[
+                    styles.labelItem,
+                    !selectedCategoryId && styles.selectedLabelItem
+                  ]}
                   onPress={() => {
                     if (onShowAllNotes) {
                       onShowAllNotes();
@@ -134,7 +139,10 @@ export default function SlideMenu({
                   {labels.map((label) => (
                     <TouchableOpacity
                       key={label.id}
-                      style={styles.labelItem}
+                      style={[
+                        styles.labelItem,
+                        selectedCategoryId === label.id && styles.selectedLabelItem
+                      ]}
                       onPress={() => handleLabelPress(label.id)}
                     >
                       <Ionicons name="apps-outline" size={20} color="#9CA3AF" />
@@ -275,5 +283,9 @@ const styles = StyleSheet.create({
     color: '#9AA0A6',
     fontSize: 16,
     marginLeft: 12,
+  },
+  selectedLabelItem: {
+    backgroundColor: '#0c7a53',
+    borderRadius: 24,
   },
 });

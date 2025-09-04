@@ -518,6 +518,7 @@ export default function NotesScreen() {
         }}
         onCategorySelect={handleCategorySelect}
         onShowAllNotes={handleShowAllNotes}
+        selectedCategoryId={selectedCategoryId}
       />
     </View>
   );
