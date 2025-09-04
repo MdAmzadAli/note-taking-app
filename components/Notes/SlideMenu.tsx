@@ -105,12 +105,14 @@ export default function SlideMenu({
       animationType="none"
       visible={visible}
       onRequestClose={onClose}
+      statusBarTranslucent 
+      presentationStyle="overFullScreen" 
     >
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <Animated.View style={[styles.menu, { transform: [{ translateX: slideAnim }] }]}>
-              {/* <SafeAreaView style={styles.safeAreaContent} edges={['left', 'right']}> */}
+             <SafeAreaView style={styles.safeAreaContent}>
                 {/* Google Keep Header */}
                 <View style={styles.header}>
                 <View style={styles.googleIcon}>
@@ -174,7 +176,7 @@ export default function SlideMenu({
                 {/* Bottom Separator */}
                 <View style={styles.separator} />
               </ScrollView>
-              {/* </SafeAreaView> */}
+             </SafeAreaView>
             </Animated.View>
           </TouchableWithoutFeedback>
         </View>
@@ -204,7 +206,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 20,
-    paddingTop: 60, // Add extra padding for status bar area
+    // paddingTop: 60, // Add extra padding for status bar area
     marginTop: 0,
   },
   googleIcon: {
