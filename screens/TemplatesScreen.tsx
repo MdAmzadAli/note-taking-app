@@ -401,16 +401,14 @@ export default function TemplatesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    backgroundColor: '#000000',
+    backgroundColor: 'transparent',
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
   },

@@ -324,14 +324,14 @@ export default function TemplateEntriesScreen({ templateId, onBack }: TemplateEn
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    backgroundColor: 'transparent',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },

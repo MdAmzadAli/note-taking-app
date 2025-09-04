@@ -417,15 +417,14 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: '#000000',
+    backgroundColor: 'transparent',
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
   },
