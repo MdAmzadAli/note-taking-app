@@ -1,18 +1,11 @@
 import React from 'react';
-import { StyleSheet, Platform, View } from 'react-native';
+import AppLayout from '@/components/AppLayout';
 import SettingsScreen from '@/screens/SettingsScreen';
 
 export default function SettingsTab() {
   return (
-    <View style={styles.container}>
+    <AppLayout>
       <SettingsScreen />
-    </View>
+    </AppLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: Platform.OS === 'ios' ? 0 : 20, // Add padding for Android status bar
-  },
-});

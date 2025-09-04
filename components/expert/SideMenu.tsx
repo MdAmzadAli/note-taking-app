@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, TouchableWithoutFeedback, FlatList, Modal, TextInput } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import RenameModal from './RenameModal';
 
@@ -190,7 +191,8 @@ export default function SideMenu({
       <View style={styles.menuOverlay}>
         <TouchableWithoutFeedback>
           <Animated.View style={[styles.slidingMenu, { transform: [{ translateX: slideAnim }] }]}>
-            <View style={styles.menuHeader}>
+            <SafeAreaView style={styles.safeAreaContent}>
+              <View style={styles.menuHeader}>
               <Text style={styles.menuTitle}>Workspaces</Text>
               <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                 <IconSymbol size={20} name="xmark" color="#FFFFFF" />
@@ -259,6 +261,7 @@ export default function SideMenu({
                 <Text style={styles.createWorkspaceButtonText}>Create New Workspace</Text>
               </TouchableOpacity>
             </View>
+            </SafeAreaView>
           </Animated.View>
         </TouchableWithoutFeedback>
 
@@ -329,6 +332,9 @@ const styles = StyleSheet.create({
     width: '85%',
     backgroundColor: '#1A1A1A',
   },
+  safeAreaContent: {
+    flex: 1,
+  },
   menuHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -337,6 +343,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
     backgroundColor: '#000000',
+    marginTop: 0,
   },
   menuTitle: {
     fontSize: 22,

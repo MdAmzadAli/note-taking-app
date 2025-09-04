@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet,
-  SafeAreaView,
   Animated,
   Dimensions,
   Alert,
 } from 'react-native';
+import AppLayout from '@/components/AppLayout';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import fileService, { FileUploadResponse } from '../../services/fileService';
@@ -798,7 +798,7 @@ export default function ExpertTab() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <AppLayout backgroundColor="#FFFFFF">
       <ExpertHeader
         onMenuPress={openMenu}
         onUploadPress={() => setIsUploadModalVisible(true)}
@@ -852,13 +852,6 @@ export default function ExpertTab() {
         file={previewFile}
         onClose={() => setIsFilePreviewVisible(false)}
       />
-    </SafeAreaView>
+    </AppLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-});

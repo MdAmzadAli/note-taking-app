@@ -10,6 +10,7 @@ import {
   Dimensions,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { getCategories } from '@/utils/storage';
@@ -109,8 +110,9 @@ export default function SlideMenu({
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <Animated.View style={[styles.menu, { transform: [{ translateX: slideAnim }] }]}>
-              {/* Google Keep Header */}
-              <View style={styles.header}>
+              <SafeAreaView style={styles.safeAreaContent}>
+                {/* Google Keep Header */}
+                <View style={styles.header}>
                 <View style={styles.googleIcon}>
                   <Ionicons name="logo-google" size={24} color="#4285F4" />
                 </View>
@@ -172,6 +174,7 @@ export default function SlideMenu({
                 {/* Bottom Separator */}
                 <View style={styles.separator} />
               </ScrollView>
+              </SafeAreaView>
             </Animated.View>
           </TouchableWithoutFeedback>
         </View>
@@ -192,13 +195,16 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: Dimensions.get('window').width * 0.8,
     backgroundColor: '#202124',
-    paddingTop: 50,
+  },
+  safeAreaContent: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 20,
+    marginTop: 0,
   },
   googleIcon: {
     marginRight: 12,

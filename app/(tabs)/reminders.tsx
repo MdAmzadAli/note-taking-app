@@ -1,17 +1,11 @@
 import React from 'react';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import AppLayout from '@/components/AppLayout';
 import RemindersScreen from '@/screens/RemindersScreen';
 
 export default function RemindersTab() {
   return (
-    <SafeAreaView style={styles.container}>
+    <AppLayout>
       <RemindersScreen />
-    </SafeAreaView>
+    </AppLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
