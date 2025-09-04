@@ -112,9 +112,9 @@ export default function SlideMenu({
                 {/* Separation Line */}
                 <View style={styles.separator} />
 
-                {/* Labels Section */}
+                {/* Categories Section */}
                 <View style={styles.labelsHeader}>
-                  <Text style={styles.labelsTitle}>Labels</Text>
+                  <Text style={styles.labelsTitle}>Categories</Text>
                   <TouchableOpacity onPress={handleCreateNewLabel}>
                     <Text style={styles.editText}>Edit</Text>
                   </TouchableOpacity>
@@ -128,7 +128,7 @@ export default function SlideMenu({
                       style={styles.labelItem}
                       onPress={() => handleLabelPress(label.id)}
                     >
-                      <Ionicons name="pricetag-outline" size={20} color="#9CA3AF" />
+                      <Ionicons name="apps-outline" size={20} color="#9CA3AF" />
                       <Text style={styles.labelText}>{label.name}</Text>
                     </TouchableOpacity>
                   ))}
@@ -140,7 +140,7 @@ export default function SlideMenu({
                   onPress={handleCreateNewLabel}
                 >
                   <Ionicons name="add" size={20} color="#9CA3AF" />
-                  <Text style={styles.createLabelText}>Create new label</Text>
+                  <Text style={styles.createLabelText}>Create new category</Text>
                 </TouchableOpacity>
 
                 {/* Bottom Separator */}
