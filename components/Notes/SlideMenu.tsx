@@ -40,8 +40,10 @@ export default function SlideMenu({
   const [labels, setLabels] = useState<Label[]>([]);
 
   useEffect(() => {
-    // Load labels from storage when component mounts
-    loadLabels();
+    // Load labels from storage when component mounts or becomes visible
+    if (visible) {
+      loadLabels();
+    }
   }, [visible]);
 
   const loadLabels = async () => {

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -13,6 +14,7 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { router } from 'expo-router';
+import { getCategories, saveCategory, deleteCategory } from '@/utils/storage';
 
 interface Category {
   id: string;
@@ -32,28 +34,39 @@ export default function CategoriesEditScreen() {
 
   const loadCategories = async () => {
     try {
-      // TODO: Implement actual category loading from AsyncStorage
-      // For now, using mock categories to match the reference image
-      const mockCategories = [
-        { id: '1', name: 'Work', createdAt: new Date().toISOString() },
-        { id: '2', name: 'Personal', createdAt: new Date().toISOString() },
-        { id: '3', name: 'Ideas', createdAt: new Date().toISOString() },
-        { id: '4', name: 'Projects', createdAt: new Date().toISOString() },
-        { id: '5', name: 'Shopping', createdAt: new Date().toISOString() },
-        { id: '6', name: 'Health', createdAt: new Date().toISOString() },
-        { id: '7', name: 'Travel', createdAt: new Date().toISOString() },
-        { id: '8', name: 'Finance', createdAt: new Date().toISOString() },
-        { id: '9', name: 'Learning', createdAt: new Date().toISOString() },
-        { id: '10', name: 'Family', createdAt: new Date().toISOString() },
-        { id: '11', name: 'Goals', createdAt: new Date().toISOString() },
-      ];
-      setCategories(mockCategories);
+      const storedCategories = await getCategories();
+      
+      // If no categories exist, create default ones
+      if (storedCategories.length === 0) {
+        const defaultCategories = [
+          { id: '1', name: 'Work', createdAt: new Date().toISOString() },
+          { id: '2', name: 'Personal', createdAt: new Date().toISOString() },
+          { id: '3', name: 'Ideas', createdAt: new Date().toISOString() },
+          { id: '4', name: 'Projects', createdAt: new Date().toISOString() },
+          { id: '5', name: 'Shopping', createdAt: new Date().toISOString() },
+          { id: '6', name: 'Health', createdAt: new Date().toISOString() },
+          { id: '7', name: 'Travel', createdAt: new Date().toISOString() },
+          { id: '8', name: 'Finance', createdAt: new Date().toISOString() },
+          { id: '9', name: 'Learning', createdAt: new Date().toISOString() },
+          { id: '10', name: 'Family', createdAt: new Date().toISOString() },
+          { id: '11', name: 'Goals', createdAt: new Date().toISOString() },
+        ];
+        
+        // Save default categories to storage
+        for (const category of defaultCategories) {
+          await saveCategory(category);
+        }
+        
+        setCategories(defaultCategories);
+      } else {
+        setCategories(storedCategories);
+      }
     } catch (error) {
       console.error('Error loading categories:', error);
     }
   };
 
-  const handleCreateCategory = () => {
+  const handleCreateCategory = async () => {
     if (newCategoryName.trim() === '') {
       Alert.alert('Error', 'Please enter a category name');
       return;
@@ -65,11 +78,15 @@ export default function CategoriesEditScreen() {
       createdAt: new Date().toISOString(),
     };
 
-    setCategories(prev => [...prev, newCategory]);
-    setNewCategoryName('');
-    
-    // TODO: Save to AsyncStorage
-    console.log('Created new category:', newCategory);
+    try {
+      await saveCategory(newCategory);
+      setCategories(prev => [...prev, newCategory]);
+      setNewCategoryName('');
+      console.log('Created new category:', newCategory);
+    } catch (error) {
+      console.error('Error creating category:', error);
+      Alert.alert('Error', 'Failed to create category');
+    }
   };
 
   const handleDeleteCategory = (categoryId: string) => {
@@ -81,10 +98,15 @@ export default function CategoriesEditScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            setCategories(prev => prev.filter(category => category.id !== categoryId));
-            // TODO: Update AsyncStorage
-            console.log('Deleted category:', categoryId);
+          onPress: async () => {
+            try {
+              await deleteCategory(categoryId);
+              setCategories(prev => prev.filter(category => category.id !== categoryId));
+              console.log('Deleted category:', categoryId);
+            } catch (error) {
+              console.error('Error deleting category:', error);
+              Alert.alert('Error', 'Failed to delete category');
+            }
           },
         },
       ]
@@ -96,25 +118,39 @@ export default function CategoriesEditScreen() {
     setEditingCategoryName(currentName);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (editingCategoryName.trim() === '') {
       Alert.alert('Error', 'Please enter a category name');
       return;
     }
 
-    setCategories(prev =>
-      prev.map(category =>
-        category.id === editingCategoryId
-          ? { ...category, name: editingCategoryName.trim() }
-          : category
-      )
-    );
+    try {
+      const updatedCategory = categories.find(c => c.id === editingCategoryId);
+      if (updatedCategory) {
+        const newCategory = {
+          ...updatedCategory,
+          name: editingCategoryName.trim()
+        };
+        
+        await saveCategory(newCategory);
+        
+        setCategories(prev =>
+          prev.map(category =>
+            category.id === editingCategoryId
+              ? { ...category, name: editingCategoryName.trim() }
+              : category
+          )
+        );
 
-    setEditingCategoryId(null);
-    setEditingCategoryName('');
-    
-    // TODO: Update AsyncStorage
-    console.log('Updated category:', editingCategoryId, editingCategoryName);
+        setEditingCategoryId(null);
+        setEditingCategoryName('');
+        
+        console.log('Updated category:', editingCategoryId, editingCategoryName);
+      }
+    } catch (error) {
+      console.error('Error updating category:', error);
+      Alert.alert('Error', 'Failed to update category');
+    }
   };
 
   const handleCancelEdit = () => {

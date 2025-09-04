@@ -112,6 +112,7 @@ export default function NotesScreen() {
   useFocusEffect(
     React.useCallback(() => {
       loadTemplates();
+      loadNotes(); // This will ensure categories are refreshed when returning from labels-edit
     }, [])
   );
 

@@ -207,11 +207,39 @@ export const saveUserSettings = async (settings: UserSettings): Promise<void> =>
 // Custom Templates
 export const getCustomTemplates = async (): Promise<CustomTemplate[]> => {
   try {
-    const templates = await AsyncStorage.getItem('custom_templates');
-    return templates ? JSON.parse(templates) : [];
+    const data = await AsyncStorage.getItem('customTemplates');
+    return data ? JSON.parse(data) : [];
   } catch (error) {
-    console.error('Error loading custom templates:', error);
+    console.error('Error getting custom templates:', error);
     return [];
+  }
+};
+
+// Category storage functions
+export const saveCategory = async (category: { id: string; name: string; createdAt: string }) => {
+  try {
+    const categories = await getCategories();
+    const existingIndex = categories.findIndex(c => c.id === category.id);
+
+    if (existingIndex >= 0) {
+      categories[existingIndex] = category;
+    } else {
+      categories.push(category);
+    }
+
+    await AsyncStorage.setItem('categories', JSON.stringify(categories));
+  } catch (error) {
+    console.error('Error saving category:', error);
+  }
+};
+
+export const deleteCategory = async (categoryId: string) => {
+  try {
+    const categories = await getCategories();
+    const filteredCategories = categories.filter(c => c.id !== categoryId);
+    await AsyncStorage.setItem('categories', JSON.stringify(filteredCategories));
+  } catch (error) {
+    console.error('Error deleting category:', error);
   }
 };
 
@@ -416,45 +444,6 @@ export const getCategories = async (): Promise<Category[]> => {
   } catch (error) {
     console.error('Error getting categories:', error);
     return [];
-  }
-};
-
-export const saveCategory = async (category: Category): Promise<void> => {
-  try {
-    const categories = await getCategories();
-    const existingIndex = categories.findIndex(c => c.id === category.id);
-
-    if (existingIndex >= 0) {
-      categories[existingIndex] = category;
-    } else {
-      categories.push(category);
-    }
-
-    await AsyncStorage.setItem(KEYS.CATEGORIES, JSON.stringify(categories));
-  } catch (error) {
-    console.error('Error saving category:', error);
-    throw error;
-  }
-};
-
-export const deleteCategory = async (categoryId: string): Promise<void> => {
-  try {
-    const categories = await getCategories();
-    const filteredCategories = categories.filter(category => category.id !== categoryId);
-    await AsyncStorage.setItem(KEYS.CATEGORIES, JSON.stringify(filteredCategories));
-  } catch (error) {
-    console.error('Error deleting category:', error);
-    throw error;
-  }
-};
-
-export const getCategoryById = async (categoryId: string): Promise<Category | null> => {
-  try {
-    const categories = await getCategories();
-    return categories.find(category => category.id === categoryId) || null;
-  } catch (error) {
-    console.error('Error getting category by id:', error);
-    return null;
   }
 };
 
