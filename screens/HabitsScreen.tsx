@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   ScrollView,
   Alert,
@@ -268,16 +267,16 @@ export default function HabitsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.centerContent}>
           <Text style={styles.loadingText}>Loading habits...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Navbar */}
       <View style={styles.navbar}>
         <Text style={styles.navTitle}>Habits</Text>
@@ -484,7 +483,7 @@ export default function HabitsScreen() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 

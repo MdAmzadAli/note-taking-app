@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  SafeAreaView,
   Platform,
 } from 'react-native';
 import { Note, Task, Reminder } from '@/types';
@@ -247,7 +246,7 @@ export default function SearchScreen() {
   }, [searchResults]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Search</Text>
         <View style={styles.headerActions}>
@@ -343,7 +342,7 @@ export default function SearchScreen() {
           <Text style={styles.emptySubtext}>Search across notes, tasks, and reminders</Text>
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 

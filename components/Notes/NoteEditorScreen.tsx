@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
   Modal,
   TouchableWithoutFeedback,
   StatusBar,
@@ -323,7 +322,7 @@ export default function NoteEditorScreen({
       {renderBackground()}
       <StatusBar barStyle="light-content" backgroundColor={selectedTheme} translucent={true} />
 
-      <SafeAreaView style={styles.safeAreaContainer}>
+      <View style={styles.safeAreaContainer}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>
@@ -463,7 +462,7 @@ export default function NoteEditorScreen({
             <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
 
       {/* Media Attachment Modal */}
       <MediaAttachmentModal

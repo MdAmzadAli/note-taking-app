@@ -4,7 +4,7 @@ import {
   Text, 
   TouchableOpacity, 
   StyleSheet, 
-  SafeAreaView, 
+ 
   Platform, 
   TextInput, 
   ScrollView,
@@ -529,7 +529,7 @@ export default function ChatInterface({
   }, []); // Properly depend on files and workspace changes
 
   return (
-    <SafeAreaView style={styles.pdfChatContainer}>
+    <View style={styles.pdfChatContainer}>
       <KeyboardAvoidingView 
         style={styles.pdfChatKeyboardContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1089,7 +1089,7 @@ export default function ChatInterface({
         placeholder="Enter new file name..."
         errorMessage="File name cannot be empty"
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

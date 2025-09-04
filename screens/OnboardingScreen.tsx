@@ -5,7 +5,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   Alert,
   Dimensions,
 } from 'react-native';
@@ -51,7 +50,7 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>Welcome to Notes App</Text>
         <Text style={styles.subtitle}>
@@ -114,7 +113,7 @@ export default function OnboardingScreen() {
           </Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 

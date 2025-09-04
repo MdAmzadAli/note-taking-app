@@ -9,7 +9,6 @@ import {
   StyleSheet,
   Alert,
   FlatList,
-  SafeAreaView,
   Animated,
   Dimensions,
   TouchableWithoutFeedback,
@@ -222,20 +221,20 @@ export default function TemplateEntriesScreen({ templateId, onBack }: TemplateEn
 
   if (!template) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
             <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Template Not Found</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (isCreating) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.iconButton} onPress={onBack}>
             <Text style={styles.iconButtonText}>←</Text>
@@ -262,12 +261,12 @@ export default function TemplateEntriesScreen({ templateId, onBack }: TemplateEn
         <ScrollView style={styles.editorContainer} contentContainerStyle={styles.templateContentContainer}>
           {template.fields.map(field => renderTemplateField(field))}
         </ScrollView>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.iconButton} onPress={onBack}>
           <Text style={styles.iconButtonText}>←</Text>
@@ -318,7 +317,7 @@ export default function TemplateEntriesScreen({ templateId, onBack }: TemplateEn
           contentContainerStyle={styles.entriesList}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 

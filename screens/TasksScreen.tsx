@@ -9,7 +9,6 @@ import {
   Alert,
   Switch,
   Platform,
-  SafeAreaView,
   Animated,
   ScrollView,
 } from 'react-native';
@@ -1414,7 +1413,7 @@ export default function TasksScreen() {
 
   if (isCreating || isEditing) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>
             {isEditing ? 'Edit Task' : 'New Task'}
@@ -1525,7 +1524,7 @@ export default function TasksScreen() {
             />
           )}
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 

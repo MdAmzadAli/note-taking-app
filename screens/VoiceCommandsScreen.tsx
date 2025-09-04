@@ -5,7 +5,6 @@ import {
   Text,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   Platform,
 } from 'react-native';
@@ -74,7 +73,7 @@ export default function VoiceCommandsScreen({ onBack }: VoiceCommandsScreenProps
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
           <IconSymbol size={24} name="chevron.left" color="#FFFFFF" />
@@ -177,7 +176,7 @@ export default function VoiceCommandsScreen({ onBack }: VoiceCommandsScreenProps
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

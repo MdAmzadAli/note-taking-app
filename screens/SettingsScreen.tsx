@@ -8,7 +8,6 @@ import {
   ScrollView,
   Switch,
   Platform,
-  SafeAreaView,
   TextInput,
   Modal,
   FlatList,
@@ -311,7 +310,7 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
         {onBack && (
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
@@ -531,7 +530,7 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <SafeAreaView style={styles.modalContainer}>
+        <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Alarm Manager</Text>
             <TouchableOpacity
@@ -622,9 +621,9 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps = {}) => {
 
             
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 

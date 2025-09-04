@@ -7,7 +7,6 @@ import {
   FlatList,
   StyleSheet,
   Alert,
-  SafeAreaView,
   Modal,
   ScrollView,
   Platform,
@@ -241,7 +240,7 @@ export default function TemplatesScreen() {
 
   if (isCreating || isEditing) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>
             {isEditing ? 'Edit Template' : 'New Template'}
@@ -335,12 +334,12 @@ export default function TemplatesScreen() {
             />
           </View>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Templates</Text>
         <View style={styles.headerActions}>
@@ -395,7 +394,7 @@ export default function TemplatesScreen() {
       />
 
 
-    </SafeAreaView>
+    </View>
   );
 }
 

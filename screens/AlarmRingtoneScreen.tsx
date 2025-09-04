@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Alert,
   FlatList,
@@ -274,7 +273,7 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Text style={styles.backButtonText}>← Cancel</Text>
@@ -411,7 +410,7 @@ const AlarmRingtoneScreen: React.FC<AlarmRingtoneScreenProps> = ({
           <Text style={styles.saveButtonText}>Save Ringtone</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

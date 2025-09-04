@@ -9,7 +9,6 @@ import {
   StyleSheet,
   Alert,
   Platform,
-  SafeAreaView,
   Image,
   Modal,
 } from 'react-native';
@@ -1278,7 +1277,7 @@ export default function RemindersScreen() {
 
   if (isCreating || isEditing) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>
             {isEditing ? 'Edit Reminder' : 'New Reminder'}
@@ -1499,12 +1498,12 @@ export default function RemindersScreen() {
             </View>
           </View>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Reminders</Text>
         <View style={styles.headerActions}>
@@ -1594,7 +1593,7 @@ export default function RemindersScreen() {
         onClose={() => setActiveAlarmReminder(null)}
         reminder={activeAlarmReminder || undefined}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
