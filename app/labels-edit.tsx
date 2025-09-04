@@ -159,8 +159,8 @@ export default function CategoriesEditScreen() {
   };
 
   return (
-    <AppLayout backgroundColor="#202124">
-      <StatusBar barStyle="light-content" backgroundColor="#202124" />
+    <AppLayout>
+      {/* <StatusBar barStyle="light-content" /> */}
       
       {/* Navbar */}
       <View style={styles.navbar}>
@@ -261,13 +261,13 @@ export default function CategoriesEditScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#202124',
+    // backgroundColor: '#202124',
   },
   navbar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    backgroundColor: '#202124',
+    // backgroundColor: '#202124',
     borderBottomWidth: 1,
     borderBottomColor: '#3C4043',
   },
