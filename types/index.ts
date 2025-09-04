@@ -25,6 +25,7 @@ export interface Note {
   gradient?: string[];
   images?: ImageAttachment[];
   isPinned?: boolean;
+  categoryId?: string; // For category-based organization
   createdAt: string;
   updatedAt: string;
 }

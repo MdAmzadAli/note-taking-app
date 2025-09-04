@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import Animated from 'react-native-reanimated';
+import { getCategoryById } from '@/utils/storage';
 
 interface ImageAttachment {
   id: string;
@@ -32,6 +33,7 @@ interface SimpleNote {
   gradient?: string[];
   isPinned?: boolean;
   images?: ImageAttachment[];
+  categoryId?: string;
 }
 
 interface NoteCardProps {
@@ -44,6 +46,26 @@ export default function NoteCard({ note, onPress, onLongPress }: NoteCardProps) 
   const [showFullImage, setShowFullImage] = useState(false);
   const [fullImageUri, setFullImageUri] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [categoryName, setCategoryName] = useState<string | null>(null);
+  
+  // Load category name when component mounts or categoryId changes
+  useEffect(() => {
+    const loadCategoryName = async () => {
+      if (note.categoryId) {
+        try {
+          const category = await getCategoryById(note.categoryId);
+          setCategoryName(category?.name || null);
+        } catch (error) {
+          console.error('Error loading category name:', error);
+          setCategoryName(null);
+        }
+      } else {
+        setCategoryName(null);
+      }
+    };
+
+    loadCategoryName();
+  }, [note.categoryId]);
   
   const hasImages = note.images && note.images.length > 0;
   const isImageNote = note.content.includes('data:image') || 
@@ -182,6 +204,7 @@ export default function NoteCard({ note, onPress, onLongPress }: NoteCardProps) 
         </Text>
         <Text style={styles.cardDate}>
           {new Date(note.createdAt).toLocaleDateString()}
+          {categoryName && <Text style={styles.categoryName}> • {categoryName}</Text>}
         </Text>
       </View>
 
@@ -266,6 +289,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 10,
     marginTop: 'auto',
+  },
+  categoryName: {
+    color: '#A0A0A0',
+    fontSize: 10,
+    fontStyle: 'italic',
   },
   imageGallery: {
     marginBottom: 12,

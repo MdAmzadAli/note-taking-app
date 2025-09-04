@@ -49,6 +49,7 @@ interface SimpleNote {
   gradient?: string[];
   isPinned?: boolean;
   images?: ImageAttachment[];
+  categoryId?: string;
 }
 
 export default function NotesScreen() {
@@ -90,6 +91,7 @@ export default function NotesScreen() {
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedWritingStyle, setSelectedWritingStyle] = useState<WritingStyle>('mind_dump');
   const [noteSections, setNoteSections] = useState<NoteSection[]>([]);
   const [checkedItems, setCheckedItems] = useState<boolean[]>([]);
@@ -116,12 +118,21 @@ export default function NotesScreen() {
   useEffect(() => {
     console.log('[NOTES] Search filter effect triggered - query:', searchQuery, 'notes count:', notes.length);
 
+    let notesToFilter = notes;
+    
+    // First apply category filter if a category is selected
+    if (selectedCategoryId) {
+      notesToFilter = notes.filter(note => note.categoryId === selectedCategoryId);
+      console.log('[NOTES] Category filtered notes count:', notesToFilter.length);
+    }
+
+    // Then apply search filter if there's a search query
     if (searchQuery.trim()) {
-      const filtered = notes.filter(note => 
+      const filtered = notesToFilter.filter(note => 
         note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (note.title && note.title.toLowerCase().includes(searchQuery.toLowerCase()))
       );
-      console.log('[NOTES] Filtered notes count:', filtered.length);
+      console.log('[NOTES] Search filtered notes count:', filtered.length);
       setFilteredNotes(filtered);
 
       const filteredTemps = templates.filter(template =>
@@ -129,11 +140,11 @@ export default function NotesScreen() {
       );
       setFilteredTemplates(filteredTemps);
     } else {
-      console.log('[NOTES] No search query, showing all notes:', notes.length);
-      setFilteredNotes([...notes]); // Create a new array to ensure re-render
+      console.log('[NOTES] No search query, showing filtered notes:', notesToFilter.length);
+      setFilteredNotes([...notesToFilter]); // Create a new array to ensure re-render
       setFilteredTemplates([...templates]);
     }
-  }, [searchQuery, notes, templates]);
+  }, [searchQuery, notes, templates, selectedCategoryId]);
 
   const loadNotes = async () => {
     try {
@@ -151,6 +162,7 @@ export default function NotesScreen() {
         gradient: note.gradient,
         isPinned: note.isPinned || false,
         images: note.images || [],
+        categoryId: note.categoryId,
       }));
 
       const sortedNotes = simpleNotes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -404,6 +416,16 @@ export default function NotesScreen() {
     });
   };
 
+  const handleCategorySelect = (categoryId: string) => {
+    setSelectedCategoryId(categoryId);
+    setSearchQuery(''); // Clear search when switching categories
+  };
+
+  const handleShowAllNotes = () => {
+    setSelectedCategoryId(null);
+    setSearchQuery(''); // Clear search when showing all notes
+  };
+
   if (isCreating) {
     return (
       <NoteEditorScreen
@@ -494,6 +516,8 @@ export default function NotesScreen() {
           closeMenu();
           setCurrentView('create-template');
         }}
+        onCategorySelect={handleCategorySelect}
+        onShowAllNotes={handleShowAllNotes}
       />
     </View>
   );

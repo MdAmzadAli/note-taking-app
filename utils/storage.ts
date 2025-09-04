@@ -11,11 +11,18 @@ interface Template {
 }
 import { eventBus, EVENTS } from './eventBus';
 
+interface Category {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
 const KEYS = {
   NOTES: 'notes',
   REMINDERS: 'reminders',
   TASKS: 'tasks',
   USER_SETTINGS: 'userSettings',
+  CATEGORIES: 'categories',
 };
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -48,6 +55,7 @@ export const getNotes = async (): Promise<Note[]> => {
         checkedItems: note.checkedItems || undefined,
         images: note.images || [],
         isPinned: note.isPinned || false,
+        categoryId: note.categoryId || undefined,
       }));
     }
     return [];
@@ -394,6 +402,59 @@ export const deleteHabit = async (habitId: string): Promise<void> => {
   } catch (error) {
     console.error('Error deleting habit:', error);
     throw error;
+  }
+};
+
+// Categories
+export const getCategories = async (): Promise<Category[]> => {
+  try {
+    const categoriesData = await AsyncStorage.getItem(KEYS.CATEGORIES);
+    if (categoriesData) {
+      return JSON.parse(categoriesData);
+    }
+    return [];
+  } catch (error) {
+    console.error('Error getting categories:', error);
+    return [];
+  }
+};
+
+export const saveCategory = async (category: Category): Promise<void> => {
+  try {
+    const categories = await getCategories();
+    const existingIndex = categories.findIndex(c => c.id === category.id);
+
+    if (existingIndex >= 0) {
+      categories[existingIndex] = category;
+    } else {
+      categories.push(category);
+    }
+
+    await AsyncStorage.setItem(KEYS.CATEGORIES, JSON.stringify(categories));
+  } catch (error) {
+    console.error('Error saving category:', error);
+    throw error;
+  }
+};
+
+export const deleteCategory = async (categoryId: string): Promise<void> => {
+  try {
+    const categories = await getCategories();
+    const filteredCategories = categories.filter(category => category.id !== categoryId);
+    await AsyncStorage.setItem(KEYS.CATEGORIES, JSON.stringify(filteredCategories));
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    throw error;
+  }
+};
+
+export const getCategoryById = async (categoryId: string): Promise<Category | null> => {
+  try {
+    const categories = await getCategories();
+    return categories.find(category => category.id === categoryId) || null;
+  } catch (error) {
+    console.error('Error getting category by id:', error);
+    return null;
   }
 };
 

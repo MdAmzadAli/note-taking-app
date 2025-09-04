@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { router } from 'expo-router';
+import { getCategories } from '@/utils/storage';
 
 interface Label {
   id: string;
@@ -24,13 +25,17 @@ interface SlideMenuProps {
   onClose: () => void;
   slideAnim: Animated.Value;
   onCreateTemplate: () => void;
+  onCategorySelect?: (categoryId: string) => void;
+  onShowAllNotes?: () => void;
 }
 
 export default function SlideMenu({ 
   visible, 
   onClose, 
   slideAnim, 
-  onCreateTemplate 
+  onCreateTemplate,
+  onCategorySelect,
+  onShowAllNotes
 }: SlideMenuProps) {
   const [labels, setLabels] = useState<Label[]>([]);
 
@@ -41,24 +46,11 @@ export default function SlideMenu({
 
   const loadLabels = async () => {
     try {
-      // TODO: Implement actual label loading from AsyncStorage
-      // For now, using mock labels to match the reference image
-      const mockLabels = [
-        { id: '1', name: 'Bbjh', createdAt: new Date().toISOString() },
-        { id: '2', name: 'Dfgt', createdAt: new Date().toISOString() },
-        { id: '3', name: 'Eiekejeh', createdAt: new Date().toISOString() },
-        { id: '4', name: 'Ejekekek', createdAt: new Date().toISOString() },
-        { id: '5', name: 'Emnshe', createdAt: new Date().toISOString() },
-        { id: '6', name: 'Nzznsmsm', createdAt: new Date().toISOString() },
-        { id: '7', name: 'Shsjjs', createdAt: new Date().toISOString() },
-        { id: '8', name: 'Sjsjjs', createdAt: new Date().toISOString() },
-        { id: '9', name: 'Skkwwhyw', createdAt: new Date().toISOString() },
-        { id: '10', name: 'Uwjwjw', createdAt: new Date().toISOString() },
-        { id: '11', name: 'Wjwkekke', createdAt: new Date().toISOString() },
-      ];
-      setLabels(mockLabels);
+      const categories = await getCategories();
+      setLabels(categories);
     } catch (error) {
-      console.error('Error loading labels:', error);
+      console.error('Error loading categories:', error);
+      setLabels([]);
     }
   };
 
@@ -68,8 +60,9 @@ export default function SlideMenu({
   };
 
   const handleLabelPress = (labelId: string) => {
-    // TODO: Implement label filtering functionality
-    console.log('Selected label:', labelId);
+    if (onCategorySelect) {
+      onCategorySelect(labelId);
+    }
     onClose();
   };
 
@@ -119,6 +112,20 @@ export default function SlideMenu({
                     <Text style={styles.editText}>Edit</Text>
                   </TouchableOpacity>
                 </View>
+
+                {/* All Notes Option */}
+                <TouchableOpacity
+                  style={styles.labelItem}
+                  onPress={() => {
+                    if (onShowAllNotes) {
+                      onShowAllNotes();
+                    }
+                    onClose();
+                  }}
+                >
+                  <Ionicons name="library-outline" size={20} color="#9CA3AF" />
+                  <Text style={styles.labelText}>All Notes</Text>
+                </TouchableOpacity>
 
                 {/* Labels List */}
                 <View style={styles.labelsContainer}>
