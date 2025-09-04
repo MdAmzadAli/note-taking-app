@@ -24,6 +24,7 @@ export default function TabLayout() {
         tabBarHideOnKeyboard: Platform.OS === 'android',
         tabBarStyle: Platform.select({
           ios: {
+            position: 'absolute',
             backgroundColor: colorScheme === 'dark' ? '#1F1F1F' : '#FFFFFF',
             borderTopWidth: 1,
             borderTopColor: colorScheme === 'dark' ? '#374151' : '#E5E7EB',
@@ -33,10 +34,14 @@ export default function TabLayout() {
             shadowOpacity: 0.04,
             shadowRadius: 8,
             paddingTop: 8,
-            paddingBottom: 8,
-            height: 64,
+            paddingBottom: Math.max(8, insets.bottom),
+            height: 64 + insets.bottom,
           },
           default: {
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
             backgroundColor: colorScheme === 'dark' ? '#1F1F1F' : '#FFFFFF',
             borderTopWidth: 1,
             borderTopColor: colorScheme === 'dark' ? '#374151' : '#E5E7EB',
@@ -46,8 +51,8 @@ export default function TabLayout() {
             shadowOpacity: 0.04,
             shadowRadius: 8,
             paddingTop: 8,
-            paddingBottom: 8,
-            height: 64,
+            paddingBottom: Math.max(8, insets.bottom),
+            height: 64 + insets.bottom,
           },
         }),
         tabBarLabelStyle: {
