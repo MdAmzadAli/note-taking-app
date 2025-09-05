@@ -30,6 +30,7 @@ export default function AudioPlayerComponent({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const progressAnimation = useRef(new Animated.Value(0)).current;
+  const positionRef = useRef(0);
 
   // Load audio on component mount
   useEffect(() => {
