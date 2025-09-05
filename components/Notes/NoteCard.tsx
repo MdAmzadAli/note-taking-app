@@ -232,11 +232,6 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
         
         {/* Bottom section with timestamp and category */}
         <View style={styles.bottomSection}>
-          {/* Category row - shown above date/time */}
-          {categoryName && !selectedCategoryId && (
-            <Text style={styles.categoryName}>{categoryName}</Text>
-          )}
-          
           {/* Date and time row with audio icon */}
           <View style={styles.timestampContainer}>
             <View style={styles.dateTimeContainer}>
@@ -253,6 +248,11 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
               />
             )}
           </View>
+          
+          {/* Category row - shown below date/time */}
+          {categoryName && !selectedCategoryId && (
+            <Text style={styles.categoryName}>{categoryName}</Text>
+          )}
         </View>
       </View>
 
@@ -323,7 +323,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'space-between',
   },
   cardTitle: {
     fontSize: 14,
@@ -338,9 +337,11 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
+    marginBottom: 8,
   },
   bottomSection: {
     marginTop: 'auto',
+    flexShrink: 0,
   },
   
   
@@ -445,6 +446,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     color: '#FFFFFF',
     opacity: 0.6,
-    marginBottom: 4,
+    marginTop: 4,
   },
 });
