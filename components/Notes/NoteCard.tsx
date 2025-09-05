@@ -231,7 +231,7 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
         {/* Date and time row with audio icon */}
         <View style={styles.timestampContainer}>
           <View style={styles.dateTimeContainer}>
-            <Text style={[styles.noteTimestamp, textColor]}>
+            <Text style={styles.noteTimestamp}>
               {formatDateTime(note.updatedAt).date} • {formatDateTime(note.updatedAt).time}
             </Text>
           </View>
@@ -247,7 +247,7 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
         
         {/* Category row - shown below date/time */}
         {categoryName && !selectedCategoryId && (
-          <Text style={[styles.categoryName, textColor]}>{categoryName}</Text>
+          <Text style={styles.categoryName}>{categoryName}</Text>
         )}
       </View>
 
@@ -425,11 +425,13 @@ const styles = StyleSheet.create({
   },
   noteTimestamp: {
     fontSize: 10,
+    color: '#FFFFFF',
     opacity: 0.7,
   },
   categoryName: {
     fontSize: 10,
     fontStyle: 'italic',
+    color: '#FFFFFF',
     opacity: 0.6,
     marginTop: 2,
   },

@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   noteCardWrapper: {
-    marginBottom: 16,
+    marginBottom: 8,
   },
   pinnedScrollView: {
     paddingHorizontal: 16,
