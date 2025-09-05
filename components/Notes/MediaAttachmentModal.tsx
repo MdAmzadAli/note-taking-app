@@ -55,8 +55,8 @@ export default function MediaAttachmentModal({
       onClose();
       setTimeout(() => action(), 300); // Small delay for smooth transition
     } else {
+      // For other actions, call the action first (which will close the modal)
       action();
-      onClose();
     }
   };
 

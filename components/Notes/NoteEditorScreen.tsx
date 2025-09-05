@@ -206,7 +206,7 @@ export default function NoteEditorScreen({
           setTimeout(() => {
             pendingModalAction();
             setPendingModalAction(null);
-          }, 150); // Small delay to ensure smooth transition
+          }, 200); // Increased delay for smoother transition
         }
       }
     );
@@ -215,7 +215,7 @@ export default function NoteEditorScreen({
       keyboardDidShowListener?.remove();
       keyboardDidHideListener?.remove();
     };
-  }, []);
+  }, [pendingModalAction]); // Add pendingModalAction as dependency
 
   const initializeSegments = () => {
     // If we have saved segments, use them (this preserves inline positioning)
@@ -522,6 +522,9 @@ export default function NoteEditorScreen({
     const hasPermission = await requestPermission();
     if (!hasPermission) return;
 
+    // Close the media modal first
+    setShowMediaModal(false);
+
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false,
@@ -543,6 +546,9 @@ export default function NoteEditorScreen({
   const handleAddImage = async () => {
     const hasPermission = await requestPermission();
     if (!hasPermission) return;
+
+    // Close the media modal first
+    setShowMediaModal(false);
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -637,6 +643,18 @@ export default function NoteEditorScreen({
     setShowAudioModal(true);
   };
 
+  // Helper function to handle modal opening with keyboard dismissal
+  const handleModalOpen = (modalAction: () => void) => {
+    if (isKeyboardVisible) {
+      // Store the action and dismiss keyboard
+      setPendingModalAction(() => modalAction);
+      Keyboard.dismiss();
+    } else {
+      // Directly execute the action if keyboard is not visible
+      modalAction();
+    }
+  };
+
   const handleAudioSave = async (audioUri: string, duration: number = 0) => {
     // Create new audio attachment
     const newAudio: AudioAttachment = {
@@ -657,6 +675,9 @@ export default function NoteEditorScreen({
   };
 
   const handleTickBoxes = () => {
+    // Close the media modal first
+    setShowMediaModal(false);
+    
     const newTickBoxGroup: TickBoxGroup = {
       id: Date.now().toString(),
       items: [],
@@ -969,30 +990,14 @@ export default function NoteEditorScreen({
           <View style={styles.bottomLeft}>
             <TouchableOpacity
               style={styles.bottomButton}
-              onPress={() => {
-                if (isKeyboardVisible) {
-                  // Dismiss keyboard first, then show modal
-                  Keyboard.dismiss();
-                  setPendingModalAction(() => setShowMediaModal(true));
-                } else {
-                  setShowMediaModal(true);
-                }
-              }}
+              onPress={() => handleModalOpen(() => setShowMediaModal(true))}
             >
               <Ionicons name="add" size={20} color="#FFFFFF" />
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.bottomButton}
-              onPress={() => {
-                if (isKeyboardVisible) {
-                  // Dismiss keyboard first, then show modal
-                  Keyboard.dismiss();
-                  setPendingModalAction(() => setShowColorPicker(true));
-                } else {
-                  setShowColorPicker(true);
-                }
-              }}
+              onPress={() => handleModalOpen(() => setShowColorPicker(true))}
             >
               <Ionicons name="brush" size={20} color="#FFFFFF" />
             </TouchableOpacity>
