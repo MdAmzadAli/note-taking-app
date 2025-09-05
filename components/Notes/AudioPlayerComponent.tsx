@@ -29,6 +29,7 @@ export default function AudioPlayerComponent({
   const [currentPosition, setCurrentPosition] = useState(0);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [actualDuration, setActualDuration] = useState(duration); // State to hold the actual audio duration
   const progressAnimation = useRef(new Animated.Value(0)).current;
   const positionRef = useRef(0);
 
@@ -70,16 +71,17 @@ export default function AudioPlayerComponent({
       newSound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded) {
           const progress = status.positionMillis || 0;
-          const actualDuration = status.durationMillis || duration;
-          
+          const fileDuration = status.durationMillis || duration;
+
           setCurrentPosition(progress);
           positionRef.current = progress;
+          setActualDuration(fileDuration);
 
-          // Update playing state based on actual status
+          // Sync the isPlaying state with actual playback status
           setIsPlaying(status.isPlaying || false);
 
           // Calculate progress percentage using actual duration from audio file
-          const progressPercent = actualDuration > 0 ? Math.min(Math.max(progress / actualDuration, 0), 1) : 0;
+          const progressPercent = fileDuration > 0 ? Math.min(Math.max(progress / fileDuration, 0), 1) : 0;
 
           // Update progress bar animation with direct value setting for better sync
           progressAnimation.setValue(progressPercent);
@@ -87,8 +89,8 @@ export default function AudioPlayerComponent({
           // Handle playback completion
           if (status.didJustFinish) {
             setIsPlaying(false);
-            setCurrentPosition(actualDuration);
-            positionRef.current = actualDuration;
+            setCurrentPosition(fileDuration);
+            positionRef.current = fileDuration;
             progressAnimation.setValue(1);
           }
         }
@@ -227,7 +229,7 @@ export default function AudioPlayerComponent({
         >
           <Ionicons 
             name={isPlaying ? "pause" : "play"} 
-            size={20} 
+            size={18} 
             color={isDarkMode ? "#FFFFFF" : "#000000"} 
           />
         </TouchableOpacity>
@@ -269,7 +271,7 @@ export default function AudioPlayerComponent({
 
         {/* Time Display - Show current/total */}
         <Text style={[styles.durationText, isDarkMode ? styles.darkText : styles.lightText]}>
-          {formatTime(currentPosition)}/{formatTime(duration)}
+          {formatTime(currentPosition)}/{formatTime(actualDuration)}
         </Text>
 
         {/* Delete Button */}
@@ -279,7 +281,7 @@ export default function AudioPlayerComponent({
         >
           <Ionicons 
             name="trash-outline" 
-            size={20} 
+            size={18} 
             color={isDarkMode ? "#FF4444" : "#CC0000"} 
           />
         </TouchableOpacity>
