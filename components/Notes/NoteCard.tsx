@@ -23,13 +23,6 @@ interface ImageAttachment {
   createdAt: string;
 }
 
-interface AudioAttachment {
-  id: string;
-  uri: string;
-  duration: number;
-  createdAt: string;
-}
-
 interface SimpleNote {
   id: string;
   title?: string;
@@ -40,7 +33,6 @@ interface SimpleNote {
   gradient?: string[];
   isPinned?: boolean;
   images?: ImageAttachment[];
-  audios?: AudioAttachment[];
   categoryId?: string;
 }
 
@@ -77,7 +69,6 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
   }, [note.categoryId]);
   
   const hasImages = note.images && note.images.length > 0;
-  const hasAudios = note.audios && note.audios.length > 0;
   const isImageNote = note.content.includes('data:image') || 
                      note.content.includes('.png') || 
                      note.content.includes('.jpg') ||
@@ -212,17 +203,10 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
         <Text style={styles.cardContent} numberOfLines={hasImages ? 2 : 4}>
           {hasImages && !note.content.trim() ? 'Image note' : note.content}
         </Text>
-        <View style={styles.cardFooter}>
-          {hasAudios && (
-            <View style={styles.audioIndicator}>
-              <Ionicons name="play" size={12} color="#4CAF50" />
-            </View>
-          )}
-          <Text style={styles.cardDate}>
-            {new Date(note.createdAt).toLocaleDateString()}
-            {categoryName && !selectedCategoryId && <Text style={styles.categoryName}> • {categoryName}</Text>}
-          </Text>
-        </View>
+        <Text style={styles.cardDate}>
+          {new Date(note.createdAt).toLocaleDateString()}
+          {categoryName && !selectedCategoryId && <Text style={styles.categoryName}> • {categoryName}</Text>}
+        </Text>
       </View>
 
       {/* Full Image View Modal */}
@@ -302,24 +286,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     flex: 1,
   },
-  cardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 'auto',
-    gap: 6,
-  },
-  audioIndicator: {
-    backgroundColor: 'rgba(76, 175, 80, 0.2)',
-    borderRadius: 8,
-    padding: 2,
-    minWidth: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   cardDate: {
     color: '#FFFFFF',
     fontSize: 10,
-    flex: 1,
+    marginTop: 'auto',
   },
   categoryName: {
     color: '#A0A0A0',

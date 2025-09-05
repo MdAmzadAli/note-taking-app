@@ -13,12 +13,6 @@ export interface ImageAttachment {
   createdAt: string;
 }
 
-export interface AudioAttachment {
-  id: string;
-  uri: string;
-  createdAt: string;
-}
-
 export interface Note {
   id: string;
   title: string;
@@ -34,7 +28,6 @@ export interface Note {
   categoryId?: string; // For category-based organization
   createdAt: string;
   updatedAt: string;
-  audios?: AudioAttachment[];
 }
 
 // FIXED: Complete interface for tracking individual occurrences of recurring reminders

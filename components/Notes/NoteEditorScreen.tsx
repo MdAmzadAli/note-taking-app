@@ -59,12 +59,11 @@ interface NoteEditorScreenProps {
   createdAt?: string;
   updatedAt?: string;
   categoryId?: string;
-  onSave: (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[], categoryId?: string, audios?: AudioAttachment[]) => void;
+  onSave: (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[], categoryId?: string) => void;
   onBack: () => void;
   onTitleChange: (title: string) => void;
   onContentChange: (content: string) => void;
   onImagesChange?: (images: ImageAttachment[]) => void;
-  onAudiosChange?: (audios: AudioAttachment[]) => void;
 }
 
 
@@ -102,7 +101,7 @@ export default function NoteEditorScreen({
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showAudioModal, setShowAudioModal] = useState(false);
   const [noteAudios, setNoteAudios] = useState<AudioAttachment[]>([]);
-
+  
   const textInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -156,9 +155,8 @@ export default function NoteEditorScreen({
           {
             text: 'Save',
             onPress: () => {
-              onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages, selectedCategoryId || undefined, noteAudios);
+              onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages, selectedCategoryId || undefined);
               onImagesChange && onImagesChange(noteImages);
-              onAudiosChange && onAudiosChange(noteAudios);
               onBack();
             },
           },
@@ -170,9 +168,8 @@ export default function NoteEditorScreen({
   };
 
   const handleSave = () => {
-    onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages, selectedCategoryId || undefined, noteAudios);
+    onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages, selectedCategoryId || undefined);
     onImagesChange && onImagesChange(noteImages);
-    onAudiosChange && onAudiosChange(noteAudios);
     setInitialTitle(noteTitle);
     setInitialContent(noteContent);
     setHasUnsavedChanges(false);
@@ -315,9 +312,9 @@ export default function NoteEditorScreen({
       duration: duration,
       createdAt: new Date().toISOString(),
     };
-
+    
     setNoteAudios([...noteAudios, newAudio]);
-
+    
     // No need to insert text indicator - we'll render the audio player component
     setShowAudioModal(false);
   };
@@ -403,7 +400,7 @@ export default function NoteEditorScreen({
                 </Text>
               )}
             </View>
-
+            
             <TouchableOpacity 
               style={styles.categoryDropdownButton}
               onPress={() => setShowCategoryDropdown(true)}
@@ -455,14 +452,13 @@ export default function NoteEditorScreen({
           {noteAudios.length > 0 && (
             <View style={styles.audioSection}>
               {noteAudios.map((audio) => (
-                <View key={audio.id} style={styles.audioCard}>
-                  <Ionicons name="play-circle" size={20} color="#FFFFFF" style={styles.playIcon} />
-                  <Text style={styles.audioText}>Recording</Text>
-                  <Text style={styles.audioDuration}>{Math.round(audio.duration)}s</Text>
-                  <TouchableOpacity onPress={() => handleAudioDelete(audio.id)} style={styles.deleteAudioButton}>
-                    <Ionicons name="trash" size={18} color="#FF4444" />
-                  </TouchableOpacity>
-                </View>
+                <AudioPlayerComponent
+                  key={audio.id}
+                  audioUri={audio.uri}
+                  duration={audio.duration}
+                  onDelete={() => handleAudioDelete(audio.id)}
+                  isDarkMode={true}
+                />
               ))}
             </View>
           )}
@@ -621,7 +617,7 @@ export default function NoteEditorScreen({
                       No Category
                     </Text>
                   </TouchableOpacity>
-
+                  
                   {categories.map((category) => (
                     <TouchableOpacity
                       key={category.id}
@@ -731,6 +727,9 @@ const styles = StyleSheet.create({
   imageScrollView: {
     paddingLeft: 20,
     paddingRight: 40,
+  },
+  audioSection: {
+    marginBottom: 16,
   },
   imageCard: {
     width: 120,
@@ -893,29 +892,5 @@ const styles = StyleSheet.create({
   selectedCategoryText: {
     color: '#000000',
     fontWeight: '600',
-  },
-  audioCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  playIcon: {
-    marginRight: 8,
-  },
-  audioText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    flex: 1,
-  },
-  audioDuration: {
-    color: '#AAAAAA',
-    fontSize: 12,
-    marginRight: 8,
-  },
-  deleteAudioButton: {
-    padding: 4,
   },
 });
