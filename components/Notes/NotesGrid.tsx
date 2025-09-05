@@ -41,12 +41,12 @@ export default function NotesGrid({ notes, onEditNote, onDeleteNote, selectedCat
   );
   const otherNotes = notes.filter(note => !note.isPinned);
 
-  // Distribute other notes into 2 columns
+  // Distribute other notes into 3 columns
   const distributeNotesIntoColumns = (notesList: SimpleNote[]) => {
-    const columns = [[], []] as SimpleNote[][];
+    const columns = [[], [], []] as SimpleNote[][];
 
     notesList.forEach((note, index) => {
-      const columnIndex = index % 2;
+      const columnIndex = index % 3;
       columns[columnIndex].push(note);
     });
 
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   },
   notesContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   noteCardWrapper: {
-    marginBottom: 8,
+    marginBottom: 16,
   },
   pinnedScrollView: {
     paddingHorizontal: 16,

@@ -54,13 +54,10 @@ interface NoteCardProps {
   selectedCategoryId?: string | null;
 }
 
-// Helper function to format date and time separately
-const formatDateTime = (dateString: string): { date: string; time: string } => {
-  const dateObj = new Date(dateString);
-  return {
-    date: dateObj.toLocaleDateString(),
-    time: dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  };
+// Helper function to format date
+const formatDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 };
 
 
@@ -149,11 +146,11 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
     onShouldBlockNativeResponder: () => false,
   });
 
-  // Use fixed width for pinned cards (200px) and calculated width for others (2 cards per row)
+  // Use fixed width for pinned cards (200px) and calculated width for others
   const cardStyle = [
     styles.card, 
     { 
-      width: note.isPinned ? 200 : (Dimensions.get('window').width - 48) / 2, // 2 cards per row with proper spacing
+      width: note.isPinned ? 200 : (Dimensions.get('window').width - 60) / 3,
       backgroundColor: note.gradient ? 'transparent' : (note.theme || '#2A2A2A')
     }
   ];
@@ -224,36 +221,28 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
             {note.title}
           </Text>
         )}
-        <View style={styles.contentContainer}>
-          <Text style={[styles.cardContent, textColor, note.fontStyle ? { fontFamily: note.fontStyle } : {}]} numberOfLines={hasImages ? 2 : 4}>
-            {hasImages && !note.content.trim() ? 'Image note' : note.content}
+        <Text style={[styles.cardContent, textColor, note.fontStyle ? { fontFamily: note.fontStyle } : {}]} numberOfLines={hasImages ? 2 : 4}>
+          {hasImages && !note.content.trim() ? 'Image note' : note.content}
+        </Text>
+        {/* Changed part */}
+        <View style={styles.timestampContainer}>
+          {note.audios && note.audios.length > 0 && (
+            <Ionicons 
+              name="play" 
+              size={12} 
+              color={textColor.color} 
+              style={styles.audioIcon}
+            />
+          )}
+          <Text style={[styles.noteTimestamp, textColor]}>
+            {formatDate(note.updatedAt)}
           </Text>
         </View>
+        {/* End of changed part */}
         
-        {/* Bottom section with timestamp and category */}
-        <View style={styles.bottomSection}>
-          {/* Date and time row with audio icon */}
-          <View style={styles.timestampContainer}>
-            <View style={styles.dateTimeContainer}>
-              <Text style={styles.noteTimestamp}>
-                {formatDateTime(note.updatedAt).date} • {formatDateTime(note.updatedAt).time}
-              </Text>
-            </View>
-            {note.audios && note.audios.length > 0 && (
-              <Ionicons 
-                name="play" 
-                size={12} 
-                color="#FFFFFF" 
-                style={styles.audioIcon}
-              />
-            )}
-          </View>
-          
-          {/* Category row - shown below date/time */}
-          {categoryName && !selectedCategoryId && (
-            <Text style={styles.categoryName}>{categoryName}</Text>
-          )}
-        </View>
+        {categoryName && !selectedCategoryId && (
+          <Text style={styles.categoryName}> • {categoryName}</Text>
+        )}
       </View>
 
       {/* Full Image View Modal */}
@@ -302,8 +291,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#2A2A2A',
     borderRadius: 12,
-    marginHorizontal: 0,
-    marginVertical: 0,
+    marginHorizontal: 4,
     borderWidth: 1,
     borderColor: '#D1D5DB',
     elevation: 6,
@@ -319,10 +307,7 @@ const styles = StyleSheet.create({
   cardInner: {
     padding: 12,
     minHeight: 120,
-    maxHeight: 220,
     backgroundColor: 'transparent',
-    display: 'flex',
-    flexDirection: 'column',
   },
   cardTitle: {
     fontSize: 14,
@@ -332,19 +317,15 @@ const styles = StyleSheet.create({
   cardContent: {
     fontSize: 12,
     lineHeight: 16,
-    flexShrink: 1,
-    flexGrow: 0,
-  },
-  contentContainer: {
-    flex: 1,
     marginBottom: 8,
-  },
-  bottomSection: {
-    marginTop: 'auto',
-    flexShrink: 0,
+    flex: 1,
   },
   
-  
+  categoryName: {
+    color: '#A0A0A0',
+    fontSize: 10,
+    fontStyle: 'italic',
+  },
   imageGallery: {
     marginBottom: 12,
     paddingVertical: 8,
@@ -424,28 +405,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
-  // Updated styles for timestamp and category layout
+  // Added styles from changes
   timestampContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  dateTimeContainer: {
-    flex: 1,
   },
   audioIcon: {
-    marginLeft: 8,
+    marginRight: 4,
   },
   noteTimestamp: {
-    fontSize: 10,
-    color: '#FFFFFF',
+    fontSize: 12,
     opacity: 0.7,
-  },
-  categoryName: {
-    fontSize: 10,
-    fontStyle: 'italic',
-    color: '#FFFFFF',
-    opacity: 0.6,
-    marginTop: 4,
   },
 });
