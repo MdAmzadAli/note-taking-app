@@ -54,10 +54,13 @@ interface NoteCardProps {
   selectedCategoryId?: string | null;
 }
 
-// Helper function to format date
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString);
-  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+// Helper function to format date and time separately
+const formatDateTime = (dateString: string): { date: string; time: string } => {
+  const dateObj = new Date(dateString);
+  return {
+    date: dateObj.toLocaleDateString(),
+    time: dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  };
 };
 
 
@@ -146,11 +149,11 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
     onShouldBlockNativeResponder: () => false,
   });
 
-  // Use fixed width for pinned cards (200px) and calculated width for others
+  // Use fixed width for pinned cards (200px) and calculated width for others (2 cards per row)
   const cardStyle = [
     styles.card, 
     { 
-      width: note.isPinned ? 200 : (Dimensions.get('window').width - 60) / 3,
+      width: note.isPinned ? 200 : (Dimensions.get('window').width - 48) / 2, // 2 cards per row with proper spacing
       backgroundColor: note.gradient ? 'transparent' : (note.theme || '#2A2A2A')
     }
   ];
@@ -224,24 +227,27 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
         <Text style={[styles.cardContent, textColor, note.fontStyle ? { fontFamily: note.fontStyle } : {}]} numberOfLines={hasImages ? 2 : 4}>
           {hasImages && !note.content.trim() ? 'Image note' : note.content}
         </Text>
-        {/* Changed part */}
+        
+        {/* Date and time row with audio icon */}
         <View style={styles.timestampContainer}>
+          <View style={styles.dateTimeContainer}>
+            <Text style={[styles.noteTimestamp, textColor]}>
+              {formatDateTime(note.updatedAt).date} • {formatDateTime(note.updatedAt).time}
+            </Text>
+          </View>
           {note.audios && note.audios.length > 0 && (
             <Ionicons 
               name="play" 
               size={12} 
-              color={textColor.color} 
+              color="#FFFFFF" 
               style={styles.audioIcon}
             />
           )}
-          <Text style={[styles.noteTimestamp, textColor]}>
-            {formatDate(note.updatedAt)}
-          </Text>
         </View>
-        {/* End of changed part */}
         
+        {/* Category row - shown below date/time */}
         {categoryName && !selectedCategoryId && (
-          <Text style={styles.categoryName}> • {categoryName}</Text>
+          <Text style={[styles.categoryName, textColor]}>{categoryName}</Text>
         )}
       </View>
 
@@ -291,7 +297,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#2A2A2A',
     borderRadius: 12,
-    marginHorizontal: 4,
+    marginHorizontal: 0,
+    marginVertical: 0,
     borderWidth: 1,
     borderColor: '#D1D5DB',
     elevation: 6,
@@ -307,6 +314,7 @@ const styles = StyleSheet.create({
   cardInner: {
     padding: 12,
     minHeight: 120,
+    maxHeight: 220,
     backgroundColor: 'transparent',
   },
   cardTitle: {
@@ -318,14 +326,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     marginBottom: 8,
-    flex: 1,
+    flexShrink: 1,
+    flexGrow: 0,
   },
   
-  categoryName: {
-    color: '#A0A0A0',
-    fontSize: 10,
-    fontStyle: 'italic',
-  },
+  
   imageGallery: {
     marginBottom: 12,
     paddingVertical: 8,
@@ -405,16 +410,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
-  // Added styles from changes
+  // Updated styles for timestamp and category layout
   timestampContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  dateTimeContainer: {
+    flex: 1,
   },
   audioIcon: {
-    marginRight: 4,
+    marginLeft: 8,
   },
   noteTimestamp: {
-    fontSize: 12,
+    fontSize: 10,
     opacity: 0.7,
+  },
+  categoryName: {
+    fontSize: 10,
+    fontStyle: 'italic',
+    opacity: 0.6,
+    marginTop: 2,
   },
 });
