@@ -33,9 +33,23 @@ export default function AudioPlayerComponent({
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    // Load audio on component mount
+    loadAudio();
+    
     return () => {
       if (sound) {
-        sound.unloadAsync();
+        sound.unloadAsync().catch(() => {});
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [audioUri]);
+
+  useEffect(() => {
+    return () => {
+      if (sound) {
+        sound.unloadAsync().catch(() => {});
       }
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -47,6 +61,7 @@ export default function AudioPlayerComponent({
     try {
       if (sound) {
         await sound.unloadAsync();
+        setSound(null);
       }
       
       const { sound: newSound } = await Audio.Sound.createAsync(
@@ -78,9 +93,11 @@ export default function AudioPlayerComponent({
             setIsPlaying(false);
             setCurrentPosition(0);
             positionRef.current = 0;
+            
+            // Reset progress bar to start
             Animated.timing(progressAnimation, {
               toValue: 0,
-              duration: 200,
+              duration: 300,
               useNativeDriver: false,
             }).start();
           }
@@ -97,37 +114,62 @@ export default function AudioPlayerComponent({
 
   const handlePlayPause = async () => {
     try {
-      if (!sound) {
-        const newSound = await loadAudio();
-        if (!newSound) return;
+      // Always ensure we have a loaded sound
+      let currentSound = sound;
+      if (!currentSound) {
+        currentSound = await loadAudio();
+        if (!currentSound) return;
       }
 
       if (isPlaying) {
-        await sound?.pauseAsync();
+        await currentSound.pauseAsync();
         setIsPlaying(false);
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
       } else {
-        await sound?.playAsync();
+        // Check if we're at the end, if so, restart from beginning
+        if (currentPosition >= duration) {
+          await currentSound.setPositionAsync(0);
+          setCurrentPosition(0);
+          positionRef.current = 0;
+          Animated.timing(progressAnimation, {
+            toValue: 0,
+            duration: 100,
+            useNativeDriver: false,
+          }).start();
+        }
+        
+        await currentSound.playAsync();
         setIsPlaying(true);
       }
     } catch (error) {
       console.error('Error playing/pausing audio:', error);
       Alert.alert('Error', 'Failed to play audio');
+      
+      // Reset state on error
+      setIsPlaying(false);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
     }
   };
 
   const handleProgressBarPress = async (event: any) => {
-    if (!sound) return;
+    // Ensure we have a loaded sound
+    let currentSound = sound;
+    if (!currentSound) {
+      currentSound = await loadAudio();
+      if (!currentSound) return;
+    }
     
     const { locationX } = event.nativeEvent;
     const progressBarWidth = 200; // Approximate width
-    const progressPercent = locationX / progressBarWidth;
+    const progressPercent = Math.max(0, Math.min(locationX / progressBarWidth, 1));
     const newPosition = Math.max(0, Math.min(duration * progressPercent, duration));
     
     try {
-      await sound.setPositionAsync(newPosition);
+      await currentSound.setPositionAsync(newPosition);
       setCurrentPosition(newPosition);
       positionRef.current = newPosition;
       
