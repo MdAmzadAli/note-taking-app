@@ -26,7 +26,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import Animated from 'react-native-reanimated';
 import ColorThemePicker from './ColorThemePicker';
-import FontStylePicker from './FontStylePicker';
 import MediaAttachmentModal from './MediaAttachmentModal';
 import AudioRecordingModal from './AudioRecordingModal';
 import AudioPlayerComponent from './AudioPlayerComponent';
@@ -145,10 +144,8 @@ export default function NoteEditorScreen({
 }: NoteEditorScreenProps) {
   const [isNotePinned, setIsNotePinned] = useState(isPinned);
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const [showFontStylePicker, setShowFontStylePicker] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState(noteTheme);
   const [selectedGradient, setSelectedGradient] = useState<string[] | null>(noteGradient);
-  const [selectedFontStyle, setSelectedFontStyle] = useState<string>('System');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [initialTitle, setInitialTitle] = useState(noteTitle);
   const [initialContent, setInitialContent] = useState(noteContent);
@@ -450,11 +447,6 @@ export default function NoteEditorScreen({
     setShowColorPicker(false);
   };
 
-  const handleFontStyleSelect = (fontStyle: string) => {
-    setSelectedFontStyle(fontStyle);
-    setShowFontStylePicker(false);
-  };
-
   const handleBack = () => {
     if (hasUnsavedChanges) {
       Alert.alert(
@@ -622,7 +614,7 @@ export default function NoteEditorScreen({
   });
 
   const handleDrawing = () => {
-    setShowFontStylePicker(true);
+    Alert.alert('Drawing', 'Drawing feature coming soon!');
   };
 
   const handleRecording = () => {
@@ -692,10 +684,7 @@ export default function NoteEditorScreen({
       return (
         <TextInput
           ref={(ref) => { if (ref) textInputRefs.current['default'] = ref; }}
-          style={[
-            styles.bodyInput,
-            { fontFamily: selectedFontStyle }
-          ]}
+          style={styles.bodyInput}
           placeholder="Start typing your note..."
           placeholderTextColor="#888888"
           value={noteContent}
@@ -736,10 +725,7 @@ export default function NoteEditorScreen({
       <TextInput
         key={segment.id}
         ref={(ref) => { if (ref) textInputRefs.current[segment.id] = ref; }}
-        style={[
-          styles.textSegmentInput,
-          { fontFamily: selectedFontStyle }
-        ]}
+        style={styles.textSegmentInput}
         placeholder={segment.order === 0 ? "Start typing your note..." : "Continue typing..."}
         placeholderTextColor="#888888"
         value={segment.content}
@@ -936,10 +922,7 @@ export default function NoteEditorScreen({
           {/* Title Input */}
           <TextInput
             ref={(ref) => { if (ref) textInputRefs.current['title'] = ref; }}
-            style={[
-              styles.titleInput,
-              { fontFamily: selectedFontStyle }
-            ]}
+            style={styles.titleInput}
             placeholder="Title"
             placeholderTextColor="#888888"
             value={noteTitle}
@@ -1050,17 +1033,6 @@ export default function NoteEditorScreen({
           )}
         </View>
       </Modal>
-
-      {/* Font Style Picker Modal */}
-      <FontStylePicker
-        visible={showFontStylePicker}
-        onClose={() => setShowFontStylePicker(false)}
-        onFontStyleSelect={handleFontStyleSelect}
-        selectedFontStyle={selectedFontStyle}
-        onThemeSelect={handleThemeSelect}
-        onGradientSelect={handleGradientSelect}
-        selectedTheme={selectedTheme}
-      />
 
       {/* Color Theme Picker Modal */}
       <ColorThemePicker
