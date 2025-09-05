@@ -4,7 +4,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
   Modal,
   TouchableWithoutFeedback,
@@ -14,11 +13,11 @@ import {
   Image,
   Dimensions,
   PanResponder,
-  KeyboardAvoidingView,
   NativeSyntheticEvent,
   TextInputSelectionChangeEventData,
   Keyboard,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { Picker } from '@react-native-picker/picker';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -168,13 +167,11 @@ export default function NoteEditorScreen({
   const [segments, setSegments] = useState<SegmentType[]>([]);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [cursorPosition, setCursorPosition] = useState({ start: 0, end: 0 });
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [pendingModalAction, setPendingModalAction] = useState<(() => void) | null>(null);
 
   const textInputRefs = useRef<{ [key: string]: TextInput | null }>({});
-  const scrollViewRef = useRef<ScrollView>(null);
-  const activeInputPosition = useRef<number>(0);
+  const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
 
   useEffect(() => {
     setInitialTitle(noteTitle);
@@ -186,20 +183,14 @@ export default function NoteEditorScreen({
     // Add keyboard event listeners
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
-      (e) => {
-        setKeyboardHeight(e.endCoordinates.height);
+      () => {
         setIsKeyboardVisible(true);
-        // Auto-scroll to active input after keyboard appears
-        setTimeout(() => {
-          scrollToActiveInput();
-        }, 100);
       }
     );
 
     const keyboardDidHideListener = Keyboard.addListener(
       'keyboardDidHide',
       () => {
-        setKeyboardHeight(0);
         setIsKeyboardVisible(false);
         // Execute pending modal action after keyboard has fully dismissed
         if (pendingModalAction) {
@@ -279,17 +270,7 @@ export default function NoteEditorScreen({
     setSegments(newSegments);
   };
 
-  const scrollToActiveInput = () => {
-    if (scrollViewRef.current && activeInputPosition.current > 0) {
-      const screenHeight = Dimensions.get('window').height;
-      const availableHeight = screenHeight - keyboardHeight - 200; // Account for header and toolbar
-
-      scrollViewRef.current.scrollTo({
-        y: Math.max(0, activeInputPosition.current - availableHeight / 2),
-        animated: true,
-      });
-    }
-  };
+  
 
   const handleTextSegmentSelection = (segmentId: string, event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
     const { start, end } = event.nativeEvent.selection;
@@ -370,13 +351,6 @@ export default function NoteEditorScreen({
       const newTextInput = textInputRefs.current[newActiveSegmentId];
       if (newTextInput) {
         newTextInput.focus();
-        // Measure and store input position for auto-scrolling
-        newTextInput.measure((x, y, width, height, pageX, pageY) => {
-          activeInputPosition.current = pageY;
-          if (isKeyboardVisible) {
-            scrollToActiveInput();
-          }
-        });
       }
     }, 100);
   };
@@ -770,23 +744,6 @@ export default function NoteEditorScreen({
         onSelectionChange={(event) => handleTextSegmentSelection(segment.id, event)}
         onFocus={() => {
           setActiveSegmentId(segment.id);
-          // Measure input position when focused
-          const input = textInputRefs.current[segment.id];
-          if (input) {
-            input.measure((x, y, width, height, pageX, pageY) => {
-              activeInputPosition.current = pageY;
-              if (isKeyboardVisible) {
-                setTimeout(() => scrollToActiveInput(), 100);
-              }
-            });
-          }
-        }}
-        onLayout={(event) => {
-          // Store layout position for scrolling calculations
-          const { y } = event.nativeEvent.layout;
-          if (activeSegmentId === segment.id) {
-            activeInputPosition.current = y;
-          }
         }}
         multiline={true}
         textAlignVertical="top"
@@ -915,21 +872,17 @@ export default function NoteEditorScreen({
         </View>
 
         {/* Main Content */}
-        <KeyboardAvoidingView
-          style={styles.keyboardAvoidingContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        <KeyboardAwareScrollView
+          ref={scrollViewRef}
+          style={styles.content}
+          contentContainerStyle={styles.scrollViewContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          enableOnAndroid={true}
+          enableAutomaticScroll={true}
+          extraHeight={120}
+          extraScrollHeight={50}
         >
-          <ScrollView
-            ref={scrollViewRef}
-            style={styles.content}
-            contentContainerStyle={[
-              styles.scrollViewContent,
-              { paddingBottom: Math.max(120, keyboardHeight + 50) }
-            ]}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
           {/* Date/Time and Category Row */}
           <View style={styles.metaInfoRow}>
             <View style={styles.dateTimeInfo}>
@@ -966,24 +919,13 @@ export default function NoteEditorScreen({
             onChangeText={onTitleChange}
             onFocus={() => {
               setActiveSegmentId('title');
-              // Measure title input position when focused
-              const input = textInputRefs.current['title'];
-              if (input) {
-                input.measure((x, y, width, height, pageX, pageY) => {
-                  activeInputPosition.current = pageY;
-                  if (isKeyboardVisible) {
-                    setTimeout(() => scrollToActiveInput(), 100);
-                  }
-                });
-              }
             }}
             multiline={false}
           />
 
           {/* Segmented Content (Text + Media) */}
           {renderSegmentedContent()}
-          </ScrollView>
-        </KeyboardAvoidingView>
+          </KeyboardAwareScrollView>
 
         {/* Bottom Toolbar */}
         <View style={styles.bottomBar}>
@@ -1155,9 +1097,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
-  keyboardAvoidingContainer: {
-    flex: 1,
-  },
+  
   safeAreaContainer: {
     flex: 1,
     backgroundColor: 'transparent',
@@ -1191,6 +1131,7 @@ const styles = StyleSheet.create({
   },
   scrollViewContent: {
     flexGrow: 1,
+    paddingBottom: 120,
   },
   titleInput: {
     fontSize: 24,
