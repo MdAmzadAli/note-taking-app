@@ -1206,9 +1206,16 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 26,
     minHeight: 400,
-    // Fix text shifting on enter by ensuring consistent line height
-    includeFontPadding: false,
+    paddingVertical: 4,
+    paddingHorizontal: 0,
+    // Fix text shifting on enter by ensuring consistent text rendering
+    includeFontPadding: true,
     textAlignVertical: 'top',
+    // Ensure consistent text baseline and prevent jumping
+    borderWidth: 0,
+    margin: 0,
+    // Use consistent vertical alignment
+    justifyContent: 'flex-start',
   },
   bottomBar: {
     flexDirection: 'row',
@@ -1476,8 +1483,14 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     minHeight: 40,
     paddingVertical: 4,
-    // Fix text shifting on enter by ensuring consistent line height
-    includeFontPadding: false,
+    paddingHorizontal: 0,
+    // Fix text shifting on enter by ensuring consistent text rendering
+    includeFontPadding: true,
     textAlignVertical: 'top',
+    // Ensure consistent text baseline and prevent jumping
+    borderWidth: 0,
+    margin: 0,
+    // Use consistent vertical alignment
+    justifyContent: 'flex-start',
   },
 });
