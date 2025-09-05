@@ -58,35 +58,36 @@ interface TickBoxGroup {
   createdAt: string;
 }
 
-// Content segment types for inline media embedding
-interface ContentSegment {
+// Segmented content structure for true inline media embedding
+interface SegmentedContent {
   id: string;
   type: 'text' | 'image' | 'audio' | 'tickbox';
-  position: number;
+  order: number;
   createdAt: string;
 }
 
-interface TextSegment extends ContentSegment {
+interface TextSegment extends SegmentedContent {
   type: 'text';
   content: string;
+  isFocused?: boolean;
 }
 
-interface ImageSegment extends ContentSegment {
+interface ImageSegment extends SegmentedContent {
   type: 'image';
   images: ImageAttachment[];
 }
 
-interface AudioSegment extends ContentSegment {
+interface AudioSegment extends SegmentedContent {
   type: 'audio';
   audio: AudioAttachment;
 }
 
-interface TickBoxSegment extends ContentSegment {
+interface TickBoxSegment extends SegmentedContent {
   type: 'tickbox';
   tickBoxGroup: TickBoxGroup;
 }
 
-type ContentSegmentType = TextSegment | ImageSegment | AudioSegment | TickBoxSegment;
+type SegmentType = TextSegment | ImageSegment | AudioSegment | TickBoxSegment;
 
 interface Category {
   id: string;
@@ -157,88 +158,99 @@ export default function NoteEditorScreen({
   const [noteAudios, setNoteAudios] = useState<AudioAttachment[]>(audios);
   const [noteTickBoxGroups, setNoteTickBoxGroups] = useState<TickBoxGroup[]>(tickBoxGroups);
   
-  // Cursor position tracking for inline media embedding
+  // Segmented content system for true inline media embedding
+  const [segments, setSegments] = useState<SegmentType[]>([]);
+  const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [cursorPosition, setCursorPosition] = useState({ start: 0, end: 0 });
-  const [contentSegments, setContentSegments] = useState<ContentSegmentType[]>([]);
   
-  const textInputRef = useRef<TextInput>(null);
+  const textInputRefs = useRef<{ [key: string]: TextInput | null }>({});
 
   useEffect(() => {
     setInitialTitle(noteTitle);
     setInitialContent(noteContent);
     loadCategories();
-    initializeContentSegments();
+    initializeSegments();
   }, []);
 
-  const initializeContentSegments = () => {
-    // Initialize with existing content and media
-    const segments: ContentSegmentType[] = [];
-    let currentPosition = 0;
+  const initializeSegments = () => {
+    const initialSegments: SegmentType[] = [];
+    let order = 0;
 
-    // Add initial text content if exists
-    if (noteContent) {
-      segments.push({
-        id: 'initial-text',
-        type: 'text',
-        content: noteContent,
-        position: currentPosition,
-        createdAt: new Date().toISOString(),
-      });
-      currentPosition = noteContent.length;
-    }
+    // Always start with an initial text segment
+    const initialTextSegment: TextSegment = {
+      id: 'initial-text',
+      type: 'text',
+      content: noteContent || '',
+      order: order++,
+      createdAt: new Date().toISOString(),
+      isFocused: true,
+    };
+    initialSegments.push(initialTextSegment);
+    setActiveSegmentId(initialTextSegment.id);
 
-    // Add existing images as segments
+    // Add existing media as separate segments (for backward compatibility)
     if (noteImages.length > 0) {
-      segments.push({
+      initialSegments.push({
         id: `images-${Date.now()}`,
         type: 'image',
         images: noteImages,
-        position: currentPosition,
+        order: order++,
         createdAt: new Date().toISOString(),
       });
     }
 
-    // Add existing audio as segments
     noteAudios.forEach((audio) => {
-      segments.push({
+      initialSegments.push({
         id: `audio-${audio.id}`,
         type: 'audio',
         audio: audio,
-        position: currentPosition,
+        order: order++,
         createdAt: new Date().toISOString(),
       });
     });
 
-    // Add existing tick box groups as segments
     noteTickBoxGroups.forEach((group) => {
-      segments.push({
+      initialSegments.push({
         id: `tickbox-${group.id}`,
         type: 'tickbox',
         tickBoxGroup: group,
-        position: currentPosition,
+        order: order++,
         createdAt: new Date().toISOString(),
       });
     });
 
-    setContentSegments(segments);
+    setSegments(initialSegments);
   };
 
-  const handleSelectionChange = (event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
+  const handleTextSegmentSelection = (segmentId: string, event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
     const { start, end } = event.nativeEvent.selection;
     setCursorPosition({ start, end });
+    setActiveSegmentId(segmentId);
   };
 
   const insertMediaAtCursor = (mediaType: 'image' | 'audio' | 'tickbox', mediaData: any) => {
-    const currentTextSegment = contentSegments.find(segment => segment.type === 'text') as TextSegment;
-    const currentText = currentTextSegment?.content || noteContent;
+    if (!activeSegmentId) return;
+
+    const activeSegment = segments.find(seg => seg.id === activeSegmentId);
+    if (!activeSegment || activeSegment.type !== 'text') return;
+
+    const textSegment = activeSegment as TextSegment;
+    const currentText = textSegment.content;
     const insertPosition = cursorPosition.start;
 
     // Split text at cursor position
     const beforeText = currentText.substring(0, insertPosition);
     const afterText = currentText.substring(insertPosition);
 
-    const newSegments: ContentSegmentType[] = [];
-    let segmentPosition = 0;
+    const newSegments: SegmentType[] = [];
+    let orderCounter = 0;
+
+    // Process all segments before the active one
+    segments.forEach(segment => {
+      if (segment.order < textSegment.order) {
+        newSegments.push({ ...segment, order: orderCounter++ });
+      }
+    });
 
     // Add text before cursor (if any)
     if (beforeText) {
@@ -246,35 +258,54 @@ export default function NoteEditorScreen({
         id: `text-before-${Date.now()}`,
         type: 'text',
         content: beforeText,
-        position: segmentPosition,
+        order: orderCounter++,
         createdAt: new Date().toISOString(),
       });
-      segmentPosition = beforeText.length;
     }
 
     // Add media segment at cursor position
-    const mediaSegment = createMediaSegment(mediaType, mediaData, segmentPosition);
+    const mediaSegment = createMediaSegment(mediaType, mediaData, orderCounter++);
     newSegments.push(mediaSegment);
-    segmentPosition += getMediaSegmentLength(mediaSegment);
 
-    // Add text after cursor (if any)
-    if (afterText) {
-      newSegments.push({
-        id: `text-after-${Date.now()}`,
-        type: 'text',
-        content: afterText,
-        position: segmentPosition,
-        createdAt: new Date().toISOString(),
-      });
-    }
+    // Add text after cursor as new focused segment
+    const newActiveSegmentId = `text-after-${Date.now()}`;
+    newSegments.push({
+      id: newActiveSegmentId,
+      type: 'text',
+      content: afterText,
+      order: orderCounter++,
+      createdAt: new Date().toISOString(),
+      isFocused: true,
+    });
 
-    // Update content segments and text content
-    setContentSegments(newSegments);
-    const newTextContent = beforeText + afterText;
-    onContentChange(newTextContent);
+    // Process all segments after the active one
+    segments.forEach(segment => {
+      if (segment.order > textSegment.order) {
+        newSegments.push({ ...segment, order: orderCounter++ });
+      }
+    });
+
+    // Update segments and focus
+    setSegments(newSegments);
+    setActiveSegmentId(newActiveSegmentId);
+    
+    // Update the main note content for saving
+    const combinedText = newSegments
+      .filter(seg => seg.type === 'text')
+      .map(seg => (seg as TextSegment).content)
+      .join('');
+    onContentChange(combinedText);
+
+    // Focus the new text input after a brief delay
+    setTimeout(() => {
+      const newTextInput = textInputRefs.current[newActiveSegmentId];
+      if (newTextInput) {
+        newTextInput.focus();
+      }
+    }, 100);
   };
 
-  const createMediaSegment = (mediaType: 'image' | 'audio' | 'tickbox', mediaData: any, position: number): ContentSegmentType => {
+  const createMediaSegment = (mediaType: 'image' | 'audio' | 'tickbox', mediaData: any, order: number): SegmentType => {
     const timestamp = Date.now();
     
     switch (mediaType) {
@@ -283,7 +314,7 @@ export default function NoteEditorScreen({
           id: `image-${timestamp}`,
           type: 'image',
           images: Array.isArray(mediaData) ? mediaData : [mediaData],
-          position,
+          order,
           createdAt: new Date().toISOString(),
         };
       case 'audio':
@@ -291,7 +322,7 @@ export default function NoteEditorScreen({
           id: `audio-${timestamp}`,
           type: 'audio',
           audio: mediaData,
-          position,
+          order,
           createdAt: new Date().toISOString(),
         };
       case 'tickbox':
@@ -299,7 +330,7 @@ export default function NoteEditorScreen({
           id: `tickbox-${timestamp}`,
           type: 'tickbox',
           tickBoxGroup: mediaData,
-          position,
+          order,
           createdAt: new Date().toISOString(),
         };
       default:
@@ -307,18 +338,22 @@ export default function NoteEditorScreen({
     }
   };
 
-  const getMediaSegmentLength = (segment: ContentSegmentType): number => {
-    // Return a nominal length for positioning calculations
-    switch (segment.type) {
-      case 'image':
-        return 50; // Placeholder length for image block
-      case 'audio':
-        return 30; // Placeholder length for audio block
-      case 'tickbox':
-        return 20; // Placeholder length for tickbox block
-      default:
-        return 0;
-    }
+  const handleTextChange = (segmentId: string, text: string) => {
+    const updatedSegments = segments.map(segment => {
+      if (segment.id === segmentId && segment.type === 'text') {
+        return { ...segment, content: text };
+      }
+      return segment;
+    });
+    
+    setSegments(updatedSegments);
+    
+    // Update main note content
+    const combinedText = updatedSegments
+      .filter(seg => seg.type === 'text')
+      .map(seg => (seg as TextSegment).content)
+      .join('');
+    onContentChange(combinedText);
   };
 
   const loadCategories = async () => {
@@ -420,7 +455,7 @@ export default function NoteEditorScreen({
         createdAt: new Date().toISOString(),
       };
       setNoteImages([...noteImages, newImage]);
-      insertMediaAtCursor('image', newImage);
+      insertMediaAtCursor('image', [newImage]);
     }
   };
 
@@ -563,18 +598,33 @@ export default function NoteEditorScreen({
     setNoteTickBoxGroups(updatedGroups);
   };
 
-  const renderInlineContent = () => {
-    if (contentSegments.length === 0) {
-      return null;
+  const renderSegmentedContent = () => {
+    if (segments.length === 0) {
+      return (
+        <TextInput
+          ref={(ref) => { if (ref) textInputRefs.current['default'] = ref; }}
+          style={styles.bodyInput}
+          placeholder="Start typing your note..."
+          placeholderTextColor="#888888"
+          value={noteContent}
+          onChangeText={onContentChange}
+          onSelectionChange={(event) => handleTextSegmentSelection('default', event)}
+          multiline={true}
+          textAlignVertical="top"
+          autoFocus
+        />
+      );
     }
 
-    // Sort segments by position to ensure proper order
-    const sortedSegments = [...contentSegments].sort((a, b) => a.position - b.position);
+    // Sort segments by order to ensure proper display
+    const sortedSegments = [...segments].sort((a, b) => a.order - b.order);
 
     return (
-      <View style={styles.inlineContentContainer}>
+      <View style={styles.segmentedContentContainer}>
         {sortedSegments.map((segment) => {
           switch (segment.type) {
+            case 'text':
+              return renderTextSegment(segment as TextSegment);
             case 'image':
               return renderImageSegment(segment as ImageSegment);
             case 'audio':
@@ -586,6 +636,25 @@ export default function NoteEditorScreen({
           }
         })}
       </View>
+    );
+  };
+
+  const renderTextSegment = (segment: TextSegment) => {
+    return (
+      <TextInput
+        key={segment.id}
+        ref={(ref) => { if (ref) textInputRefs.current[segment.id] = ref; }}
+        style={styles.textSegmentInput}
+        placeholder={segment.order === 0 ? "Start typing your note..." : "Continue typing..."}
+        placeholderTextColor="#888888"
+        value={segment.content}
+        onChangeText={(text) => handleTextChange(segment.id, text)}
+        onSelectionChange={(event) => handleTextSegmentSelection(segment.id, event)}
+        onFocus={() => setActiveSegmentId(segment.id)}
+        multiline={true}
+        textAlignVertical="top"
+        autoFocus={segment.isFocused}
+      />
     );
   };
 
@@ -746,21 +815,8 @@ export default function NoteEditorScreen({
             multiline={false}
           />
 
-          {/* Inline Content Segments */}
-          {renderInlineContent()}
-
-          {/* Plain Text Editor with cursor tracking */}
-          <TextInput
-            ref={textInputRef}
-            style={styles.bodyInput}
-            placeholder="Note"
-            placeholderTextColor="#888888"
-            value={noteContent}
-            onChangeText={onContentChange}
-            onSelectionChange={handleSelectionChange}
-            multiline={true}
-            textAlignVertical="top"
-          />
+          {/* Segmented Content (Text + Media) */}
+          {renderSegmentedContent()}
         </ScrollView>
 
         {/* Bottom Toolbar */}
@@ -1230,5 +1286,18 @@ const styles = StyleSheet.create({
   },
   inlineTickBoxContainer: {
     marginVertical: 12,
+  },
+  // Segmented content styles
+  segmentedContentContainer: {
+    flex: 1,
+  },
+  textSegmentInput: {
+    fontSize: 18,
+    color: '#FFFFFF',
+    fontFamily: 'Inter',
+    fontWeight: '400',
+    lineHeight: 26,
+    minHeight: 40,
+    paddingVertical: 4,
   },
 });
