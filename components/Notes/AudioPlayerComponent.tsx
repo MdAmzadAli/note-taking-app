@@ -69,33 +69,26 @@ export default function AudioPlayerComponent({
       newSound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded) {
           const progress = status.positionMillis || 0;
+          const actualDuration = status.durationMillis || duration;
+          
           setCurrentPosition(progress);
+          positionRef.current = progress;
 
           // Update playing state based on actual status
           setIsPlaying(status.isPlaying || false);
 
-          // Calculate progress percentage (ensure it stays within 0-1 range)
-          const progressPercent = duration > 0 ? Math.min(Math.max(progress / duration, 0), 1) : 0;
+          // Calculate progress percentage using actual duration from audio file
+          const progressPercent = actualDuration > 0 ? Math.min(Math.max(progress / actualDuration, 0), 1) : 0;
 
-          // Animate progress bar smoothly
-          Animated.timing(progressAnimation, {
-            toValue: progressPercent,
-            duration: 50,
-            useNativeDriver: false,
-          }).start();
+          // Update progress bar animation with direct value setting for better sync
+          progressAnimation.setValue(progressPercent);
 
           // Handle playback completion
           if (status.didJustFinish) {
             setIsPlaying(false);
-            // Keep position at the end instead of resetting
-            setCurrentPosition(duration);
-
-            // Set progress to 100%
-            Animated.timing(progressAnimation, {
-              toValue: 1,
-              duration: 100,
-              useNativeDriver: false,
-            }).start();
+            setCurrentPosition(actualDuration);
+            positionRef.current = actualDuration;
+            progressAnimation.setValue(1);
           }
         }
       });
@@ -136,16 +129,13 @@ export default function AudioPlayerComponent({
       } else {
         // Not playing, so play
         // Check if we're at the end (with small threshold for rounding errors)
-        if (status.positionMillis && status.positionMillis >= duration - 100) {
+        const actualDuration = status.durationMillis || duration;
+        if (status.positionMillis && status.positionMillis >= actualDuration - 100) {
           // Restart from beginning if at the end
           await currentSound.setPositionAsync(0);
           setCurrentPosition(0);
-
-          Animated.timing(progressAnimation, {
-            toValue: 0,
-            duration: 100,
-            useNativeDriver: false,
-          }).start();
+          positionRef.current = 0;
+          progressAnimation.setValue(0);
         }
         // Play from current position (resume)
         await currentSound.playAsync();
@@ -168,25 +158,26 @@ export default function AudioPlayerComponent({
       if (!currentSound) return;
     }
 
-    const { locationX } = event.nativeEvent;
-    const progressBarWidth = 200; // This should match the actual width
-    const progressPercent = Math.max(0, Math.min(locationX / progressBarWidth, 1));
-    const newPosition = Math.floor(duration * progressPercent);
-
     try {
+      // Get actual duration from the sound status
+      const status = await currentSound.getStatusAsync();
+      if (!status.isLoaded) return;
+
+      const actualDuration = status.durationMillis || duration;
+      const { locationX } = event.nativeEvent;
+      const progressBarWidth = 200; // This should match the actual width
+      const progressPercent = Math.max(0, Math.min(locationX / progressBarWidth, 1));
+      const newPosition = Math.floor(actualDuration * progressPercent);
+
       // Set the new position
       await currentSound.setPositionAsync(newPosition);
       setCurrentPosition(newPosition);
+      positionRef.current = newPosition;
 
-      // Update progress animation
-      Animated.timing(progressAnimation, {
-        toValue: progressPercent,
-        duration: 100,
-        useNativeDriver: false,
-      }).start();
+      // Update progress animation immediately
+      progressAnimation.setValue(progressPercent);
 
       // If the audio was playing, continue playing from new position
-      const status = await currentSound.getStatusAsync();
       if (status.isLoaded && !status.isPlaying && isPlaying) {
         await currentSound.playAsync();
       }
