@@ -43,20 +43,15 @@ export default function TasksScreen() {
   const [hasReminder, setHasReminder] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'today' | 'tomorrow' | 'overdue'>('all');
-  const [historyFilter, setHistoryFilter] = useState<'all' | 'completed' | 'overdue'>('all');
+  const [filter, setFilter] = useState<'all' | 'today' | 'tomorrow'>('all');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
-  const [historySearchQuery, setHistorySearchQuery] = useState('');
 
-  // New state for date range filtering
-  const [showDateRangeModal, setShowDateRangeModal] = useState(false);
-  const [fromDate, setFromDate] = useState<Date | null>(null);
-  const [toDate, setToDate] = useState<Date | null>(null);
-  const [showFromDatePicker, setShowFromDatePicker] = useState(false);
-  const [showToDatePicker, setShowToDatePicker] = useState(false);
+  // New state for date picker modal
+  const [showDateFilterModal, setShowDateFilterModal] = useState(false);
+  const [selectedFilterDate, setSelectedFilterDate] = useState<Date | null>(null);
+  const [showFilterDatePicker, setShowFilterDatePicker] = useState(false);
 
-  // New state for tabs and undo functionality
-  const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
+  // Remove tab functionality - we'll show all incomplete tasks in two sections
   const [undoTasks, setUndoTasks] = useState<Set<string>>(new Set());
   const [undoTimeouts, setUndoTimeouts] = useState<Map<string, NodeJS.Timeout>>(new Map());
   const [celebrationTaskId, setCelebrationTaskId] = useState<string | null>(null);
@@ -129,35 +124,9 @@ export default function TasksScreen() {
   }, []);
 
   useEffect(() => {
-    let filtered = getFilteredTasks();
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(task => {
-        // Search in title and description
-        const titleMatch = task.title.toLowerCase().includes(query);
-        const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
-
-        // Search in dates - check if query matches month or day names
-        const taskDate = new Date(task.scheduledDate || task.createdAt);
-        const monthName = taskDate.toLocaleDateString('en-US', { month: 'long' }).toLowerCase();
-        const shortMonthName = taskDate.toLocaleDateString('en-US', { month: 'short' }).toLowerCase();
-        const dayName = taskDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-        const shortDayName = taskDate.toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
-        const fullDate = taskDate.toLocaleDateString().toLowerCase();
-        const yearString = taskDate.getFullYear().toString();
-
-        const dateMatch = monthName.includes(query) || 
-                         shortMonthName.includes(query) ||
-                         dayName.includes(query) ||
-                         shortDayName.includes(query) ||
-                         fullDate.includes(query) ||
-                         yearString.includes(query);
-
-        return titleMatch || descriptionMatch || dateMatch;
-      });
-    }
-    setFilteredTasks(filtered);
-  }, [searchQuery, tasks, filter, activeTab, historyFilter]);
+    // We don't need filteredTasks state anymore since we'll use separate functions for overdue and upcoming
+    // This useEffect can be simplified or removed later
+  }, [searchQuery, tasks, filter, selectedFilterDate]);
 
   // Clear timeouts on component unmount
   useEffect(() => {
@@ -891,6 +860,85 @@ export default function TasksScreen() {
     return filtered;
   };
 
+  // New helper functions for the redesigned layout
+  const getOverdueTasks = () => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    let overdueTasks = tasks.filter(task => {
+      if (task.isCompleted) return false;
+      const taskDate = new Date(task.scheduledDate || task.createdAt);
+      const taskDateOnly = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
+      return taskDateOnly < today;
+    });
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      overdueTasks = overdueTasks.filter(task => {
+        const titleMatch = task.title.toLowerCase().includes(query);
+        const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
+        return titleMatch || descriptionMatch;
+      });
+    }
+
+    return overdueTasks;
+  };
+
+  const getUpcomingTasks = () => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    let upcomingTasks = tasks.filter(task => {
+      if (task.isCompleted) return false;
+      // Include tasks that are pending completion
+      if (pendingCompletionTasks.has(task.id) || temporarySuccessMessages.has(task.id)) {
+        return true;
+      }
+      const taskDate = new Date(task.scheduledDate || task.createdAt);
+      const taskDateOnly = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
+      return taskDateOnly >= today;
+    });
+
+    // Apply date filtering
+    if (selectedFilterDate) {
+      const filterDateOnly = new Date(selectedFilterDate.getFullYear(), selectedFilterDate.getMonth(), selectedFilterDate.getDate());
+      upcomingTasks = upcomingTasks.filter(task => {
+        const taskDate = new Date(task.scheduledDate || task.createdAt);
+        const taskDateOnly = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
+        return taskDateOnly.getTime() === filterDateOnly.getTime();
+      });
+    }
+    // Apply regular filters
+    else if (filter === 'today') {
+      upcomingTasks = upcomingTasks.filter(task => {
+        const taskDate = new Date(task.scheduledDate || task.createdAt);
+        const taskDateOnly = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
+        return taskDateOnly.getTime() === today.getTime();
+      });
+    } else if (filter === 'tomorrow') {
+      upcomingTasks = upcomingTasks.filter(task => {
+        const taskDate = new Date(task.scheduledDate || task.createdAt);
+        const taskDateOnly = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
+        return taskDateOnly.getTime() === tomorrow.getTime();
+      });
+    }
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      upcomingTasks = upcomingTasks.filter(task => {
+        const titleMatch = task.title.toLowerCase().includes(query);
+        const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
+        return titleMatch || descriptionMatch;
+      });
+    }
+
+    return upcomingTasks;
+  };
+
   const getTaskStats = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -970,28 +1018,18 @@ export default function TasksScreen() {
     }
   };
 
-  const onFromDateChange = (event: any, selectedDate?: Date) => {
-    setShowFromDatePicker(false);
+  const onFilterDateChange = (event: any, selectedDate?: Date) => {
+    setShowFilterDatePicker(Platform.OS === 'ios');
     if (selectedDate) {
-      setFromDate(selectedDate);
+      setSelectedFilterDate(selectedDate);
+      setShowDateFilterModal(false);
     }
   };
 
-  const onToDateChange = (event: any, selectedDate?: Date) => {
-    setShowToDatePicker(false);
-    if (selectedDate) {
-      setToDate(selectedDate);
-    }
-  };
-
-  const applyDateRangeFilter = () => {
-    setShowDateRangeModal(false);
-  };
-
-  const clearDateRangeFilter = () => {
-    setFromDate(null);
-    setToDate(null);
-    setShowDateRangeModal(false);
+  const clearDateFilter = () => {
+    setSelectedFilterDate(null);
+    setFilter('all');
+    setShowDateFilterModal(false);
   };
 
   const getTaskStatus = (task: Task) => {
@@ -1032,8 +1070,8 @@ export default function TasksScreen() {
       if (event.nativeEvent.state === State.END) {
         const { translationX } = event.nativeEvent;
 
-        // Prevent swipe completion for completed tasks and overdue tasks in history tab
-        if (Math.abs(translationX) > 120 && !item.isCompleted && !(activeTab === 'completed' && isOverdue)) {
+        // Prevent swipe completion for completed tasks
+        if (Math.abs(translationX) > 120 && !item.isCompleted) {
           // Trigger completion
           handleSwipeComplete(item);
 
@@ -1090,7 +1128,7 @@ export default function TasksScreen() {
       <PanGestureHandler
         onGestureEvent={onGestureEvent}
         onHandlerStateChange={onHandlerStateChange}
-        enabled={!item.isCompleted && !(activeTab === 'completed' && isOverdue)}
+        enabled={!item.isCompleted}
       >
         <Animated.View style={[{ transform: [{ translateX }] }]}>
           <TouchableOpacity
@@ -1105,15 +1143,6 @@ export default function TasksScreen() {
                 Alert.alert(
                   'Task Completed', 
                   'This task has been completed and cannot be modified. You can delete it if needed.',
-                  [{ text: 'OK', style: 'default' }]
-                );
-                return;
-              }
-              if (activeTab === 'completed' && isOverdue) {
-                // Show alert that overdue tasks in history cannot be edited
-                Alert.alert(
-                  'Task Overdue', 
-                  'This overdue task is in history and cannot be modified. You can delete it if needed.',
                   [{ text: 'OK', style: 'default' }]
                 );
                 return;
@@ -1561,130 +1590,122 @@ export default function TasksScreen() {
         )}
       </View>
 
-      {/* Tabs */}
-      <View style={styles.tabsContainer}>
-        {renderTabButton('active', 'Active')}
-        {renderTabButton('completed', 'History')}
+      {/* Filter Buttons Row */}
+      <View style={styles.filtersContainer}>
+        {renderFilterButton('all', 'All')}
+        {renderFilterButton('today', 'Today')}
+        {renderFilterButton('tomorrow', 'Tomorrow')}
+        <TouchableOpacity
+          style={[styles.filterButton, selectedFilterDate && styles.filterButtonActive]}
+          onPress={() => setShowDateFilterModal(true)}
+        >
+          <IconSymbol 
+            size={16} 
+            name="calendar" 
+            color={selectedFilterDate ? "#FFFFFF" : "#000000"} 
+          />
+        </TouchableOpacity>
       </View>
 
-      {activeTab === 'active' && (
-        <View style={styles.filtersContainer}>
-          {renderFilterButton('all', 'All')}
-          {renderFilterButton('today', 'Today')}
-          {renderFilterButton('tomorrow', 'Tomorrow')}
-          {renderFilterButton('overdue', 'Overdue')}
-        </View>
-      )}
+      <ScrollView style={styles.tasksList} showsVerticalScrollIndicator={false}>
+        {/* Overdue Section */}
+        {getOverdueTasks().length > 0 && (
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Overdue Tasks</Text>
+              <Text style={styles.sectionCount}>{getOverdueTasks().length}</Text>
+            </View>
+            {getOverdueTasks().map(task => (
+              <SwipeableTaskItem key={task.id} item={task} />
+            ))}
+          </View>
+        )}
 
-      {activeTab === 'active' ? (
-        <FlatList
-          data={filteredTasks}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <SwipeableTaskItem item={item} />}
-          contentContainerStyle={styles.tasksList}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
+        {/* Upcoming Tasks Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>
+              {selectedFilterDate 
+                ? `Tasks for ${selectedFilterDate.toLocaleDateString()}`
+                : filter === 'today'
+                ? 'Today\'s Tasks'
+                : filter === 'tomorrow'
+                ? 'Tomorrow\'s Tasks'
+                : 'Upcoming Tasks'
+              }
+            </Text>
+            <Text style={styles.sectionCount}>{getUpcomingTasks().length}</Text>
+          </View>
+          {getUpcomingTasks().length > 0 ? (
+            getUpcomingTasks().map(task => (
+              <SwipeableTaskItem key={task.id} item={task} />
+            ))
+          ) : (
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>
                 {searchQuery.trim()
                   ? 'No tasks found for your search.'
-                  : filter === 'all'
-                  ? "No active tasks. Tap 'New Task' to create your first task."
-                  : `No ${filter} tasks found.`
+                  : selectedFilterDate
+                  ? `No tasks scheduled for ${selectedFilterDate.toLocaleDateString()}`
+                  : filter === 'today'
+                  ? 'No tasks for today.'
+                  : filter === 'tomorrow'
+                  ? 'No tasks for tomorrow.'
+                  : "No upcoming tasks. Tap 'New Task' to create your first task."
                 }
               </Text>
             </View>
-          }
-        />
-      ) : (
-        <ScrollView style={styles.tasksList} showsVerticalScrollIndicator={false}>
-          {filteredTasks.length > 0 ? (
-            renderCompletedTasksByDate()
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No completed tasks yet.</Text>
-            </View>
           )}
-        </ScrollView>
-      )}
+        </View>
+      </ScrollView>
 
-      {/* Date Range Filter Modal */}
-      {showDateRangeModal && (
+      {/* Date Filter Modal */}
+      {showDateFilterModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.dateRangeModal}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Filter by Date Range</Text>
+              <Text style={styles.modalTitle}>Select Date</Text>
               <TouchableOpacity
-                onPress={() => setShowDateRangeModal(false)}
+                onPress={() => setShowDateFilterModal(false)}
                 style={styles.modalCloseButton}
               >
                 <Text style={styles.modalCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <View style={styles.dateInputContainer}>
-              <View style={styles.dateInputGroup}>
-                <Text style={styles.dateLabel}>From Date</Text>
-                <TouchableOpacity
-                  style={styles.dateInput}
-                  onPress={() => setShowFromDatePicker(true)}
-                >
-                  <Text style={styles.dateInputText}>
-                    {fromDate ? fromDate.toLocaleDateString() : 'Select date'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.dateInputGroup}>
-                <Text style={styles.dateLabel}>To Date</Text>
-                <TouchableOpacity
-                  style={styles.dateInput}
-                  onPress={() => setShowToDatePicker(true)}
-                >
-                  <Text style={styles.dateInputText}>
-                    {toDate ? toDate.toLocaleDateString() : 'Select date'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+            <TouchableOpacity
+              style={styles.dateInput}
+              onPress={() => setShowFilterDatePicker(true)}
+            >
+              <Text style={styles.dateInputText}>
+                {selectedFilterDate ? selectedFilterDate.toLocaleDateString() : 'Select a date'}
+              </Text>
+            </TouchableOpacity>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.modalButtonSecondary}
-                onPress={clearDateRangeFilter}
+                onPress={clearDateFilter}
               >
                 <Text style={styles.modalButtonSecondaryText}>Clear Filter</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButtonPrimary, (!fromDate || !toDate) && styles.modalButtonDisabled]}
-                onPress={applyDateRangeFilter}
-                disabled={!fromDate || !toDate}
+                style={styles.modalButtonPrimary}
+                onPress={() => setShowDateFilterModal(false)}
               >
-                <Text style={styles.modalButtonPrimaryText}>Apply Filter</Text>
+                <Text style={styles.modalButtonPrimaryText}>Done</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       )}
 
-      {showFromDatePicker && (
+      {showFilterDatePicker && (
         <DateTimePicker
-          value={fromDate || new Date()}
+          value={selectedFilterDate || new Date()}
           mode="date"
           display="default"
-          onChange={onFromDateChange}
-          maximumDate={toDate || new Date()}
-        />
-      )}
-
-      {showToDatePicker && (
-        <DateTimePicker
-          value={toDate || new Date()}
-          mode="date"
-          display="default"
-          onChange={onToDateChange}
-          minimumDate={fromDate || undefined}
-          maximumDate={new Date()}
+          onChange={onFilterDateChange}
         />
       )}
 
@@ -1856,13 +1877,29 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   taskItem: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
     position: 'relative',
+    // 3D Border Effects
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+    borderTopColor: 'rgba(255, 255, 255, 0.95)',
+    borderLeftColor: 'rgba(255, 255, 255, 0.95)',
+    borderRightColor: 'rgba(200, 200, 200, 0.4)',
+    borderBottomColor: 'rgba(180, 180, 180, 0.5)',
+    // Glossy Frosted Glass Effect
+    shadowColor: 'rgba(0, 0, 0, 0.15)',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 1,
+    shadowRadius: 20,
+    elevation: 12,
+    // Additional inner shadow effect via backdrop
+    backdropFilter: 'blur(10px)',
   },
   celebrationTask: {
     borderColor: '#10B981',
@@ -2072,6 +2109,28 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
+  },
+  sectionContainer: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    paddingBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
+    fontFamily: 'Inter',
+  },
+  sectionCount: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#6B7280',
+    fontFamily: 'Inter',
   },
   statsContainer: {
     backgroundColor: '#F9FAFB',
