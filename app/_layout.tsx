@@ -1,5 +1,11 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
+import { DancingScript_400Regular } from '@expo-google-fonts/dancing-script';
+import { Pacifico_400Regular } from '@expo-google-fonts/pacifico';
+import { GreatVibes_400Regular } from '@expo-google-fonts/great-vibes';
+import { CedarvilleCursive_400Regular } from '@expo-google-fonts/cedarville-cursive';
+import { Satisfy_400Regular } from '@expo-google-fonts/satisfy';
+import { Caveat_400Regular } from '@expo-google-fonts/caveat';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -18,6 +24,12 @@ export default function RootLayout() {
     'Inter-Medium': { uri: 'https://fonts.googleapis.com/css2?family=Inter:wght@500&display=swap' },
     'Inter-SemiBold': { uri: 'https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap' },
     'Inter-Bold': { uri: 'https://fonts.googleapis.com/css2?family=Inter:wght@700&display=swap' },
+    DancingScript_400Regular,
+    Pacifico_400Regular,
+    GreatVibes_400Regular,
+    CedarvilleCursive_400Regular,
+    Satisfy_400Regular,
+    Caveat_400Regular,
   });
 
   useEffect(() => {

@@ -27,12 +27,12 @@ interface ThemeOption {
   gradient?: string[];
 }
 const fontStyles: Array<{ name: string; value: string | undefined }> = [
+  { name: 'System Default', value: undefined },
   { name: 'Inter Regular', value: 'Inter-Regular' },
-  { name: 'Inter Medium', value: 'Inter-Medium' },
-  { name: 'Inter SemiBold', value: 'Inter-SemiBold' },
-  { name: 'Inter Bold', value: 'Inter-Bold' },
-  { name: 'SpaceMono', value: 'SpaceMono' },
-  { name: 'System Default', value: undefined }, // Uses system default
+  { name: 'Dancing Script', value: 'DancingScript_400Regular' },
+  { name: 'Pacifico', value: 'Pacifico_400Regular' },
+  { name: 'Great Vibes', value: 'GreatVibes_400Regular' },
+  { name: 'Caveat', value: 'Caveat_400Regular' },
 ];
 
 const noteThemes: ThemeOption[] = [
