@@ -127,16 +127,16 @@ const styles = StyleSheet.create({
   },
   notesContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
   column: {
     flex: 1,
-    paddingHorizontal: 4,
+    paddingHorizontal: 0,
   },
   noteCardWrapper: {
-    marginBottom: 16,
+    marginBottom: 0,
   },
   pinnedScrollView: {
     paddingHorizontal: 16,

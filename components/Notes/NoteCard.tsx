@@ -146,11 +146,11 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
     onShouldBlockNativeResponder: () => false,
   });
 
-  // Use fixed width for pinned cards (200px) and calculated width for others
+  // Use fixed width for pinned cards (200px) and calculated width for others (2 cards per row)
   const cardStyle = [
     styles.card, 
     { 
-      width: note.isPinned ? 200 : (Dimensions.get('window').width - 60) / 3,
+      width: note.isPinned ? 200 : (Dimensions.get('window').width - 48) / 2, // 2 cards per row with proper spacing
       backgroundColor: note.gradient ? 'transparent' : (note.theme || '#2A2A2A')
     }
   ];
@@ -291,7 +291,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#2A2A2A',
     borderRadius: 12,
-    marginHorizontal: 4,
+    marginHorizontal: 8,
+    marginVertical: 8,
     borderWidth: 1,
     borderColor: '#D1D5DB',
     elevation: 6,
@@ -306,7 +307,7 @@ const styles = StyleSheet.create({
   },
   cardInner: {
     padding: 12,
-    minHeight: 120,
+    minHeight: 160,
     backgroundColor: 'transparent',
   },
   cardTitle: {
@@ -414,7 +415,7 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   noteTimestamp: {
-    fontSize: 12,
+    fontSize: 10,
     opacity: 0.7,
   },
 });
