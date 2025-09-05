@@ -224,31 +224,36 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
             {note.title}
           </Text>
         )}
-        <Text style={[styles.cardContent, textColor, note.fontStyle ? { fontFamily: note.fontStyle } : {}]} numberOfLines={hasImages ? 2 : 4}>
-          {hasImages && !note.content.trim() ? 'Image note' : note.content}
-        </Text>
-        
-        {/* Date and time row with audio icon */}
-        <View style={styles.timestampContainer}>
-          <View style={styles.dateTimeContainer}>
-            <Text style={styles.noteTimestamp}>
-              {formatDateTime(note.updatedAt).date} • {formatDateTime(note.updatedAt).time}
-            </Text>
-          </View>
-          {note.audios && note.audios.length > 0 && (
-            <Ionicons 
-              name="play" 
-              size={12} 
-              color="#FFFFFF" 
-              style={styles.audioIcon}
-            />
-          )}
+        <View style={styles.contentContainer}>
+          <Text style={[styles.cardContent, textColor, note.fontStyle ? { fontFamily: note.fontStyle } : {}]} numberOfLines={hasImages ? 2 : 4}>
+            {hasImages && !note.content.trim() ? 'Image note' : note.content}
+          </Text>
         </View>
         
-        {/* Category row - shown below date/time */}
-        {categoryName && !selectedCategoryId && (
-          <Text style={styles.categoryName}>{categoryName}</Text>
-        )}
+        {/* Bottom section with timestamp and category */}
+        <View style={styles.bottomSection}>
+          {/* Category row - shown above date/time */}
+          {categoryName && !selectedCategoryId && (
+            <Text style={styles.categoryName}>{categoryName}</Text>
+          )}
+          
+          {/* Date and time row with audio icon */}
+          <View style={styles.timestampContainer}>
+            <View style={styles.dateTimeContainer}>
+              <Text style={styles.noteTimestamp}>
+                {formatDateTime(note.updatedAt).date} • {formatDateTime(note.updatedAt).time}
+              </Text>
+            </View>
+            {note.audios && note.audios.length > 0 && (
+              <Ionicons 
+                name="play" 
+                size={12} 
+                color="#FFFFFF" 
+                style={styles.audioIcon}
+              />
+            )}
+          </View>
+        </View>
       </View>
 
       {/* Full Image View Modal */}
@@ -316,6 +321,9 @@ const styles = StyleSheet.create({
     minHeight: 120,
     maxHeight: 220,
     backgroundColor: 'transparent',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
   },
   cardTitle: {
     fontSize: 14,
@@ -325,9 +333,14 @@ const styles = StyleSheet.create({
   cardContent: {
     fontSize: 12,
     lineHeight: 16,
-    marginBottom: 8,
     flexShrink: 1,
     flexGrow: 0,
+  },
+  contentContainer: {
+    flex: 1,
+  },
+  bottomSection: {
+    marginTop: 'auto',
   },
   
   
@@ -415,7 +428,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
   },
   dateTimeContainer: {
     flex: 1,
@@ -433,6 +445,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     color: '#FFFFFF',
     opacity: 0.6,
-    marginTop: 2,
+    marginBottom: 4,
   },
 });
