@@ -19,7 +19,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSection } from '@/types';
+import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSection, AudioAttachment } from '@/types';
 import { saveNote, saveTemplate, getNotes, getTemplates, getCustomTemplates, deleteNote, updateNote, getUserSettings, saveCustomTemplate, saveTemplateEntry } from '@/utils/storage';
 import { UserSettings } from '@/types';
 import { mockSpeechToText } from '@/utils/speech';
@@ -51,6 +51,7 @@ interface SimpleNote {
   isPinned?: boolean;
   images?: ImageAttachment[];
   categoryId?: string;
+  audios?: AudioAttachment[];
 }
 
 export default function NotesScreen() {
@@ -101,6 +102,7 @@ export default function NotesScreen() {
   const [currentNoteTheme, setCurrentNoteTheme] = useState<string>('#1C1C1C');
   const [currentNoteGradient, setCurrentNoteGradient] = useState<string[] | null>(null);
   const [currentNoteImages, setCurrentNoteImages] = useState<ImageAttachment[]>([]);
+  const [currentNoteAudios, setCurrentNoteAudios] = useState<AudioAttachment[]>([]);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
   const [menuScrollOffset, setMenuScrollOffset] = useState(0);
   const menuFlatListRef = useRef<FlatList>(null);
@@ -132,7 +134,7 @@ export default function NotesScreen() {
     console.log('[NOTES] Search filter effect triggered - query:', searchQuery, 'notes count:', notes.length, 'selectedCategoryId:', selectedCategoryId);
 
     let notesToFilter = [...notes]; // Create a copy to avoid mutations
-    
+
     // First apply category filter if a category is selected
     if (selectedCategoryId) {
       notesToFilter = notes.filter(note => note.categoryId === selectedCategoryId);
@@ -141,7 +143,7 @@ export default function NotesScreen() {
 
     // Then apply search filter if there's a search query
     if (searchQuery.trim()) {
-      const filtered = notesToFilter.filter(note => 
+      const filtered = notesToFilter.filter(note =>
         note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (note.title && note.title.toLowerCase().includes(searchQuery.toLowerCase()))
       );
@@ -176,6 +178,7 @@ export default function NotesScreen() {
         isPinned: note.isPinned || false,
         images: note.images || [],
         categoryId: note.categoryId,
+        audios: note.audios || [],
       }));
 
       const sortedNotes = simpleNotes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -195,7 +198,7 @@ export default function NotesScreen() {
       const templatesData = await getCustomTemplates();
       console.log('[NOTES] Loading templates:', templatesData.length);
 
-      const sortedTemplates = templatesData.sort((a, b) => 
+      const sortedTemplates = templatesData.sort((a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
 
@@ -230,8 +233,8 @@ export default function NotesScreen() {
     }
   };
 
-  const saveCurrentNote = async (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[], categoryId?: string) => {
-    if (!currentNoteText.trim() && noteSections.length === 0) {
+  const saveCurrentNote = async (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[], categoryId?: string, audios?: AudioAttachment[]) => {
+    if ((!currentNoteText.trim() && noteSections.length === 0) && (!currentNoteImages || currentNoteImages.length === 0) && (!currentNoteAudios || currentNoteAudios.length === 0)) {
       Alert.alert('Error', 'Please enter some content for your note');
       return;
     }
@@ -269,6 +272,7 @@ export default function NotesScreen() {
             theme: theme || currentNoteTheme,
             gradient: gradient || currentNoteGradient || undefined,
             images: images || currentNoteImages,
+            audios: audios || currentNoteAudios,
             updatedAt: now,
             isPinned: isPinned !== undefined ? isPinned : existingNote.isPinned,
             categoryId: categoryId || existingNote.categoryId,
@@ -287,6 +291,7 @@ export default function NotesScreen() {
           theme: theme || currentNoteTheme,
           gradient: gradient || currentNoteGradient || undefined,
           images: images || currentNoteImages,
+          audios: audios || currentNoteAudios,
           createdAt: now,
           updatedAt: now,
           isPinned: isPinned || false,
@@ -306,6 +311,7 @@ export default function NotesScreen() {
       setCurrentNoteTheme('#1C1C1C');
       setCurrentNoteGradient(null);
       setCurrentNoteImages([]);
+      setCurrentNoteAudios([]);
       setIsCreating(false);
       setIsEditing(false);
       setEditingNoteId(null);
@@ -329,6 +335,7 @@ export default function NotesScreen() {
         setCurrentNoteTheme(fullNote.theme || '#1C1C1C');
         setCurrentNoteGradient(fullNote.gradient || null);
         setCurrentNoteImages(fullNote.images || []);
+        setCurrentNoteAudios(fullNote.audios || []);
         setCurrentNotePinned(fullNote.isPinned || false);
       } else {
         setCurrentNoteText(note.content);
@@ -339,6 +346,7 @@ export default function NotesScreen() {
         setCurrentNoteTheme('#1C1C1C');
         setCurrentNoteGradient(null);
         setCurrentNoteImages(note.images || []);
+        setCurrentNoteAudios(note.audios || []);
         setCurrentNotePinned(note.isPinned || false);
       }
 
@@ -444,11 +452,11 @@ export default function NotesScreen() {
         noteGradient={currentNoteGradient}
         isPinned={currentNotePinned}
         images={currentNoteImages}
+        audios={currentNoteAudios}
         createdAt={editingNoteId ? notes.find(n => n.id === editingNoteId)?.createdAt : undefined}
         updatedAt={editingNoteId ? notes.find(n => n.id === editingNoteId)?.updatedAt : undefined}
         categoryId={editingNoteId ? notes.find(n => n.id === editingNoteId)?.categoryId || undefined : selectedCategoryId || undefined}
         onSave={saveCurrentNote}
-        onImagesChange={setCurrentNoteImages}
         onBack={() => {
           setIsCreating(false);
           setIsEditing(false);
@@ -459,9 +467,16 @@ export default function NotesScreen() {
           setCurrentNoteTheme('#1C1C1C');
           setCurrentNoteGradient(null);
           setCurrentNoteImages([]);
+          setCurrentNoteAudios([]);
         }}
         onTitleChange={setCurrentNoteTitle}
-        onContentChange={setCurrentNoteText}
+        onContentChange={handleContentChange}
+        onImagesChange={(images) => {
+          setCurrentNoteImages(images);
+        }}
+        onAudiosChange={(audios) => {
+          setCurrentNoteAudios(audios);
+        }}
       />
     );
   }
@@ -479,8 +494,8 @@ export default function NotesScreen() {
 
   return (
     <View style={styles.fullScreenContainer}>
-    
-    
+
+
         <View style={styles.header}>
           <TouchableOpacity style={styles.hamburgerButton} onPress={openMenu}>
             <Ionicons name="menu" size={24} color="#FFFFFF" />
@@ -497,10 +512,10 @@ export default function NotesScreen() {
           </View>
 
           <TouchableOpacity style={styles.micButton} onPress={handleVoiceInput}>
-            <Ionicons 
-              name="mic" 
-              size={20} 
-              color={isListening ? "#00FF7F" : "#FFFFFF"} 
+            <Ionicons
+              name="mic"
+              size={20}
+              color={isListening ? "#00FF7F" : "#FFFFFF"}
             />
           </TouchableOpacity>
         </View>
@@ -509,9 +524,9 @@ export default function NotesScreen() {
           {renderNotesGrid()}
         </ScrollView>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[
-            styles.fab, 
+            styles.fab,
             { bottom: 64 + Math.max(16, insets.bottom) + 30 } // Tab bar height + safe area + margin
           ]}
           onPress={() => {
@@ -522,7 +537,7 @@ export default function NotesScreen() {
         >
           <Ionicons name="add" size={28} color="#000000" />
         </TouchableOpacity>
-    
+
 
       <SlideMenu
         visible={isMenuVisible}
@@ -537,7 +552,7 @@ export default function NotesScreen() {
         selectedCategoryId={selectedCategoryId}
       />
     </View>
-       
+
   );
 }
 
@@ -622,6 +637,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 8,
   },
-  
-  
+
+
 });
