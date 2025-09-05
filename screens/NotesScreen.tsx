@@ -101,6 +101,8 @@ export default function NotesScreen() {
   const [currentNoteTheme, setCurrentNoteTheme] = useState<string>('#1C1C1C');
   const [currentNoteGradient, setCurrentNoteGradient] = useState<string[] | null>(null);
   const [currentNoteImages, setCurrentNoteImages] = useState<ImageAttachment[]>([]);
+  const [currentNoteAudios, setCurrentNoteAudios] = useState<any[]>([]);
+  const [currentNoteTickBoxGroups, setCurrentNoteTickBoxGroups] = useState<any[]>([]);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
   const [menuScrollOffset, setMenuScrollOffset] = useState(0);
   const menuFlatListRef = useRef<FlatList>(null);
@@ -239,7 +241,7 @@ export default function NotesScreen() {
     audios?: any[],
     tickBoxGroups?: any[]
   ) => {
-    if (!currentNoteText.trim() && noteSections.length === 0) {
+    if (!currentNoteText.trim() && noteSections.length === 0 && (!tickBoxGroups || tickBoxGroups.length === 0)) {
       Alert.alert('Error', 'Please enter some content for your note');
       return;
     }
@@ -318,6 +320,8 @@ export default function NotesScreen() {
       setCurrentNoteTheme('#1C1C1C');
       setCurrentNoteGradient(null);
       setCurrentNoteImages([]);
+      setCurrentNoteAudios([]);
+      setCurrentNoteTickBoxGroups([]);
       setIsCreating(false);
       setIsEditing(false);
       setEditingNoteId(null);
@@ -341,6 +345,8 @@ export default function NotesScreen() {
         setCurrentNoteTheme(fullNote.theme || '#1C1C1C');
         setCurrentNoteGradient(fullNote.gradient || null);
         setCurrentNoteImages(fullNote.images || []);
+        setCurrentNoteAudios(fullNote.audios || []);
+        setCurrentNoteTickBoxGroups(fullNote.tickBoxGroups || []);
         setCurrentNotePinned(fullNote.isPinned || false);
       } else {
         setCurrentNoteText(note.content);
@@ -351,6 +357,8 @@ export default function NotesScreen() {
         setCurrentNoteTheme('#1C1C1C');
         setCurrentNoteGradient(null);
         setCurrentNoteImages(note.images || []);
+        setCurrentNoteAudios([]);
+        setCurrentNoteTickBoxGroups([]);
         setCurrentNotePinned(note.isPinned || false);
       }
 
@@ -456,11 +464,15 @@ export default function NotesScreen() {
         noteGradient={currentNoteGradient}
         isPinned={currentNotePinned}
         images={currentNoteImages}
+        audios={currentNoteAudios}
+        tickBoxGroups={currentNoteTickBoxGroups}
         createdAt={editingNoteId ? notes.find(n => n.id === editingNoteId)?.createdAt : undefined}
         updatedAt={editingNoteId ? notes.find(n => n.id === editingNoteId)?.updatedAt : undefined}
         categoryId={editingNoteId ? notes.find(n => n.id === editingNoteId)?.categoryId || undefined : selectedCategoryId || undefined}
         onSave={saveCurrentNote}
         onImagesChange={setCurrentNoteImages}
+        onAudiosChange={setCurrentNoteAudios}
+        onTickBoxGroupsChange={setCurrentNoteTickBoxGroups}
         onBack={() => {
           setIsCreating(false);
           setIsEditing(false);
@@ -471,6 +483,8 @@ export default function NotesScreen() {
           setCurrentNoteTheme('#1C1C1C');
           setCurrentNoteGradient(null);
           setCurrentNoteImages([]);
+          setCurrentNoteAudios([]);
+          setCurrentNoteTickBoxGroups([]);
         }}
         onTitleChange={setCurrentNoteTitle}
         onContentChange={setCurrentNoteText}
