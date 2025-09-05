@@ -207,7 +207,7 @@ export default function AudioPlayerComponent({
                 {
                   left: progressAnimation.interpolate({
                     inputRange: [0, 1],
-                    outputRange: ['-6px', 'calc(100% - 6px)'],
+                    outputRange: [0, 188], // 200px container width - 12px dot width
                   }),
                 }
               ]} 
