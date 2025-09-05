@@ -973,7 +973,7 @@ export default function NoteEditorScreen({
                 if (isKeyboardVisible) {
                   // Dismiss keyboard first, then show modal
                   Keyboard.dismiss();
-                  setPendingModalAction(() => () => setShowMediaModal(true));
+                  setPendingModalAction(() => setShowMediaModal(true));
                 } else {
                   setShowMediaModal(true);
                 }
@@ -988,7 +988,7 @@ export default function NoteEditorScreen({
                 if (isKeyboardVisible) {
                   // Dismiss keyboard first, then show modal
                   Keyboard.dismiss();
-                  setPendingModalAction(() => () => setShowColorPicker(true));
+                  setPendingModalAction(() => setShowColorPicker(true));
                 } else {
                   setShowColorPicker(true);
                 }
