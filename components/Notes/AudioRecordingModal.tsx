@@ -15,7 +15,7 @@ import { Audio } from 'expo-av';
 interface AudioRecordingModalProps {
   visible: boolean;
   onClose: () => void;
-  onSave: (audioUri: string) => void;
+  onSave: (audioUri: string, duration: number) => void;
 }
 
 export default function AudioRecordingModal({
@@ -203,7 +203,7 @@ export default function AudioRecordingModal({
 
   const handleSave = () => {
     if (audioUri) {
-      onSave(audioUri);
+      onSave(audioUri, recordingDuration);
       onClose();
     }
   };

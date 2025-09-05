@@ -25,6 +25,7 @@ import Animated from 'react-native-reanimated';
 import ColorThemePicker from './ColorThemePicker';
 import MediaAttachmentModal from './MediaAttachmentModal';
 import AudioRecordingModal from './AudioRecordingModal';
+import AudioPlayerComponent from './AudioPlayerComponent';
 import { getCategories } from '@/utils/storage';
 
 interface ImageAttachment {
@@ -303,23 +304,23 @@ export default function NoteEditorScreen({
     setShowAudioModal(true);
   };
 
-  const handleAudioSave = async (audioUri: string) => {
+  const handleAudioSave = async (audioUri: string, duration: number = 0) => {
     // Create new audio attachment
     const newAudio: AudioAttachment = {
       id: Date.now().toString(),
       uri: audioUri,
-      duration: 0, // Will be calculated later if needed
+      duration: duration,
       createdAt: new Date().toISOString(),
     };
     
     setNoteAudios([...noteAudios, newAudio]);
     
-    // Insert audio indicator at the end of current content
-    const currentContent = noteContent;
-    const audioIndicator = `\n🎵 Audio Recording (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})\n`;
-    
-    const newContent = currentContent + audioIndicator;
-    onContentChange(newContent);
+    // No need to insert text indicator - we'll render the audio player component
+    setShowAudioModal(false);
+  };
+
+  const handleAudioDelete = (audioId: string) => {
+    setNoteAudios(noteAudios.filter(audio => audio.id !== audioId));
   };
 
   const handleTickBoxes = () => {
@@ -444,6 +445,21 @@ export default function NoteEditorScreen({
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+            </View>
+          )}
+
+          {/* Audio Recordings */}
+          {noteAudios.length > 0 && (
+            <View style={styles.audioSection}>
+              {noteAudios.map((audio) => (
+                <AudioPlayerComponent
+                  key={audio.id}
+                  audioUri={audio.uri}
+                  duration={audio.duration}
+                  onDelete={() => handleAudioDelete(audio.id)}
+                  isDarkMode={true}
+                />
+              ))}
             </View>
           )}
 
@@ -711,6 +727,9 @@ const styles = StyleSheet.create({
   imageScrollView: {
     paddingLeft: 20,
     paddingRight: 40,
+  },
+  audioSection: {
+    marginBottom: 16,
   },
   imageCard: {
     width: 120,
