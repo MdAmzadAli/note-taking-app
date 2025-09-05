@@ -16,6 +16,7 @@ import {
   NativeSyntheticEvent,
   TextInputSelectionChangeEventData,
   Keyboard,
+  ScrollView,
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { Picker } from '@react-native-picker/picker';
