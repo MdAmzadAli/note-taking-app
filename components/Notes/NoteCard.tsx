@@ -40,6 +40,7 @@ interface SimpleNote {
   updatedAt: string;
   theme?: string;
   gradient?: string[];
+  fontStyle?: string | undefined;
   isPinned?: boolean;
   images?: ImageAttachment[];
   categoryId?: string;
@@ -216,11 +217,11 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
         )}
 
         {note.title && (
-          <Text style={[styles.cardTitle, textColor]} numberOfLines={2}>
+          <Text style={[styles.cardTitle, textColor, note.fontStyle ? { fontFamily: note.fontStyle } : {}]} numberOfLines={2}>
             {note.title}
           </Text>
         )}
-        <Text style={[styles.cardContent, textColor]} numberOfLines={hasImages ? 2 : 4}>
+        <Text style={[styles.cardContent, textColor, note.fontStyle ? { fontFamily: note.fontStyle } : {}]} numberOfLines={hasImages ? 2 : 4}>
           {hasImages && !note.content.trim() ? 'Image note' : note.content}
         </Text>
         {/* Changed part */}
