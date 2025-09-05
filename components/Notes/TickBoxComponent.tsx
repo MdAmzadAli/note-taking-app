@@ -38,15 +38,17 @@ export default function TickBoxComponent({
   const completedItems = items.filter(item => item.completed);
 
   const addNewItem = () => {
-    if (newItemText.trim()) {
+    const trimmedText = newItemText.trim();
+    if (trimmedText) {
       const newItem: TickBoxItem = {
         id: Date.now().toString(),
-        text: newItemText.trim(),
+        text: trimmedText,
         completed: false,
         createdAt: new Date().toISOString(),
       };
       
-      onItemsChange([...items, newItem]);
+      const updatedItems = [...items, newItem];
+      onItemsChange(updatedItems);
       setNewItemText('');
     }
   };

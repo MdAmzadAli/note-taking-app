@@ -120,10 +120,10 @@ interface NoteEditorScreenProps {
 }
 
 
-export default function NoteEditorScreen({ 
-  isEditing, 
-  noteTitle, 
-  noteContent, 
+export default function NoteEditorScreen({
+  isEditing,
+  noteTitle,
+  noteContent,
   noteTheme = '#1C1C1C',
   segments: initialSegments,
   noteGradient = null,
@@ -134,9 +134,9 @@ export default function NoteEditorScreen({
   createdAt,
   updatedAt,
   categoryId,
-  onSave, 
-  onBack, 
-  onTitleChange, 
+  onSave,
+  onBack,
+  onTitleChange,
   onContentChange,
   onImagesChange,
   onAudiosChange,
@@ -160,14 +160,14 @@ export default function NoteEditorScreen({
   const [showAudioModal, setShowAudioModal] = useState(false);
   const [noteAudios, setNoteAudios] = useState<AudioAttachment[]>(audios);
   const [noteTickBoxGroups, setNoteTickBoxGroups] = useState<TickBoxGroup[]>(tickBoxGroups);
-  
+
   // Segmented content system for true inline media embedding
   const [segments, setSegments] = useState<SegmentType[]>([]);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [cursorPosition, setCursorPosition] = useState({ start: 0, end: 0 });
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  
+
   const textInputRefs = useRef<{ [key: string]: TextInput | null }>({});
   const scrollViewRef = useRef<ScrollView>(null);
   const activeInputPosition = useRef<number>(0);
@@ -177,7 +177,7 @@ export default function NoteEditorScreen({
     setInitialContent(noteContent);
     loadCategories();
     initializeSegments();
-    
+
     // Add keyboard event listeners
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
@@ -190,7 +190,7 @@ export default function NoteEditorScreen({
         }, 100);
       }
     );
-    
+
     const keyboardDidHideListener = Keyboard.addListener(
       'keyboardDidHide',
       () => {
@@ -271,7 +271,7 @@ export default function NoteEditorScreen({
     if (scrollViewRef.current && activeInputPosition.current > 0) {
       const screenHeight = Dimensions.get('window').height;
       const availableHeight = screenHeight - keyboardHeight - 200; // Account for header and toolbar
-      
+
       scrollViewRef.current.scrollTo({
         y: Math.max(0, activeInputPosition.current - availableHeight / 2),
         animated: true,
@@ -345,7 +345,7 @@ export default function NoteEditorScreen({
     // Update segments and focus
     setSegments(newSegments);
     setActiveSegmentId(newActiveSegmentId);
-    
+
     // Update the main note content for saving
     const combinedText = newSegments
       .filter(seg => seg.type === 'text')
@@ -371,7 +371,7 @@ export default function NoteEditorScreen({
 
   const createMediaSegment = (mediaType: 'image' | 'audio' | 'tickbox', mediaData: any, order: number): SegmentType => {
     const timestamp = Date.now();
-    
+
     switch (mediaType) {
       case 'image':
         return {
@@ -409,9 +409,9 @@ export default function NoteEditorScreen({
       }
       return segment;
     });
-    
+
     setSegments(updatedSegments);
-    
+
     // Update main note content
     const combinedText = updatedSegments
       .filter(seg => seg.type === 'text')
@@ -629,10 +629,10 @@ export default function NoteEditorScreen({
       duration: duration,
       createdAt: new Date().toISOString(),
     };
-    
+
     setNoteAudios([...noteAudios, newAudio]);
     insertMediaAtCursor('audio', newAudio);
-    
+
     setShowAudioModal(false);
   };
 
@@ -646,16 +646,32 @@ export default function NoteEditorScreen({
       items: [],
       createdAt: new Date().toISOString(),
     };
-    
+
     setNoteTickBoxGroups([...noteTickBoxGroups, newTickBoxGroup]);
     insertMediaAtCursor('tickbox', newTickBoxGroup);
   };
 
-  const handleTickBoxGroupUpdate = (groupId: string, items: TickBoxItem[]) => {
-    const updatedGroups = noteTickBoxGroups.map(group => 
-      group.id === groupId ? { ...group, items } : group
+  const handleTickBoxGroupUpdate = (groupId: string, updatedItems: any[]) => {
+    // Update tick box groups
+    const updatedGroups = noteTickBoxGroups.map(group =>
+      group.id === groupId ? { ...group, items: updatedItems } : group
     );
     setNoteTickBoxGroups(updatedGroups);
+
+    // Update segments as well
+    const updatedSegments = segments.map(segment => {
+      if (segment.type === 'tickbox' && segment.tickBoxGroup.id === groupId) {
+        return {
+          ...segment,
+          tickBoxGroup: { ...segment.tickBoxGroup, items: updatedItems }
+        } as TickBoxSegment;
+      }
+      return segment;
+    });
+    setSegments(updatedSegments);
+
+    // Force re-render by updating the key or triggering a state change
+    console.log('TickBox updated:', groupId, 'Items count:', updatedItems.length);
   };
 
   const handleTickBoxGroupDelete = (groupId: string) => {
@@ -837,41 +853,41 @@ export default function NoteEditorScreen({
           </TouchableOpacity>
 
           <View style={styles.headerIcons}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.headerIcon, hasUnsavedChanges && styles.saveButtonActive]}
               onPress={handleSave}
             >
-              <Ionicons 
-                name="checkmark" 
-                size={24} 
-                color={hasUnsavedChanges ? "#00FF7F" : "#FFFFFF"} 
+              <Ionicons
+                name="checkmark"
+                size={24}
+                color={hasUnsavedChanges ? "#00FF7F" : "#FFFFFF"}
               />
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.headerIcon}
               onPress={() => setIsNotePinned(!isNotePinned)}
             >
-              <Ionicons 
-                name={isNotePinned ? "star" : "star-outline"} 
-                size={24} 
-                color={isNotePinned ? "#FFD700" : "#FFFFFF"} 
+              <Ionicons
+                name={isNotePinned ? "star" : "star-outline"}
+                size={24}
+                color={isNotePinned ? "#FFD700" : "#FFFFFF"}
               />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Main Content */}
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
           style={styles.keyboardAvoidingContainer}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
-          <ScrollView 
+          <ScrollView
             ref={scrollViewRef}
-            style={styles.content} 
+            style={styles.content}
             contentContainerStyle={[
-              styles.scrollViewContent, 
+              styles.scrollViewContent,
               { paddingBottom: Math.max(120, keyboardHeight + 50) }
             ]}
             showsVerticalScrollIndicator={false}
@@ -891,8 +907,8 @@ export default function NoteEditorScreen({
                 </Text>
               )}
             </View>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.categoryDropdownButton}
               onPress={() => setShowCategoryDropdown(true)}
             >
@@ -935,14 +951,14 @@ export default function NoteEditorScreen({
         {/* Bottom Toolbar */}
         <View style={styles.bottomBar}>
           <View style={styles.bottomLeft}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.bottomButton}
               onPress={() => setShowMediaModal(true)}
             >
               <Ionicons name="add" size={20} color="#FFFFFF" />
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.bottomButton}
               onPress={() => setShowColorPicker(true)}
             >
@@ -1064,7 +1080,7 @@ export default function NoteEditorScreen({
                       No Category
                     </Text>
                   </TouchableOpacity>
-                  
+
                   {categories.map((category) => (
                     <TouchableOpacity
                       key={category.id}
