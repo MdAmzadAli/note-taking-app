@@ -50,6 +50,9 @@ const FONT_FAMILIES = [
   { name: 'Georgia', value: 'Georgia' },
   { name: 'Verdana', value: 'Verdana' },
   { name: 'Comic Sans', value: 'Comic Sans MS' },
+  { name: 'Cursive Script', value: 'cursive' },
+  { name: 'Dancing Script', value: 'Dancing Script' },
+  { name: 'Monospace', value: 'monospace' },
 ];
 
 export default function FontFormattingModal({
@@ -179,7 +182,7 @@ export default function FontFormattingModal({
                         onPress={() => onFontFamilyChange(font.value)}
                       >
                         <Text style={[styles.fontButtonText, { fontFamily: font.value }]}>
-                          EasyNotes
+                          font style
                         </Text>
                       </TouchableOpacity>
                     ))}
