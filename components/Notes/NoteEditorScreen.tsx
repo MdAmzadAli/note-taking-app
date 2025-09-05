@@ -24,12 +24,20 @@ import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import Animated from 'react-native-reanimated';
 import ColorThemePicker from './ColorThemePicker';
 import MediaAttachmentModal from './MediaAttachmentModal';
+import AudioRecordingModal from './AudioRecordingModal';
 import { getCategories } from '@/utils/storage';
 
 interface ImageAttachment {
   id: string;
   uri: string;
   type: 'photo' | 'image';
+  createdAt: string;
+}
+
+interface AudioAttachment {
+  id: string;
+  uri: string;
+  duration: number;
   createdAt: string;
 }
 
@@ -90,6 +98,8 @@ export default function NoteEditorScreen({
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(categoryId || null);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showAudioModal, setShowAudioModal] = useState(false);
+  const [noteAudios, setNoteAudios] = useState<AudioAttachment[]>([]);
   
   const textInputRef = useRef<TextInput>(null);
 
@@ -290,7 +300,26 @@ export default function NoteEditorScreen({
   };
 
   const handleRecording = () => {
-    Alert.alert('Recording', 'Recording feature coming soon!');
+    setShowAudioModal(true);
+  };
+
+  const handleAudioSave = async (audioUri: string) => {
+    // Create new audio attachment
+    const newAudio: AudioAttachment = {
+      id: Date.now().toString(),
+      uri: audioUri,
+      duration: 0, // Will be calculated later if needed
+      createdAt: new Date().toISOString(),
+    };
+    
+    setNoteAudios([...noteAudios, newAudio]);
+    
+    // Insert audio indicator at the end of current content
+    const currentContent = noteContent;
+    const audioIndicator = `\n🎵 Audio Recording (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})\n`;
+    
+    const newContent = currentContent + audioIndicator;
+    onContentChange(newContent);
   };
 
   const handleTickBoxes = () => {
@@ -533,6 +562,13 @@ export default function NoteEditorScreen({
         onThemeSelect={handleThemeSelect}
         onGradientSelect={handleGradientSelect}
         selectedTheme={selectedTheme}
+      />
+
+      {/* Audio Recording Modal */}
+      <AudioRecordingModal
+        visible={showAudioModal}
+        onClose={() => setShowAudioModal(false)}
+        onSave={handleAudioSave}
       />
 
       {/* Category Dropdown Modal */}

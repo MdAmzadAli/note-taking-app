@@ -50,8 +50,14 @@ export default function MediaAttachmentModal({
   }, [visible, slideAnim]);
 
   const handleOptionPress = (action: () => void) => {
-    action();
-    onClose();
+    if (action === onRecording) {
+      // For recording, close this modal first, then call the action
+      onClose();
+      setTimeout(() => action(), 300); // Small delay for smooth transition
+    } else {
+      action();
+      onClose();
+    }
   };
 
   const options = [
