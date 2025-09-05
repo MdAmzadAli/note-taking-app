@@ -15,6 +15,8 @@ import {
   Dimensions,
   PanResponder,
   KeyboardAvoidingView,
+  NativeSyntheticEvent,
+  TextInputSelectionChangeEventData,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -55,6 +57,36 @@ interface TickBoxGroup {
   items: TickBoxItem[];
   createdAt: string;
 }
+
+// Content segment types for inline media embedding
+interface ContentSegment {
+  id: string;
+  type: 'text' | 'image' | 'audio' | 'tickbox';
+  position: number;
+  createdAt: string;
+}
+
+interface TextSegment extends ContentSegment {
+  type: 'text';
+  content: string;
+}
+
+interface ImageSegment extends ContentSegment {
+  type: 'image';
+  images: ImageAttachment[];
+}
+
+interface AudioSegment extends ContentSegment {
+  type: 'audio';
+  audio: AudioAttachment;
+}
+
+interface TickBoxSegment extends ContentSegment {
+  type: 'tickbox';
+  tickBoxGroup: TickBoxGroup;
+}
+
+type ContentSegmentType = TextSegment | ImageSegment | AudioSegment | TickBoxSegment;
 
 interface Category {
   id: string;
@@ -125,13 +157,169 @@ export default function NoteEditorScreen({
   const [noteAudios, setNoteAudios] = useState<AudioAttachment[]>(audios);
   const [noteTickBoxGroups, setNoteTickBoxGroups] = useState<TickBoxGroup[]>(tickBoxGroups);
   
+  // Cursor position tracking for inline media embedding
+  const [cursorPosition, setCursorPosition] = useState({ start: 0, end: 0 });
+  const [contentSegments, setContentSegments] = useState<ContentSegmentType[]>([]);
+  
   const textInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     setInitialTitle(noteTitle);
     setInitialContent(noteContent);
     loadCategories();
+    initializeContentSegments();
   }, []);
+
+  const initializeContentSegments = () => {
+    // Initialize with existing content and media
+    const segments: ContentSegmentType[] = [];
+    let currentPosition = 0;
+
+    // Add initial text content if exists
+    if (noteContent) {
+      segments.push({
+        id: 'initial-text',
+        type: 'text',
+        content: noteContent,
+        position: currentPosition,
+        createdAt: new Date().toISOString(),
+      });
+      currentPosition = noteContent.length;
+    }
+
+    // Add existing images as segments
+    if (noteImages.length > 0) {
+      segments.push({
+        id: `images-${Date.now()}`,
+        type: 'image',
+        images: noteImages,
+        position: currentPosition,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    // Add existing audio as segments
+    noteAudios.forEach((audio) => {
+      segments.push({
+        id: `audio-${audio.id}`,
+        type: 'audio',
+        audio: audio,
+        position: currentPosition,
+        createdAt: new Date().toISOString(),
+      });
+    });
+
+    // Add existing tick box groups as segments
+    noteTickBoxGroups.forEach((group) => {
+      segments.push({
+        id: `tickbox-${group.id}`,
+        type: 'tickbox',
+        tickBoxGroup: group,
+        position: currentPosition,
+        createdAt: new Date().toISOString(),
+      });
+    });
+
+    setContentSegments(segments);
+  };
+
+  const handleSelectionChange = (event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
+    const { start, end } = event.nativeEvent.selection;
+    setCursorPosition({ start, end });
+  };
+
+  const insertMediaAtCursor = (mediaType: 'image' | 'audio' | 'tickbox', mediaData: any) => {
+    const currentTextSegment = contentSegments.find(segment => segment.type === 'text') as TextSegment;
+    const currentText = currentTextSegment?.content || noteContent;
+    const insertPosition = cursorPosition.start;
+
+    // Split text at cursor position
+    const beforeText = currentText.substring(0, insertPosition);
+    const afterText = currentText.substring(insertPosition);
+
+    const newSegments: ContentSegmentType[] = [];
+    let segmentPosition = 0;
+
+    // Add text before cursor (if any)
+    if (beforeText) {
+      newSegments.push({
+        id: `text-before-${Date.now()}`,
+        type: 'text',
+        content: beforeText,
+        position: segmentPosition,
+        createdAt: new Date().toISOString(),
+      });
+      segmentPosition = beforeText.length;
+    }
+
+    // Add media segment at cursor position
+    const mediaSegment = createMediaSegment(mediaType, mediaData, segmentPosition);
+    newSegments.push(mediaSegment);
+    segmentPosition += getMediaSegmentLength(mediaSegment);
+
+    // Add text after cursor (if any)
+    if (afterText) {
+      newSegments.push({
+        id: `text-after-${Date.now()}`,
+        type: 'text',
+        content: afterText,
+        position: segmentPosition,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    // Update content segments and text content
+    setContentSegments(newSegments);
+    const newTextContent = beforeText + afterText;
+    onContentChange(newTextContent);
+  };
+
+  const createMediaSegment = (mediaType: 'image' | 'audio' | 'tickbox', mediaData: any, position: number): ContentSegmentType => {
+    const timestamp = Date.now();
+    
+    switch (mediaType) {
+      case 'image':
+        return {
+          id: `image-${timestamp}`,
+          type: 'image',
+          images: Array.isArray(mediaData) ? mediaData : [mediaData],
+          position,
+          createdAt: new Date().toISOString(),
+        };
+      case 'audio':
+        return {
+          id: `audio-${timestamp}`,
+          type: 'audio',
+          audio: mediaData,
+          position,
+          createdAt: new Date().toISOString(),
+        };
+      case 'tickbox':
+        return {
+          id: `tickbox-${timestamp}`,
+          type: 'tickbox',
+          tickBoxGroup: mediaData,
+          position,
+          createdAt: new Date().toISOString(),
+        };
+      default:
+        throw new Error(`Unknown media type: ${mediaType}`);
+    }
+  };
+
+  const getMediaSegmentLength = (segment: ContentSegmentType): number => {
+    // Return a nominal length for positioning calculations
+    switch (segment.type) {
+      case 'image':
+        return 50; // Placeholder length for image block
+      case 'audio':
+        return 30; // Placeholder length for audio block
+      case 'tickbox':
+        return 20; // Placeholder length for tickbox block
+      default:
+        return 0;
+    }
+  };
 
   const loadCategories = async () => {
     try {
@@ -232,6 +420,7 @@ export default function NoteEditorScreen({
         createdAt: new Date().toISOString(),
       };
       setNoteImages([...noteImages, newImage]);
+      insertMediaAtCursor('image', newImage);
     }
   };
 
@@ -255,6 +444,7 @@ export default function NoteEditorScreen({
         createdAt: new Date().toISOString(),
       }));
       setNoteImages([...noteImages, ...newImages]);
+      insertMediaAtCursor('image', newImages);
     }
   };
 
@@ -341,8 +531,8 @@ export default function NoteEditorScreen({
     };
     
     setNoteAudios([...noteAudios, newAudio]);
+    insertMediaAtCursor('audio', newAudio);
     
-    // No need to insert text indicator - we'll render the audio player component
     setShowAudioModal(false);
   };
 
@@ -358,6 +548,7 @@ export default function NoteEditorScreen({
     };
     
     setNoteTickBoxGroups([...noteTickBoxGroups, newTickBoxGroup]);
+    insertMediaAtCursor('tickbox', newTickBoxGroup);
   };
 
   const handleTickBoxGroupUpdate = (groupId: string, items: TickBoxItem[]) => {
@@ -370,6 +561,94 @@ export default function NoteEditorScreen({
   const handleTickBoxGroupDelete = (groupId: string) => {
     const updatedGroups = noteTickBoxGroups.filter(group => group.id !== groupId);
     setNoteTickBoxGroups(updatedGroups);
+  };
+
+  const renderInlineContent = () => {
+    if (contentSegments.length === 0) {
+      return null;
+    }
+
+    // Sort segments by position to ensure proper order
+    const sortedSegments = [...contentSegments].sort((a, b) => a.position - b.position);
+
+    return (
+      <View style={styles.inlineContentContainer}>
+        {sortedSegments.map((segment) => {
+          switch (segment.type) {
+            case 'image':
+              return renderImageSegment(segment as ImageSegment);
+            case 'audio':
+              return renderAudioSegment(segment as AudioSegment);
+            case 'tickbox':
+              return renderTickBoxSegment(segment as TickBoxSegment);
+            default:
+              return null;
+          }
+        })}
+      </View>
+    );
+  };
+
+  const renderImageSegment = (segment: ImageSegment) => {
+    return (
+      <View key={segment.id} style={styles.inlineImageContainer}>
+        <View style={styles.inlineImageGallery}>
+          {segment.images.map((image, index) => {
+            // Display 2 images per row
+            const isNewRow = index % 2 === 0;
+            return (
+              <TouchableOpacity
+                key={image.id}
+                style={[
+                  styles.inlineImageCard,
+                  { marginLeft: isNewRow ? 0 : 8 }
+                ]}
+                onPress={() => handleImagePress(image.uri)}
+                activeOpacity={0.8}
+              >
+                <Image
+                  source={{ uri: image.uri }}
+                  style={styles.inlineImage}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+    );
+  };
+
+  const renderAudioSegment = (segment: AudioSegment) => {
+    return (
+      <View key={segment.id} style={styles.inlineAudioContainer}>
+        <AudioPlayerComponent
+          audioUri={segment.audio.uri}
+          duration={segment.audio.duration}
+          onDelete={() => handleAudioDelete(segment.audio.id)}
+          isDarkMode={true}
+        />
+      </View>
+    );
+  };
+
+  const renderTickBoxSegment = (segment: TickBoxSegment) => {
+    return (
+      <View key={segment.id} style={styles.inlineTickBoxContainer}>
+        <TickBoxComponent
+          items={segment.tickBoxGroup.items}
+          onItemsChange={(items) => handleTickBoxGroupUpdate(segment.tickBoxGroup.id, items)}
+          isDarkMode={true}
+        />
+        <TouchableOpacity
+          style={styles.deleteTickBoxGroupButton}
+          onPress={() => handleTickBoxGroupDelete(segment.tickBoxGroup.id)}
+        >
+          <Ionicons name="trash-outline" size={16} color="#FF4444" />
+          <Text style={styles.deleteTickBoxGroupText}>Delete checklist</Text>
+        </TouchableOpacity>
+      </View>
+    );
   };
 
   const formatDateTime = (dateString: string) => {
@@ -457,79 +736,7 @@ export default function NoteEditorScreen({
             </TouchableOpacity>
           </View>
 
-          {/* Image Gallery */}
-          {noteImages.length > 0 && (
-            <View style={styles.imageGallery}>
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                style={styles.imageScrollView}
-              >
-                {noteImages.map((image, index) => (
-                  <TouchableOpacity
-                    key={image.id}
-                    style={[
-                      styles.imageCard,
-                      {
-                        zIndex: noteImages.length - index,
-                        transform: [
-                          { rotate: `${(index % 3 - 1) * 3}deg` },
-                          { translateY: index * 2 },
-                          { translateX: index * -8 },
-                        ],
-                      },
-                    ]}
-                    onPress={() => handleImagePress(image.uri)}
-                    activeOpacity={0.8}
-                  >
-                    <Image
-                      source={{ uri: image.uri }}
-                      style={styles.attachedImage}
-                      resizeMode="cover"
-                    />
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* Audio Recordings */}
-          {noteAudios.length > 0 && (
-            <View style={styles.audioSection}>
-              {noteAudios.map((audio) => (
-                <AudioPlayerComponent
-                  key={audio.id}
-                  audioUri={audio.uri}
-                  duration={audio.duration}
-                  onDelete={() => handleAudioDelete(audio.id)}
-                  isDarkMode={true}
-                />
-              ))}
-            </View>
-          )}
-
-          {/* Tick Box Groups */}
-          {noteTickBoxGroups.length > 0 && (
-            <View style={styles.tickBoxSection}>
-              {noteTickBoxGroups.map((group) => (
-                <View key={group.id} style={styles.tickBoxGroupContainer}>
-                  <TickBoxComponent
-                    items={group.items}
-                    onItemsChange={(items) => handleTickBoxGroupUpdate(group.id, items)}
-                    isDarkMode={true}
-                  />
-                  <TouchableOpacity
-                    style={styles.deleteTickBoxGroupButton}
-                    onPress={() => handleTickBoxGroupDelete(group.id)}
-                  >
-                    <Ionicons name="trash-outline" size={16} color="#FF4444" />
-                    <Text style={styles.deleteTickBoxGroupText}>Delete checklist</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          )}
-
+          {/* Title Input */}
           <TextInput
             style={styles.titleInput}
             placeholder="Title"
@@ -539,7 +746,10 @@ export default function NoteEditorScreen({
             multiline={false}
           />
 
-          {/* Plain Text Editor */}
+          {/* Inline Content Segments */}
+          {renderInlineContent()}
+
+          {/* Plain Text Editor with cursor tracking */}
           <TextInput
             ref={textInputRef}
             style={styles.bodyInput}
@@ -547,6 +757,7 @@ export default function NoteEditorScreen({
             placeholderTextColor="#888888"
             value={noteContent}
             onChangeText={onContentChange}
+            onSelectionChange={handleSelectionChange}
             multiline={true}
             textAlignVertical="top"
           />
@@ -979,5 +1190,45 @@ const styles = StyleSheet.create({
   selectedCategoryText: {
     color: '#000000',
     fontWeight: '600',
+  },
+  // Inline content styles
+  inlineContentContainer: {
+    marginBottom: 16,
+  },
+  inlineImageContainer: {
+    marginVertical: 12,
+  },
+  inlineImageGallery: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+  },
+  inlineImageCard: {
+    width: '48%',
+    aspectRatio: 1,
+    borderRadius: 12,
+    backgroundColor: '#F8F8F8',
+    borderWidth: 1.5,
+    borderColor: '#E0E0E0',
+    marginBottom: 8,
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  inlineImage: {
+    width: '100%',
+    height: '100%',
+  },
+  inlineAudioContainer: {
+    marginVertical: 8,
+  },
+  inlineTickBoxContainer: {
+    marginVertical: 12,
   },
 });
