@@ -307,7 +307,8 @@ const styles = StyleSheet.create({
   },
   cardInner: {
     padding: 12,
-    minHeight: 160,
+    minHeight: 120,
+    maxHeight: 220,
     backgroundColor: 'transparent',
   },
   cardTitle: {
@@ -319,7 +320,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     marginBottom: 8,
-    flex: 1,
+    flexShrink: 1,
+    flexGrow: 0,
   },
   
   categoryName: {
