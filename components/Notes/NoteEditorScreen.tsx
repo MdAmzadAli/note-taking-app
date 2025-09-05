@@ -170,6 +170,7 @@ export default function NoteEditorScreen({
   const [cursorPosition, setCursorPosition] = useState({ start: 0, end: 0 });
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [pendingModalAction, setPendingModalAction] = useState<(() => void) | null>(null);
 
   const textInputRefs = useRef<{ [key: string]: TextInput | null }>({});
   const scrollViewRef = useRef<ScrollView>(null);
@@ -200,6 +201,13 @@ export default function NoteEditorScreen({
       () => {
         setKeyboardHeight(0);
         setIsKeyboardVisible(false);
+        // Execute pending modal action after keyboard has fully dismissed
+        if (pendingModalAction) {
+          setTimeout(() => {
+            pendingModalAction();
+            setPendingModalAction(null);
+          }, 150); // Small delay to ensure smooth transition
+        }
       }
     );
 
@@ -961,14 +969,30 @@ export default function NoteEditorScreen({
           <View style={styles.bottomLeft}>
             <TouchableOpacity
               style={styles.bottomButton}
-              onPress={() => setShowMediaModal(true)}
+              onPress={() => {
+                if (isKeyboardVisible) {
+                  // Dismiss keyboard first, then show modal
+                  Keyboard.dismiss();
+                  setPendingModalAction(() => () => setShowMediaModal(true));
+                } else {
+                  setShowMediaModal(true);
+                }
+              }}
             >
               <Ionicons name="add" size={20} color="#FFFFFF" />
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.bottomButton}
-              onPress={() => setShowColorPicker(true)}
+              onPress={() => {
+                if (isKeyboardVisible) {
+                  // Dismiss keyboard first, then show modal
+                  Keyboard.dismiss();
+                  setPendingModalAction(() => () => setShowColorPicker(true));
+                } else {
+                  setShowColorPicker(true);
+                }
+              }}
             >
               <Ionicons name="brush" size={20} color="#FFFFFF" />
             </TouchableOpacity>
@@ -1177,6 +1201,9 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 26,
     minHeight: 400,
+    // Fix text shifting on enter by ensuring consistent line height
+    includeFontPadding: false,
+    textAlignVertical: 'top',
   },
   bottomBar: {
     flexDirection: 'row',
@@ -1444,5 +1471,8 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     minHeight: 40,
     paddingVertical: 4,
+    // Fix text shifting on enter by ensuring consistent line height
+    includeFontPadding: false,
+    textAlignVertical: 'top',
   },
 });
