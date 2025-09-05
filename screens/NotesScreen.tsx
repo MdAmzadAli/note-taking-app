@@ -132,7 +132,7 @@ export default function NotesScreen() {
     console.log('[NOTES] Search filter effect triggered - query:', searchQuery, 'notes count:', notes.length, 'selectedCategoryId:', selectedCategoryId);
 
     let notesToFilter = [...notes]; // Create a copy to avoid mutations
-    
+
     // First apply category filter if a category is selected
     if (selectedCategoryId) {
       notesToFilter = notes.filter(note => note.categoryId === selectedCategoryId);
@@ -230,7 +230,15 @@ export default function NotesScreen() {
     }
   };
 
-  const saveCurrentNote = async (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[], categoryId?: string) => {
+  const saveCurrentNote = async (
+    theme?: string, 
+    gradient?: string[], 
+    isPinned?: boolean, 
+    images?: ImageAttachment[], 
+    categoryId?: string,
+    audios?: any[],
+    tickBoxGroups?: any[]
+  ) => {
     if (!currentNoteText.trim() && noteSections.length === 0) {
       Alert.alert('Error', 'Please enter some content for your note');
       return;
@@ -269,6 +277,8 @@ export default function NotesScreen() {
             theme: theme || currentNoteTheme,
             gradient: gradient || currentNoteGradient || undefined,
             images: images || currentNoteImages,
+            audios: audios || [],
+            tickBoxGroups: tickBoxGroups || [],
             updatedAt: now,
             isPinned: isPinned !== undefined ? isPinned : existingNote.isPinned,
             categoryId: categoryId || existingNote.categoryId,
@@ -287,6 +297,8 @@ export default function NotesScreen() {
           theme: theme || currentNoteTheme,
           gradient: gradient || currentNoteGradient || undefined,
           images: images || currentNoteImages,
+          audios: audios || [],
+          tickBoxGroups: tickBoxGroups || [],
           createdAt: now,
           updatedAt: now,
           isPinned: isPinned || false,
@@ -479,8 +491,8 @@ export default function NotesScreen() {
 
   return (
     <View style={styles.fullScreenContainer}>
-    
-    
+
+
         <View style={styles.header}>
           <TouchableOpacity style={styles.hamburgerButton} onPress={openMenu}>
             <Ionicons name="menu" size={24} color="#FFFFFF" />
@@ -522,7 +534,7 @@ export default function NotesScreen() {
         >
           <Ionicons name="add" size={28} color="#000000" />
         </TouchableOpacity>
-    
+
 
       <SlideMenu
         visible={isMenuVisible}
@@ -537,7 +549,7 @@ export default function NotesScreen() {
         selectedCategoryId={selectedCategoryId}
       />
     </View>
-       
+
   );
 }
 
@@ -622,6 +634,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 8,
   },
-  
-  
+
+
 });

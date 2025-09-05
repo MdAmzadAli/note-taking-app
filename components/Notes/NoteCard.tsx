@@ -23,6 +23,15 @@ interface ImageAttachment {
   createdAt: string;
 }
 
+// Assuming audio attachment type is defined elsewhere, or add it here
+interface AudioAttachment {
+  id: string;
+  uri: string;
+  type: 'audio';
+  createdAt: string;
+  duration?: number; // Optional duration
+}
+
 interface SimpleNote {
   id: string;
   title?: string;
@@ -34,6 +43,7 @@ interface SimpleNote {
   isPinned?: boolean;
   images?: ImageAttachment[];
   categoryId?: string;
+  audios?: AudioAttachment[]; // Added audios field
 }
 
 interface NoteCardProps {
@@ -43,12 +53,19 @@ interface NoteCardProps {
   selectedCategoryId?: string | null;
 }
 
+// Helper function to format date
+const formatDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+};
+
+
 export default function NoteCard({ note, onPress, onLongPress, selectedCategoryId }: NoteCardProps) {
   const [showFullImage, setShowFullImage] = useState(false);
   const [fullImageUri, setFullImageUri] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [categoryName, setCategoryName] = useState<string | null>(null);
-  
+
   // Load category name when component mounts or categoryId changes
   useEffect(() => {
     const loadCategoryName = async () => {
@@ -67,7 +84,7 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
 
     loadCategoryName();
   }, [note.categoryId]);
-  
+
   const hasImages = note.images && note.images.length > 0;
   const isImageNote = note.content.includes('data:image') || 
                      note.content.includes('.png') || 
@@ -113,7 +130,7 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
     onPanResponderRelease: (evt, gestureState) => {
       const { dx } = gestureState;
       const swipeThreshold = 50;
-      
+
       if (Math.abs(dx) > swipeThreshold && note.images && note.images.length > 1) {
         if (dx > 0) {
           // Swiped right, go to previous image
@@ -127,7 +144,7 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
     onPanResponderTerminationRequest: () => false,
     onShouldBlockNativeResponder: () => false,
   });
-  
+
   // Use fixed width for pinned cards (200px) and calculated width for others
   const cardStyle = [
     styles.card, 
@@ -150,7 +167,10 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
     }
     return null;
   };
-  
+
+  // Determine text color based on background for better contrast
+  const textColor = { color: note.theme === '#FFFFFF' || note.theme === 'white' ? '#2A2A2A' : '#FFFFFF' };
+
   return (
     <TouchableOpacity 
       style={cardStyle}
@@ -194,19 +214,34 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
             </ScrollView>
           </View>
         )}
-        
+
         {note.title && (
-          <Text style={styles.cardTitle} numberOfLines={2}>
+          <Text style={[styles.cardTitle, textColor]} numberOfLines={2}>
             {note.title}
           </Text>
         )}
-        <Text style={styles.cardContent} numberOfLines={hasImages ? 2 : 4}>
+        <Text style={[styles.cardContent, textColor]} numberOfLines={hasImages ? 2 : 4}>
           {hasImages && !note.content.trim() ? 'Image note' : note.content}
         </Text>
-        <Text style={styles.cardDate}>
-          {new Date(note.createdAt).toLocaleDateString()}
-          {categoryName && !selectedCategoryId && <Text style={styles.categoryName}> • {categoryName}</Text>}
-        </Text>
+        {/* Changed part */}
+        <View style={styles.timestampContainer}>
+          {note.audios && note.audios.length > 0 && (
+            <Ionicons 
+              name="play" 
+              size={12} 
+              color={textColor.color} 
+              style={styles.audioIcon}
+            />
+          )}
+          <Text style={[styles.noteTimestamp, textColor]}>
+            {formatDate(note.updatedAt)}
+          </Text>
+        </View>
+        {/* End of changed part */}
+        
+        {categoryName && !selectedCategoryId && (
+          <Text style={styles.categoryName}> • {categoryName}</Text>
+        )}
       </View>
 
       {/* Full Image View Modal */}
@@ -223,7 +258,7 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
           >
             <Ionicons name="close" size={30} color="#FFFFFF" />
           </TouchableOpacity>
-          
+
           {fullImageUri && (
             <Animated.View style={styles.fullImageContainer} {...panResponder.panHandlers}>
               <Image
@@ -231,7 +266,7 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
                 style={styles.fullImage}
                 resizeMode="contain"
               />
-              
+
               {/* Image navigation indicators */}
               {note.images && note.images.length > 1 && (
                 <View style={styles.imageIndicators}>
@@ -274,23 +309,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   cardTitle: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
   },
   cardContent: {
-    color: '#CCCCCC',
     fontSize: 12,
     lineHeight: 16,
     marginBottom: 8,
     flex: 1,
   },
-  cardDate: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    marginTop: 'auto',
-  },
+  
   categoryName: {
     color: '#A0A0A0',
     fontSize: 10,
@@ -374,5 +403,17 @@ const styles = StyleSheet.create({
     color: '#CCCCCC',
     fontSize: 12,
     textAlign: 'center',
+  },
+  // Added styles from changes
+  timestampContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  audioIcon: {
+    marginRight: 4,
+  },
+  noteTimestamp: {
+    fontSize: 12,
+    opacity: 0.7,
   },
 });

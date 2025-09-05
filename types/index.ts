@@ -13,6 +13,26 @@ export interface ImageAttachment {
   createdAt: string;
 }
 
+export interface AudioAttachment {
+  id: string;
+  uri: string;
+  duration: number;
+  createdAt: string;
+}
+
+export interface TickBoxItem {
+  id: string;
+  text: string;
+  completed: boolean;
+  createdAt: string;
+}
+
+export interface TickBoxGroup {
+  id: string;
+  items: TickBoxItem[];
+  createdAt: string;
+}
+
 export interface Note {
   id: string;
   title: string;
@@ -24,6 +44,8 @@ export interface Note {
   theme?: string;
   gradient?: string[];
   images?: ImageAttachment[];
+  audios?: AudioAttachment[];
+  tickBoxGroups?: TickBoxGroup[];
   isPinned?: boolean;
   categoryId?: string; // For category-based organization
   createdAt: string;

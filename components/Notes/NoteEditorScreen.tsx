@@ -26,6 +26,7 @@ import ColorThemePicker from './ColorThemePicker';
 import MediaAttachmentModal from './MediaAttachmentModal';
 import AudioRecordingModal from './AudioRecordingModal';
 import AudioPlayerComponent from './AudioPlayerComponent';
+import TickBoxComponent from './TickBoxComponent';
 import { getCategories } from '@/utils/storage';
 
 interface ImageAttachment {
@@ -39,6 +40,19 @@ interface AudioAttachment {
   id: string;
   uri: string;
   duration: number;
+  createdAt: string;
+}
+
+interface TickBoxItem {
+  id: string;
+  text: string;
+  completed: boolean;
+  createdAt: string;
+}
+
+interface TickBoxGroup {
+  id: string;
+  items: TickBoxItem[];
   createdAt: string;
 }
 
@@ -56,14 +70,18 @@ interface NoteEditorScreenProps {
   noteGradient?: string[] | null;
   isPinned?: boolean;
   images?: ImageAttachment[];
+  audios?: AudioAttachment[];
+  tickBoxGroups?: TickBoxGroup[];
   createdAt?: string;
   updatedAt?: string;
   categoryId?: string;
-  onSave: (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[], categoryId?: string) => void;
+  onSave: (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[], categoryId?: string, audios?: AudioAttachment[], tickBoxGroups?: TickBoxGroup[]) => void;
   onBack: () => void;
   onTitleChange: (title: string) => void;
   onContentChange: (content: string) => void;
   onImagesChange?: (images: ImageAttachment[]) => void;
+  onAudiosChange?: (audios: AudioAttachment[]) => void;
+  onTickBoxGroupsChange?: (tickBoxGroups: TickBoxGroup[]) => void;
 }
 
 
@@ -75,6 +93,8 @@ export default function NoteEditorScreen({
   noteGradient = null,
   isPinned = false,
   images = [],
+  audios = [],
+  tickBoxGroups = [],
   createdAt,
   updatedAt,
   categoryId,
@@ -82,7 +102,9 @@ export default function NoteEditorScreen({
   onBack, 
   onTitleChange, 
   onContentChange,
-  onImagesChange 
+  onImagesChange,
+  onAudiosChange,
+  onTickBoxGroupsChange
 }: NoteEditorScreenProps) {
   const [isNotePinned, setIsNotePinned] = useState(isPinned);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -100,7 +122,8 @@ export default function NoteEditorScreen({
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(categoryId || null);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showAudioModal, setShowAudioModal] = useState(false);
-  const [noteAudios, setNoteAudios] = useState<AudioAttachment[]>([]);
+  const [noteAudios, setNoteAudios] = useState<AudioAttachment[]>(audios);
+  const [noteTickBoxGroups, setNoteTickBoxGroups] = useState<TickBoxGroup[]>(tickBoxGroups);
   
   const textInputRef = useRef<TextInput>(null);
 
@@ -155,8 +178,10 @@ export default function NoteEditorScreen({
           {
             text: 'Save',
             onPress: () => {
-              onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages, selectedCategoryId || undefined);
+              onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages, selectedCategoryId || undefined, noteAudios, noteTickBoxGroups);
               onImagesChange && onImagesChange(noteImages);
+              onAudiosChange && onAudiosChange(noteAudios);
+              onTickBoxGroupsChange && onTickBoxGroupsChange(noteTickBoxGroups);
               onBack();
             },
           },
@@ -168,8 +193,10 @@ export default function NoteEditorScreen({
   };
 
   const handleSave = () => {
-    onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages, selectedCategoryId || undefined);
+    onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages, selectedCategoryId || undefined, noteAudios, noteTickBoxGroups);
     onImagesChange && onImagesChange(noteImages);
+    onAudiosChange && onAudiosChange(noteAudios);
+    onTickBoxGroupsChange && onTickBoxGroupsChange(noteTickBoxGroups);
     setInitialTitle(noteTitle);
     setInitialContent(noteContent);
     setHasUnsavedChanges(false);
@@ -324,7 +351,25 @@ export default function NoteEditorScreen({
   };
 
   const handleTickBoxes = () => {
-    Alert.alert('Tick Boxes', 'Tick boxes feature coming soon!');
+    const newTickBoxGroup: TickBoxGroup = {
+      id: Date.now().toString(),
+      items: [],
+      createdAt: new Date().toISOString(),
+    };
+    
+    setNoteTickBoxGroups([...noteTickBoxGroups, newTickBoxGroup]);
+  };
+
+  const handleTickBoxGroupUpdate = (groupId: string, items: TickBoxItem[]) => {
+    const updatedGroups = noteTickBoxGroups.map(group => 
+      group.id === groupId ? { ...group, items } : group
+    );
+    setNoteTickBoxGroups(updatedGroups);
+  };
+
+  const handleTickBoxGroupDelete = (groupId: string) => {
+    const updatedGroups = noteTickBoxGroups.filter(group => group.id !== groupId);
+    setNoteTickBoxGroups(updatedGroups);
   };
 
   const formatDateTime = (dateString: string) => {
@@ -459,6 +504,28 @@ export default function NoteEditorScreen({
                   onDelete={() => handleAudioDelete(audio.id)}
                   isDarkMode={true}
                 />
+              ))}
+            </View>
+          )}
+
+          {/* Tick Box Groups */}
+          {noteTickBoxGroups.length > 0 && (
+            <View style={styles.tickBoxSection}>
+              {noteTickBoxGroups.map((group) => (
+                <View key={group.id} style={styles.tickBoxGroupContainer}>
+                  <TickBoxComponent
+                    items={group.items}
+                    onItemsChange={(items) => handleTickBoxGroupUpdate(group.id, items)}
+                    isDarkMode={true}
+                  />
+                  <TouchableOpacity
+                    style={styles.deleteTickBoxGroupButton}
+                    onPress={() => handleTickBoxGroupDelete(group.id)}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#FF4444" />
+                    <Text style={styles.deleteTickBoxGroupText}>Delete checklist</Text>
+                  </TouchableOpacity>
+                </View>
               ))}
             </View>
           )}
@@ -730,6 +797,26 @@ const styles = StyleSheet.create({
   },
   audioSection: {
     marginBottom: 16,
+  },
+  tickBoxSection: {
+    marginBottom: 16,
+  },
+  tickBoxGroupContainer: {
+    marginBottom: 12,
+  },
+  deleteTickBoxGroupButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginTop: -8,
+    marginRight: 8,
+  },
+  deleteTickBoxGroupText: {
+    color: '#FF4444',
+    fontSize: 12,
+    marginLeft: 4,
   },
   imageCard: {
     width: 120,
