@@ -28,164 +28,168 @@ export default function AudioPlayerComponent({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPosition, setCurrentPosition] = useState(0);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const progressAnimation = useRef(new Animated.Value(0)).current;
-  const positionRef = useRef(0);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Load audio on component mount
   useEffect(() => {
-    // Load audio on component mount
     loadAudio();
-    
-    return () => {
-      if (sound) {
-        sound.unloadAsync().catch(() => {});
-      }
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [audioUri]);
 
-  useEffect(() => {
+    // Cleanup only on unmount
     return () => {
       if (sound) {
-        sound.unloadAsync().catch(() => {});
-      }
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+        sound.stopAsync().then(() => {
+          sound.unloadAsync();
+        }).catch(() => {});
       }
     };
-  }, [sound]);
+  }, [audioUri]); // Only reload if audioUri changes
 
   const loadAudio = async () => {
     try {
+      setIsLoading(true);
+
+      // Clean up existing sound if any
       if (sound) {
+        await sound.stopAsync();
         await sound.unloadAsync();
         setSound(null);
       }
-      
+
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: audioUri },
         { 
           shouldPlay: false,
           isLooping: false,
+          progressUpdateIntervalMillis: 50, // Update progress every 50ms for smoother animation
         }
       );
-      
-      setSound(newSound);
-      
+
+      // Set up status update listener
       newSound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded) {
           const progress = status.positionMillis || 0;
           setCurrentPosition(progress);
-          positionRef.current = progress;
-          
-          // Sync the isPlaying state with actual playback status
+
+          // Update playing state based on actual status
           setIsPlaying(status.isPlaying || false);
-          
-          // Update progress bar
-          const progressPercent = duration > 0 ? (progress / duration) : 0;
+
+          // Calculate progress percentage (ensure it stays within 0-1 range)
+          const progressPercent = duration > 0 ? Math.min(Math.max(progress / duration, 0), 1) : 0;
+
+          // Animate progress bar smoothly
           Animated.timing(progressAnimation, {
             toValue: progressPercent,
-            duration: 100,
+            duration: 50,
             useNativeDriver: false,
           }).start();
-          
-          // Check if playback finished
+
+          // Handle playback completion
           if (status.didJustFinish) {
             setIsPlaying(false);
-            setCurrentPosition(0);
-            positionRef.current = 0;
-            
-            // Reset progress bar to start
+            // Keep position at the end instead of resetting
+            setCurrentPosition(duration);
+
+            // Set progress to 100%
             Animated.timing(progressAnimation, {
-              toValue: 0,
-              duration: 300,
+              toValue: 1,
+              duration: 100,
               useNativeDriver: false,
             }).start();
           }
         }
       });
-      
+
+      setSound(newSound);
+      setIsLoading(false);
       return newSound;
     } catch (error) {
       console.error('Error loading audio:', error);
       Alert.alert('Error', 'Failed to load audio file');
+      setIsLoading(false);
       return null;
     }
   };
 
   const handlePlayPause = async () => {
+    if (isLoading) return; // Prevent action while loading
+
     try {
-      // Always ensure we have a loaded sound
+      // Ensure we have a loaded sound
       let currentSound = sound;
       if (!currentSound) {
         currentSound = await loadAudio();
         if (!currentSound) return;
       }
 
-      // Get the actual playback status from the sound object
       const status = await currentSound.getStatusAsync();
-      
-      if (status.isLoaded && status.isPlaying) {
+
+      if (!status.isLoaded) {
+        console.error('Sound not loaded');
+        return;
+      }
+
+      if (status.isPlaying) {
         // Currently playing, so pause
         await currentSound.pauseAsync();
         setIsPlaying(false);
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-        }
       } else {
         // Not playing, so play
-        // Check if we're at the end, if so, restart from beginning
-        if (currentPosition >= duration) {
+        // Check if we're at the end (with small threshold for rounding errors)
+        if (status.positionMillis && status.positionMillis >= duration - 100) {
+          // Restart from beginning if at the end
           await currentSound.setPositionAsync(0);
           setCurrentPosition(0);
-          positionRef.current = 0;
+
           Animated.timing(progressAnimation, {
             toValue: 0,
             duration: 100,
             useNativeDriver: false,
           }).start();
         }
-        
+        // Play from current position (resume)
         await currentSound.playAsync();
         setIsPlaying(true);
       }
     } catch (error) {
       console.error('Error playing/pausing audio:', error);
       Alert.alert('Error', 'Failed to play audio');
-      
-      // Reset state on error
       setIsPlaying(false);
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
     }
   };
 
   const handleProgressBarPress = async (event: any) => {
+    if (isLoading) return; // Prevent action while loading
+
     // Ensure we have a loaded sound
     let currentSound = sound;
     if (!currentSound) {
       currentSound = await loadAudio();
       if (!currentSound) return;
     }
-    
+
     const { locationX } = event.nativeEvent;
-    const progressBarWidth = 200; // Approximate width
+    const progressBarWidth = 200; // This should match the actual width
     const progressPercent = Math.max(0, Math.min(locationX / progressBarWidth, 1));
-    const newPosition = Math.max(0, Math.min(duration * progressPercent, duration));
-    
+    const newPosition = Math.floor(duration * progressPercent);
+
     try {
+      // Set the new position
       await currentSound.setPositionAsync(newPosition);
       setCurrentPosition(newPosition);
-      positionRef.current = newPosition;
-      
+
+      // Update progress animation
       Animated.timing(progressAnimation, {
         toValue: progressPercent,
         duration: 100,
         useNativeDriver: false,
       }).start();
+
+      // If the audio was playing, continue playing from new position
+      const status = await currentSound.getStatusAsync();
+      if (status.isLoaded && !status.isPlaying && isPlaying) {
+        await currentSound.playAsync();
+      }
     } catch (error) {
       console.error('Error seeking audio:', error);
     }
@@ -204,8 +208,12 @@ export default function AudioPlayerComponent({
 
   const confirmDelete = async () => {
     if (sound) {
-      await sound.stopAsync();
-      await sound.unloadAsync();
+      try {
+        await sound.stopAsync();
+        await sound.unloadAsync();
+      } catch (error) {
+        console.error('Error unloading sound:', error);
+      }
       setSound(null);
     }
     setShowDeleteModal(false);
@@ -223,6 +231,7 @@ export default function AudioPlayerComponent({
         <TouchableOpacity 
           style={[styles.playButton, isDarkMode ? styles.darkPlayButton : styles.lightPlayButton]} 
           onPress={handlePlayPause}
+          disabled={isLoading}
         >
           <Ionicons 
             name={isPlaying ? "pause" : "play"} 
@@ -236,6 +245,7 @@ export default function AudioPlayerComponent({
           style={styles.progressContainer} 
           onPress={handleProgressBarPress}
           activeOpacity={0.7}
+          disabled={isLoading}
         >
           <View style={[styles.progressBackground, isDarkMode ? styles.darkProgress : styles.lightProgress]}>
             <Animated.View 
@@ -257,7 +267,7 @@ export default function AudioPlayerComponent({
                 {
                   left: progressAnimation.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0, 188], // 200px container width - 12px dot width
+                    outputRange: [-6, 194], // -6 to center dot at start, 194 (200 - 6) to center at end
                   }),
                 }
               ]} 
@@ -265,9 +275,9 @@ export default function AudioPlayerComponent({
           </View>
         </TouchableOpacity>
 
-        {/* Duration Display */}
+        {/* Time Display - Show current/total */}
         <Text style={[styles.durationText, isDarkMode ? styles.darkText : styles.lightText]}>
-          {formatTime(duration)}
+          {formatTime(currentPosition)}/{formatTime(duration)}
         </Text>
 
         {/* Delete Button */}
@@ -298,7 +308,7 @@ export default function AudioPlayerComponent({
             <Text style={[styles.modalMessage, isDarkMode ? styles.darkText : styles.lightText]}>
               Are you sure you want to delete this audio recording? This action cannot be undone.
             </Text>
-            
+
             <View style={styles.modalButtons}>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.cancelButton]} 
@@ -306,7 +316,7 @@ export default function AudioPlayerComponent({
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity 
                 style={[styles.modalButton, styles.deleteConfirmButton]} 
                 onPress={confirmDelete}
@@ -364,11 +374,14 @@ const styles = StyleSheet.create({
     height: 36,
     justifyContent: 'center',
     marginRight: 12,
+    maxWidth: 200, // Set explicit max width
   },
   progressBackground: {
     height: 4,
     borderRadius: 2,
     position: 'relative',
+    width: 200, // Set explicit width
+    overflow: 'hidden', // Ensure content doesn't overflow
   },
   darkProgress: {
     backgroundColor: '#404040',
@@ -410,7 +423,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     marginRight: 12,
-    minWidth: 40,
+    minWidth: 65, // Increased to accommodate current/total format
     textAlign: 'right',
   },
   darkText: {
@@ -436,7 +449,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#CCCCCC',
   },
-  
+
   // Modal styles
   modalOverlay: {
     flex: 1,
