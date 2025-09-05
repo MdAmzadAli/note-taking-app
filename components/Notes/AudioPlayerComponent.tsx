@@ -80,6 +80,9 @@ export default function AudioPlayerComponent({
           setCurrentPosition(progress);
           positionRef.current = progress;
           
+          // Sync the isPlaying state with actual playback status
+          setIsPlaying(status.isPlaying || false);
+          
           // Update progress bar
           const progressPercent = duration > 0 ? (progress / duration) : 0;
           Animated.timing(progressAnimation, {
@@ -121,13 +124,18 @@ export default function AudioPlayerComponent({
         if (!currentSound) return;
       }
 
-      if (isPlaying) {
+      // Get the actual playback status from the sound object
+      const status = await currentSound.getStatusAsync();
+      
+      if (status.isLoaded && status.isPlaying) {
+        // Currently playing, so pause
         await currentSound.pauseAsync();
         setIsPlaying(false);
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
       } else {
+        // Not playing, so play
         // Check if we're at the end, if so, restart from beginning
         if (currentPosition >= duration) {
           await currentSound.setPositionAsync(0);
