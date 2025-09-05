@@ -689,6 +689,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
+    paddingBottom: 20, // Ensure proper spacing at bottom
     backgroundColor: 'rgba(0,0,0,0.1)',
   },
   bottomLeft: {

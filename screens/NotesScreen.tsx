@@ -15,7 +15,7 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -54,6 +54,7 @@ interface SimpleNote {
 
 export default function NotesScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const [notes, setNotes] = useState<SimpleNote[]>([]);
   const [filteredNotes, setFilteredNotes] = useState<SimpleNote[]>([]);
   const [isCreating, setIsCreating] = useState(false);
@@ -108,6 +109,25 @@ export default function NotesScreen() {
     loadSettings();
     loadTemplates();
   }, []);
+
+  // Control tab bar visibility based on note editor state
+  useEffect(() => {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.setOptions({
+        tabBarStyle: isCreating ? { display: 'none' } : undefined,
+      });
+    }
+    
+    return () => {
+      // Restore tab bar when component unmounts
+      if (parent) {
+        parent.setOptions({
+          tabBarStyle: undefined,
+        });
+      }
+    };
+  }, [isCreating, navigation]);
 
   // Refresh templates when screen gains focus (e.g., returning from Templates tab)
   useFocusEffect(
@@ -435,7 +455,7 @@ export default function NotesScreen() {
         images={currentNoteImages}
         createdAt={editingNoteId ? notes.find(n => n.id === editingNoteId)?.createdAt : undefined}
         updatedAt={editingNoteId ? notes.find(n => n.id === editingNoteId)?.updatedAt : undefined}
-        categoryId={editingNoteId ? notes.find(n => n.id === editingNoteId)?.categoryId : selectedCategoryId}
+        categoryId={editingNoteId ? notes.find(n => n.id === editingNoteId)?.categoryId || undefined : selectedCategoryId || undefined}
         onSave={saveCurrentNote}
         onImagesChange={setCurrentNoteImages}
         onBack={() => {
@@ -461,7 +481,7 @@ export default function NotesScreen() {
         notes={filteredNotes}
         onEditNote={editNote}
         onDeleteNote={deleteNoteHandler}
-        selectedCategoryId={selectedCategoryId}
+        selectedCategoryId={selectedCategoryId || undefined}
       />
     );
   };
