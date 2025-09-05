@@ -31,7 +31,7 @@ const fontStyles = [
   { name: 'Roboto', value: 'Roboto' },
   { name: 'Arial', value: 'Arial' },
   { name: 'Cursive Script', value: 'cursive' },
-  { name: 'Dancing Script', value: 'Dancing Script' },
+  { name: 'Fantasy Style', value: 'fantasy' },
   { name: 'Monospace', value: 'monospace' },
 ];
 

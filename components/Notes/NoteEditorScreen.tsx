@@ -146,6 +146,7 @@ export default function NoteEditorScreen({
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState(noteTheme);
   const [selectedGradient, setSelectedGradient] = useState<string[] | null>(noteGradient);
+  const [selectedFontStyle, setSelectedFontStyle] = useState<string>('System');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [initialTitle, setInitialTitle] = useState(noteTitle);
   const [initialContent, setInitialContent] = useState(noteContent);
@@ -447,6 +448,10 @@ export default function NoteEditorScreen({
     setShowColorPicker(false);
   };
 
+  const handleFontStyleSelect = (fontStyle: string) => {
+    setSelectedFontStyle(fontStyle);
+  };
+
   const handleBack = () => {
     if (hasUnsavedChanges) {
       Alert.alert(
@@ -725,7 +730,7 @@ export default function NoteEditorScreen({
       <TextInput
         key={segment.id}
         ref={(ref) => { if (ref) textInputRefs.current[segment.id] = ref; }}
-        style={styles.textSegmentInput}
+        style={[styles.textSegmentInput, { fontFamily: selectedFontStyle }]}
         placeholder={segment.order === 0 ? "Start typing your note..." : "Continue typing..."}
         placeholderTextColor="#888888"
         value={segment.content}
@@ -922,7 +927,7 @@ export default function NoteEditorScreen({
           {/* Title Input */}
           <TextInput
             ref={(ref) => { if (ref) textInputRefs.current['title'] = ref; }}
-            style={styles.titleInput}
+            style={[styles.titleInput, { fontFamily: selectedFontStyle }]}
             placeholder="Title"
             placeholderTextColor="#888888"
             value={noteTitle}
@@ -1040,7 +1045,9 @@ export default function NoteEditorScreen({
         onClose={() => setShowColorPicker(false)}
         onThemeSelect={handleThemeSelect}
         onGradientSelect={handleGradientSelect}
+        onFontStyleSelect={handleFontStyleSelect}
         selectedTheme={selectedTheme}
+        selectedFontStyle={selectedFontStyle}
       />
 
       {/* Audio Recording Modal */}
