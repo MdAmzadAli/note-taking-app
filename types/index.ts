@@ -43,6 +43,7 @@ export interface Note {
   checkedItems?: boolean[]; // For checklist style
   theme?: string;
   gradient?: string[];
+  fontStyle?: string | undefined;
   images?: ImageAttachment[];
   audios?: AudioAttachment[];
   tickBoxGroups?: TickBoxGroup[];

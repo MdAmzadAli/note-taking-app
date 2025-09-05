@@ -19,7 +19,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSection } from '@/types';
+import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSection, AudioAttachment, TickBoxGroup, SegmentType } from '@/types';
 import { saveNote, saveTemplate, getNotes, getTemplates, getCustomTemplates, deleteNote, updateNote, getUserSettings, saveCustomTemplate, saveTemplateEntry } from '@/utils/storage';
 import { UserSettings } from '@/types';
 import { mockSpeechToText } from '@/utils/speech';
@@ -51,6 +51,7 @@ interface SimpleNote {
   isPinned?: boolean;
   images?: ImageAttachment[];
   categoryId?: string;
+  fontStyle?: string;
 }
 
 export default function NotesScreen() {
@@ -104,6 +105,7 @@ export default function NotesScreen() {
   const [currentNoteAudios, setCurrentNoteAudios] = useState<any[]>([]);
   const [currentNoteTickBoxGroups, setCurrentNoteTickBoxGroups] = useState<any[]>([]);
   const [currentNoteSegments, setCurrentNoteSegments] = useState<any[]>([]);
+  const [currentNoteFontStyle, setCurrentNoteFontStyle] = useState<string | undefined>('default'); // State for font style
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
   const [menuScrollOffset, setMenuScrollOffset] = useState(0);
   const menuFlatListRef = useRef<FlatList>(null);
@@ -176,6 +178,7 @@ export default function NotesScreen() {
         updatedAt: note.updatedAt,
         theme: note.theme,
         gradient: note.gradient,
+        fontStyle: note.fontStyle, // Load fontStyle
         isPinned: note.isPinned || false,
         images: note.images || [],
         categoryId: note.categoryId,
@@ -233,15 +236,16 @@ export default function NotesScreen() {
     }
   };
 
-  const saveCurrentNote = async (
+  const handleSaveNote = async (
     theme?: string, 
     gradient?: string[], 
     isPinned?: boolean, 
     images?: ImageAttachment[], 
     categoryId?: string,
-    audios?: any[],
-    tickBoxGroups?: any[],
-    segments?: any[]
+    audios?: AudioAttachment[],
+    tickBoxGroups?: TickBoxGroup[],
+    segments?: SegmentType[],
+    fontStyle?: string | undefined
   ) => {
     if (!currentNoteText.trim() && noteSections.length === 0 && (!tickBoxGroups || tickBoxGroups.length === 0)) {
       Alert.alert('Error', 'Please enter some content for your note');
@@ -280,6 +284,7 @@ export default function NotesScreen() {
             checkedItems: checkedItems.length > 0 ? checkedItems : undefined,
             theme: theme || currentNoteTheme,
             gradient: gradient || currentNoteGradient || undefined,
+            fontStyle: fontStyle !== undefined ? fontStyle : existingNote.fontStyle, // Update fontStyle
             images: images || currentNoteImages,
             audios: audios || [],
             tickBoxGroups: tickBoxGroups || [],
@@ -301,6 +306,7 @@ export default function NotesScreen() {
           checkedItems: checkedItems.length > 0 ? checkedItems : undefined,
           theme: theme || currentNoteTheme,
           gradient: gradient || currentNoteGradient || undefined,
+          fontStyle: fontStyle, // Save fontStyle
           images: images || currentNoteImages,
           audios: audios || [],
           tickBoxGroups: tickBoxGroups || [],
@@ -327,6 +333,7 @@ export default function NotesScreen() {
       setCurrentNoteAudios([]);
       setCurrentNoteTickBoxGroups([]);
       setCurrentNoteSegments([]);
+      setCurrentNoteFontStyle(undefined); // Reset font style
       setIsCreating(false);
       setIsEditing(false);
       setEditingNoteId(null);
@@ -349,6 +356,7 @@ export default function NotesScreen() {
         setCheckedItems(fullNote.checkedItems || []);
         setCurrentNoteTheme(fullNote.theme || '#1C1C1C');
         setCurrentNoteGradient(fullNote.gradient || null);
+        setCurrentNoteFontStyle(fullNote.fontStyle); // Load fontStyle
         setCurrentNoteImages(fullNote.images || []);
         setCurrentNoteAudios(fullNote.audios || []);
         setCurrentNoteTickBoxGroups(fullNote.tickBoxGroups || []);
@@ -360,12 +368,8 @@ export default function NotesScreen() {
         setSelectedWritingStyle('mind_dump');
         setNoteSections([]);
         setCheckedItems([]);
-        setCurrentNoteTheme('#1C1C1C');
-        setCurrentNoteGradient(null);
-        setCurrentNoteImages(note.images || []);
-        setCurrentNoteAudios([]);
-        setCurrentNoteTickBoxGroups([]);
         setCurrentNotePinned(note.isPinned || false);
+        setCurrentNoteFontStyle('default'); // Set default font style when editing a note without it
       }
 
       setEditingNoteId(note.id);
@@ -379,6 +383,7 @@ export default function NotesScreen() {
       setNoteSections([]);
       setCheckedItems([]);
       setCurrentNotePinned(note.isPinned || false);
+      setCurrentNoteFontStyle('default'); // Set default font style
       setEditingNoteId(note.id);
       setIsEditing(true);
       setIsCreating(true);
@@ -460,6 +465,24 @@ export default function NotesScreen() {
     setSearchQuery(''); // Clear search when showing all notes
   };
 
+  // Handler for when the note editor is closed without saving
+  const handleCloseEditor = () => {
+    setIsCreating(false);
+    setIsEditing(false);
+    setEditingNoteId(null);
+    setCurrentNoteText('');
+    setCurrentNoteTitle('');
+    setCurrentNotePinned(false);
+    setCurrentNoteTheme('#1C1C1C');
+    setCurrentNoteGradient(null);
+    setCurrentNoteImages([]);
+    setCurrentNoteAudios([]);
+    setCurrentNoteTickBoxGroups([]);
+    setCurrentNoteSegments([]);
+    setCurrentNoteFontStyle(undefined); // Reset font style
+  };
+
+
   if (isCreating) {
     return (
       <NoteEditorScreen
@@ -468,6 +491,7 @@ export default function NotesScreen() {
         noteContent={currentNoteText}
         noteTheme={currentNoteTheme}
         noteGradient={currentNoteGradient}
+        fontStyle={currentNoteFontStyle} // Pass fontStyle prop
         isPinned={currentNotePinned}
         images={currentNoteImages}
         audios={currentNoteAudios}
@@ -476,26 +500,14 @@ export default function NotesScreen() {
         createdAt={editingNoteId ? notes.find(n => n.id === editingNoteId)?.createdAt : undefined}
         updatedAt={editingNoteId ? notes.find(n => n.id === editingNoteId)?.updatedAt : undefined}
         categoryId={editingNoteId ? notes.find(n => n.id === editingNoteId)?.categoryId || undefined : selectedCategoryId || undefined}
-        onSave={saveCurrentNote}
+        onSave={handleSaveNote}
+        onBack={handleCloseEditor}
+        onTitleChange={setCurrentNoteTitle}
+        onContentChange={setCurrentNoteText}
         onImagesChange={setCurrentNoteImages}
         onAudiosChange={setCurrentNoteAudios}
         onTickBoxGroupsChange={setCurrentNoteTickBoxGroups}
-        onBack={() => {
-          setIsCreating(false);
-          setIsEditing(false);
-          setEditingNoteId(null);
-          setCurrentNoteText('');
-          setCurrentNoteTitle('');
-          setCurrentNotePinned(false);
-          setCurrentNoteTheme('#1C1C1C');
-          setCurrentNoteGradient(null);
-          setCurrentNoteImages([]);
-          setCurrentNoteAudios([]);
-          setCurrentNoteTickBoxGroups([]);
-          setCurrentNoteSegments([]);
-        }}
-        onTitleChange={setCurrentNoteTitle}
-        onContentChange={setCurrentNoteText}
+        onFontStyleChange={setCurrentNoteFontStyle} // Handler for font style change
       />
     );
   }

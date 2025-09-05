@@ -102,6 +102,7 @@ interface NoteEditorScreenProps {
   noteContent: string;
   noteTheme?: string;
   noteGradient?: string[] | null;
+  fontStyle?: string | undefined;
   isPinned?: boolean;
   images?: ImageAttachment[];
   audios?: AudioAttachment[];
@@ -110,7 +111,7 @@ interface NoteEditorScreenProps {
   createdAt?: string;
   updatedAt?: string;
   categoryId?: string;
-  onSave: (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[], categoryId?: string, audios?: AudioAttachment[], tickBoxGroups?: TickBoxGroup[], segments?: SegmentType[]) => void;
+  onSave: (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[], categoryId?: string, audios?: AudioAttachment[], tickBoxGroups?: TickBoxGroup[], segments?: SegmentType[], fontStyle?: string | undefined) => void;
   onBack: () => void;
   onTitleChange: (title: string) => void;
   onContentChange: (content: string) => void;
@@ -127,6 +128,7 @@ export default function NoteEditorScreen({
   noteTheme = '#1C1C1C',
   segments: initialSegments,
   noteGradient = null,
+  fontStyle,
   isPinned = false,
   images = [],
   audios = [],
@@ -146,7 +148,7 @@ export default function NoteEditorScreen({
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState(noteTheme);
   const [selectedGradient, setSelectedGradient] = useState<string[] | null>(noteGradient);
-  const [selectedFontStyle, setSelectedFontStyle] = useState<string | undefined>('Inter-Regular');
+  const [selectedFontStyle, setSelectedFontStyle] = useState<string | undefined>(undefined);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [initialTitle, setInitialTitle] = useState(noteTitle);
   const [initialContent, setInitialContent] = useState(noteContent);
@@ -176,6 +178,7 @@ export default function NoteEditorScreen({
   useEffect(() => {
     setInitialTitle(noteTitle);
     setInitialContent(noteContent);
+    setSelectedFontStyle(fontStyle);
     loadCategories();
     initializeSegments();
 
@@ -470,7 +473,7 @@ export default function NoteEditorScreen({
           {
             text: 'Save',
             onPress: () => {
-              onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages, selectedCategoryId || undefined, noteAudios, noteTickBoxGroups);
+              onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages, selectedCategoryId || undefined, noteAudios, noteTickBoxGroups, segments, selectedFontStyle);
               onImagesChange && onImagesChange(noteImages);
               onAudiosChange && onAudiosChange(noteAudios);
               onTickBoxGroupsChange && onTickBoxGroupsChange(noteTickBoxGroups);
@@ -486,7 +489,7 @@ export default function NoteEditorScreen({
 
   const handleSave = () => {
     // Save with segments to preserve inline positioning
-    onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages, selectedCategoryId || undefined, noteAudios, noteTickBoxGroups, segments);
+    onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages, selectedCategoryId || undefined, noteAudios, noteTickBoxGroups, segments, selectedFontStyle);
     onImagesChange && onImagesChange(noteImages);
     onAudiosChange && onAudiosChange(noteAudios);
     onTickBoxGroupsChange && onTickBoxGroupsChange(noteTickBoxGroups);
