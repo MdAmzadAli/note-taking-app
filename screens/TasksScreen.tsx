@@ -16,6 +16,7 @@ import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-g
 import DateTimePicker from '@react-native-community/datetimepicker';
 // Removed uuid import - using custom ID generation for React Native compatibility
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import FloatingActionButton from '@/components/ui/FloatingActionButton';
 import { Task } from '@/types';
 import { getTasks, saveTask, deleteTask, updateTask, getUserSettings } from '@/utils/storage';
 import { scheduleNotification, cancelNotification } from '@/utils/notifications';
@@ -1545,13 +1546,6 @@ export default function TasksScreen() {
           />
         </View>
 
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setIsCreating(true)}
-        >
-          <Text style={styles.addButtonText}>New Task</Text>
-        </TouchableOpacity>
-
         {showTopCelebration && (
           <Animated.View 
             style={[
@@ -1699,6 +1693,18 @@ export default function TasksScreen() {
         onClose={() => setShowSearchModal(false)}
         searchQuery={voiceSearchQuery}
         results={voiceSearchResults}
+      />
+
+      <FloatingActionButton
+        onPress={() => setIsCreating(true)}
+        iconName="add"
+        iconSize={28}
+        iconColor="#000000"
+        backgroundColor="#00FF7F"
+        shadowColor="#00FF7F"
+        bottom={30}
+        right={30}
+        size={56}
       />
     </GestureHandlerRootView>
   );
