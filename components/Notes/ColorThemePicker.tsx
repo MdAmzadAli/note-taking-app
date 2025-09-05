@@ -16,7 +16,9 @@ interface ColorThemePickerProps {
   onClose: () => void;
   onThemeSelect: (color: string) => void;
   onGradientSelect?: (gradient: string[]) => void;
+  onFontStyleSelect?: (fontStyle: string) => void;
   selectedTheme: string;
+  selectedFontStyle?: string;
 }
 
 interface ThemeOption {
@@ -24,6 +26,15 @@ interface ThemeOption {
   color?: string;
   gradient?: string[];
 }
+const fontStyles = [
+  { name: 'System', value: 'System' },
+  { name: 'Roboto', value: 'Roboto' },
+  { name: 'Arial', value: 'Arial' },
+  { name: 'Cursive Script', value: 'cursive' },
+  { name: 'Dancing Script', value: 'Dancing Script' },
+  { name: 'Monospace', value: 'monospace' },
+];
+
 const noteThemes: ThemeOption[] = [
   { name: 'Charcoal', color: '#1C1C1C' },
   { name: 'Deep Red', color: '#B91C1C' },
@@ -49,7 +60,9 @@ export default function ColorThemePicker({
   onClose, 
   onThemeSelect, 
   onGradientSelect,
-  selectedTheme 
+  onFontStyleSelect,
+  selectedTheme,
+  selectedFontStyle 
 }: ColorThemePickerProps) {
   return (
     <Modal
@@ -69,11 +82,14 @@ export default function ColorThemePicker({
                 </TouchableOpacity>
               </View>
               
-              <ScrollView 
-                style={styles.scroll}
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-              >
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Color Themes Section */}
+                <Text style={styles.sectionTitle}>Color Theme</Text>
+                <ScrollView 
+                  style={styles.scroll}
+                  horizontal={true}
+                  showsHorizontalScrollIndicator={false}
+                >
                 {noteThemes.map((theme, index) => {
                   const themeValue = theme.color || theme.gradient?.[0] || '#1A1A1A';
                   const isSelected = selectedTheme === themeValue;
@@ -114,6 +130,36 @@ export default function ColorThemePicker({
                     </TouchableOpacity>
                   );
                 })}
+                </ScrollView>
+                
+                {/* Font Styles Section */}
+                <Text style={styles.sectionTitle}>Font Style</Text>
+                <View style={styles.fontStylesContainer}>
+                  {fontStyles.map((font, index) => {
+                    const isSelected = selectedFontStyle === font.value;
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        style={[
+                          styles.fontStyleItem,
+                          isSelected && styles.selectedFontStyle
+                        ]}
+                        onPress={() => {
+                          if (onFontStyleSelect) {
+                            onFontStyleSelect(font.value);
+                          }
+                        }}
+                      >
+                        <Text style={[
+                          styles.fontStyleText,
+                          { fontFamily: font.value }
+                        ]}>
+                          font style
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </ScrollView>
             </View>
           </TouchableWithoutFeedback>
@@ -188,5 +234,36 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
+  },
+  sectionTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
+  },
+  fontStylesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  fontStyleItem: {
+    backgroundColor: '#444444',
+    padding: 12,
+    borderRadius: 8,
+    marginRight: 10,
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  selectedFontStyle: {
+    borderColor: '#007AFF',
+  },
+  fontStyleText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    textAlign: 'center',
   },
 });
