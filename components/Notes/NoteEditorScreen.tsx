@@ -170,6 +170,11 @@ export default function NoteEditorScreen({
   const [cursorPosition, setCursorPosition] = useState({ start: 0, end: 0 });
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [pendingModalAction, setPendingModalAction] = useState<(() => void) | null>(null);
+  
+  // Height management for text inputs
+  const [textInputHeights, setTextInputHeights] = useState<{ [key: string]: number }>({});
+  const minInputHeight = 40; // Minimum height for text inputs
+  const maxInputHeight = 260; // Maximum height (~10 lines at 26 line height)
 
   const textInputRefs = useRef<{ [key: string]: TextInput | null }>({});
   const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
@@ -405,6 +410,14 @@ export default function NoteEditorScreen({
       .map(seg => (seg as TextSegment).content)
       .join('');
     onContentChange(combinedText);
+  };
+
+  const handleContentSizeChange = (segmentId: string, contentSize: { width: number; height: number }) => {
+    const newHeight = Math.max(minInputHeight, Math.min(contentSize.height, maxInputHeight));
+    setTextInputHeights(prev => ({
+      ...prev,
+      [segmentId]: newHeight
+    }));
   };
 
   const loadCategories = async () => {
@@ -693,17 +706,28 @@ export default function NoteEditorScreen({
 
   const renderSegmentedContent = () => {
     if (segments.length === 0) {
+      const inputHeight = textInputHeights['default'] || minInputHeight;
+      const shouldScroll = inputHeight >= maxInputHeight;
+      
       return (
         <TextInput
           ref={(ref) => { if (ref) textInputRefs.current['default'] = ref; }}
-          style={styles.bodyInput}
+          style={[
+            styles.bodyInput,
+            { 
+              height: Math.max(inputHeight, 200), // Ensure minimum visible area for the main input
+              maxHeight: maxInputHeight
+            }
+          ]}
           placeholder="Start typing your note..."
           placeholderTextColor="#888888"
           value={noteContent}
           onChangeText={onContentChange}
+          onContentSizeChange={(e) => handleContentSizeChange('default', e.nativeEvent.contentSize)}
           onSelectionChange={(event) => handleTextSegmentSelection('default', event)}
           multiline={true}
           textAlignVertical="top"
+          scrollEnabled={shouldScroll}
           autoFocus
         />
       );
@@ -733,21 +757,33 @@ export default function NoteEditorScreen({
   };
 
   const renderTextSegment = (segment: TextSegment) => {
+    const inputHeight = textInputHeights[segment.id] || minInputHeight;
+    const shouldScroll = inputHeight >= maxInputHeight;
+    
     return (
       <TextInput
         key={segment.id}
         ref={(ref) => { if (ref) textInputRefs.current[segment.id] = ref; }}
-        style={[styles.textSegmentInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
+        style={[
+          styles.textSegmentInput, 
+          selectedFontStyle ? { fontFamily: selectedFontStyle } : {},
+          { 
+            height: inputHeight,
+            maxHeight: maxInputHeight
+          }
+        ]}
         placeholder={segment.order === 0 ? "Start typing your note..." : "Continue typing..."}
         placeholderTextColor="#888888"
         value={segment.content}
         onChangeText={(text) => handleTextChange(segment.id, text)}
+        onContentSizeChange={(e) => handleContentSizeChange(segment.id, e.nativeEvent.contentSize)}
         onSelectionChange={(event) => handleTextSegmentSelection(segment.id, event)}
         onFocus={() => {
           setActiveSegmentId(segment.id);
         }}
         multiline={true}
         textAlignVertical="top"
+        scrollEnabled={shouldScroll}
         autoFocus={segment.isFocused}
       />
     );
@@ -913,15 +949,21 @@ export default function NoteEditorScreen({
           {/* Title Input */}
           <TextInput
             ref={(ref) => { if (ref) textInputRefs.current['title'] = ref; }}
-            style={[styles.titleInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
+            style={[
+              styles.titleInput, 
+              selectedFontStyle ? { fontFamily: selectedFontStyle } : {},
+              { height: textInputHeights['title'] || minInputHeight }
+            ]}
             placeholder="Title"
             placeholderTextColor="#888888"
             value={noteTitle}
             onChangeText={onTitleChange}
+            onContentSizeChange={(e) => handleContentSizeChange('title', e.nativeEvent.contentSize)}
             onFocus={() => {
               setActiveSegmentId('title');
             }}
-            multiline={false}
+            multiline={true}
+            scrollEnabled={textInputHeights['title'] >= maxInputHeight}
           />
 
           {/* Segmented Content (Text + Media) */}
@@ -1140,6 +1182,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontWeight: '400',
     marginBottom: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 0,
+    textAlignVertical: 'top',
+    borderWidth: 0,
+    margin: 0,
   },
   bodyInput: {
     fontSize: 18,
@@ -1147,7 +1194,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontWeight: '400',
     lineHeight: 26,
-    minHeight: 400,
     paddingVertical: 4,
     paddingHorizontal: 0,
     // Fix text shifting on enter by ensuring consistent text rendering
@@ -1423,7 +1469,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontWeight: '400',
     lineHeight: 26,
-    minHeight: 40,
     paddingVertical: 4,
     paddingHorizontal: 0,
     // Fix text shifting on enter by ensuring consistent text rendering
