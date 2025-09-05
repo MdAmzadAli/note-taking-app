@@ -1531,7 +1531,27 @@ export default function TasksScreen() {
   return (
     <GestureHandlerRootView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Tasks</Text>
+        <TouchableOpacity style={styles.hamburgerButton} onPress={() => {}}>
+          <IconSymbol size={24} name="line.3.horizontal" color="#FFFFFF" />
+        </TouchableOpacity>
+
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search tasks..."
+            placeholderTextColor="#999999"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => setIsCreating(true)}
+        >
+          <Text style={styles.addButtonText}>New Task</Text>
+        </TouchableOpacity>
+
         {showTopCelebration && (
           <Animated.View 
             style={[
@@ -1545,34 +1565,7 @@ export default function TasksScreen() {
             <Text style={styles.topCelebrationEmoji}>🎉</Text>
           </Animated.View>
         )}
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.searchButton}
-            onPress={() => setIsSearchVisible(!isSearchVisible)}
-          >
-            <IconSymbol size={20} name="magnifyingglass" color="#FFFFFF" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => setIsCreating(true)}
-          >
-            <Text style={styles.addButtonText}>New Task</Text>
-          </TouchableOpacity>
-        </View>
       </View>
-
-      {isSearchVisible && (
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search tasks..."
-            placeholderTextColor="#6B7280"
-          />
-        </View>
-      )}
 
       {/* Tabs */}
       <View style={styles.tabsContainer}>
@@ -1718,37 +1711,33 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    backgroundColor: 'transparent',
-    borderBottomWidth: 1,
-    borderBottomColor: '#333333',
+    paddingVertical: 12,
+    backgroundColor: '#1A1A1A',
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  hamburgerButton: {
+    padding: 8,
+    marginRight: 12,
+  },
+  searchContainer: {
+    flex: 1,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    marginRight: 12,
+  },
+  searchInput: {
     color: '#FFFFFF',
-    fontFamily: 'Inter',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 8,
+    fontSize: 16,
+    paddingVertical: 12,
   },
   headerButtons: {
     flexDirection: 'row',
     gap: 8,
   },
-  searchButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 8,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   addButton: {
-    backgroundColor: '#000000',
+    backgroundColor: '#2A2A2A',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
@@ -1793,24 +1782,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'Inter',
   },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: 'Inter',
-    color: '#000000',
-  },
+  
   tabsContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
