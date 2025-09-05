@@ -16,9 +16,9 @@ interface ColorThemePickerProps {
   onClose: () => void;
   onThemeSelect: (color: string) => void;
   onGradientSelect?: (gradient: string[]) => void;
-  onFontStyleSelect?: (fontStyle: string) => void;
+  onFontStyleSelect?: (fontStyle: string | undefined) => void;
   selectedTheme: string;
-  selectedFontStyle?: string;
+  selectedFontStyle?: string | undefined;
 }
 
 interface ThemeOption {
@@ -26,13 +26,13 @@ interface ThemeOption {
   color?: string;
   gradient?: string[];
 }
-const fontStyles = [
-  { name: 'System', value: 'System' },
-  { name: 'Roboto', value: 'Roboto' },
-  { name: 'Arial', value: 'Arial' },
-  { name: 'Cursive Script', value: 'cursive' },
-  { name: 'Fantasy Style', value: 'fantasy' },
-  { name: 'Monospace', value: 'monospace' },
+const fontStyles: Array<{ name: string; value: string | undefined }> = [
+  { name: 'Inter Regular', value: 'Inter-Regular' },
+  { name: 'Inter Medium', value: 'Inter-Medium' },
+  { name: 'Inter SemiBold', value: 'Inter-SemiBold' },
+  { name: 'Inter Bold', value: 'Inter-Bold' },
+  { name: 'SpaceMono', value: 'SpaceMono' },
+  { name: 'System Default', value: undefined }, // Uses system default
 ];
 
 const noteThemes: ThemeOption[] = [
@@ -152,7 +152,7 @@ export default function ColorThemePicker({
                       >
                         <Text style={[
                           styles.fontStyleText,
-                          { fontFamily: font.value }
+                          font.value ? { fontFamily: font.value } : {}
                         ]}>
                           font style
                         </Text>
