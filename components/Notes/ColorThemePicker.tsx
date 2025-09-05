@@ -1,4 +1,3 @@
-
 import React from 'react';
 import {
   View,
@@ -27,18 +26,13 @@ interface ThemeOption {
   color?: string;
   gradient?: string[];
 }
-
-const fontStyles: Array<{ name: string; value: string | undefined; displayName: string }> = [
-  { name: 'Inter Regular', value: 'Inter-Regular', displayName: 'Clean & Modern' },
-  { name: 'Inter Medium', value: 'Inter-Medium', displayName: 'Medium Weight' },
-  { name: 'Inter SemiBold', value: 'Inter-SemiBold', displayName: 'Semi Bold' },
-  { name: 'Inter Bold', value: 'Inter-Bold', displayName: 'Bold Text' },
-  { name: 'Space Mono', value: 'SpaceMono-Regular', displayName: 'Monospace' },
-  { name: 'Cursive', value: 'cursive', displayName: 'Cursive Style' },
-  { name: 'Fantasy', value: 'fantasy', displayName: 'Fantasy Font' },
-  { name: 'Serif', value: 'serif', displayName: 'Serif Style' },
-  { name: 'Sans-Serif', value: 'sans-serif', displayName: 'Sans Serif' },
-  { name: 'System Default', value: undefined, displayName: 'System Default' },
+const fontStyles: Array<{ name: string; value: string | undefined }> = [
+  { name: 'Inter Regular', value: 'Inter-Regular' },
+  { name: 'Inter Medium', value: 'Inter-Medium' },
+  { name: 'Inter SemiBold', value: 'Inter-SemiBold' },
+  { name: 'Inter Bold', value: 'Inter-Bold' },
+  { name: 'SpaceMono', value: 'SpaceMono' },
+  { name: 'System Default', value: undefined }, // Uses system default
 ];
 
 const noteThemes: ThemeOption[] = [
@@ -96,46 +90,46 @@ export default function ColorThemePicker({
                   horizontal={true}
                   showsHorizontalScrollIndicator={false}
                 >
-                  {noteThemes.map((theme, index) => {
-                    const themeValue = theme.color || theme.gradient?.[0] || '#1A1A1A';
-                    const isSelected = selectedTheme === themeValue;
-                    
-                    return (
-                      <TouchableOpacity
-                        key={index}
-                        style={[
-                          styles.themeItem,
-                          {
-                            borderWidth: isSelected ? 3 : 0,
-                            borderColor: '#FFFFFF',
-                            overflow: 'hidden'
-                          }
-                        ]}
-                        onPress={() => {
-                          if (theme.gradient && onGradientSelect) {
-                            onGradientSelect(theme.gradient);
-                          } else {
-                            onThemeSelect(themeValue);
-                          }
-                        }}
-                      >
-                        {theme.gradient ? (
-                          <LinearGradient
-                            colors={theme.gradient as any}
-                            style={styles.gradientBackground}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                          >
-                            <Text style={styles.themeText}>{theme.name}</Text>
-                          </LinearGradient>
-                        ) : (
-                          <View style={[styles.solidBackground, { backgroundColor: theme.color }]}>
-                            <Text style={styles.themeText}>{theme.name}</Text>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
+                {noteThemes.map((theme, index) => {
+                  const themeValue = theme.color || theme.gradient?.[0] || '#1A1A1A';
+                  const isSelected = selectedTheme === themeValue;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.themeItem,
+                        {
+                          borderWidth: isSelected ? 3 : 0,
+                          borderColor: '#FFFFFF',
+                          overflow: 'hidden'
+                        }
+                      ]}
+                      onPress={() => {
+                        if (theme.gradient && onGradientSelect) {
+                          onGradientSelect(theme.gradient);
+                        } else {
+                          onThemeSelect(themeValue);
+                        }
+                      }}
+                    >
+                      {theme.gradient ? (
+                        <LinearGradient
+                          colors={theme.gradient as any}
+                          style={styles.gradientBackground}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                        >
+                          <Text style={styles.themeText}>{theme.name}</Text>
+                        </LinearGradient>
+                      ) : (
+                        <View style={[styles.solidBackground, { backgroundColor: theme.color }]}>
+                          <Text style={styles.themeText}>{theme.name}</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
                 </ScrollView>
                 
                 {/* Font Styles Section */}
@@ -160,10 +154,7 @@ export default function ColorThemePicker({
                           styles.fontStyleText,
                           font.value ? { fontFamily: font.value } : {}
                         ]}>
-                          {font.displayName}
-                        </Text>
-                        <Text style={styles.fontStyleSubtitle}>
-                          {font.name}
+                          font style
                         </Text>
                       </TouchableOpacity>
                     );
@@ -266,22 +257,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 2,
     borderColor: 'transparent',
-    minWidth: '45%',
-    alignItems: 'center',
   },
   selectedFontStyle: {
     borderColor: '#007AFF',
-    backgroundColor: '#505050',
   },
   fontStyleText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  fontStyleSubtitle: {
-    color: '#CCCCCC',
-    fontSize: 11,
+    fontSize: 14,
     textAlign: 'center',
   },
 });
