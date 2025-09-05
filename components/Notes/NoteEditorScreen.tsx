@@ -105,10 +105,11 @@ interface NoteEditorScreenProps {
   images?: ImageAttachment[];
   audios?: AudioAttachment[];
   tickBoxGroups?: TickBoxGroup[];
+  segments?: SegmentType[]; // Add segmented content support
   createdAt?: string;
   updatedAt?: string;
   categoryId?: string;
-  onSave: (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[], categoryId?: string, audios?: AudioAttachment[], tickBoxGroups?: TickBoxGroup[]) => void;
+  onSave: (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[], categoryId?: string, audios?: AudioAttachment[], tickBoxGroups?: TickBoxGroup[], segments?: SegmentType[]) => void;
   onBack: () => void;
   onTitleChange: (title: string) => void;
   onContentChange: (content: string) => void;
@@ -123,6 +124,7 @@ export default function NoteEditorScreen({
   noteTitle, 
   noteContent, 
   noteTheme = '#1C1C1C',
+  segments: initialSegments,
   noteGradient = null,
   isPinned = false,
   images = [],
@@ -173,10 +175,22 @@ export default function NoteEditorScreen({
   }, []);
 
   const initializeSegments = () => {
-    const initialSegments: SegmentType[] = [];
+    // If we have saved segments, use them (this preserves inline positioning)
+    if (initialSegments && initialSegments.length > 0) {
+      setSegments(initialSegments);
+      // Set focus to the first text segment
+      const firstTextSegment = initialSegments.find(seg => seg.type === 'text');
+      if (firstTextSegment) {
+        setActiveSegmentId(firstTextSegment.id);
+      }
+      return;
+    }
+
+    // Otherwise, create initial structure for new/legacy notes
+    const newSegments: SegmentType[] = [];
     let order = 0;
 
-    // Always start with an initial text segment
+    // Create initial text segment
     const initialTextSegment: TextSegment = {
       id: 'initial-text',
       type: 'text',
@@ -185,12 +199,12 @@ export default function NoteEditorScreen({
       createdAt: new Date().toISOString(),
       isFocused: true,
     };
-    initialSegments.push(initialTextSegment);
+    newSegments.push(initialTextSegment);
     setActiveSegmentId(initialTextSegment.id);
 
     // Add existing media as separate segments (for backward compatibility)
     if (noteImages.length > 0) {
-      initialSegments.push({
+      newSegments.push({
         id: `images-${Date.now()}`,
         type: 'image',
         images: noteImages,
@@ -200,7 +214,7 @@ export default function NoteEditorScreen({
     }
 
     noteAudios.forEach((audio) => {
-      initialSegments.push({
+      newSegments.push({
         id: `audio-${audio.id}`,
         type: 'audio',
         audio: audio,
@@ -210,7 +224,7 @@ export default function NoteEditorScreen({
     });
 
     noteTickBoxGroups.forEach((group) => {
-      initialSegments.push({
+      newSegments.push({
         id: `tickbox-${group.id}`,
         type: 'tickbox',
         tickBoxGroup: group,
@@ -219,7 +233,7 @@ export default function NoteEditorScreen({
       });
     });
 
-    setSegments(initialSegments);
+    setSegments(newSegments);
   };
 
   const handleTextSegmentSelection = (segmentId: string, event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
@@ -416,7 +430,8 @@ export default function NoteEditorScreen({
   };
 
   const handleSave = () => {
-    onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages, selectedCategoryId || undefined, noteAudios, noteTickBoxGroups);
+    // Save with segments to preserve inline positioning
+    onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages, selectedCategoryId || undefined, noteAudios, noteTickBoxGroups, segments);
     onImagesChange && onImagesChange(noteImages);
     onAudiosChange && onAudiosChange(noteAudios);
     onTickBoxGroupsChange && onTickBoxGroupsChange(noteTickBoxGroups);
@@ -778,7 +793,11 @@ export default function NoteEditorScreen({
         </View>
 
         {/* Main Content */}
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.content} 
+          contentContainerStyle={styles.scrollViewContent}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Date/Time and Category Row */}
           <View style={styles.metaInfoRow}>
             <View style={styles.dateTimeInfo}>
@@ -1017,6 +1036,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 20,
+  },
+  scrollViewContent: {
+    paddingBottom: 120, // Add bottom padding to prevent toolbar overlap
   },
   titleInput: {
     fontSize: 24,

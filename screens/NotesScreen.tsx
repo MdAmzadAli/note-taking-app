@@ -103,6 +103,7 @@ export default function NotesScreen() {
   const [currentNoteImages, setCurrentNoteImages] = useState<ImageAttachment[]>([]);
   const [currentNoteAudios, setCurrentNoteAudios] = useState<any[]>([]);
   const [currentNoteTickBoxGroups, setCurrentNoteTickBoxGroups] = useState<any[]>([]);
+  const [currentNoteSegments, setCurrentNoteSegments] = useState<any[]>([]);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
   const [menuScrollOffset, setMenuScrollOffset] = useState(0);
   const menuFlatListRef = useRef<FlatList>(null);
@@ -239,7 +240,8 @@ export default function NotesScreen() {
     images?: ImageAttachment[], 
     categoryId?: string,
     audios?: any[],
-    tickBoxGroups?: any[]
+    tickBoxGroups?: any[],
+    segments?: any[]
   ) => {
     if (!currentNoteText.trim() && noteSections.length === 0 && (!tickBoxGroups || tickBoxGroups.length === 0)) {
       Alert.alert('Error', 'Please enter some content for your note');
@@ -281,6 +283,7 @@ export default function NotesScreen() {
             images: images || currentNoteImages,
             audios: audios || [],
             tickBoxGroups: tickBoxGroups || [],
+            segments: segments || [], // Add segments support
             updatedAt: now,
             isPinned: isPinned !== undefined ? isPinned : existingNote.isPinned,
             categoryId: categoryId || existingNote.categoryId,
@@ -301,6 +304,7 @@ export default function NotesScreen() {
           images: images || currentNoteImages,
           audios: audios || [],
           tickBoxGroups: tickBoxGroups || [],
+          segments: segments || [], // Add segments support
           createdAt: now,
           updatedAt: now,
           isPinned: isPinned || false,
@@ -322,6 +326,7 @@ export default function NotesScreen() {
       setCurrentNoteImages([]);
       setCurrentNoteAudios([]);
       setCurrentNoteTickBoxGroups([]);
+      setCurrentNoteSegments([]);
       setIsCreating(false);
       setIsEditing(false);
       setEditingNoteId(null);
@@ -348,6 +353,7 @@ export default function NotesScreen() {
         setCurrentNoteAudios(fullNote.audios || []);
         setCurrentNoteTickBoxGroups(fullNote.tickBoxGroups || []);
         setCurrentNotePinned(fullNote.isPinned || false);
+        setCurrentNoteSegments(fullNote.segments || []); // Load segments for inline positioning
       } else {
         setCurrentNoteText(note.content);
         setCurrentNoteTitle('');
@@ -466,6 +472,7 @@ export default function NotesScreen() {
         images={currentNoteImages}
         audios={currentNoteAudios}
         tickBoxGroups={currentNoteTickBoxGroups}
+        segments={currentNoteSegments}
         createdAt={editingNoteId ? notes.find(n => n.id === editingNoteId)?.createdAt : undefined}
         updatedAt={editingNoteId ? notes.find(n => n.id === editingNoteId)?.updatedAt : undefined}
         categoryId={editingNoteId ? notes.find(n => n.id === editingNoteId)?.categoryId || undefined : selectedCategoryId || undefined}
@@ -485,6 +492,7 @@ export default function NotesScreen() {
           setCurrentNoteImages([]);
           setCurrentNoteAudios([]);
           setCurrentNoteTickBoxGroups([]);
+          setCurrentNoteSegments([]);
         }}
         onTitleChange={setCurrentNoteTitle}
         onContentChange={setCurrentNoteText}
