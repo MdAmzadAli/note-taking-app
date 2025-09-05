@@ -15,7 +15,7 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -31,6 +31,7 @@ import SlideMenu from '@/components/Notes/SlideMenu';
 
 import WritingStyleSelector from '@/components/WritingStyleSelector';
 import WritingStyleEditor from '@/components/WritingStyleEditor';
+import { useTabBar } from '@/contexts/TabBarContext';
 
 interface ImageAttachment {
   id: string;
@@ -54,7 +55,7 @@ interface SimpleNote {
 
 export default function NotesScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const { hideTabBar, showTabBar } = useTabBar();
   const [notes, setNotes] = useState<SimpleNote[]>([]);
   const [filteredNotes, setFilteredNotes] = useState<SimpleNote[]>([]);
   const [isCreating, setIsCreating] = useState(false);
@@ -110,24 +111,14 @@ export default function NotesScreen() {
     loadTemplates();
   }, []);
 
-  // Control tab bar visibility based on note editor state
+  // Control tab bar visibility using Context
   useEffect(() => {
-    const parent = navigation.getParent();
-    if (parent) {
-      parent.setOptions({
-        tabBarStyle: isCreating ? { display: 'none' } : undefined,
-      });
+    if (isCreating) {
+      hideTabBar();
+    } else {
+      showTabBar();
     }
-    
-    return () => {
-      // Restore tab bar when component unmounts
-      if (parent) {
-        parent.setOptions({
-          tabBarStyle: undefined,
-        });
-      }
-    };
-  }, [isCreating, navigation]);
+  }, [isCreating, hideTabBar, showTabBar]);
 
   // Refresh templates when screen gains focus (e.g., returning from Templates tab)
   useFocusEffect(

@@ -8,10 +8,12 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { TabBarProvider, useTabBar } from '@/contexts/TabBarContext';
 
-export default function TabLayout() {
+function TabLayoutContent() {
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
+  const { isTabBarVisible } = useTabBar();
 
   return (
     <Tabs
@@ -22,7 +24,7 @@ export default function TabLayout() {
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
         tabBarHideOnKeyboard: Platform.OS === 'android',
-        tabBarStyle: Platform.select({
+        tabBarStyle: !isTabBarVisible ? { display: 'none' } : Platform.select({
           ios: {
             position: 'absolute',
             backgroundColor: colorScheme === 'dark' ? '#1F1F1F' : '#FFFFFF',
@@ -123,5 +125,13 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+  );
+}
+
+export default function TabLayout() {
+  return (
+    <TabBarProvider>
+      <TabLayoutContent />
+    </TabBarProvider>
   );
 }
