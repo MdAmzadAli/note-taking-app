@@ -1057,6 +1057,9 @@ export default function NoteEditorScreen({
         onClose={() => setShowFontStylePicker(false)}
         onFontStyleSelect={handleFontStyleSelect}
         selectedFontStyle={selectedFontStyle}
+        onThemeSelect={handleThemeSelect}
+        onGradientSelect={handleGradientSelect}
+        selectedTheme={selectedTheme}
       />
 
       {/* Color Theme Picker Modal */}

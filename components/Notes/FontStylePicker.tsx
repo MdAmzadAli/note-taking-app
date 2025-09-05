@@ -11,12 +11,16 @@ import {
   ScrollView,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface FontStylePickerProps {
   visible: boolean;
   onClose: () => void;
   onFontStyleSelect: (fontStyle: string) => void;
   selectedFontStyle: string;
+  onThemeSelect?: (color: string) => void;
+  onGradientSelect?: (gradient: string[]) => void;
+  selectedTheme?: string;
 }
 
 const FONT_STYLES = [
@@ -36,11 +40,29 @@ const FONT_STYLES = [
   { name: 'Sans-Serif', value: 'sans-serif', displayName: 'EasyNotes' },
 ];
 
+const noteThemes = [
+  { name: 'Night', color: '#1A1A1A' },
+  { name: 'Dark Blue', color: '#1E3A8A' },
+  { name: 'Deep Purple', color: '#4C1D95' },
+  { name: 'Forest Green', color: '#14532D' },
+  { name: 'Burgundy', color: '#7F1D1D' },
+  { name: 'Midnight', color: '#0F172A' },
+  { name: 'Ocean', gradient: ['#1E40AF', '#3B82F6'] },
+  { name: 'Sunset', gradient: ['#DC2626', '#F97316'] },
+  { name: 'Aurora', gradient: ['#7C3AED', '#EC4899'] },
+  { name: 'Forest', gradient: ['#059669', '#10B981'] },
+  { name: 'Twilight', gradient: ['#4338CA', '#7C3AED'] },
+  { name: 'Fire', gradient: ['#DC2626', '#EF4444', '#F97316'] },
+];
+
 export default function FontStylePicker({
   visible,
   onClose,
   onFontStyleSelect,
   selectedFontStyle,
+  onThemeSelect,
+  onGradientSelect,
+  selectedTheme,
 }: FontStylePickerProps) {
   const slideAnim = React.useRef(new Animated.Value(400)).current;
 
@@ -67,6 +89,18 @@ export default function FontStylePicker({
     onClose();
   };
 
+  const handleThemeSelect = (color: string) => {
+    if (onThemeSelect) {
+      onThemeSelect(color);
+    }
+  };
+
+  const handleGradientSelect = (gradient: string[]) => {
+    if (onGradientSelect) {
+      onGradientSelect(gradient);
+    }
+  };
+
   return (
     <Modal
       visible={visible}
@@ -89,35 +123,87 @@ export default function FontStylePicker({
                 <TouchableOpacity onPress={onClose}>
                   <Ionicons name="close" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Font Styles</Text>
+                <Text style={styles.headerTitle}>Themes & Fonts</Text>
                 <TouchableOpacity onPress={onClose}>
                   <Ionicons name="checkmark" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                <View style={styles.fontStylesGrid}>
-                  {FONT_STYLES.map((fontStyle) => (
-                    <TouchableOpacity
-                      key={fontStyle.value}
-                      style={[
-                        styles.fontStyleButton,
-                        selectedFontStyle === fontStyle.value && styles.selectedFontStyle,
-                      ]}
-                      onPress={() => handleFontStyleSelect(fontStyle.value)}
-                    >
-                      <Text style={styles.fontStyleName}>{fontStyle.name}</Text>
-                      <Text
+                {/* Color Themes Section */}
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Color Themes</Text>
+                  <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.themesScroll}
+                  >
+                    {noteThemes.map((theme, index) => {
+                      const themeValue = theme.color || theme.gradient?.[0] || '#1A1A1A';
+                      const isSelected = selectedTheme === themeValue;
+                      
+                      return (
+                        <TouchableOpacity
+                          key={index}
+                          style={[
+                            styles.themeItem,
+                            {
+                              borderWidth: isSelected ? 3 : 0,
+                              borderColor: '#FFFFFF',
+                              overflow: 'hidden'
+                            }
+                          ]}
+                          onPress={() => {
+                            if (theme.gradient) {
+                              handleGradientSelect(theme.gradient);
+                            } else if (theme.color) {
+                              handleThemeSelect(theme.color);
+                            }
+                          }}
+                        >
+                          {theme.gradient ? (
+                            <LinearGradient
+                              colors={theme.gradient as any}
+                              style={styles.gradientTheme}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 1 }}
+                            />
+                          ) : (
+                            <View style={[styles.solidTheme, { backgroundColor: theme.color }]} />
+                          )}
+                          <Text style={styles.themeName}>{theme.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
+                {/* Font Styles Section */}
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Font Styles</Text>
+                  <View style={styles.fontStylesGrid}>
+                    {FONT_STYLES.map((fontStyle) => (
+                      <TouchableOpacity
+                        key={fontStyle.value}
                         style={[
-                          styles.fontStylePreview,
-                          { fontFamily: fontStyle.value },
-                          selectedFontStyle === fontStyle.value && styles.selectedFontStyleText,
+                          styles.fontStyleButton,
+                          selectedFontStyle === fontStyle.value && styles.selectedFontStyle,
                         ]}
+                        onPress={() => handleFontStyleSelect(fontStyle.value)}
                       >
-                        {fontStyle.displayName}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Text style={styles.fontStyleName}>{fontStyle.name}</Text>
+                        <Text
+                          style={[
+                            styles.fontStylePreview,
+                            { fontFamily: fontStyle.value },
+                            selectedFontStyle === fontStyle.value && styles.selectedFontStyleText,
+                          ]}
+                        >
+                          {fontStyle.displayName}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
               </ScrollView>
             </Animated.View>
@@ -186,5 +272,54 @@ const styles = StyleSheet.create({
   selectedFontStyleText: {
     color: '#FFFFFF',
     fontWeight: 'bold',
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 12,
+  },
+  themesScroll: {
+    paddingLeft: 4,
+  },
+  themeItem: {
+    width: 80,
+    height: 100,
+    borderRadius: 12,
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingBottom: 8,
+    position: 'relative',
+  },
+  solidTheme: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 12,
+  },
+  gradientTheme: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 12,
+  },
+  themeName: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    overflow: 'hidden',
   },
 });
