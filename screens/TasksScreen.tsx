@@ -1094,12 +1094,6 @@ export default function TasksScreen() {
 
             <View style={styles.taskMeta}>
               <View style={styles.taskMetaLeft}>
-                <Text style={[
-                  styles.statusBadge,
-                  item.fontStyle && { fontFamily: item.fontStyle }
-                ]}>
-                  {item.isCompleted ? 'Completed' : 'Pending'}
-                </Text>
                 {item.scheduledDate && (
                   <Text style={[
                     styles.taskDate,
@@ -1134,7 +1128,7 @@ export default function TasksScreen() {
                   styles.overdueText,
                   item.fontStyle && { fontFamily: item.fontStyle }
                 ]}>
-                  overdue
+                  Overdue
                 </Text>
               )}
 
@@ -1152,7 +1146,7 @@ export default function TasksScreen() {
               deleteTaskById(item);
             }}
           >
-            <IconSymbol size={18} name="trash" color="#EF4444" />
+            <IconSymbol size={18} name="trash" color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
@@ -1931,12 +1925,7 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
-  statusBadge: {
-    fontSize: 13,
-    fontWeight: '500',
-    fontFamily: 'Inter',
-    color: '#FFFFFF',
-  },
+  
   taskDate: {
     fontSize: 13,
     color: '#D1D5DB',
@@ -1965,7 +1954,7 @@ const styles = StyleSheet.create({
   },
   overdueText: {
     fontSize: 12,
-    color: '#EF4444',
+    color: '#FFFFFF',
     fontFamily: 'Inter',
     fontWeight: '500',
     marginLeft: 8,
