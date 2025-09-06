@@ -20,6 +20,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import FloatingActionButton from '@/components/ui/FloatingActionButton';
 import SlideMenu from '@/components/ui/SlideMenu';
+import ColorThemePicker from '@/components/Notes/ColorThemePicker';
 import { getTaskCategories } from '@/utils/storage';
 import { Task } from '@/types';
 import { getTasks, saveTask, deleteTask, updateTask, getUserSettings } from '@/utils/storage';
@@ -1708,6 +1709,18 @@ export default function TasksScreen() {
             }))
           }
         ]}
+      />
+
+      {/* Color Theme Picker Modal */}
+      <ColorThemePicker
+        visible={showColorThemePicker}
+        onClose={() => setShowColorThemePicker(false)}
+        onThemeSelect={(color) => setSelectedTheme(color)}
+        onFontStyleSelect={(font) => setSelectedFont(font || 'default')}
+        selectedTheme={selectedTheme}
+        selectedFontStyle={selectedFont === 'default' ? undefined : selectedFont}
+        title="Task Style"
+        mode="task"
       />
 
       <View style={styles.contentContainer}>
