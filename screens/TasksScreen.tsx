@@ -1874,12 +1874,12 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   taskItem: {
-    // backgroundColor: '#353839',
+    backgroundColor: '#333333',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#CCCCCC',
+    borderColor: '#555555',
     position: 'relative',
   },
   celebrationTask: {
@@ -2575,6 +2575,7 @@ const styles = StyleSheet.create({
   calendarOnlyButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 36,
+    
+    maxWidth: 42,
   },
 });
