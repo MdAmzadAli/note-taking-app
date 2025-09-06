@@ -1461,25 +1461,13 @@ export default function TasksScreen() {
   );
 
   const [isMenuVisible, setIsMenuVisible] = useState(false);
-  const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
 
   const openMenu = () => {
     setIsMenuVisible(true);
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
   };
 
   const closeMenu = () => {
-    Animated.timing(slideAnim, {
-      toValue: -Dimensions.get('window').width,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      setIsMenuVisible(false);
-    });
+    setIsMenuVisible(false);
   };
 
   const handleCategorySelect = (categoryId: string) => {
@@ -1652,7 +1640,6 @@ export default function TasksScreen() {
       <SlideMenu
         visible={isMenuVisible}
         onClose={closeMenu}
-        slideAnim={slideAnim}
         title="Task Manager"
         titleIcon="checkmark-circle-outline"
         selectedItemId={selectedCategoryId}
