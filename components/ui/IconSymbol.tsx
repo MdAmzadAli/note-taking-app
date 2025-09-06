@@ -49,6 +49,7 @@ const MAPPING: IconMapping = {
   // Add more mappings as needed
   'house.fill': 'home',
   'paperplane.fill': 'send',
+  'line.3.horizontal': 'menu',
   'chevron.left.forwardslash.chevron.right': 'code-slash',
   'chevron.right': 'chevron-forward',
   'chevron.left': 'chevron-back',

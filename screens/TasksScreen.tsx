@@ -17,6 +17,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 // Removed uuid import - using custom ID generation for React Native compatibility
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import FloatingActionButton from '@/components/ui/FloatingActionButton';
+import SlideMenu from '@/components/ui/SlideMenu';
 import { Task } from '@/types';
 import { getTasks, saveTask, deleteTask, updateTask, getUserSettings } from '@/utils/storage';
 import { scheduleNotification, cancelNotification } from '@/utils/notifications';
@@ -69,8 +70,13 @@ export default function TasksScreen() {
   const celebrationScale = useRef(new Animated.Value(0)).current;
   const celebrationOpacity = useRef(new Animated.Value(0)).current;
 
+  // New state for categories
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<any[]>([]);
+
   useEffect(() => {
     loadTasksAndSettings();
+    loadCategories();
   }, []);
 
   useEffect(() => {
@@ -334,18 +340,19 @@ export default function TasksScreen() {
   };
 
   const loadTasksAndSettings = async () => {
+    console.log('[UNDO] Loading tasks and settings...');
     try {
-      console.log('[UNDO] Loading tasks and settings...');
-      const tasksData = await getTasks();
+      const storedTasks = await getTasks();
+      const userSettings = await getUserSettings();
 
-      // Auto-delete completed tasks older than 60 days
+      // Auto-delete old completed tasks (older than 60 days)
       const sixtyDaysAgo = new Date();
       sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
       const tasksToDelete: Task[] = [];
       const tasksToKeep: Task[] = [];
 
-      tasksData.forEach(task => {
+      storedTasks.forEach(task => {
         const taskDate = new Date(task.createdAt);
         if (task.isCompleted && taskDate < sixtyDaysAgo) {
           tasksToDelete.push(task);
@@ -406,8 +413,26 @@ export default function TasksScreen() {
       const sortedTasks = uniqueTasks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       console.log('[UNDO] Setting tasks state with', sortedTasks.length, 'tasks');
       setTasks(sortedTasks);
+      setSettings(userSettings); // Assuming you have a setSettings function
     } catch (error) {
       console.error('[UNDO] Error loading tasks:', error);
+    }
+  };
+
+  const loadCategories = async () => {
+    try {
+      // You can implement category loading logic here
+      // For now, using default categories similar to Notes
+      const defaultCategories = [
+        { id: '1', name: 'Work', createdAt: new Date().toISOString() },
+        { id: '2', name: 'Personal', createdAt: new Date().toISOString() },
+        { id: '3', name: 'Shopping', createdAt: new Date().toISOString() },
+        { id: '4', name: 'Health', createdAt: new Date().toISOString() },
+        { id: '5', name: 'Projects', createdAt: new Date().toISOString() },
+      ];
+      setCategories(defaultCategories);
+    } catch (error) {
+      console.error('Error loading categories:', error);
     }
   };
 
@@ -884,6 +909,13 @@ export default function TasksScreen() {
       return activeTabFilters[filter] || true;
     });
 
+    // Filter by category
+    if (selectedCategoryId) {
+      // This part needs to be implemented based on how categories are associated with tasks.
+      // For now, we assume tasks have a 'categoryId' property.
+      filtered = filtered.filter(task => task.categoryId === selectedCategoryId);
+    }
+
     // Group completed tasks by date if showing completed tab
     if (activeTab === 'completed') {
       filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -895,17 +927,17 @@ export default function TasksScreen() {
   const getOverdueTasks = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
+
     return tasks.filter(task => {
       const taskDate = new Date(task.scheduledDate || task.createdAt);
       const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
       const isOverdue = taskDay < today && !task.isCompleted;
-      
+
       // Include pending completion and temporary success messages
       if (pendingCompletionTasks.has(task.id) || temporarySuccessMessages.has(task.id)) {
         return isOverdue;
       }
-      
+
       return isOverdue && !task.isCompleted;
     });
   };
@@ -915,20 +947,20 @@ export default function TasksScreen() {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     return tasks.filter(task => {
       const taskDate = new Date(task.scheduledDate || task.createdAt);
       const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
       const isOverdue = taskDay < today && !task.isCompleted;
-      
+
       // Include pending completion and temporary success messages for upcoming only
       if (pendingCompletionTasks.has(task.id) || temporarySuccessMessages.has(task.id)) {
         return !isOverdue;
       }
-      
+
       // Only show non-completed, non-overdue tasks
       if (task.isCompleted || isOverdue) return false;
-      
+
       // Apply upcoming filter
       if (upcomingFilter === 'today') {
         return taskDay.getTime() === today.getTime();
@@ -1427,6 +1459,34 @@ export default function TasksScreen() {
     </TouchableOpacity>
   );
 
+  const closeMenu = () => {
+    // Implement menu closing logic if needed
+  };
+
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  const openMenu = () => {
+    setIsMenuVisible(true);
+    Animated.timing(slideAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleCategorySelect = (categoryId: string) => {
+    setSelectedCategoryId(categoryId);
+    setSearchQuery(''); // Clear search when a category is selected
+    closeMenu();
+  };
+
+  const handleShowAllNotes = () => {
+    setSelectedCategoryId(null);
+    setSearchQuery(''); // Clear search when showing all
+    closeMenu();
+  };
+
   if (isCreating || isEditing) {
     return (
       <View style={styles.container}>
@@ -1547,7 +1607,7 @@ export default function TasksScreen() {
   return (
     <GestureHandlerRootView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.hamburgerButton} onPress={() => {}}>
+        <TouchableOpacity style={styles.hamburgerButton} onPress={openMenu}>
           <IconSymbol size={24} name="line.3.horizontal" color="#FFFFFF" />
         </TouchableOpacity>
 
@@ -1582,6 +1642,63 @@ export default function TasksScreen() {
         {renderTabButton('completed', 'History')}
       </View>
 
+      <SlideMenu
+        visible={isMenuVisible}
+        onClose={closeMenu}
+        slideAnim={slideAnim}
+        title="Task Manager"
+        titleIcon="checkmark-circle-outline"
+        selectedItemId={selectedCategoryId}
+        sections={[
+          {
+            title: "Views",
+            items: [
+              {
+                id: "all-tasks",
+                name: "All Tasks",
+                icon: "list-outline",
+                onPress: () => {
+                  setSelectedCategoryId(null);
+                  setSearchQuery('');
+                },
+                isSelected: !selectedCategoryId
+              },
+              {
+                id: "completed-tasks",
+                name: "Completed Tasks",
+                icon: "checkmark-circle-outline",
+                onPress: () => {
+                  // Add completed tasks filter logic here
+                  console.log('Show completed tasks');
+                }
+              }
+            ]
+          },
+          {
+            title: "Categories",
+            items: categories.map(category => ({
+              id: category.id,
+              name: category.name,
+              icon: "folder-outline",
+              onPress: () => {
+                setSelectedCategoryId(category.id);
+                setSearchQuery('');
+              },
+              isSelected: selectedCategoryId === category.id
+            })),
+            showEdit: true,
+            onEdit: () => {
+              // Navigate to category edit screen
+              console.log('Edit categories');
+            },
+            showCreate: true,
+            onCreateNew: () => {
+              // Add logic to create new category
+              console.log('Create new category');
+            }
+          }
+        ]}
+      />
 
       <View style={styles.contentContainer}>
         {activeTab === 'active' ? (
@@ -1612,7 +1729,7 @@ export default function TasksScreen() {
             {/* Upcoming Tasks Section */}
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionTitle}>Upcoming Tasks</Text>
-              
+
               {/* Upcoming Filters */}
               <View style={styles.upcomingFiltersContainer}>
                 <TouchableOpacity
@@ -1629,7 +1746,7 @@ export default function TasksScreen() {
                     All
                   </Text>
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
                   style={[
                     styles.upcomingFilterButton,
@@ -1644,7 +1761,7 @@ export default function TasksScreen() {
                     Today
                   </Text>
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
                   style={[
                     styles.upcomingFilterButton,
@@ -1660,7 +1777,7 @@ export default function TasksScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
-              
+
               {/* Upcoming Tasks List */}
               {getUpcomingTasks().filter(task => {
                 if (searchQuery.trim()) {
