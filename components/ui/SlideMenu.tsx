@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   editText: {
-    color: '#8AB4F8',
+    color: '#00FF7F',
     fontSize: 14,
     fontWeight: '500',
   },
