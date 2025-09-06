@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import {
   View,
@@ -88,14 +89,18 @@ export default function SlideMenu({
                         <View style={styles.sectionHeader}>
                           <Text style={styles.sectionTitle}>{section.title}</Text>
                           {section.showEdit && section.onEdit && (
-                            <TouchableOpacity onPress={section.onEdit || (() => {
-                              onClose();
-                              // Navigate based on section title
-                              if (section.title.toLowerCase().includes('categor')) {
-                                const type = title.toLowerCase().includes('task') ? 'task-categories' : 'categories';
-                                router.push(`/labels-edit?type=${type}`);
+                            <TouchableOpacity onPress={() => {
+                              if (section.onEdit) {
+                                section.onEdit();
+                              } else {
+                                onClose();
+                                // Navigate based on section title
+                                if (section.title.toLowerCase().includes('categor')) {
+                                  const type = title.toLowerCase().includes('task') ? 'task-categories' : 'categories';
+                                  router.push(`/labels-edit?type=${type}`);
+                                }
                               }
-                            })}>
+                            }}>
                               <Text style={styles.editText}>Edit</Text>
                             </TouchableOpacity>
                           )}
@@ -126,7 +131,9 @@ export default function SlideMenu({
                         <TouchableOpacity 
                           style={styles.createNewItem}
                           onPress={() => {
-                            section.onCreateNew!();
+                            if (section.onCreateNew) {
+                              section.onCreateNew();
+                            }
                             onClose();
                           }}
                         >
