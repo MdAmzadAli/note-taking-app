@@ -31,6 +31,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import SearchResultsModal from '@/components/SearchResultsModal';
 import TaskCreationModal from '@/components/Task/TaskCreationModal';
+import TaskCalendarModal from '@/components/Task/TaskCalendarModal';
 
 export default function TasksScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -43,7 +44,7 @@ export default function TasksScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [filter, setFilter] = useState<'all' | 'today' | 'tomorrow' | 'overdue'>('all');
-  const [upcomingFilter, setUpcomingFilter] = useState<'all' | 'today' | 'tomorrow'>('all');
+  const [upcomingFilter, setUpcomingFilter] = useState<'all' | 'today' | 'tomorrow' | 'after-tomorrow'>('all');
   const [historyFilter, setHistoryFilter] = useState<'all' | 'completed' | 'overdue'>('all');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
 
@@ -56,13 +57,13 @@ export default function TasksScreen() {
 
   // State for undo functionality
   const [undoTasks, setUndoTasks] = useState<Set<string>>(new Set());
-  const [undoTimeouts, setUndoTimeouts] = useState<Map<string, NodeJS.Timeout>>(new Map());
+  const [undoTimeouts, setUndoTimeouts] = useState<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [celebrationTaskId, setCelebrationTaskId] = useState<string | null>(null);
   const [showTopCelebration, setShowTopCelebration] = useState(false);
   const [pendingCompletionTasks, setPendingCompletionTasks] = useState<Set<string>>(new Set());
-  const [pendingCompletionTimeouts, setPendingCompletionTimeouts] = useState<Map<string, NodeJS.Timeout>>(new Map());
+  const [pendingCompletionTimeouts, setPendingCompletionTimeouts] = useState<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [temporarySuccessMessages, setTemporarySuccessMessages] = useState<Set<string>>(new Set());
-  const [allCompletionsFinishedTimeout, setAllCompletionsFinishedTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [allCompletionsFinishedTimeout, setAllCompletionsFinishedTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
   const celebrationScale = useRef(new Animated.Value(0)).current;
   const celebrationOpacity = useRef(new Animated.Value(0)).current;
 
@@ -78,6 +79,9 @@ export default function TasksScreen() {
   const [showColorThemePicker, setShowColorThemePicker] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState('default');
   const [selectedFont, setSelectedFont] = useState('default');
+  
+  // State for calendar modal
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
 
   const loadTaskCategories = useCallback(async () => {
     try {
@@ -262,7 +266,7 @@ export default function TasksScreen() {
         console.log('[UNDO] All delegation cleanup completed');
       }, 4000);
 
-      setAllCompletionsFinishedTimeout(timeout);
+      setAllCompletionsFinishedTimeout(timeout as ReturnType<typeof setTimeout>);
     }
   }, [undoTasks, temporarySuccessMessages, pendingCompletionTasks, tasks]);
 
@@ -825,6 +829,8 @@ export default function TasksScreen() {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
+    const afterTomorrow = new Date(today);
+    afterTomorrow.setDate(afterTomorrow.getDate() + 2);
 
     return tasks.filter(task => {
       const taskDate = new Date(task.scheduledDate || task.createdAt);
@@ -850,6 +856,9 @@ export default function TasksScreen() {
       }
       if (upcomingFilter === 'tomorrow') {
         return taskDay.getTime() === tomorrow.getTime();
+      }
+      if (upcomingFilter === 'after-tomorrow') {
+        return taskDay.getTime() >= afterTomorrow.getTime();
       }
       // 'all' shows all upcoming tasks
       return true;
@@ -1585,6 +1594,32 @@ export default function TasksScreen() {
                       Tomorrow
                     </Text>
                   </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.upcomingFilterButton,
+                      upcomingFilter === 'after-tomorrow' && styles.upcomingFilterButtonActive,
+                    ]}
+                    onPress={() => setUpcomingFilter('after-tomorrow')}
+                  >
+                    <View style={styles.afterTomorrowContainer}>
+                      <Text style={[
+                        styles.upcomingFilterButtonText,
+                        upcomingFilter === 'after-tomorrow' && styles.upcomingFilterButtonTextActive,
+                      ]}>
+                        After Tomorrow
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.calendarIconButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          setShowCalendarModal(true);
+                        }}
+                      >
+                        <IconSymbol size={16} name="calendar.circle" color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
                 </View>
 
                 {/* Upcoming Tasks List */}
@@ -1701,6 +1736,12 @@ export default function TasksScreen() {
         onClose={() => setShowSearchModal(false)}
         searchQuery={voiceSearchQuery}
         results={voiceSearchResults}
+      />
+
+      <TaskCalendarModal
+        visible={showCalendarModal}
+        onClose={() => setShowCalendarModal(false)}
+        tasks={tasks}
       />
 
       <TaskCreationModal
@@ -2100,13 +2141,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
     fontFamily: 'Inter',
-  },
-  filterButton: {
-    padding: 8,
-    borderRadius: 6,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   filterIconButton: {
     padding: 8,
@@ -2553,5 +2587,16 @@ const styles = StyleSheet.create({
   upcomingFilterButtonTextActive: {
     color: '#FFFFFF',
     fontWeight: '600',
+  },
+  afterTomorrowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  calendarIconButton: {
+    padding: 2,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
 });
