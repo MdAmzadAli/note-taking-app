@@ -1502,10 +1502,7 @@ export default function TasksScreen() {
                 onPress={applyDateRangeFilter}
                 disabled={!fromDate || !toDate}
               >
-                <Text style={[
-                  styles.modalButtonPrimaryText,
-                  (!fromDate || !toDate) && styles.modalButtonDisabledText,
-                ]}>Apply Filter</Text>
+                <Text style={styles.modalButtonPrimaryText}>Apply Filter</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2089,11 +2086,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
   modalButtonDisabled: {
-    backgroundColor: 'transparent',
+    backgroundColor: '#4B5563',
     borderColor: '#4B5563',
-  },
-  modalButtonDisabledText: {
-    color: '#4B5563',
   },
   historyFiltersContainer: {
     flexDirection: 'row',
