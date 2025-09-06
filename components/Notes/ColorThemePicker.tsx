@@ -37,6 +37,7 @@ const fontStyles: Array<{ name: string; value: string | undefined }> = [
 ];
 
 const noteThemes: ThemeOption[] = [
+  { name: 'Default', color: '#333333' },
   { name: 'Charcoal', color: '#1C1C1C' },
   { name: 'Deep Red', color: '#B91C1C' },
   { name: 'Forest', color: '#166534' },
