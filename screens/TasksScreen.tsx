@@ -1482,8 +1482,10 @@ export default function TasksScreen() {
 
   const openMenu = () => {
     setIsMenuVisible(true);
-    // Reload categories when opening menu to sync with any changes from labels-edit
-    loadTaskCategories();
+    // Reload categories in background to avoid blocking menu animation
+    setTimeout(() => {
+      loadTaskCategories();
+    }, 0);
   };
 
   const closeMenu = () => {
