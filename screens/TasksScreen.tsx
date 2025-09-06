@@ -1849,16 +1849,8 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: '#CCCCCC',
     position: 'relative',
-    shadowColor: '#000000',
-    shadowOffset: {
-      width: 2,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
   },
   celebrationTask: {
     borderColor: '#10B981',
