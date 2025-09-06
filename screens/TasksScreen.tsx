@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { router } from 'expo-router';
 // Removed uuid import - using custom ID generation for React Native compatibility
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import FloatingActionButton from '@/components/ui/FloatingActionButton';
