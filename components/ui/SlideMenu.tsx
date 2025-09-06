@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -157,9 +156,13 @@ export default function SlideMenu({
                             onPress={() => handleItemPress(item)}
                           >
                             {item.icon && (
-                              <Ionicons name={item.icon} size={20} color="#FFFFFF" />
+                              <Ionicons 
+                                name={item.icon} 
+                                size={20} 
+                                color={(selectedItemId === item.id || item.isSelected) ? "#000000" : "#FFFFFF"} 
+                              />
                             )}
-                            <Text style={styles.menuItemText}>{item.name}</Text>
+                            <Text style={[styles.menuItemText, (selectedItemId === item.id || item.isSelected) && styles.selectedMenuItemText]}>{item.name}</Text>
                           </TouchableOpacity>
                         ))}
                       </View>
@@ -287,4 +290,7 @@ const styles = StyleSheet.create({
     color:'#000000',
     borderRadius: 24,
   },
+  selectedMenuItemText: {
+    color: '#000000',
+  }
 });
