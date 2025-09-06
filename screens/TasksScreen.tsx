@@ -80,7 +80,7 @@ export default function TasksScreen() {
   const [showColorThemePicker, setShowColorThemePicker] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState('default');
   const [selectedFont, setSelectedFont] = useState('default');
-  
+
   // State for calendar modal
   const [showCalendarModal, setShowCalendarModal] = useState(false);
 
@@ -2169,7 +2169,7 @@ const styles = StyleSheet.create({
   calendarOnlyButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    
+
     maxWidth: 42,
   },
 });
