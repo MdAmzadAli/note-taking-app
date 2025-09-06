@@ -1614,7 +1614,7 @@ export default function TasksScreen() {
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
-            placeholder={showCompletedTasks ? "Search completed tasks..." : "Search tasks..."}
+            placeholder={showCompletedTasks ? "Search tasks by title, description, or month name..." : "Search tasks..."}
             placeholderTextColor="#999999"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -2320,7 +2320,7 @@ const styles = StyleSheet.create({
   dateHeader: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#374151',
+    color: '#FFFFFF',
     fontFamily: 'Inter',
     marginBottom: 12,
     paddingLeft: 8,
@@ -2513,18 +2513,20 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
   },
   dateRangeModal: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
     borderRadius: 12,
     padding: 24,
     margin: 20,
     minWidth: 300,
     maxWidth: 400,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -2543,7 +2545,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000000',
+    color: '#FFFFFF',
     fontFamily: 'Inter',
   },
   modalCloseButton: {
@@ -2551,7 +2553,7 @@ const styles = StyleSheet.create({
   },
   modalCloseText: {
     fontSize: 18,
-    color: '#6B7280',
+    color: '#FFFFFF',
     fontWeight: 'bold',
   },
   dateInputContainer: {
@@ -2563,22 +2565,22 @@ const styles = StyleSheet.create({
   dateLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#374151',
+    color: '#FFFFFF',
     fontFamily: 'Inter',
     marginBottom: 8,
   },
   dateInput: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#FFFFFF',
     borderRadius: 8,
     padding: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
     minHeight: 44,
     justifyContent: 'center',
   },
   dateInputText: {
     fontSize: 16,
-    color: '#000000',
+    color: '#FFFFFF',
     fontFamily: 'Inter',
   },
   modalButtons: {
@@ -2591,14 +2593,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 44,
   },
   modalButtonSecondaryText: {
-    color: '#6B7280',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '500',
     fontFamily: 'Inter',
@@ -2608,19 +2610,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
-    backgroundColor: '#000000',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 44,
   },
   modalButtonPrimaryText: {
-    color: '#FFFFFF',
+    color: '#000000',
     fontSize: 14,
     fontWeight: '500',
     fontFamily: 'Inter',
   },
   modalButtonDisabled: {
-    backgroundColor: '#9CA3AF',
+    backgroundColor: '#4B5563',
+    borderColor: '#4B5563',
   },
   historyFiltersContainer: {
     flexDirection: 'row',
