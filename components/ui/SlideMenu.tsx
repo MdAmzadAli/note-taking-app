@@ -163,6 +163,14 @@ export default function SlideMenu({
                               />
                             )}
                             <Text style={[styles.menuItemText, (selectedItemId === item.id || item.isSelected) && styles.selectedMenuItemText]}>{item.name}</Text>
+                            {item.name === "Completed Tasks" && (
+                              <Ionicons 
+                                name="information-circle-outline" 
+                                size={16} 
+                                color={(selectedItemId === item.id || item.isSelected) ? "#666666" : "#9AA0A6"}
+                                style={styles.infoIcon}
+                              />
+                            )}
                           </TouchableOpacity>
                         ))}
                       </View>
@@ -292,5 +300,9 @@ const styles = StyleSheet.create({
   },
   selectedMenuItemText: {
     color: '#000000',
+  },
+  infoIcon: {
+    marginLeft: 'auto',
+    marginRight: 4,
   }
 });
