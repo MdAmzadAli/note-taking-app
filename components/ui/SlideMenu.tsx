@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -50,24 +50,28 @@ export default function SlideMenu({
   selectedItemId
 }: SlideMenuProps) {
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
+  const [isModalVisible, setIsModalVisible] = useState(false);
 
   useEffect(() => {
     if (visible) {
-      // Slide in animation
+      // Show modal first, then animate in
+      setIsModalVisible(true);
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 300,
         useNativeDriver: true,
       }).start();
-    } else {
-      // Slide out animation
+    } else if (isModalVisible) {
+      // Animate out, then hide modal
       Animated.timing(slideAnim, {
         toValue: -Dimensions.get('window').width,
         duration: 300,
         useNativeDriver: true,
-      }).start();
+      }).start(() => {
+        setIsModalVisible(false);
+      });
     }
-  }, [visible, slideAnim]);
+  }, [visible, slideAnim, isModalVisible]);
 
   const handleItemPress = (item: MenuItem) => {
     if (item.onPress) {
@@ -80,7 +84,7 @@ export default function SlideMenu({
     <Modal
       transparent={true}
       animationType="none"
-      visible={visible}
+      visible={isModalVisible}
       onRequestClose={onClose}
       statusBarTranslucent 
       presentationStyle="overFullScreen" 
