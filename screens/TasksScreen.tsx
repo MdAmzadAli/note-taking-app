@@ -473,6 +473,7 @@ export default function TasksScreen() {
         isCompleted: false,
         scheduledDate: selectedDate.toISOString(),
         createdAt: new Date().toISOString(),
+        categoryId: selectedCategoryId || undefined,
       };
 
       console.log('[TASK] Generated task ID:', task.id);

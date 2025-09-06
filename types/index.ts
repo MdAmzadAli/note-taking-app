@@ -106,9 +106,10 @@ export interface Task {
   description?: string;
   isCompleted: boolean;
   scheduledDate?: string;
+  createdAt: string;
   reminderTime?: string;
   notificationId?: string;
-  createdAt: string;
+  categoryId?: string;
 }
 
 export interface FieldType {
@@ -163,7 +164,7 @@ export interface Habit {
   // For measurable habits: stores "Every day", "Every week", "Every month"
   // For yes/no habits: stores "custom" and uses frequencyType for details
   frequency: string;
-  goalType: 'yes_no' | 'quantity' | 'time';
+  goalType: 'yes_no' | 'measurable';
   question?: string;
   // Fields specific to measurable habits (quantity/time)
   unit?: string;
