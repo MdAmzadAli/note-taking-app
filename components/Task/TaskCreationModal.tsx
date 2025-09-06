@@ -9,6 +9,7 @@ import {
   Alert,
   Switch,
   Modal,
+  Keyboard,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -220,7 +221,13 @@ export default function TaskCreationModal({
           <View style={styles.rightButtonsContainer}>
             <TouchableOpacity
               style={styles.brushIconButton}
-              onPress={() => setShowColorThemePicker(true)}
+              onPress={() => {
+                Keyboard.dismiss();
+                // Small delay to ensure keyboard is dismissed before opening modal
+                setTimeout(() => {
+                  setShowColorThemePicker(true);
+                }, 100);
+              }}
             >
               <IconSymbol size={24} name="gear" color="#FFFFFF" />
             </TouchableOpacity>
