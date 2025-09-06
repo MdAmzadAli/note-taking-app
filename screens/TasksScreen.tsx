@@ -1207,30 +1207,33 @@ export default function TasksScreen() {
         }}
       >
         <View style={styles.taskHeader}>
-          <TouchableOpacity
-            style={styles.checkboxContainer}
-            onPress={(e) => {
-              e.stopPropagation();
-              // Prevent status changes for overdue tasks in completed view
-              if (showCompletedTasks && isOverdue) {
-                Alert.alert(
-                  'Task Overdue', 
-                  'This overdue task is in completed view and its status cannot be changed.',
-                  [{ text: 'OK', style: 'default' }]
-                );
-                return;
-              }
-              // Use toggleTaskComplete which now handles undo logic internally
-              toggleTaskComplete(item, true, true);
-            }}
-          >
-            <View style={[
-              styles.checkbox,
-              item.isCompleted && styles.checkboxCompleted
-            ]}>
-              {item.isCompleted && <Text style={styles.checkmark}>✓</Text>}
-            </View>
-          </TouchableOpacity>
+          {/* Hide checkbox in completed tasks view */}
+          {!showCompletedTasks && (
+            <TouchableOpacity
+              style={styles.checkboxContainer}
+              onPress={(e) => {
+                e.stopPropagation();
+                // Prevent status changes for overdue tasks in completed view
+                if (showCompletedTasks && isOverdue) {
+                  Alert.alert(
+                    'Task Overdue', 
+                    'This overdue task is in completed view and its status cannot be changed.',
+                    [{ text: 'OK', style: 'default' }]
+                  );
+                  return;
+                }
+                // Use toggleTaskComplete which now handles undo logic internally
+                toggleTaskComplete(item, true, true);
+              }}
+            >
+              <View style={[
+                styles.checkbox,
+                item.isCompleted && styles.checkboxCompleted
+              ]}>
+                {item.isCompleted && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+            </TouchableOpacity>
+          )}
 
           <View style={styles.taskInfo}>
             <Text style={[
