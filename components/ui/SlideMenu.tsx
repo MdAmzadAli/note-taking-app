@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import {
   View,
@@ -13,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { router } from 'expo-router';
 
 interface MenuItem {
   id: string;
@@ -88,7 +88,14 @@ export default function SlideMenu({
                         <View style={styles.sectionHeader}>
                           <Text style={styles.sectionTitle}>{section.title}</Text>
                           {section.showEdit && section.onEdit && (
-                            <TouchableOpacity onPress={section.onEdit}>
+                            <TouchableOpacity onPress={section.onEdit || (() => {
+                              onClose();
+                              // Navigate based on section title
+                              if (section.title.toLowerCase().includes('categor')) {
+                                const type = title.toLowerCase().includes('task') ? 'task-categories' : 'categories';
+                                router.push(`/labels-edit?type=${type}`);
+                              }
+                            })}>
                               <Text style={styles.editText}>Edit</Text>
                             </TouchableOpacity>
                           )}

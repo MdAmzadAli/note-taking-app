@@ -1693,22 +1693,12 @@ export default function TasksScreen() {
             showEdit: true,
             onEdit: () => {
               closeMenu();
-              // Use router.push for navigation, assuming it's available in the scope
-              // If not, replace with the appropriate navigation method.
-              // For example, if using React Navigation: navigation.navigate('LabelsEdit', { type: 'task-categories' });
-              // Assuming 'router' is defined and imported for Next.js or similar environments
-              // Example for Next.js:
-              // import { useRouter } from 'next/router';
-              // const router = useRouter();
-              // router.push('/labels-edit?type=task-categories');
-              // Since we don't have the router context here, we'll use a placeholder comment.
-              // For a React Native app, you would use your navigation library (e.g., React Navigation).
-              console.log('Navigate to labels-edit with type=task-categories');
+              router.push('/labels-edit?type=task-categories');
             },
             showCreate: true,
             onCreateNew: () => {
-              // Add logic to create new category
-              console.log('Create new category');
+              closeMenu();
+              router.push('/labels-edit?type=task-categories');
             }
           }
         ]}
