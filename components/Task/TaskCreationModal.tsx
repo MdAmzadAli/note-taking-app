@@ -237,7 +237,7 @@ export default function TaskCreationModal({
                 }, 100);
               }}
             >
-              <IconSymbol size={24} name="gear" color="#FFFFFF" />
+              <IconSymbol size={24} name="brush" color="#FFFFFF" />
             </TouchableOpacity>
             
             <TouchableOpacity

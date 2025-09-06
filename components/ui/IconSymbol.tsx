@@ -38,7 +38,9 @@ type IconSymbolName =
   | 'arrow.right'
   | 'checkmark'
   | 'folder'
-  | 'ellipsis';
+  | 'ellipsis'
+  | 'calendar'
+  | 'brush';
 
 /**
  * Add your SF Symbols to Ionicons mappings here.
@@ -75,6 +77,9 @@ const MAPPING: IconMapping = {
   'envelope.fill': 'mail',
   'envelope.open': 'mail-open',
   'ellipsis': 'ellipsis-vertical',
+  'calendar': 'calendar',
+  'brush': 'brush',
+  'gear': 'settings',
 } as const;
 
 /**
