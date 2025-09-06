@@ -60,8 +60,7 @@ export default function TasksScreen() {
   const [showFromDatePicker, setShowFromDatePicker] = useState(false);
   const [showToDatePicker, setShowToDatePicker] = useState(false);
 
-  // New state for tabs and undo functionality
-  const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
+  // State for undo functionality
   const [undoTasks, setUndoTasks] = useState<Set<string>>(new Set());
   const [undoTimeouts, setUndoTimeouts] = useState<Map<string, NodeJS.Timeout>>(new Map());
   const [celebrationTaskId, setCelebrationTaskId] = useState<string | null>(null);
@@ -72,6 +71,9 @@ export default function TasksScreen() {
   const [allCompletionsFinishedTimeout, setAllCompletionsFinishedTimeout] = useState<NodeJS.Timeout | null>(null);
   const celebrationScale = useRef(new Animated.Value(0)).current;
   const celebrationOpacity = useRef(new Animated.Value(0)).current;
+  
+  // State for completed tasks view (accessed via slide menu)
+  const [showCompletedTasks, setShowCompletedTasks] = useState(false);
 
   // New state for categories
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -159,7 +161,7 @@ export default function TasksScreen() {
   }, []);
 
   useEffect(() => {
-    let filtered = getFilteredTasks();
+    let filtered = showCompletedTasks ? getCompletedTasks() : getActiveTasks();
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(task => {
@@ -187,7 +189,7 @@ export default function TasksScreen() {
       });
     }
     setFilteredTasks(filtered);
-  }, [searchQuery, tasks, filter, activeTab, historyFilter, upcomingFilter]);
+  }, [searchQuery, tasks, filter, showCompletedTasks, historyFilter, upcomingFilter]);
 
   // Clear timeouts on component unmount
   useEffect(() => {
@@ -884,7 +886,7 @@ export default function TasksScreen() {
     );
   };
 
-  const getFilteredTasks = () => {
+  const getActiveTasks = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const tomorrow = new Date(today);
@@ -895,54 +897,56 @@ export default function TasksScreen() {
       const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
       const isOverdue = taskDay < today && !task.isCompleted;
 
-      // Special handling for tasks with pending completion
-      if (activeTab === 'active') {
-        // Keep tasks that are pending completion in active tab (even if completed in state)
-        if (pendingCompletionTasks.has(task.id)) {
-          return true;
-        }
-        // Keep tasks that have temporary success messages
-        if (temporarySuccessMessages.has(task.id)) {
-          return true;
-        }
-        // Only filter out completed tasks (overdue tasks stay in active tab)
-        if (task.isCompleted) return false;
+      // Keep tasks that are pending completion (even if completed in state)
+      if (pendingCompletionTasks.has(task.id)) {
+        return true;
       }
-
-      if (activeTab === 'completed') {
-        // Don't show tasks that are pending completion in completed tab
-        if (pendingCompletionTasks.has(task.id)) {
-          return false;
-        }
-        // Don't show tasks with temporary success messages in completed tab
-        if (temporarySuccessMessages.has(task.id)) {
-          return false;
-        }
-        // Only show completed tasks in history tab
-        if (!task.isCompleted) return false;
+      // Keep tasks that have temporary success messages
+      if (temporarySuccessMessages.has(task.id)) {
+        return true;
       }
+      // Only filter out completed tasks (overdue tasks stay in active view)
+      if (task.isCompleted) return false;
 
-      const activeTabFilters = {
+      const activeFilters = {
         'today': taskDay.getTime() === today.getTime(),
         'tomorrow': taskDay.getTime() === tomorrow.getTime(),
         'overdue': isOverdue,
         'all': true
       };
 
-      return activeTabFilters[filter] || true;
+      return activeFilters[filter] || true;
     });
 
     // Filter by category
     if (selectedCategoryId) {
-      // This part needs to be implemented based on how categories are associated with tasks.
-      // For now, we assume tasks have a 'categoryId' property.
       filtered = filtered.filter(task => task.categoryId === selectedCategoryId);
     }
 
-    // Group completed tasks by date if showing completed tab
-    if (activeTab === 'completed') {
-      filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return filtered;
+  };
+
+  const getCompletedTasks = () => {
+    let filtered = tasks.filter(task => {
+      // Don't show tasks that are pending completion
+      if (pendingCompletionTasks.has(task.id)) {
+        return false;
+      }
+      // Don't show tasks with temporary success messages
+      if (temporarySuccessMessages.has(task.id)) {
+        return false;
+      }
+      // Only show completed tasks
+      return task.isCompleted;
+    });
+
+    // Filter by category
+    if (selectedCategoryId) {
+      filtered = filtered.filter(task => task.categoryId === selectedCategoryId);
     }
+
+    // Sort by completion date
+    filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return filtered;
   };
@@ -1191,11 +1195,11 @@ export default function TasksScreen() {
             );
             return;
           }
-          if (activeTab === 'completed' && isOverdue) {
-            // Show alert that overdue tasks in history cannot be edited
+          if (showCompletedTasks && isOverdue) {
+            // Show alert that overdue tasks in completed view cannot be edited
             Alert.alert(
               'Task Overdue', 
-              'This overdue task is in history and cannot be modified. You can delete it if needed.',
+              'This overdue task is in completed view and cannot be modified. You can delete it if needed.',
               [{ text: 'OK', style: 'default' }]
             );
             return;
@@ -1208,11 +1212,11 @@ export default function TasksScreen() {
             style={styles.checkboxContainer}
             onPress={(e) => {
               e.stopPropagation();
-              // Prevent status changes for overdue tasks in history tab
-              if (activeTab === 'completed' && isOverdue) {
+              // Prevent status changes for overdue tasks in completed view
+              if (showCompletedTasks && isOverdue) {
                 Alert.alert(
                   'Task Overdue', 
-                  'This overdue task is in history and its status cannot be changed.',
+                  'This overdue task is in completed view and its status cannot be changed.',
                   [{ text: 'OK', style: 'default' }]
                 );
                 return;
@@ -1481,22 +1485,7 @@ export default function TasksScreen() {
     </TouchableOpacity>
   );
 
-  const renderTabButton = (tabType: 'active' | 'completed', label: string) => (
-    <TouchableOpacity
-      style={[
-        styles.tabButton,
-        activeTab === tabType && styles.tabButtonActive,
-      ]}
-      onPress={() => setActiveTab(tabType)}
-    >
-      <Text style={[
-        styles.tabButtonText,
-        activeTab === tabType && styles.tabButtonTextActive,
-      ]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
+  
 
   const openMenu = () => {
     setIsMenuVisible(true);
@@ -1510,11 +1499,13 @@ export default function TasksScreen() {
 
   const handleCategorySelect = (categoryId: string) => {
     setSelectedCategoryId(categoryId);
+    setShowCompletedTasks(false);
     setSearchQuery(''); // Clear search when a category is selected
   };
 
   const handleShowAllTasks = () => {
     setSelectedCategoryId(null);
+    setShowCompletedTasks(false);
     setSearchQuery(''); // Clear search when showing all
   };
 
@@ -1667,11 +1658,7 @@ export default function TasksScreen() {
         )}
       </View>
 
-      {/* Tabs */}
-      <View style={styles.tabsContainer}>
-        {renderTabButton('active', 'Active')}
-        {renderTabButton('completed', 'History')}
-      </View>
+      
 
       <SlideMenu
         visible={isMenuVisible}
@@ -1688,16 +1675,18 @@ export default function TasksScreen() {
                 name: "All Tasks",
                 icon: "list-outline",
                 onPress: handleShowAllTasks,
-                isSelected: !selectedCategoryId
+                isSelected: !selectedCategoryId && !showCompletedTasks
               },
               {
                 id: "completed-tasks",
                 name: "Completed Tasks",
                 icon: "checkmark-circle-outline",
                 onPress: () => {
-                  // Add completed tasks filter logic here
-                  console.log('Show completed tasks');
-                }
+                  setShowCompletedTasks(true);
+                  setSelectedCategoryId(null);
+                  setSearchQuery('');
+                },
+                isSelected: showCompletedTasks
               }
             ]
           },
@@ -1719,120 +1708,116 @@ export default function TasksScreen() {
       />
 
       <View style={styles.contentContainer}>
-        {activeTab === 'active' ? (
-          <ScrollView 
-            style={styles.scrollContainer} 
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {/* Overdue Tasks Section */}
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Overdue</Text>
-              {getOverdueTasks().filter(task => {
-                if (searchQuery.trim()) {
-                  const query = searchQuery.toLowerCase();
-                  const titleMatch = task.title.toLowerCase().includes(query);
-                  const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
-                  return titleMatch || descriptionMatch;
-                }
-                return true;
-              }).map(task => (
-                <TaskItem key={task.id} item={task} />
-              ))}
-              {getOverdueTasks().length === 0 && (
-                <Text style={styles.emptyText}>No overdue tasks</Text>
-              )}
-            </View>
-
-            {/* Upcoming Tasks Section */}
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Upcoming Tasks</Text>
-
-              {/* Upcoming Filters */}
-              <View style={styles.upcomingFiltersContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.upcomingFilterButton,
-                    upcomingFilter === 'all' && styles.upcomingFilterButtonActive,
-                  ]}
-                  onPress={() => setUpcomingFilter('all')}
-                >
-                  <Text style={[
-                    styles.upcomingFilterButtonText,
-                    upcomingFilter === 'all' && styles.upcomingFilterButtonTextActive,
-                  ]}>
-                    All
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.upcomingFilterButton,
-                    upcomingFilter === 'today' && styles.upcomingFilterButtonActive,
-                  ]}
-                  onPress={() => setUpcomingFilter('today')}
-                >
-                  <Text style={[
-                    styles.upcomingFilterButtonText,
-                    upcomingFilter === 'today' && styles.upcomingFilterButtonTextActive,
-                  ]}>
-                    Today
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.upcomingFilterButton,
-                    upcomingFilter === 'tomorrow' && styles.upcomingFilterButtonActive,
-                  ]}
-                  onPress={() => setUpcomingFilter('tomorrow')}
-                >
-                  <Text style={[
-                    styles.upcomingFilterButtonText,
-                    upcomingFilter === 'tomorrow' && styles.upcomingFilterButtonTextActive,
-                  ]}>
-                    Tomorrow
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Upcoming Tasks List */}
-              {getUpcomingTasks().filter(task => {
-                if (searchQuery.trim()) {
-                  const query = searchQuery.toLowerCase();
-                  const titleMatch = task.title.toLowerCase().includes(query);
-                  const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
-                  return titleMatch || descriptionMatch;
-                }
-                return true;
-              }).map(task => (
-                <TaskItem key={task.id} item={task} />
-              ))}
-              {getUpcomingTasks().length === 0 && (
-                <Text style={styles.emptyText}>
-                  {searchQuery.trim()
-                    ? 'No upcoming tasks found for your search.'
-                    : "No upcoming tasks. Tap 'New Task' to create your first task."
-                  }
-                </Text>
-              )}
-            </View>
-          </ScrollView>
-        ) : (
-          <ScrollView 
-            style={styles.scrollContainer} 
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {filteredTasks.length > 0 ? (
+        <ScrollView 
+          style={styles.scrollContainer} 
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {showCompletedTasks ? (
+            filteredTasks.length > 0 ? (
               renderCompletedTasksByDate()
             ) : (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyText}>No completed tasks yet.</Text>
               </View>
-            )}
-          </ScrollView>
-        )}
+            )
+          ) : (
+            <>
+              {/* Overdue Tasks Section */}
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionTitle}>Overdue</Text>
+                {getOverdueTasks().filter(task => {
+                  if (searchQuery.trim()) {
+                    const query = searchQuery.toLowerCase();
+                    const titleMatch = task.title.toLowerCase().includes(query);
+                    const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
+                    return titleMatch || descriptionMatch;
+                  }
+                  return true;
+                }).map(task => (
+                  <TaskItem key={task.id} item={task} />
+                ))}
+                {getOverdueTasks().length === 0 && (
+                  <Text style={styles.emptyText}>No overdue tasks</Text>
+                )}
+              </View>
+
+              {/* Upcoming Tasks Section */}
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionTitle}>Upcoming Tasks</Text>
+
+                {/* Upcoming Filters */}
+                <View style={styles.upcomingFiltersContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.upcomingFilterButton,
+                      upcomingFilter === 'all' && styles.upcomingFilterButtonActive,
+                    ]}
+                    onPress={() => setUpcomingFilter('all')}
+                  >
+                    <Text style={[
+                      styles.upcomingFilterButtonText,
+                      upcomingFilter === 'all' && styles.upcomingFilterButtonTextActive,
+                    ]}>
+                      All
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.upcomingFilterButton,
+                      upcomingFilter === 'today' && styles.upcomingFilterButtonActive,
+                    ]}
+                    onPress={() => setUpcomingFilter('today')}
+                  >
+                    <Text style={[
+                      styles.upcomingFilterButtonText,
+                      upcomingFilter === 'today' && styles.upcomingFilterButtonTextActive,
+                    ]}>
+                      Today
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.upcomingFilterButton,
+                      upcomingFilter === 'tomorrow' && styles.upcomingFilterButtonActive,
+                    ]}
+                    onPress={() => setUpcomingFilter('tomorrow')}
+                  >
+                    <Text style={[
+                      styles.upcomingFilterButtonText,
+                      upcomingFilter === 'tomorrow' && styles.upcomingFilterButtonTextActive,
+                    ]}>
+                      Tomorrow
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Upcoming Tasks List */}
+                {getUpcomingTasks().filter(task => {
+                  if (searchQuery.trim()) {
+                    const query = searchQuery.toLowerCase();
+                    const titleMatch = task.title.toLowerCase().includes(query);
+                    const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
+                    return titleMatch || descriptionMatch;
+                  }
+                  return true;
+                }).map(task => (
+                  <TaskItem key={task.id} item={task} />
+                ))}
+                {getUpcomingTasks().length === 0 && (
+                  <Text style={styles.emptyText}>
+                    {searchQuery.trim()
+                      ? 'No upcoming tasks found for your search.'
+                      : "No upcoming tasks. Tap 'New Task' to create your first task."
+                    }
+                  </Text>
+                )}
+              </View>
+            </>
+          )}
+        </ScrollView>
       </View>
 
       {/* Date Range Filter Modal */}
@@ -2015,39 +2000,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
 
-  tabsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    // backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    gap: 8,
-  },
-  tabButton: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    alignItems: 'center',
-  },
-  tabButtonActive: {
-    backgroundColor: '#000000',
-    borderColor: '#000000',
-  },
-  tabButtonText: {
-    fontSize: 14,
-    color: '#000000',
-    fontWeight: '500',
-    fontFamily: 'Inter',
-  },
-  tabButtonTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '500',
-  },
+  
   filtersContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
