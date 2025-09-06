@@ -44,6 +44,7 @@ export default function TasksScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [filter, setFilter] = useState<'all' | 'today' | 'tomorrow' | 'overdue'>('all');
+  const [upcomingFilter, setUpcomingFilter] = useState<'all' | 'today' | 'tomorrow'>('all');
   const [historyFilter, setHistoryFilter] = useState<'all' | 'completed' | 'overdue'>('all');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [historySearchQuery, setHistorySearchQuery] = useState('');
@@ -157,7 +158,7 @@ export default function TasksScreen() {
       });
     }
     setFilteredTasks(filtered);
-  }, [searchQuery, tasks, filter, activeTab, historyFilter]);
+  }, [searchQuery, tasks, filter, activeTab, historyFilter, upcomingFilter]);
 
   // Clear timeouts on component unmount
   useEffect(() => {
@@ -891,6 +892,55 @@ export default function TasksScreen() {
     return filtered;
   };
 
+  const getOverdueTasks = () => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    return tasks.filter(task => {
+      const taskDate = new Date(task.scheduledDate || task.createdAt);
+      const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
+      const isOverdue = taskDay < today && !task.isCompleted;
+      
+      // Include pending completion and temporary success messages
+      if (pendingCompletionTasks.has(task.id) || temporarySuccessMessages.has(task.id)) {
+        return isOverdue;
+      }
+      
+      return isOverdue && !task.isCompleted;
+    });
+  };
+
+  const getUpcomingTasks = () => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    return tasks.filter(task => {
+      const taskDate = new Date(task.scheduledDate || task.createdAt);
+      const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
+      const isOverdue = taskDay < today && !task.isCompleted;
+      
+      // Include pending completion and temporary success messages for upcoming only
+      if (pendingCompletionTasks.has(task.id) || temporarySuccessMessages.has(task.id)) {
+        return !isOverdue;
+      }
+      
+      // Only show non-completed, non-overdue tasks
+      if (task.isCompleted || isOverdue) return false;
+      
+      // Apply upcoming filter
+      if (upcomingFilter === 'today') {
+        return taskDay.getTime() === today.getTime();
+      }
+      if (upcomingFilter === 'tomorrow') {
+        return taskDay.getTime() === tomorrow.getTime();
+      }
+      // 'all' shows all upcoming tasks
+      return true;
+    });
+  };
+
   const getTaskStats = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -1567,35 +1617,102 @@ export default function TasksScreen() {
         {renderTabButton('completed', 'History')}
       </View>
 
-      {activeTab === 'active' && (
-        <View style={styles.filtersContainer}>
-          {renderFilterButton('all', 'All')}
-          {renderFilterButton('today', 'Today')}
-          {renderFilterButton('tomorrow', 'Tomorrow')}
-          {renderFilterButton('overdue', 'Overdue')}
-        </View>
-      )}
 
       {activeTab === 'active' ? (
-        <FlatList
-          data={filteredTasks}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <SwipeableTaskItem item={item} />}
-          contentContainerStyle={styles.tasksList}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
+        <ScrollView style={styles.tasksList} showsVerticalScrollIndicator={false}>
+          {/* Overdue Tasks Section */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Overdue</Text>
+            {getOverdueTasks().filter(task => {
+              if (searchQuery.trim()) {
+                const query = searchQuery.toLowerCase();
+                const titleMatch = task.title.toLowerCase().includes(query);
+                const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
+                return titleMatch || descriptionMatch;
+              }
+              return true;
+            }).map(task => (
+              <SwipeableTaskItem key={task.id} item={task} />
+            ))}
+            {getOverdueTasks().length === 0 && (
+              <Text style={styles.emptyText}>No overdue tasks</Text>
+            )}
+          </View>
+
+          {/* Upcoming Tasks Section */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Upcoming Tasks</Text>
+            
+            {/* Upcoming Filters */}
+            <View style={styles.upcomingFiltersContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.upcomingFilterButton,
+                  upcomingFilter === 'all' && styles.upcomingFilterButtonActive,
+                ]}
+                onPress={() => setUpcomingFilter('all')}
+              >
+                <Text style={[
+                  styles.upcomingFilterButtonText,
+                  upcomingFilter === 'all' && styles.upcomingFilterButtonTextActive,
+                ]}>
+                  All
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.upcomingFilterButton,
+                  upcomingFilter === 'today' && styles.upcomingFilterButtonActive,
+                ]}
+                onPress={() => setUpcomingFilter('today')}
+              >
+                <Text style={[
+                  styles.upcomingFilterButtonText,
+                  upcomingFilter === 'today' && styles.upcomingFilterButtonTextActive,
+                ]}>
+                  Today
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.upcomingFilterButton,
+                  upcomingFilter === 'tomorrow' && styles.upcomingFilterButtonActive,
+                ]}
+                onPress={() => setUpcomingFilter('tomorrow')}
+              >
+                <Text style={[
+                  styles.upcomingFilterButtonText,
+                  upcomingFilter === 'tomorrow' && styles.upcomingFilterButtonTextActive,
+                ]}>
+                  Tomorrow
+                </Text>
+              </TouchableOpacity>
+            </View>
+            
+            {/* Upcoming Tasks List */}
+            {getUpcomingTasks().filter(task => {
+              if (searchQuery.trim()) {
+                const query = searchQuery.toLowerCase();
+                const titleMatch = task.title.toLowerCase().includes(query);
+                const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
+                return titleMatch || descriptionMatch;
+              }
+              return true;
+            }).map(task => (
+              <SwipeableTaskItem key={task.id} item={task} />
+            ))}
+            {getUpcomingTasks().length === 0 && (
               <Text style={styles.emptyText}>
                 {searchQuery.trim()
-                  ? 'No tasks found for your search.'
-                  : filter === 'all'
-                  ? "No active tasks. Tap 'New Task' to create your first task."
-                  : `No ${filter} tasks found.`
+                  ? 'No upcoming tasks found for your search.'
+                  : "No upcoming tasks. Tap 'New Task' to create your first task."
                 }
               </Text>
-            </View>
-          }
-        />
+            )}
+          </View>
+        </ScrollView>
       ) : (
         <ScrollView style={styles.tasksList} showsVerticalScrollIndicator={false}>
           {filteredTasks.length > 0 ? (
