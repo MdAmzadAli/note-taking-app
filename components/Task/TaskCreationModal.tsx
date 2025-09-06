@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -7,6 +8,7 @@ import {
   StyleSheet,
   Alert,
   Switch,
+  Modal,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -199,132 +201,135 @@ export default function TaskCreationModal({
     }
   };
 
-  if (!visible) {
-    return null;
-  }
-
   return (
-    <View style={styles.container}>
-      <View style={styles.createTaskHeader}>
-        <TouchableOpacity
-          style={styles.backIconButton}
-          onPress={handleClose}
-        >
-          <IconSymbol size={24} name="chevron.left" color="#FFFFFF" />
-        </TouchableOpacity>
-        
-        <View style={styles.rightButtonsContainer}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={handleClose}
+    >
+      <View style={styles.container}>
+        <View style={styles.createTaskHeader}>
           <TouchableOpacity
-            style={styles.brushIconButton}
-            onPress={() => setShowColorThemePicker(true)}
+            style={styles.backIconButton}
+            onPress={handleClose}
           >
-            <IconSymbol size={24} name="gear" color="#FFFFFF" />
+            <IconSymbol size={24} name="chevron.left" color="#FFFFFF" />
           </TouchableOpacity>
           
-          <TouchableOpacity
-            style={styles.saveIconButton}
-            onPress={isEditing ? updateTask : createTask}
-          >
-            <IconSymbol size={24} name="checkmark" color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.transparentFormContainer}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.transparentLabel}>Task Title *</Text>
-          <TextInput
-            style={styles.transparentInput}
-            value={newTitle}
-            onChangeText={setNewTitle}
-            placeholder="Enter task title"
-            placeholderTextColor="#9CA3AF"
-          />
+          <View style={styles.rightButtonsContainer}>
+            <TouchableOpacity
+              style={styles.brushIconButton}
+              onPress={() => setShowColorThemePicker(true)}
+            >
+              <IconSymbol size={24} name="gear" color="#FFFFFF" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.saveIconButton}
+              onPress={isEditing ? updateTask : createTask}
+            >
+              <IconSymbol size={24} name="checkmark" color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.transparentLabel}>Description</Text>
-          <TextInput
-            style={styles.transparentTextArea}
-            value={newDescription}
-            onChangeText={setNewDescription}
-            placeholder="Enter task description (optional)"
-            placeholderTextColor="#9CA3AF"
-            multiline
-            numberOfLines={3}
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.transparentLabel}>Scheduled Date</Text>
-          <TouchableOpacity
-            style={styles.transparentDateButton}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Text style={styles.transparentDateButtonText}>
-              📅 {selectedDate.toLocaleDateString()}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <View style={styles.reminderHeader}>
-            <Text style={styles.transparentLabel}>Set Reminder</Text>
-            <Switch
-              value={hasReminder}
-              onValueChange={setHasReminder}
-              trackColor={{
-                false: '#374151',
-                true: '#FFFFFF',
-              }}
-              thumbColor={hasReminder ? '#000000' : '#9CA3AF'}
+        <View style={styles.transparentFormContainer}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.transparentLabel}>Task Title *</Text>
+            <TextInput
+              style={styles.transparentInput}
+              value={newTitle}
+              onChangeText={setNewTitle}
+              placeholder="Enter task title"
+              placeholderTextColor="#9CA3AF"
             />
           </View>
 
-          {hasReminder && (
+          <View style={styles.inputGroup}>
+            <Text style={styles.transparentLabel}>Description</Text>
+            <TextInput
+              style={styles.transparentTextArea}
+              value={newDescription}
+              onChangeText={setNewDescription}
+              placeholder="Enter task description (optional)"
+              placeholderTextColor="#9CA3AF"
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.transparentLabel}>Scheduled Date</Text>
             <TouchableOpacity
-              style={styles.transparentTimeButton}
-              onPress={() => setShowTimePicker(true)}
+              style={styles.transparentDateButton}
+              onPress={() => setShowDatePicker(true)}
             >
-              <Text style={styles.transparentTimeButtonText}>
-                🕐 {reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              <Text style={styles.transparentDateButtonText}>
+                📅 {selectedDate.toLocaleDateString()}
               </Text>
             </TouchableOpacity>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <View style={styles.reminderHeader}>
+              <Text style={styles.transparentLabel}>Set Reminder</Text>
+              <Switch
+                value={hasReminder}
+                onValueChange={setHasReminder}
+                trackColor={{
+                  false: '#374151',
+                  true: '#FFFFFF',
+                }}
+                thumbColor={hasReminder ? '#000000' : '#9CA3AF'}
+              />
+            </View>
+
+            {hasReminder && (
+              <TouchableOpacity
+                style={styles.transparentTimeButton}
+                onPress={() => setShowTimePicker(true)}
+              >
+                <Text style={styles.transparentTimeButtonText}>
+                  🕐 {reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {showDatePicker && (
+            <DateTimePicker
+              value={selectedDate}
+              mode="date"
+              display="default"
+              onChange={onDateChange}
+              minimumDate={new Date()}
+            />
+          )}
+
+          {showTimePicker && (
+            <DateTimePicker
+              value={reminderTime}
+              mode="time"
+              display="default"
+              onChange={onTimeChange}
+            />
           )}
         </View>
 
-        {showDatePicker && (
-          <DateTimePicker
-            value={selectedDate}
-            mode="date"
-            display="default"
-            onChange={onDateChange}
-            minimumDate={new Date()}
-          />
-        )}
-
-        {showTimePicker && (
-          <DateTimePicker
-            value={reminderTime}
-            mode="time"
-            display="default"
-            onChange={onTimeChange}
-          />
-        )}
+        {/* Color Theme Picker Modal */}
+        <ColorThemePicker
+          visible={showColorThemePicker}
+          onClose={() => setShowColorThemePicker(false)}
+          onThemeSelect={(color) => setSelectedTheme(color)}
+          onFontStyleSelect={(font) => setSelectedFont(font || 'default')}
+          selectedTheme={selectedTheme}
+          selectedFontStyle={selectedFont === 'default' ? undefined : selectedFont}
+          title="Task Style"
+          mode="task"
+        />
       </View>
-
-      {/* Color Theme Picker Modal */}
-      <ColorThemePicker
-        visible={showColorThemePicker}
-        onClose={() => setShowColorThemePicker(false)}
-        onThemeSelect={(color) => setSelectedTheme(color)}
-        onFontStyleSelect={(font) => setSelectedFont(font || 'default')}
-        selectedTheme={selectedTheme}
-        selectedFontStyle={selectedFont === 'default' ? undefined : selectedFont}
-        title="Task Style"
-        mode="task"
-      />
-    </View>
+    </Modal>
   );
 }
 
