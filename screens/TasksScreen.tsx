@@ -23,13 +23,14 @@ import SlideMenu from '@/components/ui/SlideMenu';
 import ColorThemePicker from '@/components/Notes/ColorThemePicker';
 import { getTaskCategories } from '@/utils/storage';
 import { Task } from '@/types';
-import { getTasks, saveTask, deleteTask, updateTask, getUserSettings } from '@/utils/storage';
+import { getTasks, saveTask, deleteTask, getUserSettings } from '@/utils/storage';
 import { scheduleNotification, cancelNotification } from '@/utils/notifications';
 import { eventBus, EVENTS } from '@/utils/eventBus';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 import SearchResultsModal from '@/components/SearchResultsModal';
+import TaskCreationModal from '@/components/Task/TaskCreationModal';
 
 export default function TasksScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -38,16 +39,9 @@ export default function TasksScreen() {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
   const [voiceSearchResults, setVoiceSearchResults] = useState<any[]>([]);
-  const [isCreating, setIsCreating] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [newTitle, setNewTitle] = useState('');
-  const [newDescription, setNewDescription] = useState('');
-  const [selectedDate, setSelectedDate] = useState(getTomorrowDate());
-  const [reminderTime, setReminderTime] = useState(new Date());
-  const [hasReminder, setHasReminder] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
   const [filter, setFilter] = useState<'all' | 'today' | 'tomorrow' | 'overdue'>('all');
   const [upcomingFilter, setUpcomingFilter] = useState<'all' | 'today' | 'tomorrow'>('all');
   const [historyFilter, setHistoryFilter] = useState<'all' | 'completed' | 'overdue'>('all');
@@ -463,158 +457,7 @@ export default function TasksScreen() {
     }
   };
 
-  const createTask = async () => {
-    if (!newTitle.trim()) {
-      Alert.alert('Error', 'Please enter a task title');
-      return;
-    }
 
-    try {
-      console.log('[TASK] Creating new task...');
-      const task: Task = {
-        id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        title: newTitle.trim(),
-        description: newDescription.trim(),
-        isCompleted: false,
-        scheduledDate: selectedDate.toISOString(),
-        createdAt: new Date().toISOString(),
-        categoryId: selectedCategoryId || undefined,
-      };
-
-      console.log('[TASK] Generated task ID:', task.id);
-
-      // Schedule reminder if enabled
-      if (hasReminder) {
-        const reminderDate = new Date(selectedDate);
-        reminderDate.setHours(reminderTime.getHours());
-        reminderDate.setMinutes(reminderTime.getMinutes());
-
-        const notificationId = await scheduleNotification(
-          `Task Reminder`,
-          `Task: ${task.title}`,
-          reminderDate
-        );
-
-        if (notificationId) {
-          task.notificationId = notificationId;
-          task.reminderTime = reminderDate.toISOString();
-        }
-      }
-
-      console.log('[TASK] Saving task to storage...');
-      await saveTask(task);
-
-      console.log('[TASK] Adding task to state directly...');
-      // Add task to state directly - DO NOT emit event to prevent double creation
-      setTasks(prevTasks => {
-        // Double-check for duplicates
-        const existingTask = prevTasks.find(t => t.id === task.id);
-        if (existingTask) {
-          console.log('[TASK] Duplicate task detected, not adding again');
-          return prevTasks;
-        }
-        return [task, ...prevTasks];
-      });
-
-      console.log('[TASK] Task creation completed successfully');
-
-      // Reset form
-      setNewTitle('');
-      setNewDescription('');
-      setSelectedDate(getTomorrowDate());
-      setReminderTime(new Date());
-      setHasReminder(false);
-      setIsCreating(false);
-    } catch (error) {
-      console.error('[TASK] Error creating task:', error);
-      Alert.alert('Error', 'Failed to create task');
-    }
-  };
-
-  const startEditingTask = (task: Task) => {
-    // Prevent editing of completed tasks
-    if (task.isCompleted) {
-      return;
-    }
-
-    setEditingTask(task);
-    setNewTitle(task.title);
-    setNewDescription(task.description || '');
-    setSelectedDate(new Date(task.scheduledDate || task.createdAt));
-    if (task.reminderTime) {
-      setReminderTime(new Date(task.reminderTime));
-      setHasReminder(true);
-    } else {
-      setHasReminder(false);
-    }
-    setIsEditing(true);
-  };
-
-  const updateTask = async () => {
-    if (!editingTask || !newTitle.trim()) {
-      Alert.alert('Error', 'Please enter a task title');
-      return;
-    }
-
-    try {
-      console.log('[TASK] Updating task:', editingTask.id);
-
-      // Cancel old notification if exists
-      if (editingTask.notificationId) {
-        await cancelNotification(editingTask.notificationId);
-      }
-
-      const updatedTask: Task = {
-        ...editingTask,
-        title: newTitle.trim(),
-        description: newDescription.trim(),
-        scheduledDate: selectedDate.toISOString(),
-        reminderTime: undefined,
-        notificationId: undefined,
-      };
-
-      // Schedule reminder if enabled
-      if (hasReminder) {
-        const reminderDate = new Date(selectedDate);
-        reminderDate.setHours(reminderTime.getHours());
-        reminderDate.setMinutes(reminderTime.getMinutes());
-
-        const notificationId = await scheduleNotification(
-          `Task Reminder`,
-          `Task: ${updatedTask.title}`,
-          reminderDate
-        );
-
-        if (notificationId) {
-          updatedTask.notificationId = notificationId;
-          updatedTask.reminderTime = reminderDate.toISOString();
-        }
-      }
-
-      console.log('[TASK] Saving updated task to storage...');
-      await saveTask(updatedTask);
-
-      console.log('[TASK] Updating task in state directly...');
-      // Update task in state directly - DO NOT emit event to prevent double updates
-      setTasks(prevTasks => 
-        prevTasks.map(t => t.id === updatedTask.id ? updatedTask : t)
-      );
-
-      console.log('[TASK] Task update completed successfully');
-
-      // Reset form
-      setNewTitle('');
-      setNewDescription('');
-      setSelectedDate(getTomorrowDate());
-      setReminderTime(new Date());
-      setHasReminder(false);
-      setIsEditing(false);
-      setEditingTask(null);
-    } catch (error) {
-      console.error('[TASK] Error updating task:', error);
-      Alert.alert('Error', 'Failed to update task');
-    }
-  };
 
   const showCelebrationAnimation = () => {
     setShowTopCelebration(true);
@@ -1078,19 +921,6 @@ export default function TasksScreen() {
     };
   };
 
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      setSelectedDate(selectedDate);
-    }
-  };
-
-  const onTimeChange = (event: any, selectedTime?: Date) => {
-    setShowTimePicker(false);
-    if (selectedTime) {
-      setReminderTime(selectedTime);
-    }
-  };
 
   const onFromDateChange = (event: any, selectedDate?: Date) => {
     setShowFromDatePicker(false);
@@ -1210,7 +1040,7 @@ export default function TasksScreen() {
             );
             return;
           }
-          startEditingTask(item);
+          handleEditTask(item);
         }}
       >
         <View style={styles.taskHeader}>
@@ -1354,7 +1184,7 @@ export default function TasksScreen() {
               style={styles.filterIconButton}
               onPress={() => setShowDateRangeModal(true)}
             >
-              <IconSymbol size={20} name="line.3.horizontal" color="#FFFFFF" />
+              <IconSymbol size={20} name="line.horizontal.3" color="#FFFFFF" />
             </TouchableOpacity>
           </View>
           {(fromDate && toDate) && (
@@ -1508,133 +1338,50 @@ export default function TasksScreen() {
     setSearchQuery(''); // Clear search when showing all
   };
 
-  if (isCreating || isEditing) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.createTaskHeader}>
-          <TouchableOpacity
-            style={styles.backIconButton}
-            onPress={() => {
-              setIsCreating(false);
-              setIsEditing(false);
-              setEditingTask(null);
-              setNewTitle('');
-              setNewDescription('');
-              setSelectedDate(getTomorrowDate());
-              setHasReminder(false);
-            }}
-          >
-            <IconSymbol size={24} name="arrow.left" color="#FFFFFF" />
-          </TouchableOpacity>
-          
-          <View style={styles.rightButtonsContainer}>
-            <TouchableOpacity
-              style={styles.brushIconButton}
-              onPress={() => setShowColorThemePicker(true)}
-            >
-              <IconSymbol size={24} name="paintbrush" color="#FFFFFF" />
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.saveIconButton}
-              onPress={isEditing ? updateTask : createTask}
-            >
-              <IconSymbol size={24} name="checkmark" color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-        </View>
+  // Modal handlers
+  const handleCreateTask = () => {
+    setIsEditing(false);
+    setEditingTask(null);
+    setShowTaskModal(true);
+  };
 
-        <View style={styles.transparentFormContainer}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.transparentLabel}>Task Title *</Text>
-            <TextInput
-              style={styles.transparentInput}
-              value={newTitle}
-              onChangeText={setNewTitle}
-              placeholder="Enter task title"
-              placeholderTextColor="#9CA3AF"
-            />
-          </View>
+  const handleEditTask = (task: Task) => {
+    if (task.isCompleted) {
+      return;
+    }
+    setIsEditing(true);
+    setEditingTask(task);
+    setShowTaskModal(true);
+  };
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.transparentLabel}>Description</Text>
-            <TextInput
-              style={styles.transparentTextArea}
-              value={newDescription}
-              onChangeText={setNewDescription}
-              placeholder="Enter task description (optional)"
-              placeholderTextColor="#9CA3AF"
-              multiline
-              numberOfLines={3}
-            />
-          </View>
+  const handleCloseTaskModal = () => {
+    setShowTaskModal(false);
+    setIsEditing(false);
+    setEditingTask(null);
+  };
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.transparentLabel}>Scheduled Date</Text>
-            <TouchableOpacity
-              style={styles.transparentDateButton}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Text style={styles.transparentDateButtonText}>
-                📅 {selectedDate.toLocaleDateString()}
-              </Text>
-            </TouchableOpacity>
-          </View>
+  const handleTaskCreated = (task: Task) => {
+    setTasks(prevTasks => {
+      const existingTask = prevTasks.find(t => t.id === task.id);
+      if (existingTask) {
+        return prevTasks;
+      }
+      return [task, ...prevTasks];
+    });
+  };
 
-          <View style={styles.inputGroup}>
-            <View style={styles.reminderHeader}>
-              <Text style={styles.transparentLabel}>Set Reminder</Text>
-              <Switch
-                value={hasReminder}
-                onValueChange={setHasReminder}
-                trackColor={{
-                  false: '#374151',
-                  true: '#FFFFFF',
-                }}
-                thumbColor={hasReminder ? '#000000' : '#9CA3AF'}
-              />
-            </View>
-
-            {hasReminder && (
-              <TouchableOpacity
-                style={styles.transparentTimeButton}
-                onPress={() => setShowTimePicker(true)}
-              >
-                <Text style={styles.transparentTimeButtonText}>
-                  🕐 {reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {showDatePicker && (
-            <DateTimePicker
-              value={selectedDate}
-              mode="date"
-              display="default"
-              onChange={onDateChange}
-              minimumDate={new Date()}
-            />
-          )}
-
-          {showTimePicker && (
-            <DateTimePicker
-              value={reminderTime}
-              mode="time"
-              display="default"
-              onChange={onTimeChange}
-            />
-          )}
-        </View>
-      </View>
+  const handleTaskUpdated = (updatedTask: Task) => {
+    setTasks(prevTasks => 
+      prevTasks.map(t => t.id === updatedTask.id ? updatedTask : t)
     );
-  }
+  };
+
 
   return (
     <GestureHandlerRootView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.hamburgerButton} onPress={openMenu}>
-          <IconSymbol size={24} name="line.3.horizontal" color="#FFFFFF" />
+          <IconSymbol size={24} name="line.horizontal.3" color="#FFFFFF" />
         </TouchableOpacity>
 
         <View style={styles.searchContainer}>
@@ -1908,8 +1655,18 @@ export default function TasksScreen() {
         results={voiceSearchResults}
       />
 
+      <TaskCreationModal
+        visible={showTaskModal}
+        isEditing={isEditing}
+        editingTask={editingTask}
+        onClose={handleCloseTaskModal}
+        onTaskCreated={handleTaskCreated}
+        onTaskUpdated={handleTaskUpdated}
+        selectedCategoryId={selectedCategoryId}
+      />
+
       <FloatingActionButton
-        onPress={() => setIsCreating(true)}
+        onPress={handleCreateTask}
         iconName="add"
         iconSize={28}
         iconColor="#000000"
