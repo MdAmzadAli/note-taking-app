@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Task } from '@/types';
+import TaskCard from './TaskCard';
 
 interface TaskCalendarModalProps {
   visible: boolean;
@@ -24,10 +25,6 @@ interface CalendarDay {
   isToday: boolean;
   isSelected: boolean;
   taskCount: number;
-}
-
-interface TaskItemProps {
-  task: Task;
 }
 
 const TaskCalendarModal: React.FC<TaskCalendarModalProps> = ({
@@ -118,36 +115,7 @@ const TaskCalendarModal: React.FC<TaskCalendarModalProps> = ({
     setSelectedDate(day.date);
   };
 
-  const TaskItem: React.FC<TaskItemProps> = ({ task }) => (
-    <View style={styles.taskItem}>
-      <View style={styles.taskHeader}>
-        <Text style={styles.taskTitle} numberOfLines={1}>
-          {task.title}
-        </Text>
-        <View style={[
-          styles.taskStatus,
-          task.isCompleted ? styles.taskCompleted : styles.taskPending
-        ]}>
-          <Text style={styles.taskStatusText}>
-            {task.isCompleted ? 'Done' : 'Pending'}
-          </Text>
-        </View>
-      </View>
-      {task.description && (
-        <Text style={styles.taskDescription} numberOfLines={2}>
-          {task.description}
-        </Text>
-      )}
-      {task.scheduledDate && (
-        <Text style={styles.taskTime}>
-          {new Date(task.scheduledDate).toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          })}
-        </Text>
-      )}
-    </View>
-  );
+  
 
   const renderCalendarDay = (day: CalendarDay, index: number) => (
     <TouchableOpacity
@@ -248,13 +216,18 @@ const TaskCalendarModal: React.FC<TaskCalendarModalProps> = ({
           </Text>
           
           {tasksForSelectedDate.length > 0 ? (
-            <FlatList
-              data={tasksForSelectedDate}
-              renderItem={({ item }) => <TaskItem task={item} />}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.tasksList}
-            />
+            <View style={styles.tasksList}>
+              {tasksForSelectedDate.map(task => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onPress={() => {}} // No edit functionality in calendar modal
+                  onComplete={() => {}} // No completion functionality in calendar modal
+                  onDelete={() => {}} // No delete functionality in calendar modal
+                  showCompletedTasks={false}
+                />
+              ))}
+            </View>
           ) : (
             <View style={styles.emptyTasks}>
               <Text style={styles.emptyTasksText}>
@@ -402,58 +375,6 @@ const styles = StyleSheet.create({
   },
   tasksList: {
     paddingBottom: 20,
-  },
-  taskItem: {
-    backgroundColor: '#333333',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#444444',
-  },
-  taskHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  taskTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#FFFFFF',
-    fontFamily: 'Inter',
-    flex: 1,
-    marginRight: 12,
-  },
-  taskStatus: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  taskCompleted: {
-    backgroundColor: '#10B981',
-  },
-  taskPending: {
-    backgroundColor: '#F59E0B',
-  },
-  taskStatusText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#FFFFFF',
-    fontFamily: 'Inter',
-  },
-  taskDescription: {
-    fontSize: 14,
-    color: '#CCCCCC',
-    fontFamily: 'Inter',
-    marginBottom: 8,
-    lineHeight: 20,
-  },
-  taskTime: {
-    fontSize: 12,
-    color: '#999999',
-    fontFamily: 'Inter',
-    fontWeight: '500',
   },
   emptyTasks: {
     flex: 1,
