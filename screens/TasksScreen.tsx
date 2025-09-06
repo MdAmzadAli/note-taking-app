@@ -1927,7 +1927,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
     paddingVertical: 12,
   },
   headerButtons: {
