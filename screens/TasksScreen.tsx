@@ -1029,7 +1029,7 @@ export default function TasksScreen() {
           styles.taskItem,
           item.isCompleted && styles.completedTask,
           celebrationTaskId === item.id && styles.celebrationTask,
-          item.theme && { backgroundColor: item.theme }
+          item.theme && { backgroundColor: item.theme, borderColor: '#FFFFFF' }
         ]}
         onPress={() => {
           if (item.isCompleted) {
