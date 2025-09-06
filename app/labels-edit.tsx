@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Alert,
   StatusBar,
   Platform,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -113,9 +115,26 @@ export default function EditScreen() {
   const [newItemName, setNewItemName] = useState('');
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingItemName, setEditingItemName] = useState('');
+  
+  // Animation setup
+  const slideAnim = useRef(new Animated.Value(Dimensions.get('window').width)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadItems();
+    // Start entrance animation
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: true,
+      })
+    ]).start();
   }, [type]);
 
   const loadItems = async () => {
@@ -230,17 +249,44 @@ export default function EditScreen() {
     setEditingItemName('');
   };
 
+  const handleBackPress = () => {
+    // Start exit animation before navigating back
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: Dimensions.get('window').width,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      })
+    ]).start(() => {
+      router.back();
+    });
+  };
+
   return (
     <AppLayout>
-      {/* Navbar */}
-      <View style={styles.navbar}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#E8EAED" />
-        </TouchableOpacity>
-        <Text style={styles.navbarTitle}>{config.title}</Text>
-      </View>
+      <Animated.View 
+        style={[
+          styles.container,
+          {
+            transform: [{ translateX: slideAnim }],
+            opacity: fadeAnim,
+          }
+        ]}
+      >
+        {/* Navbar */}
+        <View style={styles.navbar}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
+            <Ionicons name="arrow-back" size={24} color="#E8EAED" />
+          </TouchableOpacity>
+          <Text style={styles.navbarTitle}>{config.title}</Text>
+        </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Create New Item Section */}
         <View style={styles.createSection}>
           <TouchableOpacity 
@@ -323,12 +369,16 @@ export default function EditScreen() {
             </View>
           ))}
         </View>
-      </ScrollView>
+        </ScrollView>
+      </Animated.View>
     </AppLayout>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   navbar: {
     flexDirection: 'row',
     alignItems: 'center',
