@@ -935,6 +935,11 @@ export default function TasksScreen() {
       const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
       const isOverdue = taskDay < today && !task.isCompleted;
 
+      // Apply category filter if a category is selected
+      if (selectedCategoryId && task.categoryId !== selectedCategoryId) {
+        return false;
+      }
+
       // Include pending completion and temporary success messages
       if (pendingCompletionTasks.has(task.id) || temporarySuccessMessages.has(task.id)) {
         return isOverdue;
@@ -954,6 +959,11 @@ export default function TasksScreen() {
       const taskDate = new Date(task.scheduledDate || task.createdAt);
       const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
       const isOverdue = taskDay < today && !task.isCompleted;
+
+      // Apply category filter if a category is selected
+      if (selectedCategoryId && task.categoryId !== selectedCategoryId) {
+        return false;
+      }
 
       // Include pending completion and temporary success messages for upcoming only
       if (pendingCompletionTasks.has(task.id) || temporarySuccessMessages.has(task.id)) {
