@@ -51,17 +51,6 @@ export default function SlideMenu({
   sections,
   selectedItemId
 }: SlideMenuProps) {
-  
-  // Ensure smooth opening animation when visible changes
-  useEffect(() => {
-    if (visible) {
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [visible, slideAnim]);
 
   const handleItemPress = (item: MenuItem) => {
     if (item.onPress) {

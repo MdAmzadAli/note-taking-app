@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,8 +10,6 @@ import {
   Alert,
   StatusBar,
   Platform,
-  Animated,
-  Dimensions,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -115,31 +113,10 @@ export default function EditScreen() {
   const [newItemName, setNewItemName] = useState('');
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingItemName, setEditingItemName] = useState('');
-  
-  // Animation setup
-  const slideAnim = useRef(new Animated.Value(Dimensions.get('window').width)).current;
 
   useEffect(() => {
     loadItems();
-    
-    // Start opening animation
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
   }, [type]);
-
-  const handleBack = () => {
-    // Close animation before navigating back
-    Animated.timing(slideAnim, {
-      toValue: Dimensions.get('window').width,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      router.back();
-    });
-  };
 
   const loadItems = async () => {
     try {
@@ -255,14 +232,13 @@ export default function EditScreen() {
 
   return (
     <AppLayout>
-      <Animated.View style={[styles.container, { transform: [{ translateX: slideAnim }] }]}>
-        {/* Navbar */}
-        <View style={styles.navbar}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color="#E8EAED" />
-          </TouchableOpacity>
-          <Text style={styles.navbarTitle}>{config.title}</Text>
-        </View>
+      {/* Navbar */}
+      <View style={styles.navbar}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#E8EAED" />
+        </TouchableOpacity>
+        <Text style={styles.navbarTitle}>{config.title}</Text>
+      </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Create New Item Section */}
@@ -348,15 +324,11 @@ export default function EditScreen() {
           ))}
         </View>
       </ScrollView>
-      </Animated.View>
     </AppLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   navbar: {
     flexDirection: 'row',
     alignItems: 'center',
