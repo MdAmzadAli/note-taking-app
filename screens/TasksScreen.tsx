@@ -2086,8 +2086,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
   modalButtonDisabled: {
-    backgroundColor: '#4B5563',
-    borderColor: '#4B5563',
+    backgroundColor: '#808080',
+    borderColor: '#808080',
   },
   historyFiltersContainer: {
     flexDirection: 'row',
