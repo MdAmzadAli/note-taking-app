@@ -1238,6 +1238,12 @@ export default function TasksScreen() {
                   🔔 {new Date(item.reminderTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </Text>
               )}
+
+              {!selectedCategoryId && item.categoryId && (
+                <Text style={styles.taskCategory}>
+                  🏷️ {taskCategories.find(cat => cat.id === item.categoryId)?.name || 'Unknown Category'}
+                </Text>
+              )}
             </View>
           </View>
 
@@ -2160,6 +2166,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
   reminderTime: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  taskCategory: {
     fontSize: 13,
     color: '#6B7280',
     fontWeight: '500',
