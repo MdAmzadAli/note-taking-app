@@ -284,6 +284,7 @@ const styles = StyleSheet.create({
   },
   selectedMenuItem: {
     backgroundColor: '#00FF7F',
+    color:'#000000',
     borderRadius: 24,
   },
 });
