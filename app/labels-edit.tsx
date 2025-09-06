@@ -129,11 +129,11 @@ export default function EditScreen() {
         duration: 300,
         useNativeDriver: true,
       }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 250,
-        useNativeDriver: true,
-      })
+      // Animated.timing(fadeAnim, {
+      //   toValue: 1,
+      //   duration: 250,
+      //   useNativeDriver: true,
+      // })
     ]).start();
   }, [type]);
 
