@@ -1829,7 +1829,7 @@ export default function TasksScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: '#000000',
   },
   header: {
     flexDirection: 'row',
@@ -2352,7 +2352,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#6B7280',
+    color: '#FFFFFF',
     textAlign: 'center',
     fontFamily: 'Inter',
     lineHeight: 25.6,
@@ -2546,6 +2546,49 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
   historyFilterButtonTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  sectionContainer: {
+    marginBottom: 24,
+    paddingHorizontal: 0,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    fontFamily: 'Inter',
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  upcomingFiltersContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+    marginBottom: 12,
+  },
+  upcomingFilterButton: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  upcomingFilterButtonActive: {
+    backgroundColor: '#333333',
+    borderColor: '#555555',
+  },
+  upcomingFilterButtonText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  upcomingFilterButtonTextActive: {
     color: '#FFFFFF',
     fontWeight: '600',
   },
