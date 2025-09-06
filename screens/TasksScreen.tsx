@@ -856,8 +856,8 @@ export default function TasksScreen() {
         if (temporarySuccessMessages.has(task.id)) {
           return true;
         }
-        // Filter out completed tasks and overdue tasks (they go to history)
-        if (task.isCompleted || isOverdue) return false;
+        // Only filter out completed tasks (overdue tasks stay in active tab)
+        if (task.isCompleted) return false;
       }
 
       if (activeTab === 'completed') {
@@ -869,8 +869,8 @@ export default function TasksScreen() {
         if (temporarySuccessMessages.has(task.id)) {
           return false;
         }
-        // Show completed tasks and overdue tasks in history tab
-        if (!task.isCompleted && !isOverdue) return false;
+        // Only show completed tasks in history tab
+        if (!task.isCompleted) return false;
       }
 
       const activeTabFilters = {
