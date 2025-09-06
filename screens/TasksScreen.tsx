@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 // Removed uuid import - using custom ID generation for React Native compatibility
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import FloatingActionButton from '@/components/ui/FloatingActionButton';
@@ -76,6 +76,26 @@ export default function TasksScreen() {
   // New state for categories
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
+
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const [taskCategories, setTaskCategories] = useState<{ id: string; name: string; createdAt: string }[]>([]);
+
+  const loadTaskCategories = useCallback(async () => {
+    try {
+      const categories = await getTaskCategories();
+      setTaskCategories(categories);
+    } catch (error) {
+      console.error('Error loading task categories:', error);
+      setTaskCategories([]);
+    }
+  }, []);
+
+  // Reload categories when the screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      loadTaskCategories();
+    }, [loadTaskCategories])
+  );
 
   useEffect(() => {
     loadTasksAndSettings();
@@ -1476,23 +1496,6 @@ export default function TasksScreen() {
       </Text>
     </TouchableOpacity>
   );
-
-  const [isMenuVisible, setIsMenuVisible] = useState(false);
-  const [taskCategories, setTaskCategories] = useState<{ id: string; name: string; createdAt: string }[]>([]);
-
-  const loadTaskCategories = async () => {
-    try {
-      const categories = await getTaskCategories();
-      setTaskCategories(categories);
-    } catch (error) {
-      console.error('Error loading task categories:', error);
-      setTaskCategories([]);
-    }
-  };
-
-  useEffect(() => {
-    loadTaskCategories();
-  }, []);
 
   const openMenu = () => {
     setIsMenuVisible(true);
