@@ -1618,112 +1618,122 @@ export default function TasksScreen() {
       </View>
 
 
-      {activeTab === 'active' ? (
-        <ScrollView style={styles.tasksList} showsVerticalScrollIndicator={false}>
-          {/* Overdue Tasks Section */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Overdue</Text>
-            {getOverdueTasks().filter(task => {
-              if (searchQuery.trim()) {
-                const query = searchQuery.toLowerCase();
-                const titleMatch = task.title.toLowerCase().includes(query);
-                const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
-                return titleMatch || descriptionMatch;
-              }
-              return true;
-            }).map(task => (
-              <SwipeableTaskItem key={task.id} item={task} />
-            ))}
-            {getOverdueTasks().length === 0 && (
-              <Text style={styles.emptyText}>No overdue tasks</Text>
-            )}
-          </View>
-
-          {/* Upcoming Tasks Section */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Upcoming Tasks</Text>
-            
-            {/* Upcoming Filters */}
-            <View style={styles.upcomingFiltersContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.upcomingFilterButton,
-                  upcomingFilter === 'all' && styles.upcomingFilterButtonActive,
-                ]}
-                onPress={() => setUpcomingFilter('all')}
-              >
-                <Text style={[
-                  styles.upcomingFilterButtonText,
-                  upcomingFilter === 'all' && styles.upcomingFilterButtonTextActive,
-                ]}>
-                  All
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[
-                  styles.upcomingFilterButton,
-                  upcomingFilter === 'today' && styles.upcomingFilterButtonActive,
-                ]}
-                onPress={() => setUpcomingFilter('today')}
-              >
-                <Text style={[
-                  styles.upcomingFilterButtonText,
-                  upcomingFilter === 'today' && styles.upcomingFilterButtonTextActive,
-                ]}>
-                  Today
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[
-                  styles.upcomingFilterButton,
-                  upcomingFilter === 'tomorrow' && styles.upcomingFilterButtonActive,
-                ]}
-                onPress={() => setUpcomingFilter('tomorrow')}
-              >
-                <Text style={[
-                  styles.upcomingFilterButtonText,
-                  upcomingFilter === 'tomorrow' && styles.upcomingFilterButtonTextActive,
-                ]}>
-                  Tomorrow
-                </Text>
-              </TouchableOpacity>
-            </View>
-            
-            {/* Upcoming Tasks List */}
-            {getUpcomingTasks().filter(task => {
-              if (searchQuery.trim()) {
-                const query = searchQuery.toLowerCase();
-                const titleMatch = task.title.toLowerCase().includes(query);
-                const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
-                return titleMatch || descriptionMatch;
-              }
-              return true;
-            }).map(task => (
-              <SwipeableTaskItem key={task.id} item={task} />
-            ))}
-            {getUpcomingTasks().length === 0 && (
-              <Text style={styles.emptyText}>
-                {searchQuery.trim()
-                  ? 'No upcoming tasks found for your search.'
-                  : "No upcoming tasks. Tap 'New Task' to create your first task."
+      <View style={styles.contentContainer}>
+        {activeTab === 'active' ? (
+          <ScrollView 
+            style={styles.scrollContainer} 
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Overdue Tasks Section */}
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>Overdue</Text>
+              {getOverdueTasks().filter(task => {
+                if (searchQuery.trim()) {
+                  const query = searchQuery.toLowerCase();
+                  const titleMatch = task.title.toLowerCase().includes(query);
+                  const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
+                  return titleMatch || descriptionMatch;
                 }
-              </Text>
-            )}
-          </View>
-        </ScrollView>
-      ) : (
-        <ScrollView style={styles.tasksList} showsVerticalScrollIndicator={false}>
-          {filteredTasks.length > 0 ? (
-            renderCompletedTasksByDate()
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No completed tasks yet.</Text>
+                return true;
+              }).map(task => (
+                <SwipeableTaskItem key={task.id} item={task} />
+              ))}
+              {getOverdueTasks().length === 0 && (
+                <Text style={styles.emptyText}>No overdue tasks</Text>
+              )}
             </View>
-          )}
-        </ScrollView>
-      )}
+
+            {/* Upcoming Tasks Section */}
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>Upcoming Tasks</Text>
+              
+              {/* Upcoming Filters */}
+              <View style={styles.upcomingFiltersContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.upcomingFilterButton,
+                    upcomingFilter === 'all' && styles.upcomingFilterButtonActive,
+                  ]}
+                  onPress={() => setUpcomingFilter('all')}
+                >
+                  <Text style={[
+                    styles.upcomingFilterButtonText,
+                    upcomingFilter === 'all' && styles.upcomingFilterButtonTextActive,
+                  ]}>
+                    All
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.upcomingFilterButton,
+                    upcomingFilter === 'today' && styles.upcomingFilterButtonActive,
+                  ]}
+                  onPress={() => setUpcomingFilter('today')}
+                >
+                  <Text style={[
+                    styles.upcomingFilterButtonText,
+                    upcomingFilter === 'today' && styles.upcomingFilterButtonTextActive,
+                  ]}>
+                    Today
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.upcomingFilterButton,
+                    upcomingFilter === 'tomorrow' && styles.upcomingFilterButtonActive,
+                  ]}
+                  onPress={() => setUpcomingFilter('tomorrow')}
+                >
+                  <Text style={[
+                    styles.upcomingFilterButtonText,
+                    upcomingFilter === 'tomorrow' && styles.upcomingFilterButtonTextActive,
+                  ]}>
+                    Tomorrow
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              {/* Upcoming Tasks List */}
+              {getUpcomingTasks().filter(task => {
+                if (searchQuery.trim()) {
+                  const query = searchQuery.toLowerCase();
+                  const titleMatch = task.title.toLowerCase().includes(query);
+                  const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
+                  return titleMatch || descriptionMatch;
+                }
+                return true;
+              }).map(task => (
+                <SwipeableTaskItem key={task.id} item={task} />
+              ))}
+              {getUpcomingTasks().length === 0 && (
+                <Text style={styles.emptyText}>
+                  {searchQuery.trim()
+                    ? 'No upcoming tasks found for your search.'
+                    : "No upcoming tasks. Tap 'New Task' to create your first task."
+                  }
+                </Text>
+              )}
+            </View>
+          </ScrollView>
+        ) : (
+          <ScrollView 
+            style={styles.scrollContainer} 
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {filteredTasks.length > 0 ? (
+              renderCompletedTasksByDate()
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No completed tasks yet.</Text>
+              </View>
+            )}
+          </ScrollView>
+        )}
+      </View>
 
       {/* Date Range Filter Modal */}
       {showDateRangeModal && (
@@ -1969,8 +1979,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '500',
   },
-  tasksList: {
+  contentContainer: {
+    flex: 1,
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
     padding: 16,
+    paddingBottom: 100,
   },
   taskItem: {
     backgroundColor: '#FFFFFF',
