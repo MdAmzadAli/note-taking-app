@@ -1459,15 +1459,6 @@ export default function TasksScreen() {
     </TouchableOpacity>
   );
 
-  const closeMenu = () => {
-    setIsMenuVisible(false);
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  };
-
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
 
