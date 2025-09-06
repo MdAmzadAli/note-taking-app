@@ -1140,6 +1140,9 @@ export default function TasksScreen() {
     const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
     const isOverdue = taskDay < today && !item.isCompleted;
 
+    // Check if task was completed after being overdue (for completed tasks view)
+    const wasOverdueWhenCompleted = item.isCompleted && taskDay < today;
+
     // Show temporary success message if this task has one
     if (temporarySuccessMessages.has(item.id)) {
       console.log('[UNDO] Rendering temporary success message for task:', item.id);
@@ -1270,6 +1273,11 @@ export default function TasksScreen() {
                 <Text style={styles.taskCategory}>
                   🏷️ {taskCategories.find(cat => cat.id === item.categoryId)?.name || 'Unknown Category'}
                 </Text>
+              )}
+
+              {/* Show red circle if task was completed after being overdue (only in completed tasks view) */}
+              {showCompletedTasks && wasOverdueWhenCompleted && (
+                <Text style={styles.overdueCompletedIndicator}>🔴</Text>
               )}
             </View>
           </View>
@@ -2099,6 +2107,10 @@ const styles = StyleSheet.create({
     color: '#D1D5DB',
     fontWeight: '500',
     fontFamily: 'Inter',
+  },
+  overdueCompletedIndicator: {
+    fontSize: 13,
+    color: '#EF4444',
   },
   deleteButton: {
     fontSize: 13,
