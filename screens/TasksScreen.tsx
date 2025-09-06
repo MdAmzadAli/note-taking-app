@@ -1595,27 +1595,15 @@ export default function TasksScreen() {
                     </Text>
                   </TouchableOpacity>
 
-                  <View style={[
-                    styles.upcomingFilterButton,
-                    upcomingFilter === 'after-tomorrow' && styles.upcomingFilterButtonActive,
-                  ]}>
-                    <TouchableOpacity
-                      style={styles.afterTomorrowTextButton}
-                      onPress={() => setUpcomingFilter('after-tomorrow')}
-                    >
-                      <Text style={[
-                        styles.upcomingFilterButtonText,
-                        upcomingFilter === 'after-tomorrow' && styles.upcomingFilterButtonTextActive,
-                      ]}>
-                        After Tomorrow
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.calendarIconButton}
-                      onPress={() => setShowCalendarModal(true)}
-                    >
-                      <IconSymbol size={16} name="calendar" color="#FFFFFF" />
-                    </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.upcomingFilterButton,
+                      styles.calendarOnlyButton,
+                    ]}
+                    onPress={() => setShowCalendarModal(true)}
+                  >
+                    <IconSymbol size={20} name="calendar" color="#FFFFFF" />
+                  </TouchableOpacity>
                   </View>
                 </View>
 
@@ -2585,20 +2573,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
   },
-  afterTomorrowContainer: {
-    flexDirection: 'row',
+  calendarOnlyButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-  },
-  calendarIconButton: {
-    padding: 2,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  afterTomorrowTextButton: {
-    flex: 1,
-    paddingVertical: 8,
+    minWidth: 44,
+  },ingVertical: 8,
     paddingHorizontal: 12,
     alignItems: 'center',
     justifyContent: 'center',
