@@ -1251,7 +1251,7 @@ export default function TasksScreen() {
 
             <View style={styles.taskMeta}>
               <Text style={[styles.statusBadge, { color: status.color }]}>
-                {status.icon} {status.text}
+                {status.icon}
               </Text>
 
               {item.scheduledDate && (
