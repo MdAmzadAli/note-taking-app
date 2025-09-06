@@ -19,6 +19,8 @@ interface ColorThemePickerProps {
   onFontStyleSelect?: (fontStyle: string | undefined) => void;
   selectedTheme: string;
   selectedFontStyle?: string | undefined;
+  title?: string; // Allow custom title for different contexts
+  mode?: 'note' | 'task'; // Add mode to differentiate between note and task styling
 }
 
 interface ThemeOption {
@@ -62,7 +64,9 @@ export default function ColorThemePicker({
   onGradientSelect,
   onFontStyleSelect,
   selectedTheme,
-  selectedFontStyle 
+  selectedFontStyle,
+  title = "Choose Theme",
+  mode = "note"
 }: ColorThemePickerProps) {
   return (
     <Modal
@@ -76,7 +80,7 @@ export default function ColorThemePicker({
           <TouchableWithoutFeedback>
             <View style={styles.modal}>
               <View style={styles.header}>
-                <Text style={styles.title}>Choose Theme</Text>
+                <Text style={styles.title}>{title}</Text>
                 <TouchableOpacity onPress={onClose}>
                   <Ionicons name="close" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
