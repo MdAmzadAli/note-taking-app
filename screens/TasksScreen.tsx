@@ -2021,7 +2021,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   taskItem: {
-    backgroundColor: '#011710',
+    // backgroundColor: '#353839',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
