@@ -413,7 +413,6 @@ export default function TasksScreen() {
       const sortedTasks = uniqueTasks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       console.log('[UNDO] Setting tasks state with', sortedTasks.length, 'tasks');
       setTasks(sortedTasks);
-      setSettings(userSettings); // Assuming you have a setSettings function
     } catch (error) {
       console.error('[UNDO] Error loading tasks:', error);
     }
