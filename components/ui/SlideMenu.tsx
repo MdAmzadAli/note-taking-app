@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -35,7 +35,6 @@ interface MenuSection {
 interface SlideMenuProps {
   visible: boolean;
   onClose: () => void;
-  slideAnim: Animated.Value;
   title?: string;
   titleIcon?: string;
   sections: MenuSection[];
@@ -45,12 +44,12 @@ interface SlideMenuProps {
 export default function SlideMenu({ 
   visible, 
   onClose, 
-  slideAnim, 
   title = "Menu",
   titleIcon = "menu-outline",
   sections,
   selectedItemId
 }: SlideMenuProps) {
+  const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
 
   useEffect(() => {
     if (visible) {
