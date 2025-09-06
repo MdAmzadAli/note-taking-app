@@ -2499,7 +2499,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   deleteOlderButton: {
-    backgroundColor: '#DC2626',
+    backgroundColor: 'transparent',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
