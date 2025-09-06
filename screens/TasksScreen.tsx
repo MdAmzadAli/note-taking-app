@@ -2051,8 +2051,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxCompleted: {
-    backgroundColor: '#10B981',
-    borderColor: '#10B981',
+    backgroundColor: '#00FF7F',
+    borderColor: '#00FF7F',
   },
   checkmark: {
     color: '#FFFFFF',
@@ -2113,7 +2113,8 @@ const styles = StyleSheet.create({
   },
   completedText: {
     textDecorationLine: 'line-through',
-    opacity: 0.6,
+    color: '#FFFFFF',
+    opacity: 1,
   },
   undoContainer: {
     backgroundColor: '#10B981',
