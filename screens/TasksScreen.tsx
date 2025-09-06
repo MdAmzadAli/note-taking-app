@@ -1512,66 +1512,62 @@ export default function TasksScreen() {
   if (isCreating || isEditing) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>
-            {isEditing ? 'Edit Task' : 'New Task'}
-          </Text>
-          <View style={styles.headerButtons}>
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={isEditing ? updateTask : createTask}
-            >
-              <Text style={styles.saveButtonText}>Save</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => {
-                setIsCreating(false);
-                setIsEditing(false);
-                setEditingTask(null);
-                setNewTitle('');
-                setNewDescription('');
-                setSelectedDate(getTomorrowDate());
-                setHasReminder(false);
-              }}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.createTaskHeader}>
+          <TouchableOpacity
+            style={styles.backIconButton}
+            onPress={() => {
+              setIsCreating(false);
+              setIsEditing(false);
+              setEditingTask(null);
+              setNewTitle('');
+              setNewDescription('');
+              setSelectedDate(getTomorrowDate());
+              setHasReminder(false);
+            }}
+          >
+            <IconSymbol size={24} name="arrow.left" color="#FFFFFF" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.saveIconButton}
+            onPress={isEditing ? updateTask : createTask}
+          >
+            <IconSymbol size={24} name="checkmark" color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.formContainer}>
+        <View style={styles.transparentFormContainer}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Task Title *</Text>
+            <Text style={styles.transparentLabel}>Task Title *</Text>
             <TextInput
-              style={styles.input}
+              style={styles.transparentInput}
               value={newTitle}
               onChangeText={setNewTitle}
               placeholder="Enter task title"
-              placeholderTextColor="#6B7280"
+              placeholderTextColor="#9CA3AF"
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Description</Text>
+            <Text style={styles.transparentLabel}>Description</Text>
             <TextInput
-              style={styles.textArea}
+              style={styles.transparentTextArea}
               value={newDescription}
               onChangeText={setNewDescription}
               placeholder="Enter task description (optional)"
-              placeholderTextColor="#6B7280"
+              placeholderTextColor="#9CA3AF"
               multiline
               numberOfLines={3}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Scheduled Date</Text>
+            <Text style={styles.transparentLabel}>Scheduled Date</Text>
             <TouchableOpacity
-              style={styles.dateButton}
+              style={styles.transparentDateButton}
               onPress={() => setShowDatePicker(true)}
             >
-              <Text style={styles.dateButtonText}>
+              <Text style={styles.transparentDateButtonText}>
                 📅 {selectedDate.toLocaleDateString()}
               </Text>
             </TouchableOpacity>
@@ -1579,24 +1575,24 @@ export default function TasksScreen() {
 
           <View style={styles.inputGroup}>
             <View style={styles.reminderHeader}>
-              <Text style={styles.label}>Set Reminder</Text>
+              <Text style={styles.transparentLabel}>Set Reminder</Text>
               <Switch
                 value={hasReminder}
                 onValueChange={setHasReminder}
                 trackColor={{
-                  false: '#E5E7EB',
-                  true: '#000000',
+                  false: '#374151',
+                  true: '#FFFFFF',
                 }}
-                thumbColor={hasReminder ? '#FFFFFF' : '#6B7280'}
+                thumbColor={hasReminder ? '#000000' : '#9CA3AF'}
               />
             </View>
 
             {hasReminder && (
               <TouchableOpacity
-                style={styles.timeButton}
+                style={styles.transparentTimeButton}
                 onPress={() => setShowTimePicker(true)}
               >
-                <Text style={styles.timeButtonText}>
+                <Text style={styles.transparentTimeButtonText}>
                   🕐 {reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </Text>
               </TouchableOpacity>
@@ -2347,9 +2343,27 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingLeft: 8,
   },
+  createTaskHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  backIconButton: {
+    padding: 8,
+  },
+  saveIconButton: {
+    padding: 8,
+  },
   formContainer: {
     padding: 16,
     backgroundColor: '#FFFFFF',
+  },
+  transparentFormContainer: {
+    padding: 16,
+    backgroundColor: 'transparent',
+    flex: 1,
   },
   inputGroup: {
     marginBottom: 20,
@@ -2358,6 +2372,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#000000',
+    fontFamily: 'Inter',
+    marginBottom: 8,
+  },
+  transparentLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#FFFFFF',
     fontFamily: 'Inter',
     marginBottom: 8,
   },
@@ -2372,6 +2393,17 @@ const styles = StyleSheet.create({
     color: '#000000',
     minHeight: 44,
   },
+  transparentInput: {
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: 'transparent',
+    fontFamily: 'Inter',
+    color: '#FFFFFF',
+    minHeight: 44,
+  },
   textArea: {
     borderWidth: 1,
     borderColor: '#E5E7EB',
@@ -2381,6 +2413,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     fontFamily: 'Inter',
     color: '#000000',
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  transparentTextArea: {
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: 'transparent',
+    fontFamily: 'Inter',
+    color: '#FFFFFF',
     minHeight: 80,
     textAlignVertical: 'top',
   },
@@ -2394,9 +2438,24 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
   },
+  transparentDateButton: {
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
+  },
   dateButtonText: {
     fontSize: 16,
     color: '#000000',
+    fontFamily: 'Inter',
+  },
+  transparentDateButtonText: {
+    fontSize: 16,
+    color: '#FFFFFF',
     fontFamily: 'Inter',
   },
   reminderHeader: {
@@ -2415,9 +2474,24 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
   },
+  transparentTimeButton: {
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
+  },
   timeButtonText: {
     fontSize: 16,
     color: '#000000',
+    fontFamily: 'Inter',
+  },
+  transparentTimeButtonText: {
+    fontSize: 16,
+    color: '#FFFFFF',
     fontFamily: 'Inter',
   },
   emptyState: {
