@@ -37,7 +37,6 @@ const fontStyles: Array<{ name: string; value: string | undefined }> = [
 ];
 
 const noteThemes: ThemeOption[] = [
-  { name: 'Default', color: '#333333' },
   { name: 'Charcoal', color: '#1C1C1C' },
   { name: 'Deep Red', color: '#B91C1C' },
   { name: 'Forest', color: '#166534' },
@@ -96,8 +95,7 @@ export default function ColorThemePicker({
                 >
                 {noteThemes.map((theme, index) => {
                   const themeValue = theme.color || theme.gradient?.[0] || '#1A1A1A';
-                  // Make default color (#333333) selected when no theme is selected
-                  const isSelected = selectedTheme === themeValue || (!selectedTheme && themeValue === '#333333');
+                  const isSelected = selectedTheme === themeValue;
                   
                   return (
                     <TouchableOpacity
@@ -115,10 +113,6 @@ export default function ColorThemePicker({
                           onGradientSelect(theme.gradient);
                         } else {
                           onThemeSelect(themeValue);
-                          // If no theme was previously selected and user clicks default, apply it immediately
-                          if (!selectedTheme && themeValue === '#333333') {
-                            onThemeSelect('#333333');
-                          }
                         }
                       }}
                     >

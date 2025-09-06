@@ -154,8 +154,7 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
     styles.card, 
     { 
       width: note.isPinned ? 200 : (Dimensions.get('window').width - 48) / 2, // 2 cards per row with proper spacing
-      backgroundColor: note.gradient ? 'transparent' : (note.theme || '#333333'),
-      borderColor: note.theme || note.gradient ? '#FFFFFF' : '#555555'
+      backgroundColor: note.gradient ? 'transparent' : (note.theme || '#2A2A2A')
     }
   ];
 
@@ -174,7 +173,7 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
   };
 
   // Determine text color based on background for better contrast
-  const textColor = { color: note.theme === '#FFFFFF' || note.theme === 'white' ? '#333333' : '#FFFFFF' };
+  const textColor = { color: note.theme === '#FFFFFF' || note.theme === 'white' ? '#2A2A2A' : '#FFFFFF' };
 
   return (
     <TouchableOpacity 
@@ -296,12 +295,12 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#333333',
+    backgroundColor: '#2A2A2A',
     borderRadius: 12,
     marginHorizontal: 0,
     marginVertical: 0,
     borderWidth: 1,
-    borderColor: '#555555',
+    borderColor: '#D1D5DB',
     elevation: 6,
     shadowColor: '#000000',
     shadowOffset: {
