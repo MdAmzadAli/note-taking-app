@@ -1173,10 +1173,8 @@ export default function TasksScreen() {
 
   const openMenu = () => {
     setIsMenuVisible(true);
-    // Reload categories in background to avoid blocking menu animation
-    setTimeout(() => {
-      loadTaskCategories();
-    }, 0);
+    // Load categories immediately when menu opens to ensure they're always available
+    loadTaskCategories();
   };
 
   const closeMenu = () => {

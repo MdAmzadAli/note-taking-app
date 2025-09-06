@@ -157,7 +157,7 @@ export default function SlideMenu({
                             onPress={() => handleItemPress(item)}
                           >
                             {item.icon && (
-                              <Ionicons name={item.icon} size={20} color="#9CA3AF" />
+                              <Ionicons name={item.icon} size={20} color="#FFFFFF" />
                             )}
                             <Text style={styles.menuItemText}>{item.name}</Text>
                           </TouchableOpacity>
@@ -175,7 +175,7 @@ export default function SlideMenu({
                             handleClose();
                           }}
                         >
-                          <Ionicons name="add" size={20} color="#9CA3AF" />
+                          <Ionicons name="add" size={20} color="#FFFFFF" />
                           <Text style={styles.createNewText}>Create new</Text>
                         </TouchableOpacity>
                       )}
@@ -278,12 +278,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   createNewText: {
-    color: '#9AA0A6',
+    color: '#FFFFFF',
     fontSize: 16,
     marginLeft: 12,
   },
   selectedMenuItem: {
-    backgroundColor: '#4285F4',
+    backgroundColor: '#00FF7F',
     borderRadius: 24,
   },
 });
