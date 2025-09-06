@@ -184,6 +184,7 @@ const TaskCalendarModal: React.FC<TaskCalendarModalProps> = ({
       visible={visible}
       animationType="slide"
       presentationStyle="fullScreen"
+      onRequestClose={onClose}
     >
       <View style={styles.container}>
         {/* Header with back button */}
