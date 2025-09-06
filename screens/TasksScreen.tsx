@@ -1595,31 +1595,28 @@ export default function TasksScreen() {
                     </Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[
-                      styles.upcomingFilterButton,
-                      upcomingFilter === 'after-tomorrow' && styles.upcomingFilterButtonActive,
-                    ]}
-                    onPress={() => setUpcomingFilter('after-tomorrow')}
-                  >
-                    <View style={styles.afterTomorrowContainer}>
+                  <View style={[
+                    styles.upcomingFilterButton,
+                    upcomingFilter === 'after-tomorrow' && styles.upcomingFilterButtonActive,
+                  ]}>
+                    <TouchableOpacity
+                      style={styles.afterTomorrowTextButton}
+                      onPress={() => setUpcomingFilter('after-tomorrow')}
+                    >
                       <Text style={[
                         styles.upcomingFilterButtonText,
                         upcomingFilter === 'after-tomorrow' && styles.upcomingFilterButtonTextActive,
                       ]}>
                         After Tomorrow
                       </Text>
-                      <TouchableOpacity
-                        style={styles.calendarIconButton}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          setShowCalendarModal(true);
-                        }}
-                      >
-                        <IconSymbol size={16} name="calendar.circle" color="#FFFFFF" />
-                      </TouchableOpacity>
-                    </View>
-                  </TouchableOpacity>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.calendarIconButton}
+                      onPress={() => setShowCalendarModal(true)}
+                    >
+                      <IconSymbol size={16} name="calendar.circle" color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 {/* Upcoming Tasks List */}
@@ -2598,5 +2595,12 @@ const styles = StyleSheet.create({
     padding: 2,
     borderRadius: 4,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  afterTomorrowTextButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
