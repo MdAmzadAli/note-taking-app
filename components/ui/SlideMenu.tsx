@@ -52,6 +52,24 @@ export default function SlideMenu({
   selectedItemId
 }: SlideMenuProps) {
 
+  useEffect(() => {
+    if (visible) {
+      // Slide in animation
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      // Slide out animation
+      Animated.timing(slideAnim, {
+        toValue: -Dimensions.get('window').width,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [visible, slideAnim]);
+
   const handleItemPress = (item: MenuItem) => {
     if (item.onPress) {
       item.onPress();
