@@ -54,15 +54,26 @@ export default function SlideMenu({
 
   useEffect(() => {
     if (visible && !isModalVisible) {
-      // Show modal first, then animate in
+      // Show modal first
       setIsModalVisible(true);
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
     }
-  }, [visible, slideAnim, isModalVisible]);
+  }, [visible, isModalVisible]);
+
+  // Separate effect to start animation after modal is shown
+  useEffect(() => {
+    if (visible && isModalVisible) {
+      // Use setTimeout to ensure Modal is fully mounted before animating
+      const timer = setTimeout(() => {
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      }, 10); // Small delay to ensure Modal is ready
+
+      return () => clearTimeout(timer);
+    }
+  }, [visible, isModalVisible, slideAnim]);
 
   const handleClose = () => {
     // Animate out, then hide modal
