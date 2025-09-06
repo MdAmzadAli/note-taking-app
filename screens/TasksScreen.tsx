@@ -1614,7 +1614,7 @@ export default function TasksScreen() {
                       style={styles.calendarIconButton}
                       onPress={() => setShowCalendarModal(true)}
                     >
-                      <IconSymbol size={16} name="calendar.circle" color="#FFFFFF" />
+                      <IconSymbol size={16} name="calendar" color="#FFFFFF" />
                     </TouchableOpacity>
                   </View>
                 </View>
