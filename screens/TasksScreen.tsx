@@ -1093,36 +1093,48 @@ export default function TasksScreen() {
             )}
 
             <View style={styles.taskMeta}>
-              <Text style={[
-                styles.statusBadge,
-                item.fontStyle && { fontFamily: item.fontStyle }
-              ]}>
-                {item.isCompleted ? '✅ Completed' : '⏳ Pending'}
-              </Text>
-              {item.scheduledDate && (
+              <View style={styles.taskMetaLeft}>
                 <Text style={[
-                  styles.taskDate,
+                  styles.statusBadge,
                   item.fontStyle && { fontFamily: item.fontStyle }
                 ]}>
-                  📅 {new Date(item.scheduledDate).toLocaleDateString()}
+                  {item.isCompleted ? 'Completed' : 'Pending'}
                 </Text>
-              )}
+                {item.scheduledDate && (
+                  <Text style={[
+                    styles.taskDate,
+                    item.fontStyle && { fontFamily: item.fontStyle }
+                  ]}>
+                    📅 {new Date(item.scheduledDate).toLocaleDateString()}
+                  </Text>
+                )}
 
-              {item.reminderTime && !item.isCompleted && (
+                {item.reminderTime && !item.isCompleted && (
+                  <Text style={[
+                    styles.reminderTime,
+                    item.fontStyle && { fontFamily: item.fontStyle }
+                  ]}>
+                    🔔 {new Date(item.reminderTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                )}
+
+                {!selectedCategoryId && item.categoryId && (
+                  <Text style={[
+                    styles.taskCategory,
+                    item.fontStyle && { fontFamily: item.fontStyle }
+                  ]}>
+                    🏷️ {taskCategories.find(cat => cat.id === item.categoryId)?.name || 'Unknown Category'}
+                  </Text>
+                )}
+              </View>
+
+              {/* Show overdue text if task is overdue */}
+              {isOverdue && !item.isCompleted && (
                 <Text style={[
-                  styles.reminderTime,
+                  styles.overdueText,
                   item.fontStyle && { fontFamily: item.fontStyle }
                 ]}>
-                  🔔 {new Date(item.reminderTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              )}
-
-              {!selectedCategoryId && item.categoryId && (
-                <Text style={[
-                  styles.taskCategory,
-                  item.fontStyle && { fontFamily: item.fontStyle }
-                ]}>
-                  🏷️ {taskCategories.find(cat => cat.id === item.categoryId)?.name || 'Unknown Category'}
+                  overdue
                 </Text>
               )}
 
@@ -1133,11 +1145,14 @@ export default function TasksScreen() {
             </View>
           </View>
 
-          <TouchableOpacity onPress={(e) => {
-            e.stopPropagation();
-            deleteTaskById(item);
-          }}>
-            <Text style={styles.deleteButton}>Delete</Text>
+          <TouchableOpacity 
+            style={styles.deleteIconButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              deleteTaskById(item);
+            }}
+          >
+            <IconSymbol size={18} name="trash" color="#EF4444" />
           </TouchableOpacity>
         </View>
 
@@ -1503,24 +1518,23 @@ export default function TasksScreen() {
             )
           ) : (
             <>
-              {/* Overdue Tasks Section */}
-              <View style={styles.sectionContainer}>
-                <Text style={styles.sectionTitle}>Overdue</Text>
-                {getOverdueTasks().filter(task => {
-                  if (searchQuery.trim()) {
-                    const query = searchQuery.toLowerCase();
-                    const titleMatch = task.title.toLowerCase().includes(query);
-                    const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
-                    return titleMatch || descriptionMatch;
-                  }
-                  return true;
-                }).map(task => (
-                  <TaskItem key={task.id} item={task} />
-                ))}
-                {getOverdueTasks().length === 0 && (
-                  <Text style={styles.emptyText}>No overdue tasks</Text>
-                )}
-              </View>
+              {/* Overdue Tasks Section - Only show if there are overdue tasks */}
+              {getOverdueTasks().length > 0 && (
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Overdue</Text>
+                  {getOverdueTasks().filter(task => {
+                    if (searchQuery.trim()) {
+                      const query = searchQuery.toLowerCase();
+                      const titleMatch = task.title.toLowerCase().includes(query);
+                      const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
+                      return titleMatch || descriptionMatch;
+                    }
+                    return true;
+                  }).map(task => (
+                    <TaskItem key={task.id} item={task} />
+                  ))}
+                </View>
+              )}
 
               {/* Upcoming Tasks Section */}
               <View style={styles.sectionContainer}>
@@ -1843,6 +1857,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333333',
     position: 'relative',
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 2,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   celebrationTask: {
     borderColor: '#10B981',
@@ -1899,9 +1921,15 @@ const styles = StyleSheet.create({
   },
   taskMeta: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  taskMetaLeft: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginTop: 8,
+    flex: 1,
   },
   statusBadge: {
     fontSize: 13,
@@ -1931,13 +1959,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#EF4444',
   },
-  deleteButton: {
-    fontSize: 13,
-    color: '#FFFFFF',
+  deleteIconButton: {
+    padding: 4,
+    borderRadius: 4,
+  },
+  overdueText: {
+    fontSize: 12,
+    color: '#EF4444',
     fontFamily: 'Inter',
     fontWeight: '500',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    marginLeft: 8,
   },
   completedTask: {
     opacity: 0.7,
