@@ -336,7 +336,8 @@ export default function TaskCreationModal({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#1A1A1A',
+    // position:"absolute",
   },
   createTaskHeader: {
     flexDirection: 'row',
@@ -344,7 +345,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#1A1A1A',
+    // backgroundColor: '#1A1A1A',
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
   },
@@ -364,7 +365,7 @@ const styles = StyleSheet.create({
   },
   saveIconButton: {
     padding: 8,
-    backgroundColor: '#00FF7F',
+    // backgroundColor: '#00FF7F',
     borderRadius: 8,
   },
   transparentFormContainer: {
@@ -387,7 +388,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    backgroundColor: '#1F2937',
+    // backgroundColor: '#1F2937',
     color: '#FFFFFF',
     fontFamily: 'Inter',
   },
@@ -397,7 +398,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    backgroundColor: '#1F2937',
+    // backgroundColor: '#1F2937',
     color: '#FFFFFF',
     fontFamily: 'Inter',
     minHeight: 80,
@@ -408,7 +409,7 @@ const styles = StyleSheet.create({
     borderColor: '#374151',
     borderRadius: 8,
     padding: 12,
-    backgroundColor: '#1F2937',
+    // backgroundColor: '#1F2937',
   },
   transparentDateButtonText: {
     fontSize: 16,
@@ -426,7 +427,7 @@ const styles = StyleSheet.create({
     borderColor: '#374151',
     borderRadius: 8,
     padding: 12,
-    backgroundColor: '#1F2937',
+    // backgroundColor: '#1F2937',
     marginTop: 8,
   },
   transparentTimeButtonText: {
