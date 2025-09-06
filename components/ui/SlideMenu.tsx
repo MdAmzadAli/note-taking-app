@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   selectedMenuItem: {
-    backgroundColor: '#0c7a53',
+    backgroundColor: '#4285F4',
     borderRadius: 24,
   },
 });

@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
   },
   transparentInput: {
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#FFFFFF',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
   },
   transparentTextArea: {
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#FFFFFF',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
@@ -421,7 +421,7 @@ const styles = StyleSheet.create({
   },
   transparentDateButton: {
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#FFFFFF',
     borderRadius: 8,
     padding: 12,
     // backgroundColor: '#1F2937',
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
   },
   transparentTimeButton: {
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#FFFFFF',
     borderRadius: 8,
     padding: 12,
     // backgroundColor: '#1F2937',
