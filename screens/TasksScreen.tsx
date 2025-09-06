@@ -51,7 +51,6 @@ export default function TasksScreen() {
   const [upcomingFilter, setUpcomingFilter] = useState<'all' | 'today' | 'tomorrow'>('all');
   const [historyFilter, setHistoryFilter] = useState<'all' | 'completed' | 'overdue'>('all');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
-  const [historySearchQuery, setHistorySearchQuery] = useState('');
 
   // New state for date range filtering
   const [showDateRangeModal, setShowDateRangeModal] = useState(false);
@@ -1294,8 +1293,8 @@ export default function TasksScreen() {
     let { tasksByDate } = stats;
 
     // Filter tasks by search query if provided
-    if (historySearchQuery.trim()) {
-      const query = historySearchQuery.toLowerCase();
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
       const filteredTasksByDate: Record<string, Task[]> = {};
       Object.entries(tasksByDate).forEach(([date, tasks]) => {
         const filteredTasks = tasks.filter(task => {
@@ -1332,23 +1331,6 @@ export default function TasksScreen() {
 
     return (
       <View>
-        {/* Search Bar for History */}
-        <View style={styles.historySearchContainer}>
-          <TextInput
-            style={styles.historySearchInput}
-            value={historySearchQuery}
-            onChangeText={setHistorySearchQuery}
-            placeholder="Search completed tasks..."
-            placeholderTextColor="#6B7280"
-          />
-          <TouchableOpacity
-            style={styles.historySearchIcon}
-            onPress={() => setHistorySearchQuery('')}
-          >
-            <IconSymbol size={20} name="magnifyingglass" color="#6B7280" />
-          </TouchableOpacity>
-        </View>
-
         {/* Statistics Section */}
         <View style={styles.statsContainer}>
           <View style={styles.statsHeader}>
@@ -1459,9 +1441,9 @@ export default function TasksScreen() {
           </View>
         ))}
 
-        {dates.length === 0 && historySearchQuery.trim() && (
+        {dates.length === 0 && searchQuery.trim() && (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No completed tasks found matching "{historySearchQuery}"</Text>
+            <Text style={styles.emptyText}>No completed tasks found matching "{searchQuery}"</Text>
           </View>
         )}
       </View>
@@ -1632,7 +1614,7 @@ export default function TasksScreen() {
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
-            placeholder="Search tasks..."
+            placeholder={showCompletedTasks ? "Search completed tasks..." : "Search tasks..."}
             placeholderTextColor="#999999"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -2506,31 +2488,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'Inter',
     lineHeight: 25.6,
-  },
-  historySearchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#F9FAFB',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  historySearchInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: 'Inter',
-    color: '#000000',
-    marginRight: 8,
-  },
-  historySearchIcon: {
-    padding: 8,
   },
   dateSectionHeader: {
     flexDirection: 'row',
