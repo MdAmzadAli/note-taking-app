@@ -80,6 +80,9 @@ export default function TasksScreen() {
 
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [taskCategories, setTaskCategories] = useState<{ id: string; name: string; createdAt: string }[]>([]);
+  const [showColorThemePicker, setShowColorThemePicker] = useState(false);
+  const [selectedTheme, setSelectedTheme] = useState('default');
+  const [selectedFont, setSelectedFont] = useState('default');
 
   const loadTaskCategories = useCallback(async () => {
     try {
@@ -1523,12 +1526,21 @@ export default function TasksScreen() {
             <IconSymbol size={24} name="arrow.left" color="#FFFFFF" />
           </TouchableOpacity>
           
-          <TouchableOpacity
-            style={styles.saveIconButton}
-            onPress={isEditing ? updateTask : createTask}
-          >
-            <IconSymbol size={24} name="checkmark" color="#FFFFFF" />
-          </TouchableOpacity>
+          <View style={styles.rightButtonsContainer}>
+            <TouchableOpacity
+              style={styles.brushIconButton}
+              onPress={() => setShowColorThemePicker(true)}
+            >
+              <IconSymbol size={24} name="paintbrush" color="#FFFFFF" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.saveIconButton}
+              onPress={isEditing ? updateTask : createTask}
+            >
+              <IconSymbol size={24} name="checkmark" color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.transparentFormContainer}>
@@ -2346,6 +2358,14 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   saveIconButton: {
+    padding: 8,
+  },
+  rightButtonsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  brushIconButton: {
     padding: 8,
   },
   formContainer: {
