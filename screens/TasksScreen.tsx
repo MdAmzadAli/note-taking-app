@@ -20,6 +20,7 @@ import { router } from 'expo-router';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import FloatingActionButton from '@/components/ui/FloatingActionButton';
 import SlideMenu from '@/components/ui/SlideMenu';
+import { getTaskCategories } from '@/utils/storage';
 import { Task } from '@/types';
 import { getTasks, saveTask, deleteTask, updateTask, getUserSettings } from '@/utils/storage';
 import { scheduleNotification, cancelNotification } from '@/utils/notifications';
@@ -1461,9 +1462,26 @@ export default function TasksScreen() {
   );
 
   const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const [taskCategories, setTaskCategories] = useState<{ id: string; name: string; createdAt: string }[]>([]);
+
+  const loadTaskCategories = async () => {
+    try {
+      const categories = await getTaskCategories();
+      setTaskCategories(categories);
+    } catch (error) {
+      console.error('Error loading task categories:', error);
+      setTaskCategories([]);
+    }
+  };
+
+  useEffect(() => {
+    loadTaskCategories();
+  }, []);
 
   const openMenu = () => {
     setIsMenuVisible(true);
+    // Reload categories when opening menu to sync with any changes from labels-edit
+    loadTaskCategories();
   };
 
   const closeMenu = () => {
@@ -1475,7 +1493,7 @@ export default function TasksScreen() {
     setSearchQuery(''); // Clear search when a category is selected
   };
 
-  const handleShowAllNotes = () => {
+  const handleShowAllTasks = () => {
     setSelectedCategoryId(null);
     setSearchQuery(''); // Clear search when showing all
   };
@@ -1649,10 +1667,7 @@ export default function TasksScreen() {
                 id: "all-tasks",
                 name: "All Tasks",
                 icon: "list-outline",
-                onPress: () => {
-                  setSelectedCategoryId(null);
-                  setSearchQuery('');
-                },
+                onPress: handleShowAllTasks,
                 isSelected: !selectedCategoryId
               },
               {
@@ -1668,26 +1683,17 @@ export default function TasksScreen() {
           },
           {
             title: "Categories",
-            items: categories.map(category => ({
+            showEdit: true,
+            onEdit: () => {
+              router.push('/labels-edit?type=task-categories');
+            },
+            items: taskCategories.map(category => ({
               id: category.id,
               name: category.name,
               icon: "folder-outline",
-              onPress: () => {
-                setSelectedCategoryId(category.id);
-                setSearchQuery('');
-              },
+              onPress: () => handleCategorySelect(category.id),
               isSelected: selectedCategoryId === category.id
-            })),
-            showEdit: true,
-            onEdit: () => {
-              closeMenu();
-              router.push('/labels-edit?type=task-categories');
-            },
-            showCreate: true,
-            onCreateNew: () => {
-              closeMenu();
-              router.push('/labels-edit?type=task-categories');
-            }
+            }))
           }
         ]}
       />
