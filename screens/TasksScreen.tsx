@@ -2021,7 +2021,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   taskItem: {
-    backgroundColor: '#000000',
+    backgroundColor: '#011710',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -2519,7 +2519,7 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   dateRangeModal: {
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    backgroundColor: '#011710',
     borderRadius: 12,
     padding: 24,
     margin: 20,
@@ -2631,8 +2631,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: 'transparent',
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FFFFFF',
     marginBottom: 16,
     gap: 8,
   },
