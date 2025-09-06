@@ -118,23 +118,15 @@ export default function EditScreen() {
   
   // Animation setup
   const slideAnim = useRef(new Animated.Value(Dimensions.get('window').width)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadItems();
     // Start entrance animation
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      // Animated.timing(fadeAnim, {
-      //   toValue: 1,
-      //   duration: 250,
-      //   useNativeDriver: true,
-      // })
-    ]).start();
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
   }, [type]);
 
   const loadItems = async () => {
@@ -251,18 +243,11 @@ export default function EditScreen() {
 
   const handleBackPress = () => {
     // Start exit animation before navigating back
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: Dimensions.get('window').width,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      })
-    ]).start(() => {
+    Animated.timing(slideAnim, {
+      toValue: Dimensions.get('window').width,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
       router.back();
     });
   };
@@ -274,7 +259,6 @@ export default function EditScreen() {
           styles.container,
           {
             transform: [{ translateX: slideAnim }],
-            opacity: fadeAnim,
           }
         ]}
       >
