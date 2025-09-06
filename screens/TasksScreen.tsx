@@ -1342,7 +1342,7 @@ export default function TasksScreen() {
               style={styles.filterButton}
               onPress={() => setShowDateRangeModal(true)}
             >
-              <IconSymbol size={20} name="line.3.horizontal.decrease.circle" color="#6B7280" />
+              <IconSymbol size={20} name="line.3.horizontal" color="#6B7280" />
             </TouchableOpacity>
           </View>
           {(fromDate && toDate) && (
@@ -1841,21 +1841,6 @@ export default function TasksScreen() {
               </View>
             </View>
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalButtonSecondary}
-                onPress={clearDateRangeFilter}
-              >
-                <Text style={styles.modalButtonSecondaryText}>Clear Filter</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButtonPrimary, (!fromDate || !toDate) && styles.modalButtonDisabled]}
-                onPress={applyDateRangeFilter}
-                disabled={!fromDate || !toDate}
-              >
-                <Text style={styles.modalButtonPrimaryText}>Apply Filter</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
       )}
