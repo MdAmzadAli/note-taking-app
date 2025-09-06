@@ -11,6 +11,7 @@ import {
   Platform,
   Animated,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 import DateTimePicker from '@react-native-community/datetimepicker';
