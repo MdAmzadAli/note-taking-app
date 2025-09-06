@@ -1339,10 +1339,10 @@ export default function TasksScreen() {
           <View style={styles.statsHeader}>
             <Text style={styles.statsTitle}>Task Statistics</Text>
             <TouchableOpacity
-              style={styles.filterButton}
+              style={styles.filterIconButton}
               onPress={() => setShowDateRangeModal(true)}
             >
-              <IconSymbol size={20} name="line.3.horizontal" color="#6B7280" />
+              <IconSymbol size={20} name="line.3.horizontal" color="#FFFFFF" />
             </TouchableOpacity>
           </View>
           {(fromDate && toDate) && (
@@ -2258,6 +2258,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E5E7EB',
+  },
+  filterIconButton: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
   },
   dateRangeDisplay: {
     flexDirection: 'row',
