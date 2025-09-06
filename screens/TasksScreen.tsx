@@ -65,7 +65,7 @@ export default function TasksScreen() {
   const [allCompletionsFinishedTimeout, setAllCompletionsFinishedTimeout] = useState<NodeJS.Timeout | null>(null);
   const celebrationScale = useRef(new Animated.Value(0)).current;
   const celebrationOpacity = useRef(new Animated.Value(0)).current;
-  
+
   // State for completed tasks view (accessed via slide menu)
   const [showCompletedTasks, setShowCompletedTasks] = useState(false);
 
@@ -975,7 +975,7 @@ export default function TasksScreen() {
     const isOverdue = taskDay < today && !item.isCompleted;
 
     // Check if task was completed after being overdue (for completed tasks view)
-    const wasOverdueWhenCompleted = item.isCompleted && taskDay < today;
+    const wasOverdueAndCompleted = item.isCompleted && taskDay < today;
 
     // Show temporary success message if this task has one
     if (temporarySuccessMessages.has(item.id)) {
@@ -1020,6 +1020,7 @@ export default function TasksScreen() {
           styles.taskItem,
           item.isCompleted && styles.completedTask,
           celebrationTaskId === item.id && styles.celebrationTask,
+          item.theme && { backgroundColor: item.theme }
         ]}
         onPress={() => {
           if (item.isCompleted) {
@@ -1076,41 +1077,57 @@ export default function TasksScreen() {
             <Text style={[
               styles.taskTitle,
               item.isCompleted && styles.completedText,
+              item.fontStyle && { fontFamily: item.fontStyle }
             ]}>
               {item.title}
             </Text>
 
             {item.description && (
-              <Text style={[styles.taskDescription, item.isCompleted && styles.completedText]}>
+              <Text style={[
+                styles.taskDescription,
+                item.isCompleted && styles.completedText,
+                item.fontStyle && { fontFamily: item.fontStyle }
+              ]}>
                 {item.description}
               </Text>
             )}
 
             <View style={styles.taskMeta}>
-              <Text style={[styles.statusBadge, { color: status.color }]}>
-                {status.icon}
+              <Text style={[
+                styles.statusBadge,
+                item.fontStyle && { fontFamily: item.fontStyle }
+              ]}>
+                {item.isCompleted ? '✅ Completed' : '⏳ Pending'}
               </Text>
-
               {item.scheduledDate && (
-                <Text style={styles.taskDate}>
+                <Text style={[
+                  styles.taskDate,
+                  item.fontStyle && { fontFamily: item.fontStyle }
+                ]}>
                   📅 {new Date(item.scheduledDate).toLocaleDateString()}
                 </Text>
               )}
 
               {item.reminderTime && !item.isCompleted && (
-                <Text style={styles.reminderTime}>
+                <Text style={[
+                  styles.reminderTime,
+                  item.fontStyle && { fontFamily: item.fontStyle }
+                ]}>
                   🔔 {new Date(item.reminderTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </Text>
               )}
 
               {!selectedCategoryId && item.categoryId && (
-                <Text style={styles.taskCategory}>
+                <Text style={[
+                  styles.taskCategory,
+                  item.fontStyle && { fontFamily: item.fontStyle }
+                ]}>
                   🏷️ {taskCategories.find(cat => cat.id === item.categoryId)?.name || 'Unknown Category'}
                 </Text>
               )}
 
               {/* Show red circle if task was completed after being overdue (only in completed tasks view) */}
-              {showCompletedTasks && wasOverdueWhenCompleted && (
+              {showCompletedTasks && wasOverdueAndCompleted && (
                 <Text style={styles.overdueCompletedIndicator}>🔴</Text>
               )}
             </View>
@@ -1312,7 +1329,7 @@ export default function TasksScreen() {
     </TouchableOpacity>
   );
 
-  
+
 
   const openMenu = () => {
     setIsMenuVisible(true);
@@ -1409,7 +1426,7 @@ export default function TasksScreen() {
         )}
       </View>
 
-      
+
 
       <SlideMenu
         visible={isMenuVisible}
@@ -1623,6 +1640,24 @@ export default function TasksScreen() {
               </View>
             </View>
 
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButtonSecondary}
+                onPress={clearDateRangeFilter}
+              >
+                <Text style={styles.modalButtonSecondaryText}>Clear Filter</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButtonPrimary,
+                  (!fromDate || !toDate) && styles.modalButtonDisabled,
+                ]}
+                onPress={applyDateRangeFilter}
+                disabled={!fromDate || !toDate}
+              >
+                <Text style={styles.modalButtonPrimaryText}>Apply Filter</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       )}
@@ -1758,7 +1793,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
 
-  
+
   filtersContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,

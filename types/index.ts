@@ -110,6 +110,8 @@ export interface Task {
   reminderTime?: string;
   notificationId?: string;
   categoryId?: string;
+  theme?: string;
+  fontStyle?: string;
 }
 
 export interface FieldType {

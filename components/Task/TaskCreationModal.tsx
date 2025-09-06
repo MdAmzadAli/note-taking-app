@@ -65,6 +65,8 @@ export default function TaskCreationModal({
       if (editingTask.reminderTime) {
         setReminderTime(new Date(editingTask.reminderTime));
       }
+      setSelectedTheme(editingTask.theme || 'default');
+      setSelectedFont(editingTask.fontStyle || 'default');
     } else {
       // Reset form for creating new task
       setNewTitle('');
@@ -72,6 +74,8 @@ export default function TaskCreationModal({
       setSelectedDate(getTomorrowDate());
       setReminderTime(new Date());
       setHasReminder(false);
+      setSelectedTheme('default');
+      setSelectedFont('default');
     }
   }, [isEditing, editingTask, visible]);
 
@@ -102,6 +106,8 @@ export default function TaskCreationModal({
         scheduledDate: selectedDate.toISOString(),
         createdAt: new Date().toISOString(),
         categoryId: selectedCategoryId || undefined,
+        theme: selectedTheme !== 'default' ? selectedTheme : undefined,
+        fontStyle: selectedFont !== 'default' ? selectedFont : undefined,
       };
 
       console.log('[TASK] Generated task ID:', task.id);
@@ -155,6 +161,8 @@ export default function TaskCreationModal({
         title: newTitle.trim(),
         description: newDescription.trim(),
         scheduledDate: selectedDate.toISOString(),
+        theme: selectedTheme !== 'default' ? selectedTheme : undefined,
+        fontStyle: selectedFont !== 'default' ? selectedFont : undefined,
       };
 
       // Schedule new reminder if enabled
