@@ -1242,7 +1242,7 @@ export default function TasksScreen() {
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
-            placeholder={showCompletedTasks ? "Search tasks by title, description, or month name..." : "Search tasks..."}
+            placeholder={showCompletedTasks ? "Search tasks by title, description, or month..." : "Search tasks..."}
             placeholderTextColor="#999999"
             value={searchQuery}
             onChangeText={setSearchQuery}
