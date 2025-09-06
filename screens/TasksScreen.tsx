@@ -2575,6 +2575,6 @@ const styles = StyleSheet.create({
   calendarOnlyButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 44,
+    minWidth: 36,
   },
 });
