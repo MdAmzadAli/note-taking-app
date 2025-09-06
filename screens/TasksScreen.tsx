@@ -1880,7 +1880,7 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 4,
     borderWidth: 2,
-    borderColor: '#6B7280',
+    borderColor: '#FFFFFF',
     backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
