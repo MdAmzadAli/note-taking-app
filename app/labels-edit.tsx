@@ -12,33 +12,41 @@ import {
   Platform,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { router } from 'expo-router';
-import { getCategories, saveCategory, deleteCategory } from '@/utils/storage';
+import { router, useLocalSearchParams } from 'expo-router';
+import { 
+  getCategories, saveCategory, deleteCategory,
+  getTaskCategories, saveTaskCategory, deleteTaskCategory,
+  getReminderCategories, saveReminderCategory, deleteReminderCategory
+} from '@/utils/storage';
 import AppLayout from './AppLayout';
 
-interface Category {
+interface DataItem {
   id: string;
   name: string;
   createdAt: string;
 }
 
-export default function CategoriesEditScreen() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
-  const [editingCategoryName, setEditingCategoryName] = useState('');
+interface DataConfig {
+  title: string;
+  icon: string;
+  placeholder: string;
+  createText: string;
+  defaultItems: DataItem[];
+  storageKey: string;
+  saveFunction: (item: DataItem) => Promise<void>;
+  deleteFunction: (id: string) => Promise<void>;
+  getFunction: () => Promise<DataItem[]>;
+}
 
-  useEffect(() => {
-    loadCategories();
-  }, []);
-
-  const loadCategories = async () => {
-    try {
-      const storedCategories = await getCategories();
-      
-      // If no categories exist, create default ones
-      if (storedCategories.length === 0) {
-        const defaultCategories = [
+const getDataConfig = (type: string): DataConfig => {
+  switch (type) {
+    case 'categories':
+      return {
+        title: 'Edit Categories',
+        icon: 'apps-outline',
+        placeholder: 'Create new category',
+        createText: 'category',
+        defaultItems: [
           { id: '1', name: 'Work', createdAt: new Date().toISOString() },
           { id: '2', name: 'Personal', createdAt: new Date().toISOString() },
           { id: '3', name: 'Ideas', createdAt: new Date().toISOString() },
@@ -50,49 +58,113 @@ export default function CategoriesEditScreen() {
           { id: '9', name: 'Learning', createdAt: new Date().toISOString() },
           { id: '10', name: 'Family', createdAt: new Date().toISOString() },
           { id: '11', name: 'Goals', createdAt: new Date().toISOString() },
-        ];
-        
-        // Save default categories to storage
-        for (const category of defaultCategories) {
-          await saveCategory(category);
+        ],
+        storageKey: 'categories',
+        saveFunction: saveCategory,
+        deleteFunction: deleteCategory,
+        getFunction: getCategories,
+      };
+    case 'task-categories':
+      return {
+        title: 'Edit Task Categories',
+        icon: 'folder-outline',
+        placeholder: 'Create new task category',
+        createText: 'task category',
+        defaultItems: [
+          { id: '1', name: 'Personal', createdAt: new Date().toISOString() },
+          { id: '2', name: 'Work', createdAt: new Date().toISOString() },
+          { id: '3', name: 'Shopping', createdAt: new Date().toISOString() },
+          { id: '4', name: 'Health', createdAt: new Date().toISOString() },
+          { id: '5', name: 'Learning', createdAt: new Date().toISOString() },
+        ],
+        storageKey: 'task-categories',
+        saveFunction: saveTaskCategory,
+        deleteFunction: deleteTaskCategory,
+        getFunction: getTaskCategories,
+      };
+    case 'reminder-categories':
+      return {
+        title: 'Edit Reminder Categories',
+        icon: 'alarm-outline',
+        placeholder: 'Create new reminder category',
+        createText: 'reminder category',
+        defaultItems: [
+          { id: '1', name: 'Important', createdAt: new Date().toISOString() },
+          { id: '2', name: 'Daily', createdAt: new Date().toISOString() },
+          { id: '3', name: 'Weekly', createdAt: new Date().toISOString() },
+          { id: '4', name: 'Monthly', createdAt: new Date().toISOString() },
+        ],
+        storageKey: 'reminder-categories',
+        saveFunction: saveReminderCategory,
+        deleteFunction: deleteReminderCategory,
+        getFunction: getReminderCategories,
+      };
+    default:
+      return getDataConfig('categories');
+  }
+};
+
+export default function EditScreen() {
+  const params = useLocalSearchParams();
+  const type = (params.type as string) || 'categories';
+  const config = getDataConfig(type);
+
+  const [items, setItems] = useState<DataItem[]>([]);
+  const [newItemName, setNewItemName] = useState('');
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingItemName, setEditingItemName] = useState('');
+
+  useEffect(() => {
+    loadItems();
+  }, [type]);
+
+  const loadItems = async () => {
+    try {
+      const storedItems = await config.getFunction();
+      
+      // If no items exist, create default ones
+      if (storedItems.length === 0) {
+        // Save default items to storage
+        for (const item of config.defaultItems) {
+          await config.saveFunction(item);
         }
         
-        setCategories(defaultCategories);
+        setItems(config.defaultItems);
       } else {
-        setCategories(storedCategories);
+        setItems(storedItems);
       }
     } catch (error) {
-      console.error('Error loading categories:', error);
+      console.error(`Error loading ${config.createText}s:`, error);
     }
   };
 
-  const handleCreateCategory = async () => {
-    if (newCategoryName.trim() === '') {
-      Alert.alert('Error', 'Please enter a category name');
+  const handleCreateItem = async () => {
+    if (newItemName.trim() === '') {
+      Alert.alert('Error', `Please enter a ${config.createText} name`);
       return;
     }
 
-    const newCategory: Category = {
+    const newItem: DataItem = {
       id: Date.now().toString(),
-      name: newCategoryName.trim(),
+      name: newItemName.trim(),
       createdAt: new Date().toISOString(),
     };
 
     try {
-      await saveCategory(newCategory);
-      setCategories(prev => [...prev, newCategory]);
-      setNewCategoryName('');
-      console.log('Created new category:', newCategory);
+      await config.saveFunction(newItem);
+      setItems(prev => [...prev, newItem]);
+      setNewItemName('');
+      console.log(`Created new ${config.createText}:`, newItem);
     } catch (error) {
-      console.error('Error creating category:', error);
-      Alert.alert('Error', 'Failed to create category');
+      console.error(`Error creating ${config.createText}:`, error);
+      Alert.alert('Error', `Failed to create ${config.createText}`);
     }
   };
 
-  const handleDeleteCategory = (categoryId: string) => {
+  const handleDeleteItem = (itemId: string) => {
     Alert.alert(
-      'Delete Category',
-      'Are you sure you want to delete this category?',
+      `Delete ${config.createText.charAt(0).toUpperCase() + config.createText.slice(1)}`,
+      `Are you sure you want to delete this ${config.createText}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -100,12 +172,12 @@ export default function CategoriesEditScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteCategory(categoryId);
-              setCategories(prev => prev.filter(category => category.id !== categoryId));
-              console.log('Deleted category:', categoryId);
+              await config.deleteFunction(itemId);
+              setItems(prev => prev.filter(item => item.id !== itemId));
+              console.log(`Deleted ${config.createText}:`, itemId);
             } catch (error) {
-              console.error('Error deleting category:', error);
-              Alert.alert('Error', 'Failed to delete category');
+              console.error(`Error deleting ${config.createText}:`, error);
+              Alert.alert('Error', `Failed to delete ${config.createText}`);
             }
           },
         },
@@ -113,112 +185,110 @@ export default function CategoriesEditScreen() {
     );
   };
 
-  const handleEditCategory = (categoryId: string, currentName: string) => {
-    setEditingCategoryId(categoryId);
-    setEditingCategoryName(currentName);
+  const handleEditItem = (itemId: string, currentName: string) => {
+    setEditingItemId(itemId);
+    setEditingItemName(currentName);
   };
 
   const handleSaveEdit = async () => {
-    if (editingCategoryName.trim() === '') {
-      Alert.alert('Error', 'Please enter a category name');
+    if (editingItemName.trim() === '') {
+      Alert.alert('Error', `Please enter a ${config.createText} name`);
       return;
     }
 
     try {
-      const updatedCategory = categories.find(c => c.id === editingCategoryId);
-      if (updatedCategory) {
-        const newCategory = {
-          ...updatedCategory,
-          name: editingCategoryName.trim()
+      const updatedItem = items.find(c => c.id === editingItemId);
+      if (updatedItem) {
+        const newItem = {
+          ...updatedItem,
+          name: editingItemName.trim()
         };
         
-        await saveCategory(newCategory);
+        await config.saveFunction(newItem);
         
-        setCategories(prev =>
-          prev.map(category =>
-            category.id === editingCategoryId
-              ? { ...category, name: editingCategoryName.trim() }
-              : category
+        setItems(prev =>
+          prev.map(item =>
+            item.id === editingItemId
+              ? { ...item, name: editingItemName.trim() }
+              : item
           )
         );
 
-        setEditingCategoryId(null);
-        setEditingCategoryName('');
+        setEditingItemId(null);
+        setEditingItemName('');
         
-        console.log('Updated category:', editingCategoryId, editingCategoryName);
+        console.log(`Updated ${config.createText}:`, editingItemId, editingItemName);
       }
     } catch (error) {
-      console.error('Error updating category:', error);
-      Alert.alert('Error', 'Failed to update category');
+      console.error(`Error updating ${config.createText}:`, error);
+      Alert.alert('Error', `Failed to update ${config.createText}`);
     }
   };
 
   const handleCancelEdit = () => {
-    setEditingCategoryId(null);
-    setEditingCategoryName('');
+    setEditingItemId(null);
+    setEditingItemName('');
   };
 
   return (
     <AppLayout>
-      {/* <StatusBar barStyle="light-content" /> */}
-      
       {/* Navbar */}
       <View style={styles.navbar}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#E8EAED" />
         </TouchableOpacity>
-        <Text style={styles.navbarTitle}>Edit Categories</Text>
+        <Text style={styles.navbarTitle}>{config.title}</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Create New Category Section */}
+        {/* Create New Item Section */}
         <View style={styles.createSection}>
           <TouchableOpacity 
             style={styles.clearButton}
-            onPress={() => setNewCategoryName('')}
+            onPress={() => setNewItemName('')}
           >
             <Ionicons name="close" size={20} color="#9AA0A6" />
           </TouchableOpacity>
           
           <TextInput
             style={styles.createInput}
-            placeholder="Create new category"
+            placeholder={config.placeholder}
             placeholderTextColor="#9AA0A6"
-            value={newCategoryName}
-            onChangeText={setNewCategoryName}
-            onSubmitEditing={handleCreateCategory}
+            value={newItemName}
+            onChangeText={setNewItemName}
+            onSubmitEditing={handleCreateItem}
           />
           
           <TouchableOpacity 
             style={styles.checkButton}
-            onPress={handleCreateCategory}
+            onPress={handleCreateItem}
           >
             <Ionicons name="checkmark" size={20} color="#9AA0A6" />
           </TouchableOpacity>
         </View>
 
-        {/* Categories List */}
-        <View style={styles.categoriesContainer}>
-          {categories.map((category) => (
-            <View key={category.id} style={styles.categoryRow}>
-              <View style={styles.categoryInfo}>
-                <Ionicons name="apps-outline" size={20} color="#9AA0A6" />
+        {/* Items List */}
+        <View style={styles.itemsContainer}>
+          {items.map((item) => (
+            <View key={item.id} style={styles.itemRow}>
+              <View style={styles.itemInfo}>
+                <Ionicons name={config.icon} size={20} color="#9AA0A6" />
                 
-                {editingCategoryId === category.id ? (
+                {editingItemId === item.id ? (
                   <TextInput
                     style={styles.editInput}
-                    value={editingCategoryName}
-                    onChangeText={setEditingCategoryName}
+                    value={editingItemName}
+                    onChangeText={setEditingItemName}
                     onSubmitEditing={handleSaveEdit}
                     autoFocus
                   />
                 ) : (
-                  <Text style={styles.categoryName}>{category.name}</Text>
+                  <Text style={styles.itemName}>{item.name}</Text>
                 )}
               </View>
 
-              <View style={styles.categoryActions}>
-                {editingCategoryId === category.id ? (
+              <View style={styles.itemActions}>
+                {editingItemId === item.id ? (
                   <>
                     <TouchableOpacity 
                       style={styles.actionButton}
@@ -237,13 +307,13 @@ export default function CategoriesEditScreen() {
                   <>
                     <TouchableOpacity 
                       style={styles.actionButton}
-                      onPress={() => handleEditCategory(category.id, category.name)}
+                      onPress={() => handleEditItem(item.id, item.name)}
                     >
                       <Ionicons name="pencil" size={20} color="#9AA0A6" />
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={styles.actionButton}
-                      onPress={() => handleDeleteCategory(category.id)}
+                      onPress={() => handleDeleteItem(item.id)}
                     >
                       <Ionicons name="trash-outline" size={20} color="#9AA0A6" />
                     </TouchableOpacity>
@@ -259,15 +329,10 @@ export default function CategoriesEditScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    // backgroundColor: '#202124',
-  },
   navbar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    // backgroundColor: '#202124',
     borderBottomWidth: 1,
     borderBottomColor: '#3C4043',
   },
@@ -305,10 +370,10 @@ const styles = StyleSheet.create({
     marginLeft: 16,
     padding: 8,
   },
-  categoriesContainer: {
+  itemsContainer: {
     flex: 1,
   },
-  categoryRow: {
+  itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -317,12 +382,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#2E3134',
   },
-  categoryInfo: {
+  itemInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  categoryName: {
+  itemName: {
     color: '#E8EAED',
     fontSize: 16,
     marginLeft: 16,
@@ -336,7 +401,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#8AB4F8',
     paddingBottom: 4,
   },
-  categoryActions: {
+  itemActions: {
     flexDirection: 'row',
     alignItems: 'center',
   },

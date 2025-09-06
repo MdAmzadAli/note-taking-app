@@ -216,32 +216,107 @@ export const getCustomTemplates = async (): Promise<CustomTemplate[]> => {
 };
 
 // Category storage functions
-export const saveCategory = async (category: { id: string; name: string; createdAt: string }) => {
+export const getCategories = async (): Promise<Category[]> => {
   try {
-    const categories = await getCategories();
-    const existingIndex = categories.findIndex(c => c.id === category.id);
+    const categoriesJson = await AsyncStorage.getItem('categories');
+    return categoriesJson ? JSON.parse(categoriesJson) : [];
+  } catch (error) {
+    console.error('Error getting categories:', error);
+    return [];
+  }
+};
 
-    if (existingIndex >= 0) {
-      categories[existingIndex] = category;
-    } else {
-      categories.push(category);
-    }
-
-    await AsyncStorage.setItem('categories', JSON.stringify(categories));
+export const saveCategory = async (category: Category): Promise<void> => {
+  try {
+    const existingCategories = await getCategories();
+    const updatedCategories = existingCategories.filter(c => c.id !== category.id);
+    updatedCategories.push(category);
+    await AsyncStorage.setItem('categories', JSON.stringify(updatedCategories));
   } catch (error) {
     console.error('Error saving category:', error);
+    throw error;
   }
 };
 
-export const deleteCategory = async (categoryId: string) => {
+export const deleteCategory = async (categoryId: string): Promise<void> => {
   try {
-    const categories = await getCategories();
-    const filteredCategories = categories.filter(c => c.id !== categoryId);
-    await AsyncStorage.setItem('categories', JSON.stringify(filteredCategories));
+    const existingCategories = await getCategories();
+    const updatedCategories = existingCategories.filter(c => c.id !== categoryId);
+    await AsyncStorage.setItem('categories', JSON.stringify(updatedCategories));
   } catch (error) {
     console.error('Error deleting category:', error);
+    throw error;
   }
 };
+
+// Task Categories
+export const getTaskCategories = async (): Promise<Category[]> => {
+  try {
+    const categoriesJson = await AsyncStorage.getItem('task-categories');
+    return categoriesJson ? JSON.parse(categoriesJson) : [];
+  } catch (error) {
+    console.error('Error getting task categories:', error);
+    return [];
+  }
+};
+
+export const saveTaskCategory = async (category: Category): Promise<void> => {
+  try {
+    const existingCategories = await getTaskCategories();
+    const updatedCategories = existingCategories.filter(c => c.id !== category.id);
+    updatedCategories.push(category);
+    await AsyncStorage.setItem('task-categories', JSON.stringify(updatedCategories));
+  } catch (error) {
+    console.error('Error saving task category:', error);
+    throw error;
+  }
+};
+
+export const deleteTaskCategory = async (categoryId: string): Promise<void> => {
+  try {
+    const existingCategories = await getTaskCategories();
+    const updatedCategories = existingCategories.filter(c => c.id !== categoryId);
+    await AsyncStorage.setItem('task-categories', JSON.stringify(updatedCategories));
+  } catch (error) {
+    console.error('Error deleting task category:', error);
+    throw error;
+  }
+};
+
+// Reminder Categories
+export const getReminderCategories = async (): Promise<Category[]> => {
+  try {
+    const categoriesJson = await AsyncStorage.getItem('reminder-categories');
+    return categoriesJson ? JSON.parse(categoriesJson) : [];
+  } catch (error) {
+    console.error('Error getting reminder categories:', error);
+    return [];
+  }
+};
+
+export const saveReminderCategory = async (category: Category): Promise<void> => {
+  try {
+    const existingCategories = await getReminderCategories();
+    const updatedCategories = existingCategories.filter(c => c.id !== category.id);
+    updatedCategories.push(category);
+    await AsyncStorage.setItem('reminder-categories', JSON.stringify(updatedCategories));
+  } catch (error) {
+    console.error('Error saving reminder category:', error);
+    throw error;
+  }
+};
+
+export const deleteReminderCategory = async (categoryId: string): Promise<void> => {
+  try {
+    const existingCategories = await getReminderCategories();
+    const updatedCategories = existingCategories.filter(c => c.id !== categoryId);
+    await AsyncStorage.setItem('reminder-categories', JSON.stringify(updatedCategories));
+  } catch (error) {
+    console.error('Error deleting reminder category:', error);
+    throw error;
+  }
+};
+
 
 export const saveCustomTemplate = async (template: CustomTemplate): Promise<void> => {
   try {
@@ -351,6 +426,9 @@ export const clearAllData = async (): Promise<void> => {
       'custom_templates',
       'template_entries',
       'templates',
+      'categories',
+      'task-categories',
+      'reminder-categories',
     ]);
   } catch (error) {
     console.error('Error clearing all data:', error);
@@ -434,19 +512,6 @@ export const deleteHabit = async (habitId: string): Promise<void> => {
 };
 
 // Categories
-export const getCategories = async (): Promise<Category[]> => {
-  try {
-    const categoriesData = await AsyncStorage.getItem(KEYS.CATEGORIES);
-    if (categoriesData) {
-      return JSON.parse(categoriesData);
-    }
-    return [];
-  } catch (error) {
-    console.error('Error getting categories:', error);
-    return [];
-  }
-};
-
 export const getCategoryById = async (categoryId: string): Promise<Category | null> => {
   try {
     const categories = await getCategories();

@@ -89,7 +89,7 @@ export default function SlideMenu({
 
   const handleCreateNewLabel = () => {
     onClose();
-    router.push('/labels-edit');
+    router.push('/labels-edit?type=categories');
   };
 
   const handleLabelPress = (labelId: string) => {
