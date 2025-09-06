@@ -1132,9 +1132,14 @@ export default function TasksScreen() {
                 </Text>
               )}
 
-              {/* Show red circle if task was completed after being overdue (only in completed tasks view) */}
+              {/* Show "Overdue" text if task was completed after being overdue (only in completed tasks view) */}
               {showCompletedTasks && wasOverdueAndCompleted && (
-                <Text style={styles.overdueCompletedIndicator}>🔴</Text>
+                <Text style={[
+                  styles.overdueText,
+                  item.fontStyle && { fontFamily: item.fontStyle }
+                ]}>
+                  Overdue
+                </Text>
               )}
             </View>
           </View>
