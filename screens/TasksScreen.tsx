@@ -1473,13 +1473,11 @@ export default function TasksScreen() {
   const handleCategorySelect = (categoryId: string) => {
     setSelectedCategoryId(categoryId);
     setSearchQuery(''); // Clear search when a category is selected
-    closeMenu();
   };
 
   const handleShowAllNotes = () => {
     setSelectedCategoryId(null);
     setSearchQuery(''); // Clear search when showing all
-    closeMenu();
   };
 
   if (isCreating || isEditing) {

@@ -34,7 +34,7 @@ interface MenuSection {
 
 interface SlideMenuProps {
   visible: boolean;
-  onClose: () => void;
+  onClose?: () => void; // Optional callback for when menu closes
   title?: string;
   titleIcon?: string;
   sections: MenuSection[];
@@ -53,7 +53,7 @@ export default function SlideMenu({
   const [isModalVisible, setIsModalVisible] = useState(false);
 
   useEffect(() => {
-    if (visible) {
+    if (visible && !isModalVisible) {
       // Show modal first, then animate in
       setIsModalVisible(true);
       Animated.timing(slideAnim, {
@@ -61,23 +61,29 @@ export default function SlideMenu({
         duration: 300,
         useNativeDriver: true,
       }).start();
-    } else if (isModalVisible) {
-      // Animate out, then hide modal
-      Animated.timing(slideAnim, {
-        toValue: -Dimensions.get('window').width,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => {
-        setIsModalVisible(false);
-      });
     }
   }, [visible, slideAnim, isModalVisible]);
+
+  const handleClose = () => {
+    // Animate out, then hide modal
+    Animated.timing(slideAnim, {
+      toValue: -Dimensions.get('window').width,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsModalVisible(false);
+      // Notify parent that menu closed (optional callback)
+      if (onClose) {
+        onClose();
+      }
+    });
+  };
 
   const handleItemPress = (item: MenuItem) => {
     if (item.onPress) {
       item.onPress();
     }
-    onClose();
+    handleClose();
   };
 
   return (
@@ -85,11 +91,11 @@ export default function SlideMenu({
       transparent={true}
       animationType="none"
       visible={isModalVisible}
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
       statusBarTranslucent 
       presentationStyle="overFullScreen" 
     >
-      <TouchableWithoutFeedback onPress={onClose}>
+      <TouchableWithoutFeedback onPress={handleClose}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <Animated.View style={[styles.menu, { transform: [{ translateX: slideAnim }] }]}>
@@ -114,7 +120,7 @@ export default function SlideMenu({
                               if (section.onEdit) {
                                 section.onEdit();
                               } else {
-                                onClose();
+                                handleClose();
                                 // Navigate based on section title
                                 if (section.title.toLowerCase().includes('categor')) {
                                   const type = title.toLowerCase().includes('task') ? 'task-categories' : 'categories';
@@ -155,7 +161,7 @@ export default function SlideMenu({
                             if (section.onCreateNew) {
                               section.onCreateNew();
                             }
-                            onClose();
+                            handleClose();
                           }}
                         >
                           <Ionicons name="add" size={20} color="#9CA3AF" />
