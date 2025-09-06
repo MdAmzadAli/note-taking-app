@@ -1062,8 +1062,7 @@ export default function TasksScreen() {
     return { icon: '📅', color: '#000000', text: 'Upcoming' };
   };
 
-  const SwipeableTaskItem = ({ item }: { item: Task }) => {
-    const translateX = new Animated.Value(0);
+  const TaskItem = ({ item }: { item: Task }) => {
     const status = getTaskStatus(item);
 
     // Check if task is overdue
@@ -1072,32 +1071,6 @@ export default function TasksScreen() {
     const taskDate = new Date(item.scheduledDate || item.createdAt);
     const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
     const isOverdue = taskDay < today && !item.isCompleted;
-
-    const onGestureEvent = Animated.event(
-      [{ nativeEvent: { translationX: translateX } }],
-      { useNativeDriver: false }
-    );
-
-    const onHandlerStateChange = (event: any) => {
-      if (event.nativeEvent.state === State.END) {
-        const { translationX } = event.nativeEvent;
-
-        // Prevent swipe completion for completed tasks and overdue tasks in history tab
-        if (Math.abs(translationX) > 120 && !item.isCompleted && !(activeTab === 'completed' && isOverdue)) {
-          // Trigger completion
-          handleSwipeComplete(item);
-
-          // Reset position immediately to show undo
-          translateX.setValue(0);
-        } else {
-          // Snap back
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: false,
-          }).start();
-        }
-      }
-    };
 
     // Show temporary success message if this task has one
     if (temporarySuccessMessages.has(item.id)) {
@@ -1137,115 +1110,107 @@ export default function TasksScreen() {
     console.log('[UNDO] Rendering normal task item for:', item.id, 'in undoTasks:', undoTasks.has(item.id));
 
     return (
-      <PanGestureHandler
-        onGestureEvent={onGestureEvent}
-        onHandlerStateChange={onHandlerStateChange}
-        enabled={!item.isCompleted && !(activeTab === 'completed' && isOverdue)}
+      <TouchableOpacity
+        style={[
+          styles.taskItem,
+          item.isCompleted && styles.completedTask,
+          celebrationTaskId === item.id && styles.celebrationTask,
+        ]}
+        onPress={() => {
+          if (item.isCompleted) {
+            // Show a brief alert or feedback that completed tasks cannot be edited
+            Alert.alert(
+              'Task Completed', 
+              'This task has been completed and cannot be modified. You can delete it if needed.',
+              [{ text: 'OK', style: 'default' }]
+            );
+            return;
+          }
+          if (activeTab === 'completed' && isOverdue) {
+            // Show alert that overdue tasks in history cannot be edited
+            Alert.alert(
+              'Task Overdue', 
+              'This overdue task is in history and cannot be modified. You can delete it if needed.',
+              [{ text: 'OK', style: 'default' }]
+            );
+            return;
+          }
+          startEditingTask(item);
+        }}
       >
-        <Animated.View style={[{ transform: [{ translateX }] }]}>
+        <View style={styles.taskHeader}>
           <TouchableOpacity
-            style={[
-              styles.taskItem,
-              item.isCompleted && styles.completedTask,
-              celebrationTaskId === item.id && styles.celebrationTask,
-            ]}
-            onPress={() => {
-              if (item.isCompleted) {
-                // Show a brief alert or feedback that completed tasks cannot be edited
-                Alert.alert(
-                  'Task Completed', 
-                  'This task has been completed and cannot be modified. You can delete it if needed.',
-                  [{ text: 'OK', style: 'default' }]
-                );
-                return;
-              }
+            style={styles.checkboxContainer}
+            onPress={(e) => {
+              e.stopPropagation();
+              // Prevent status changes for overdue tasks in history tab
               if (activeTab === 'completed' && isOverdue) {
-                // Show alert that overdue tasks in history cannot be edited
                 Alert.alert(
                   'Task Overdue', 
-                  'This overdue task is in history and cannot be modified. You can delete it if needed.',
+                  'This overdue task is in history and its status cannot be changed.',
                   [{ text: 'OK', style: 'default' }]
                 );
                 return;
               }
-              startEditingTask(item);
+              // Use toggleTaskComplete which now handles undo logic internally
+              toggleTaskComplete(item, true, true);
             }}
           >
-            <View style={styles.taskHeader}>
-              <TouchableOpacity
-                style={styles.checkboxContainer}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  // Prevent status changes for overdue tasks in history tab
-                  if (activeTab === 'completed' && isOverdue) {
-                    Alert.alert(
-                      'Task Overdue', 
-                      'This overdue task is in history and its status cannot be changed.',
-                      [{ text: 'OK', style: 'default' }]
-                    );
-                    return;
-                  }
-                  // Use toggleTaskComplete which now handles undo logic internally
-                  toggleTaskComplete(item, true, true);
-                }}
-              >
-                <View style={[
-                  styles.checkbox,
-                  item.isCompleted && styles.checkboxCompleted
-                ]}>
-                  {item.isCompleted && <Text style={styles.checkmark}>✓</Text>}
-                </View>
-              </TouchableOpacity>
-
-              <View style={styles.taskInfo}>
-                <Text style={[
-                  styles.taskTitle,
-                  item.isCompleted && styles.completedText,
-                ]}>
-                  {item.title}
-                </Text>
-
-                {item.description && (
-                  <Text style={[styles.taskDescription, item.isCompleted && styles.completedText]}>
-                    {item.description}
-                  </Text>
-                )}
-
-                <View style={styles.taskMeta}>
-                  <Text style={[styles.statusBadge, { color: status.color }]}>
-                    {status.icon} {status.text}
-                  </Text>
-
-                  {item.scheduledDate && (
-                    <Text style={styles.taskDate}>
-                      📅 {new Date(item.scheduledDate).toLocaleDateString()}
-                    </Text>
-                  )}
-
-                  {item.reminderTime && !item.isCompleted && (
-                    <Text style={styles.reminderTime}>
-                      🔔 {new Date(item.reminderTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                  )}
-                </View>
-              </View>
-
-              <TouchableOpacity onPress={(e) => {
-                e.stopPropagation();
-                deleteTaskById(item);
-              }}>
-                <Text style={styles.deleteButton}>Delete</Text>
-              </TouchableOpacity>
+            <View style={[
+              styles.checkbox,
+              item.isCompleted && styles.checkboxCompleted
+            ]}>
+              {item.isCompleted && <Text style={styles.checkmark}>✓</Text>}
             </View>
-
-            {celebrationTaskId === item.id && (
-              <Animated.View style={styles.celebrationOverlay}>
-                <Text style={styles.celebrationText}>🎉 Great job! 🎉</Text>
-              </Animated.View>
-            )}
           </TouchableOpacity>
-        </Animated.View>
-      </PanGestureHandler>
+
+          <View style={styles.taskInfo}>
+            <Text style={[
+              styles.taskTitle,
+              item.isCompleted && styles.completedText,
+            ]}>
+              {item.title}
+            </Text>
+
+            {item.description && (
+              <Text style={[styles.taskDescription, item.isCompleted && styles.completedText]}>
+                {item.description}
+              </Text>
+            )}
+
+            <View style={styles.taskMeta}>
+              <Text style={[styles.statusBadge, { color: status.color }]}>
+                {status.icon} {status.text}
+              </Text>
+
+              {item.scheduledDate && (
+                <Text style={styles.taskDate}>
+                  📅 {new Date(item.scheduledDate).toLocaleDateString()}
+                </Text>
+              )}
+
+              {item.reminderTime && !item.isCompleted && (
+                <Text style={styles.reminderTime}>
+                  🔔 {new Date(item.reminderTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              )}
+            </View>
+          </View>
+
+          <TouchableOpacity onPress={(e) => {
+            e.stopPropagation();
+            deleteTaskById(item);
+          }}>
+            <Text style={styles.deleteButton}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+
+        {celebrationTaskId === item.id && (
+          <Animated.View style={styles.celebrationOverlay}>
+            <Text style={styles.celebrationText}>🎉 Great job! 🎉</Text>
+          </Animated.View>
+        )}
+      </TouchableOpacity>
     );
   };
 
@@ -1414,7 +1379,7 @@ export default function TasksScreen() {
               </TouchableOpacity>
             </View>
             {tasksByDate[date].map(task => (
-              <SwipeableTaskItem key={task.id} item={task} />
+              <TaskItem key={task.id} item={task} />
             ))}
           </View>
         ))}
@@ -1637,7 +1602,7 @@ export default function TasksScreen() {
                 }
                 return true;
               }).map(task => (
-                <SwipeableTaskItem key={task.id} item={task} />
+                <TaskItem key={task.id} item={task} />
               ))}
               {getOverdueTasks().length === 0 && (
                 <Text style={styles.emptyText}>No overdue tasks</Text>
@@ -1706,7 +1671,7 @@ export default function TasksScreen() {
                 }
                 return true;
               }).map(task => (
-                <SwipeableTaskItem key={task.id} item={task} />
+                <TaskItem key={task.id} item={task} />
               ))}
               {getUpcomingTasks().length === 0 && (
                 <Text style={styles.emptyText}>
