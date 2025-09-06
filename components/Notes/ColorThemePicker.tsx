@@ -96,7 +96,8 @@ export default function ColorThemePicker({
                 >
                 {noteThemes.map((theme, index) => {
                   const themeValue = theme.color || theme.gradient?.[0] || '#1A1A1A';
-                  const isSelected = selectedTheme === themeValue;
+                  // Make default color (#333333) selected when no theme is selected
+                  const isSelected = selectedTheme === themeValue || (!selectedTheme && themeValue === '#333333');
                   
                   return (
                     <TouchableOpacity
@@ -114,6 +115,10 @@ export default function ColorThemePicker({
                           onGradientSelect(theme.gradient);
                         } else {
                           onThemeSelect(themeValue);
+                          // If no theme was previously selected and user clicks default, apply it immediately
+                          if (!selectedTheme && themeValue === '#333333') {
+                            onThemeSelect('#333333');
+                          }
                         }
                       }}
                     >
