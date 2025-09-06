@@ -25,7 +25,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 import SearchResultsModal from '@/components/SearchResultsModal';
-import SlideMenu from '@/components/SlideMenu'; // Assuming SlideMenu is in this path
 
 export default function TasksScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -69,29 +68,6 @@ export default function TasksScreen() {
   const [allCompletionsFinishedTimeout, setAllCompletionsFinishedTimeout] = useState<NodeJS.Timeout | null>(null);
   const celebrationScale = useRef(new Animated.Value(0)).current;
   const celebrationOpacity = useRef(new Animated.Value(0)).current;
-
-  // Slide menu state and animations
-  const [isMenuVisible, setIsMenuVisible] = useState(false);
-  const slideAnim = useRef(new Animated.Value(0)).current; // 0 for closed, 1 for open
-
-  const openMenu = () => {
-    setIsMenuVisible(true);
-    Animated.timing(slideAnim, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const closeMenu = () => {
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      setIsMenuVisible(false);
-    });
-  };
 
   useEffect(() => {
     loadTasksAndSettings();
@@ -319,7 +295,8 @@ export default function TasksScreen() {
       { title: "Volunteer at shelter", description: "Sign up for weekend shifts at local animal shelter", completed: true }
     ];
 
-    const sampleTasks: Task[] = [];
+    const now = new Date();
+    const tasks: Task[] = [];
 
     sampleTaskData.forEach((data, index) => {
       let randomDate = new Date(now);
@@ -350,10 +327,10 @@ export default function TasksScreen() {
         createdAt: randomDate.toISOString(),
       };
 
-      sampleTasks.push(task);
+      tasks.push(task);
     });
 
-    return sampleTasks;
+    return tasks;
   };
 
   const loadTasksAndSettings = async () => {
@@ -918,17 +895,17 @@ export default function TasksScreen() {
   const getOverdueTasks = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
+    
     return tasks.filter(task => {
       const taskDate = new Date(task.scheduledDate || task.createdAt);
       const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
       const isOverdue = taskDay < today && !task.isCompleted;
-
+      
       // Include pending completion and temporary success messages
       if (pendingCompletionTasks.has(task.id) || temporarySuccessMessages.has(task.id)) {
         return isOverdue;
       }
-
+      
       return isOverdue && !task.isCompleted;
     });
   };
@@ -938,20 +915,20 @@ export default function TasksScreen() {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-
+    
     return tasks.filter(task => {
       const taskDate = new Date(task.scheduledDate || task.createdAt);
       const taskDay = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
       const isOverdue = taskDay < today && !task.isCompleted;
-
+      
       // Include pending completion and temporary success messages for upcoming only
       if (pendingCompletionTasks.has(task.id) || temporarySuccessMessages.has(task.id)) {
         return !isOverdue;
       }
-
+      
       // Only show non-completed, non-overdue tasks
       if (task.isCompleted || isOverdue) return false;
-
+      
       // Apply upcoming filter
       if (upcomingFilter === 'today') {
         return taskDay.getTime() === today.getTime();
@@ -1570,7 +1547,7 @@ export default function TasksScreen() {
   return (
     <GestureHandlerRootView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.hamburgerButton} onPress={openMenu}>
+        <TouchableOpacity style={styles.hamburgerButton} onPress={() => {}}>
           <IconSymbol size={24} name="line.3.horizontal" color="#FFFFFF" />
         </TouchableOpacity>
 
@@ -1635,7 +1612,7 @@ export default function TasksScreen() {
             {/* Upcoming Tasks Section */}
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionTitle}>Upcoming Tasks</Text>
-
+              
               {/* Upcoming Filters */}
               <View style={styles.upcomingFiltersContainer}>
                 <TouchableOpacity
@@ -1652,7 +1629,7 @@ export default function TasksScreen() {
                     All
                   </Text>
                 </TouchableOpacity>
-
+                
                 <TouchableOpacity
                   style={[
                     styles.upcomingFilterButton,
@@ -1667,7 +1644,7 @@ export default function TasksScreen() {
                     Today
                   </Text>
                 </TouchableOpacity>
-
+                
                 <TouchableOpacity
                   style={[
                     styles.upcomingFilterButton,
@@ -1683,7 +1660,7 @@ export default function TasksScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
-
+              
               {/* Upcoming Tasks List */}
               {getUpcomingTasks().filter(task => {
                 if (searchQuery.trim()) {
@@ -1819,25 +1796,6 @@ export default function TasksScreen() {
         shadowColor="#00FF7F"
         right={30}
         size={56}
-      />
-
-      <SlideMenu
-        visible={isMenuVisible}
-        onClose={closeMenu}
-        slideAnim={slideAnim}
-        onCreateTemplate={() => {
-          closeMenu();
-          // Handle template creation if needed
-        }}
-        onCategorySelect={(categoryId: string) => {
-          // Handle category selection if needed
-          closeMenu();
-        }}
-        onShowAllNotes={() => {
-          // Handle show all if needed
-          closeMenu();
-        }}
-        selectedCategoryId={null}
       />
     </GestureHandlerRootView>
   );
