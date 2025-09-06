@@ -1604,7 +1604,6 @@ export default function TasksScreen() {
                   >
                     <IconSymbol size={20} name="calendar" color="#FFFFFF" />
                   </TouchableOpacity>
-                  </View>
                 </View>
 
                 {/* Upcoming Tasks List */}
