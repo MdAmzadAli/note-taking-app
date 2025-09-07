@@ -654,6 +654,7 @@ export default function NotesScreen() {
         createdAt={editingNoteId ? notes.find(n => n.id === editingNoteId)?.createdAt : undefined}
         updatedAt={editingNoteId ? notes.find(n => n.id === editingNoteId)?.updatedAt : undefined}
         categoryId={editingNoteId ? notes.find(n => n.id === editingNoteId)?.categoryId || undefined : selectedCategoryId || undefined}
+        readOnly={selectedSection === 'deleted' && !isEditing}
         onSave={handleSaveNote}
         onBack={handleCloseEditor}
         onTitleChange={setCurrentNoteTitle}

@@ -111,6 +111,7 @@ interface NoteEditorScreenProps {
   createdAt?: string;
   updatedAt?: string;
   categoryId?: string;
+  readOnly?: boolean; // Add read-only mode for deleted notes
   onSave: (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[], categoryId?: string, audios?: AudioAttachment[], tickBoxGroups?: TickBoxGroup[], segments?: SegmentType[], fontStyle?: string | undefined) => void;
   onBack: () => void;
   onTitleChange: (title: string) => void;
@@ -136,6 +137,7 @@ export default function NoteEditorScreen({
   createdAt,
   updatedAt,
   categoryId,
+  readOnly = false,
   onSave,
   onBack,
   onTitleChange,
@@ -722,7 +724,8 @@ export default function NoteEditorScreen({
         <TextInput
           ref={(ref) => { if (ref) textInputRefs.current['default'] = ref; }}
           style={styles.bodyInput}
-          placeholder="Start typing your note..."
+          placeholder={readOnly ? "" : "Start typing your note..."}
+          editable={!readOnly}
           placeholderTextColor="#888888"
           value={noteContent}
           onChangeText={onContentChange}
@@ -763,6 +766,7 @@ export default function NoteEditorScreen({
         key={segment.id}
         ref={(ref) => { if (ref) textInputRefs.current[segment.id] = ref; }}
         style={[styles.textSegmentInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
+        editable={!readOnly}
         placeholder={segment.order === 0 ? "Start typing your note..." : "Continue typing..."}
         placeholderTextColor="#888888"
         value={segment.content}
@@ -889,29 +893,31 @@ export default function NoteEditorScreen({
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
 
-          <View style={styles.headerIcons}>
-            <TouchableOpacity
-              style={[styles.headerIcon, hasUnsavedChanges && styles.saveButtonActive]}
-              onPress={handleSave}
-            >
-              <Ionicons
-                name="checkmark"
-                size={24}
-                color={hasUnsavedChanges ? "#00FF7F" : "#FFFFFF"}
-              />
-            </TouchableOpacity>
+          {!readOnly && (
+            <View style={styles.headerIcons}>
+              <TouchableOpacity
+                style={[styles.headerIcon, hasUnsavedChanges && styles.saveButtonActive]}
+                onPress={handleSave}
+              >
+                <Ionicons
+                  name="checkmark"
+                  size={24}
+                  color={hasUnsavedChanges ? "#00FF7F" : "#FFFFFF"}
+                />
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.headerIcon}
-              onPress={() => setIsNotePinned(!isNotePinned)}
-            >
-              <Ionicons
-                name={isNotePinned ? "star" : "star-outline"}
-                size={24}
-                color={isNotePinned ? "#FFD700" : "#FFFFFF"}
-              />
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                style={styles.headerIcon}
+                onPress={() => setIsNotePinned(!isNotePinned)}
+              >
+                <Ionicons
+                  name={isNotePinned ? "star" : "star-outline"}
+                  size={24}
+                  color={isNotePinned ? "#FFD700" : "#FFFFFF"}
+                />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Main Content */}
@@ -947,7 +953,8 @@ export default function NoteEditorScreen({
 
             <TouchableOpacity
               style={styles.categoryDropdownButton}
-              onPress={() => setShowCategoryDropdown(true)}
+              onPress={readOnly ? undefined : () => setShowCategoryDropdown(true)}
+              disabled={readOnly}
             >
               <Text style={styles.categoryButtonText}>
                 {categories.find(cat => cat.id === selectedCategoryId)?.name || 'No Category'}
@@ -961,6 +968,7 @@ export default function NoteEditorScreen({
             ref={(ref) => { if (ref) textInputRefs.current['title'] = ref; }}
             style={[styles.titleInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
             placeholder="Title"
+            editable={!readOnly}
             placeholderTextColor="#888888"
             value={noteTitle}
             onChangeText={onTitleChange}
