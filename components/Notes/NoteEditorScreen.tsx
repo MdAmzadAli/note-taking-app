@@ -454,17 +454,18 @@ export default function NoteEditorScreen({
   const handleThemeSelect = (color: string) => {
     setSelectedTheme(color);
     setSelectedGradient(null);
-    setShowColorPicker(false);
+    // Don't close modal automatically - let user decide
   };
 
   const handleGradientSelect = (gradient: string[]) => {
     setSelectedGradient(gradient);
     setSelectedTheme(gradient[0]);
-    setShowColorPicker(false);
+    // Don't close modal automatically - let user decide
   };
 
   const handleFontStyleSelect = (fontStyle: string | undefined) => {
     setSelectedFontStyle(fontStyle);
+    // Don't close modal automatically - let user decide
   };
 
   const handleBack = () => {
