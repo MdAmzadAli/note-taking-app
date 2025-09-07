@@ -35,11 +35,10 @@ export default function MediaAttachmentModal({
   React.useEffect(() => {
     if (visible) {
       setIsAnimationComplete(false);
-      Animated.spring(slideAnim, {
+      Animated.timing(slideAnim, {
         toValue: 0,
+        duration: 200,
         useNativeDriver: true,
-        tension: 80,
-        friction: 10,
       }).start((finished) => {
         if (finished) {
           setIsAnimationComplete(true);
@@ -47,11 +46,10 @@ export default function MediaAttachmentModal({
       });
     } else {
       setIsAnimationComplete(false);
-      Animated.spring(slideAnim, {
+      Animated.timing(slideAnim, {
         toValue: 350,
+        duration: 150,
         useNativeDriver: true,
-        tension: 80,
-        friction: 10,
       }).start();
     }
   }, [visible, slideAnim]);
