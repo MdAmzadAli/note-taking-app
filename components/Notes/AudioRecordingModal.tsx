@@ -36,18 +36,16 @@ export default function AudioRecordingModal({
 
   useEffect(() => {
     if (visible) {
-      Animated.spring(slideAnim, {
+      Animated.timing(slideAnim, {
         toValue: 0,
+        duration: 200,
         useNativeDriver: true,
-        tension: 50,
-        friction: 8,
       }).start();
     } else {
-      Animated.spring(slideAnim, {
+      Animated.timing(slideAnim, {
         toValue: 350,
+        duration: 150,
         useNativeDriver: true,
-        tension: 50,
-        friction: 8,
       }).start();
       // Clean up when modal closes
       cleanup();
