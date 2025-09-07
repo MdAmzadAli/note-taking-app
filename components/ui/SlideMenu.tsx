@@ -132,7 +132,7 @@ export default function SlideMenu({
                               } else {
                                 handleClose();
                                 // Navigate based on section title
-                                if (section.title.toLowerCase().includes('categor')) {
+                                if (section.title?.toLowerCase().includes('categor')) {
                                   const type = title.toLowerCase().includes('task') ? 'task-categories' : 'categories';
                                   router.push(`/labels-edit?type=${type}`);
                                 }
@@ -163,14 +163,6 @@ export default function SlideMenu({
                               />
                             )}
                             <Text style={[styles.menuItemText, (selectedItemId === item.id || item.isSelected) && styles.selectedMenuItemText]}>{item.name}</Text>
-                            {item.name === "Completed Tasks" && (
-                              <Ionicons 
-                                name="information-circle-outline" 
-                                size={20} 
-                                color={(selectedItemId === item.id || item.isSelected) ? "#666666" : "#9AA0A6"}
-                                style={styles.infoIcon}
-                              />
-                            )}
                           </TouchableOpacity>
                         ))}
                       </View>
