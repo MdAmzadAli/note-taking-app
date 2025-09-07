@@ -23,9 +23,10 @@ interface NotesGridProps {
   onEditNote: (note: SimpleNote) => void;
   onDeleteNote: (noteId: string) => void;
   selectedCategoryId?: string; // Added selectedCategoryId prop
+  showSections?: boolean; // Whether to show pinned/others sections
 }
 
-export default function NotesGrid({ notes, onEditNote, onDeleteNote, selectedCategoryId }: NotesGridProps) {
+export default function NotesGrid({ notes, onEditNote, onDeleteNote, selectedCategoryId, showSections = true }: NotesGridProps) {
   if (notes.length === 0) {
     return (
       <View style={styles.emptyState}>
@@ -35,13 +36,7 @@ export default function NotesGrid({ notes, onEditNote, onDeleteNote, selectedCat
     );
   }
 
-  // Separate pinned and unpinned notes
-  const pinnedNotes = notes.filter(note => note.isPinned).sort((a, b) => 
-    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  );
-  const otherNotes = notes.filter(note => !note.isPinned);
-
-  // Distribute other notes into 2 columns
+  // Distribute notes into 2 columns
   const distributeNotesIntoColumns = (notesList: SimpleNote[]) => {
     const columns = [[], []] as SimpleNote[][];
 
@@ -53,6 +48,38 @@ export default function NotesGrid({ notes, onEditNote, onDeleteNote, selectedCat
     return columns;
   };
 
+  // If not showing sections (e.g., deleted notes), just display all notes in a simple grid
+  if (!showSections) {
+    const allColumns = distributeNotesIntoColumns(notes);
+    return (
+      <ScrollView style={styles.grid} showsVerticalScrollIndicator={false}>
+        <View style={styles.notesContainer}>
+          {allColumns.map((column, columnIndex) => (
+            <View key={`column-${columnIndex}`} style={styles.column}>
+              {column.map((note) => (
+                <View key={note.id} style={styles.noteCardWrapper}>
+                  <NoteCard
+                    note={note}
+                    onPress={() => onEditNote(note)}
+                    onLongPress={() => onDeleteNote(note.id)}
+                    selectedCategoryId={selectedCategoryId}
+                  />
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+        {/* Bottom padding for FAB */}
+        <View style={{ height: 100 }} />
+      </ScrollView>
+    );
+  }
+
+  // Separate pinned and unpinned notes for sectioned display
+  const pinnedNotes = notes.filter(note => note.isPinned).sort((a, b) => 
+    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+  const otherNotes = notes.filter(note => !note.isPinned);
   const otherColumns = distributeNotesIntoColumns(otherNotes);
 
   return (

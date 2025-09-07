@@ -644,6 +644,7 @@ export default function NotesScreen() {
         onEditNote={editNote}
         onDeleteNote={deleteNoteHandler}
         selectedCategoryId={selectedCategoryId || undefined}
+        showSections={selectedSection !== 'deleted'}
       />
     );
   };
