@@ -884,7 +884,7 @@ export default function NoteEditorScreen({
   return (
     <View style={[styles.container, { backgroundColor: selectedGradient ? 'transparent' : selectedTheme }]}>
       {renderBackground()}
-      <StatusBar barStyle="light-content" backgroundColor={selectedTheme} translucent={true} />
+      {/* <StatusBar barStyle="light-content" backgroundColor={selectedTheme} translucent={true} /> */}
 
       <View style={styles.safeAreaContainer}>
         {/* Header */}
@@ -1161,7 +1161,7 @@ export default function NoteEditorScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    // paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   keyboardAvoidingContainer: {
     flex: 1,
