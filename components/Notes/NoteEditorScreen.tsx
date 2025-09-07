@@ -302,14 +302,24 @@ export default function NoteEditorScreen({
   };
 
   const insertMediaAtCursor = (mediaType: 'image' | 'audio' | 'tickbox', mediaData: any) => {
-    if (!activeSegmentId) return;
+    console.log('insertMediaAtCursor called with:', mediaType, 'activeSegmentId:', activeSegmentId);
+    
+    if (!activeSegmentId) {
+      console.log('No active segment ID, cannot insert media');
+      return;
+    }
 
     const activeSegment = segments.find(seg => seg.id === activeSegmentId);
-    if (!activeSegment || activeSegment.type !== 'text') return;
+    if (!activeSegment || activeSegment.type !== 'text') {
+      console.log('Active segment not found or not text type:', activeSegment?.type);
+      return;
+    }
 
     const textSegment = activeSegment as TextSegment;
     const currentText = textSegment.content;
     const insertPosition = cursorPosition.start;
+
+    console.log('Inserting at position:', insertPosition, 'in text:', currentText);
 
     // Split text at cursor position
     const beforeText = currentText.substring(0, insertPosition);
@@ -338,6 +348,10 @@ export default function NoteEditorScreen({
 
     // Add media segment at cursor position
     const mediaSegment = createMediaSegment(mediaType, mediaData, orderCounter++);
+    console.log('Created media segment:', mediaSegment.type, mediaSegment.id, 'order:', mediaSegment.order);
+    if (mediaType === 'image') {
+      console.log('Image segment contains:', (mediaSegment as ImageSegment).images.length, 'images');
+    }
     newSegments.push(mediaSegment);
 
     // Add text after cursor as new focused segment
@@ -357,6 +371,9 @@ export default function NoteEditorScreen({
         newSegments.push({ ...segment, order: orderCounter++ });
       }
     });
+
+    console.log('New segments array length:', newSegments.length);
+    console.log('New segments breakdown:', newSegments.map(s => ({ type: s.type, id: s.id, order: s.order })));
 
     // Update segments and focus
     setSegments(newSegments);
@@ -812,23 +829,33 @@ export default function NoteEditorScreen({
     // Sort segments by order to ensure proper display
     const sortedSegments = [...segments].sort((a, b) => a.order - b.order);
     
-    console.log('Sorted segments:', sortedSegments.map(s => ({ type: s.type, id: s.id, order: s.order })));
+    console.log('Sorted segments:', sortedSegments.map(s => ({ 
+      type: s.type, 
+      id: s.id, 
+      order: s.order,
+      imageCount: s.type === 'image' ? (s as ImageSegment).images.length : 0
+    })));
 
     return (
       <View style={styles.segmentedContentContainer}>
         {sortedSegments.map((segment) => {
-          console.log('Rendering segment:', segment.type, segment.id);
+          console.log('Processing segment for rendering:', segment.type, segment.id);
           switch (segment.type) {
             case 'text':
+              console.log('Rendering text segment:', segment.id);
               return renderTextSegment(segment as TextSegment);
             case 'image':
-              console.log('Rendering image segment with images:', (segment as ImageSegment).images.length);
-              return renderImageSegment(segment as ImageSegment);
+              const imageSegment = segment as ImageSegment;
+              console.log('About to render image segment:', segment.id, 'with', imageSegment.images.length, 'images');
+              return renderImageSegment(imageSegment);
             case 'audio':
+              console.log('Rendering audio segment:', segment.id);
               return renderAudioSegment(segment as AudioSegment);
             case 'tickbox':
+              console.log('Rendering tickbox segment:', segment.id);
               return renderTickBoxSegment(segment as TickBoxSegment);
             default:
+              console.log('Unknown segment type:', segment.type);
               return null;
           }
         })}
@@ -876,10 +903,12 @@ export default function NoteEditorScreen({
   };
 
   const renderImageSegment = (segment: ImageSegment) => {
+    console.log('Rendering image segment with images:', segment.images.length, segment.images.map(img => img.uri));
     return (
       <View key={segment.id} style={styles.inlineImageContainer}>
         <View style={styles.inlineImageGallery}>
           {segment.images.map((image, index) => {
+            console.log('Rendering individual image:', image.uri, 'Index:', index);
             // Display 2 images per row
             const isNewRow = index % 2 === 0;
             return (
@@ -897,7 +926,7 @@ export default function NoteEditorScreen({
                   style={styles.inlineImage}
                   resizeMode="cover"
                   onError={(error) => {
-                    console.error('Image load error:', error);
+                    console.error('Image load error for:', image.uri, error);
                   }}
                   onLoad={() => {
                     console.log('Image loaded successfully:', image.uri);
