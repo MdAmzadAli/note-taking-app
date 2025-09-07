@@ -177,6 +177,22 @@ export const permanentlyDeleteNote = async (noteId: string): Promise<void> => {
   }
 };
 
+export const permanentlyDeleteAllNotes = async (): Promise<void> => {
+  try {
+    const deletedNotes = await getDeletedNotes();
+    const deleteCount = deletedNotes.length;
+    
+    // Clear all deleted notes
+    await AsyncStorage.setItem(KEYS.DELETED_NOTES, JSON.stringify([]));
+    
+    // Note: Could add custom event here if needed
+    console.log(`Permanently deleted ${deleteCount} notes`);
+  } catch (error) {
+    console.error('Error permanently deleting all notes:', error);
+    throw error;
+  }
+};
+
 export const deleteNote = async (noteId: string): Promise<void> => {
   try {
     const notes = await getNotes();

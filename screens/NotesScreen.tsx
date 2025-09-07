@@ -21,7 +21,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import FloatingActionButton from '@/components/ui/FloatingActionButton';
 import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSection, AudioAttachment, TickBoxGroup } from '@/types';
-import { saveNote, saveTemplate, getNotes, getTemplates, getCustomTemplates, deleteNote, updateNote, getUserSettings, saveCustomTemplate, saveTemplateEntry, getDeletedNotes } from '@/utils/storage';
+import { saveNote, saveTemplate, getNotes, getTemplates, getCustomTemplates, deleteNote, updateNote, getUserSettings, saveCustomTemplate, saveTemplateEntry, getDeletedNotes, permanentlyDeleteAllNotes } from '@/utils/storage';
 import { UserSettings } from '@/types';
 import { mockSpeechToText } from '@/utils/speech';
 import TemplateEntriesScreen from './TemplateEntriesScreen';
@@ -472,6 +472,34 @@ export default function NotesScreen() {
     );
   };
 
+  const handleDeleteAllNotes = async () => {
+    if (deletedNotes.length === 0) {
+      Alert.alert('No Deleted Notes', 'There are no deleted notes to remove.');
+      return;
+    }
+
+    Alert.alert(
+      'Permanently Delete All',
+      `Are you sure you want to permanently delete all ${deletedNotes.length} deleted notes? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete All',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await permanentlyDeleteAllNotes();
+              await loadDeletedNotes(); // Refresh deleted notes
+              Alert.alert('Success', 'All deleted notes have been permanently removed.');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete all notes');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const loadSettings = async () => {
     try {
       const userSettings = await getUserSettings();
@@ -661,20 +689,30 @@ export default function NotesScreen() {
           <View style={styles.searchContainer}>
             <TextInput
               style={styles.searchInput}
-              placeholder="Search Keep"
+              placeholder={selectedSection === 'deleted' ? "Search deleted notes..." : "Search Keep"}
               placeholderTextColor="#999999"
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
           </View>
 
-          <TouchableOpacity style={styles.micButton} onPress={handleVoiceInput}>
-            <Ionicons 
-              name="mic" 
-              size={20} 
-              color={isListening ? "#00FF7F" : "#FFFFFF"} 
-            />
-          </TouchableOpacity>
+          {selectedSection === 'deleted' ? (
+            <TouchableOpacity style={styles.micButton} onPress={handleDeleteAllNotes}>
+              <Ionicons 
+                name="ellipsis-horizontal" 
+                size={20} 
+                color="#FFFFFF" 
+              />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.micButton} onPress={handleVoiceInput}>
+              <Ionicons 
+                name="mic" 
+                size={20} 
+                color={isListening ? "#00FF7F" : "#FFFFFF"} 
+              />
+            </TouchableOpacity>
+          )}
         </View>
 
         <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
