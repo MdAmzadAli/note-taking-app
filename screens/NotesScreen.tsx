@@ -561,13 +561,6 @@ export default function NotesScreen() {
             setIsCreating(true);
             setCurrentNotePinned(false);
           }}
-          iconName="add"
-          iconSize={28}
-          iconColor="#000000"
-          backgroundColor="#00FF7F"
-          shadowColor="#00FF7F"
-          right={30}
-          size={56}
         />
 
 
