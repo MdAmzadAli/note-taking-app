@@ -114,6 +114,7 @@ export default function ColorThemePicker({
                         } else {
                           onThemeSelect(themeValue);
                         }
+                        // Don't close modal automatically - let user decide
                       }}
                     >
                       {theme.gradient ? (
@@ -151,6 +152,7 @@ export default function ColorThemePicker({
                           if (onFontStyleSelect) {
                             onFontStyleSelect(font.value);
                           }
+                          // Don't close modal automatically - let user decide
                         }}
                       >
                         <Text style={[
