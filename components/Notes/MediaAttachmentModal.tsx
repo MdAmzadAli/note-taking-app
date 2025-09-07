@@ -31,7 +31,7 @@ export default function MediaAttachmentModal({
 }: MediaAttachmentModalProps) {
   const slideAnim = React.useRef(new Animated.Value(350)).current;
   const [isAnimationComplete, setIsAnimationComplete] = React.useState(false);
-
+// sjdifsid
   React.useEffect(() => {
     if (visible) {
       setIsAnimationComplete(false);
