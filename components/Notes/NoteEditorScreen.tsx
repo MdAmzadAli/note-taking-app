@@ -510,65 +510,99 @@ export default function NoteEditorScreen({
 
 
   const requestPermission = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
 
-    if (status !== 'granted' || cameraStatus.status !== 'granted') {
-      Alert.alert('Permission required', 'Please grant camera and photo library permissions to add images.');
+      if (status !== 'granted' || cameraStatus.status !== 'granted') {
+        Alert.alert(
+          'Permission required', 
+          'Please grant camera and photo library permissions to add images.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Try Again', onPress: () => requestPermission() }
+          ]
+        );
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Error requesting permissions:', error);
+      // On web or in development, permissions might not be fully supported
+      // Return true to allow the functionality to proceed
+      if (Platform.OS === 'web') {
+        return true;
+      }
+      Alert.alert('Error', 'Failed to request permissions. Please try again.');
       return false;
     }
-    return true;
   };
 
   const handleTakePhoto = async () => {
-    const hasPermission = await requestPermission();
-    if (!hasPermission) return;
+    try {
+      // Close the media modal first
+      setShowMediaModal(false);
+      
+      // Add a small delay to ensure modal is fully closed
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const hasPermission = await requestPermission();
+      if (!hasPermission) return;
 
-    // Close the media modal first
-    setShowMediaModal(false);
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+      });
 
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      const newImage: ImageAttachment = {
-        id: Date.now().toString(),
-        uri: result.assets[0].uri,
-        type: 'photo',
-        createdAt: new Date().toISOString(),
-      };
-      setNoteImages([...noteImages, newImage]);
-      insertMediaAtCursor('image', [newImage]);
+      if (!result.canceled && result.assets[0]) {
+        const newImage: ImageAttachment = {
+          id: Date.now().toString(),
+          uri: result.assets[0].uri,
+          type: 'photo',
+          createdAt: new Date().toISOString(),
+        };
+        setNoteImages([...noteImages, newImage]);
+        insertMediaAtCursor('image', [newImage]);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      Alert.alert('Error', 'Failed to take photo. Please try again.');
     }
   };
 
   const handleAddImage = async () => {
-    const hasPermission = await requestPermission();
-    if (!hasPermission) return;
+    try {
+      // Close the media modal first
+      setShowMediaModal(false);
+      
+      // Add a small delay to ensure modal is fully closed
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const hasPermission = await requestPermission();
+      if (!hasPermission) return;
 
-    // Close the media modal first
-    setShowMediaModal(false);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+        allowsMultipleSelection: true,
+        selectionLimit: 10,
+      });
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
-      quality: 0.8,
-      allowsMultipleSelection: true,
-      selectionLimit: 10,
-    });
-
-    if (!result.canceled && result.assets) {
-      const newImages: ImageAttachment[] = result.assets.map((asset, index) => ({
-        id: (Date.now() + index).toString(),
-        uri: asset.uri,
-        type: 'image',
-        createdAt: new Date().toISOString(),
-      }));
-      setNoteImages([...noteImages, ...newImages]);
-      insertMediaAtCursor('image', newImages);
+      if (!result.canceled && result.assets) {
+        const newImages: ImageAttachment[] = result.assets.map((asset, index) => ({
+          id: (Date.now() + index).toString(),
+          uri: asset.uri,
+          type: 'image',
+          createdAt: new Date().toISOString(),
+        }));
+        setNoteImages([...noteImages, ...newImages]);
+        insertMediaAtCursor('image', newImages);
+      }
+    } catch (error) {
+      console.error('Error adding image:', error);
+      Alert.alert('Error', 'Failed to add image. Please try again.');
     }
   };
 
