@@ -17,8 +17,13 @@ interface Category {
   createdAt: string;
 }
 
+interface DeletedNote extends Note {
+  deletedAt: string;
+}
+
 const KEYS = {
   NOTES: 'notes',
+  DELETED_NOTES: 'deleted_notes',
   REMINDERS: 'reminders',
   TASKS: 'tasks',
   USER_SETTINGS: 'userSettings',
@@ -85,11 +90,116 @@ export const saveNote = async (note: Note): Promise<void> => {
   }
 };
 
+// Deleted Notes functionality
+export const getDeletedNotes = async (): Promise<DeletedNote[]> => {
+  try {
+    const deletedNotesData = await AsyncStorage.getItem(KEYS.DELETED_NOTES);
+    if (deletedNotesData) {
+      const deletedNotes = JSON.parse(deletedNotesData);
+      return deletedNotes.map((note: any) => ({
+        ...note,
+        writingStyle: note.writingStyle || 'mind_dump',
+        sections: note.sections || undefined,
+        checkedItems: note.checkedItems || undefined,
+        images: note.images || [],
+        isPinned: note.isPinned || false,
+        categoryId: note.categoryId || undefined,
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error('Error getting deleted notes:', error);
+    return [];
+  }
+};
+
+export const saveDeletedNote = async (deletedNote: DeletedNote): Promise<void> => {
+  try {
+    const deletedNotes = await getDeletedNotes();
+    deletedNotes.push(deletedNote);
+    await AsyncStorage.setItem(KEYS.DELETED_NOTES, JSON.stringify(deletedNotes));
+  } catch (error) {
+    console.error('Error saving deleted note:', error);
+    throw error;
+  }
+};
+
+export const cleanupOldDeletedNotes = async (): Promise<void> => {
+  try {
+    const deletedNotes = await getDeletedNotes();
+    const now = new Date();
+    const sixtyDaysAgo = new Date(now.getTime() - (60 * 24 * 60 * 60 * 1000));
+    
+    const validDeletedNotes = deletedNotes.filter(note => {
+      const deletedDate = new Date(note.deletedAt);
+      return deletedDate > sixtyDaysAgo;
+    });
+    
+    await AsyncStorage.setItem(KEYS.DELETED_NOTES, JSON.stringify(validDeletedNotes));
+  } catch (error) {
+    console.error('Error cleaning up old deleted notes:', error);
+  }
+};
+
+export const restoreNote = async (noteId: string): Promise<void> => {
+  try {
+    const deletedNotes = await getDeletedNotes();
+    const noteToRestore = deletedNotes.find(note => note.id === noteId);
+    
+    if (noteToRestore) {
+      // Remove deletedAt property to restore original note structure
+      const { deletedAt, ...restoredNote } = noteToRestore;
+      
+      // Add back to regular notes
+      await saveNote(restoredNote as Note);
+      
+      // Remove from deleted notes
+      const remainingDeletedNotes = deletedNotes.filter(note => note.id !== noteId);
+      await AsyncStorage.setItem(KEYS.DELETED_NOTES, JSON.stringify(remainingDeletedNotes));
+      
+      eventBus.emit(EVENTS.NOTE_RESTORED, restoredNote);
+    }
+  } catch (error) {
+    console.error('Error restoring note:', error);
+    throw error;
+  }
+};
+
+export const permanentlyDeleteNote = async (noteId: string): Promise<void> => {
+  try {
+    const deletedNotes = await getDeletedNotes();
+    const filteredDeletedNotes = deletedNotes.filter(note => note.id !== noteId);
+    await AsyncStorage.setItem(KEYS.DELETED_NOTES, JSON.stringify(filteredDeletedNotes));
+    eventBus.emit(EVENTS.NOTE_PERMANENTLY_DELETED, { noteId });
+  } catch (error) {
+    console.error('Error permanently deleting note:', error);
+    throw error;
+  }
+};
+
 export const deleteNote = async (noteId: string): Promise<void> => {
   try {
     const notes = await getNotes();
-    const filteredNotes = notes.filter(note => note.id !== noteId);
-    await AsyncStorage.setItem(KEYS.NOTES, JSON.stringify(filteredNotes));
+    const noteToDelete = notes.find(note => note.id === noteId);
+    
+    if (noteToDelete) {
+      // Move note to deleted notes with deletion timestamp
+      const deletedNote: DeletedNote = {
+        ...noteToDelete,
+        deletedAt: new Date().toISOString(),
+      };
+      
+      await saveDeletedNote(deletedNote);
+      
+      // Remove from regular notes
+      const filteredNotes = notes.filter(note => note.id !== noteId);
+      await AsyncStorage.setItem(KEYS.NOTES, JSON.stringify(filteredNotes));
+      
+      // Cleanup old deleted notes
+      await cleanupOldDeletedNotes();
+      
+      eventBus.emit(EVENTS.NOTE_DELETED, noteToDelete);
+    }
   } catch (error) {
     console.error('Error deleting note:', error);
     throw error;

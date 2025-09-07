@@ -63,6 +63,8 @@ export const EVENTS = {
   TEMPLATE_CREATED: 'template_created',
   TEMPLATE_UPDATED: 'template_updated',
   NOTE_DELETED: 'note_deleted',
+  NOTE_RESTORED: 'note_restored',
+  NOTE_PERMANENTLY_DELETED: 'note_permanently_deleted',
   TASK_DELETED: 'task_deleted',
   REMINDER_DELETED: 'reminder_deleted',
   TEMPLATE_DELETED: 'template_deleted',
