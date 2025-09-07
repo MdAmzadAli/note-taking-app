@@ -33,6 +33,7 @@ import SearchResultsModal from '@/components/SearchResultsModal';
 import TaskCreationModal from '@/components/Task/TaskCreationModal';
 import TaskCalendarModal from '@/components/Task/TaskCalendarModal';
 import TaskCard from '@/components/Task/TaskCard';
+import DeleteConfirmationModal from '@/components/Task/DeleteConfirmationModal';
 
 export default function TasksScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -83,6 +84,15 @@ export default function TasksScreen() {
 
   // State for calendar modal
   const [showCalendarModal, setShowCalendarModal] = useState(false);
+
+  // State for delete confirmation modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [showDeleteOlderModal, setShowDeleteOlderModal] = useState(false);
+  const [deleteOlderTasksData, setDeleteOlderTasksData] = useState<{
+    tasks: Task[];
+    targetDate: string;
+  } | null>(null);
 
   const loadTaskCategories = useCallback(async () => {
     try {
@@ -660,42 +670,44 @@ export default function TasksScreen() {
     }
   };
 
-  const deleteTaskById = async (task: Task) => {
-    Alert.alert(
-      'Delete Task',
-      'Are you sure you want to delete this task?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              console.log('[TASK] Deleting task:', task.id);
-
-              if (task.notificationId) {
-                await cancelNotification(task.notificationId);
-              }
-
-              console.log('[TASK] Deleting from storage...');
-              await deleteTask(task.id);
-
-              console.log('[TASK] Removing from state...');
-              // Remove task from state directly - DO NOT emit event to prevent doubles
-              setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
-
-              console.log('[TASK] Task deletion completed successfully');
-            } catch (error) {
-              console.error('[TASK] Error deleting task:', error);
-              Alert.alert('Error', 'Failed to delete task');
-            }
-          },
-        },
-      ]
-    );
+  const deleteTaskById = (task: Task) => {
+    setTaskToDelete(task);
+    setShowDeleteModal(true);
   };
 
-  const deleteOlderTasks = async (targetDate: string) => {
+  const handleConfirmDelete = async () => {
+    if (!taskToDelete) return;
+    
+    try {
+      console.log('[TASK] Deleting task:', taskToDelete.id);
+
+      if (taskToDelete.notificationId) {
+        await cancelNotification(taskToDelete.notificationId);
+      }
+
+      console.log('[TASK] Deleting from storage...');
+      await deleteTask(taskToDelete.id);
+
+      console.log('[TASK] Removing from state...');
+      // Remove task from state directly - DO NOT emit event to prevent doubles
+      setTasks(prevTasks => prevTasks.filter(t => t.id !== taskToDelete.id));
+
+      console.log('[TASK] Task deletion completed successfully');
+    } catch (error) {
+      console.error('[TASK] Error deleting task:', error);
+      Alert.alert('Error', 'Failed to delete task');
+    } finally {
+      setShowDeleteModal(false);
+      setTaskToDelete(null);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteModal(false);
+    setTaskToDelete(null);
+  };
+
+  const deleteOlderTasks = (targetDate: string) => {
     const targetDateObj = new Date(targetDate);
     const tasksToDelete = tasks.filter(task => {
       if (!task.isCompleted) return false;
@@ -703,38 +715,40 @@ export default function TasksScreen() {
       return taskDate <= targetDateObj;
     });
 
-    Alert.alert(
-      'Delete Older Tasks',
-      `Are you sure you want to delete all ${tasksToDelete.length} completed tasks from ${new Date(targetDate).toLocaleDateString()} and earlier?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete All',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              console.log('[TASK] Deleting older tasks:', tasksToDelete.length);
+    setDeleteOlderTasksData({ tasks: tasksToDelete, targetDate });
+    setShowDeleteOlderModal(true);
+  };
 
-              for (const task of tasksToDelete) {
-                if (task.notificationId) {
-                  await cancelNotification(task.notificationId);
-                }
-                await deleteTask(task.id);
-              }
+  const handleConfirmDeleteOlder = async () => {
+    if (!deleteOlderTasksData) return;
+    
+    try {
+      console.log('[TASK] Deleting older tasks:', deleteOlderTasksData.tasks.length);
 
-              console.log('[TASK] Removing deleted tasks from state...');
-              const taskIdsToDelete = new Set(tasksToDelete.map(t => t.id));
-              setTasks(prevTasks => prevTasks.filter(t => !taskIdsToDelete.has(t.id)));
+      for (const task of deleteOlderTasksData.tasks) {
+        if (task.notificationId) {
+          await cancelNotification(task.notificationId);
+        }
+        await deleteTask(task.id);
+      }
 
-              console.log('[TASK] Older tasks deletion completed successfully');
-            } catch (error) {
-              console.error('[TASK] Error deleting older tasks:', error);
-              Alert.alert('Error', 'Failed to delete older tasks');
-            }
-          },
-        },
-      ]
-    );
+      console.log('[TASK] Removing deleted tasks from state...');
+      const taskIdsToDelete = new Set(deleteOlderTasksData.tasks.map(t => t.id));
+      setTasks(prevTasks => prevTasks.filter(t => !taskIdsToDelete.has(t.id)));
+
+      console.log('[TASK] Older tasks deletion completed successfully');
+    } catch (error) {
+      console.error('[TASK] Error deleting older tasks:', error);
+      Alert.alert('Error', 'Failed to delete older tasks');
+    } finally {
+      setShowDeleteOlderModal(false);
+      setDeleteOlderTasksData(null);
+    }
+  };
+
+  const handleCancelDeleteOlder = () => {
+    setShowDeleteOlderModal(false);
+    setDeleteOlderTasksData(null);
   };
 
   const getActiveTasks = () => {
@@ -1562,6 +1576,29 @@ export default function TasksScreen() {
         shadowColor="#00FF7F"
         right={30}
         size={56}
+      />
+
+      <DeleteConfirmationModal
+        visible={showDeleteModal}
+        title="Delete Task"
+        message="Are you sure you want to delete this task?"
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
+
+      <DeleteConfirmationModal
+        visible={showDeleteOlderModal}
+        title="Delete Older Tasks"
+        message={deleteOlderTasksData ? 
+          `Are you sure you want to delete all ${deleteOlderTasksData.tasks.length} completed tasks from ${new Date(deleteOlderTasksData.targetDate).toLocaleDateString()} and earlier?` :
+          'Are you sure you want to delete older tasks?'
+        }
+        onConfirm={handleConfirmDeleteOlder}
+        onCancel={handleCancelDeleteOlder}
+        confirmText="Delete All"
+        cancelText="Cancel"
       />
     </GestureHandlerRootView>
   );
