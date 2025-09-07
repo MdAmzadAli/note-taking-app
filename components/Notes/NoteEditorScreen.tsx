@@ -1043,28 +1043,30 @@ export default function NoteEditorScreen({
           </ScrollView>
         </KeyboardAvoidingView>
 
-        {/* Bottom Toolbar */}
-        <View style={styles.bottomBar}>
-          <View style={styles.bottomLeft}>
-            <TouchableOpacity
-              style={styles.bottomButton}
-              onPress={() => handleModalOpen(() => setShowMediaModal(true))}
-            >
-              <Ionicons name="add" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
+        {/* Bottom Toolbar - Hidden for read-only/deleted notes */}
+        {!readOnly && (
+          <View style={styles.bottomBar}>
+            <View style={styles.bottomLeft}>
+              <TouchableOpacity
+                style={styles.bottomButton}
+                onPress={() => handleModalOpen(() => setShowMediaModal(true))}
+              >
+                <Ionicons name="add" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.bottomButton}
-              onPress={() => handleModalOpen(() => setShowColorPicker(true))}
-            >
-              <Ionicons name="brush" size={20} color="#FFFFFF" />
+              <TouchableOpacity
+                style={styles.bottomButton}
+                onPress={() => handleModalOpen(() => setShowColorPicker(true))}
+              >
+                <Ionicons name="brush" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={styles.bottomButton}>
+              <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
-
-          <TouchableOpacity style={styles.bottomButton}>
-            <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
+        )}
       </View>
 
       {/* Media Attachment Modal */}
