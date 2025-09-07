@@ -49,15 +49,18 @@ export default function MediaAttachmentModal({
     }
   }, [visible, slideAnim]);
 
-  const handleOptionPress = (action: () => void) => {
+  const handleOptionPress = React.useCallback((action: () => void) => {
+    console.log('MediaAttachmentModal handleOptionPress called');
+    
     // Close modal first for all actions to ensure clean state
     onClose();
     
     // Execute the action after a small delay to ensure modal is closed
     setTimeout(() => {
+      console.log('MediaAttachmentModal executing action after timeout');
       action();
     }, 100);
-  };
+  }, [onClose]);
 
   const options = [
     {
