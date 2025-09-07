@@ -52,14 +52,11 @@ export default function MediaAttachmentModal({
   const handleOptionPress = React.useCallback((action: () => void) => {
     console.log('MediaAttachmentModal handleOptionPress called');
     
-    // Close modal first for all actions to ensure clean state
+    // Close modal immediately
     onClose();
     
-    // Execute the action after a small delay to ensure modal is closed
-    setTimeout(() => {
-      console.log('MediaAttachmentModal executing action after timeout');
-      action();
-    }, 100);
+    // Execute action immediately without setTimeout which may cause issues
+    action();
   }, [onClose]);
 
   const options = [

@@ -1047,11 +1047,11 @@ export default function NoteEditorScreen({
       <MediaAttachmentModal
         visible={showMediaModal}
         onClose={() => setShowMediaModal(false)}
-        onTakePhoto={handleTakePhoto}
-        onAddImage={handleAddImage}
-        onDrawing={handleDrawing}
-        onRecording={handleRecording}
-        onTickBoxes={handleTickBoxes}
+        onTakePhoto={React.useCallback(handleTakePhoto, [])}
+        onAddImage={React.useCallback(handleAddImage, [])}
+        onDrawing={React.useCallback(handleDrawing, [])}
+        onRecording={React.useCallback(handleRecording, [])}
+        onTickBoxes={React.useCallback(handleTickBoxes, [])}
       />
 
       {/* Full Image View Modal */}
