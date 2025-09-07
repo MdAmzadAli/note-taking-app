@@ -30,21 +30,28 @@ export default function MediaAttachmentModal({
   onTickBoxes,
 }: MediaAttachmentModalProps) {
   const slideAnim = React.useRef(new Animated.Value(350)).current;
+  const [isAnimationComplete, setIsAnimationComplete] = React.useState(false);
 
   React.useEffect(() => {
     if (visible) {
+      setIsAnimationComplete(false);
       Animated.spring(slideAnim, {
         toValue: 0,
         useNativeDriver: true,
-        tension: 50,
-        friction: 8,
-      }).start();
+        tension: 80,
+        friction: 10,
+      }).start((finished) => {
+        if (finished) {
+          setIsAnimationComplete(true);
+        }
+      });
     } else {
+      setIsAnimationComplete(false);
       Animated.spring(slideAnim, {
         toValue: 350,
         useNativeDriver: true,
-        tension: 50,
-        friction: 8,
+        tension: 80,
+        friction: 10,
       }).start();
     }
   }, [visible, slideAnim]);
@@ -113,18 +120,34 @@ export default function MediaAttachmentModal({
                 {options.map((option, index) => (
                   <TouchableOpacity
                     key={option.label}
-                    style={styles.option}
-                    onPress={() => handleOptionPress(option.action)}
-                    activeOpacity={0.7}
+                    style={[
+                      styles.option,
+                      !isAnimationComplete && styles.optionDisabled
+                    ]}
+                    onPress={() => {
+                      if (isAnimationComplete) {
+                        handleOptionPress(option.action);
+                      }
+                    }}
+                    activeOpacity={isAnimationComplete ? 0.7 : 1}
+                    disabled={!isAnimationComplete}
                   >
-                    <View style={styles.iconContainer}>
+                    <View style={[
+                      styles.iconContainer,
+                      !isAnimationComplete && styles.iconContainerDisabled
+                    ]}>
                       <Ionicons 
                         name={option.icon as any} 
                         size={24} 
-                        color="#FFFFFF" 
+                        color={isAnimationComplete ? "#FFFFFF" : "#888888"} 
                       />
                     </View>
-                    <Text style={styles.optionLabel}>{option.label}</Text>
+                    <Text style={[
+                      styles.optionLabel,
+                      !isAnimationComplete && styles.optionLabelDisabled
+                    ]}>
+                      {option.label}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -186,5 +209,14 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: 'Inter',
     fontWeight: '500',
+  },
+  optionDisabled: {
+    opacity: 0.6,
+  },
+  iconContainerDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  optionLabelDisabled: {
+    color: '#888888',
   },
 });
