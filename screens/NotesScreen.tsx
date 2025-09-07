@@ -359,6 +359,12 @@ export default function NotesScreen() {
   };
 
   const editNote = async (note: SimpleNote) => {
+    // Check if we're viewing a deleted note - if so, open in read-only mode
+    if (selectedSection === 'deleted') {
+      viewDeletedNote(note);
+      return;
+    }
+
     try {
       const fullNotes = await getNotes();
       const fullNote = fullNotes.find(n => n.id === note.id);
@@ -405,6 +411,44 @@ export default function NotesScreen() {
     }
   };
 
+  const viewDeletedNote = async (note: SimpleNote) => {
+    try {
+      const fullDeletedNotes = await getDeletedNotes();
+      const fullNote = fullDeletedNotes.find(n => n.id === note.id);
+
+      if (fullNote) {
+        setCurrentNoteText(fullNote.content);
+        setCurrentNoteTitle(fullNote.title || '');
+        setSelectedWritingStyle(fullNote.writingStyle || 'mind_dump');
+        setNoteSections(fullNote.sections || []);
+        setCheckedItems(fullNote.checkedItems || []);
+        setCurrentNoteTheme(fullNote.theme || '#1C1C1C');
+        setCurrentNoteGradient(fullNote.gradient || null);
+        setCurrentNoteFontStyle(fullNote.fontStyle);
+        setCurrentNoteImages(fullNote.images || []);
+        setCurrentNoteAudios(fullNote.audios || []);
+        setCurrentNoteTickBoxGroups(fullNote.tickBoxGroups || []);
+        setCurrentNotePinned(fullNote.isPinned || false);
+        setCurrentNoteSegments(fullNote.segments || []);
+      } else {
+        setCurrentNoteText(note.content);
+        setCurrentNoteTitle(note.title || '');
+        setSelectedWritingStyle('mind_dump');
+        setNoteSections([]);
+        setCheckedItems([]);
+        setCurrentNotePinned(note.isPinned || false);
+        setCurrentNoteFontStyle('default');
+      }
+
+      setEditingNoteId(note.id);
+      setIsEditing(false); // Not editing, just viewing
+      setIsCreating(true); // Use the editor screen but in read-only mode
+    } catch (error) {
+      console.error('Error loading deleted note for viewing:', error);
+      Alert.alert('Error', 'Failed to load deleted note');
+    }
+  };
+
   const deleteNoteHandler = async (noteId: string) => {
     Alert.alert(
       'Delete Note',
@@ -417,7 +461,8 @@ export default function NotesScreen() {
           onPress: async () => {
             try {
               await deleteNote(noteId);
-              loadNotes();
+              await loadNotes(); // Refresh regular notes
+              await loadDeletedNotes(); // Refresh deleted notes for count update
             } catch (error) {
               Alert.alert('Error', 'Failed to delete note');
             }
