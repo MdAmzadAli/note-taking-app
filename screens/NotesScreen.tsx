@@ -21,7 +21,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import FloatingActionButton from '@/components/ui/FloatingActionButton';
 import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSection, AudioAttachment, TickBoxGroup } from '@/types';
-import { saveNote, saveTemplate, getNotes, getTemplates, getCustomTemplates, deleteNote, updateNote, getUserSettings, saveCustomTemplate, saveTemplateEntry } from '@/utils/storage';
+import { saveNote, saveTemplate, getNotes, getTemplates, getCustomTemplates, deleteNote, updateNote, getUserSettings, saveCustomTemplate, saveTemplateEntry, getDeletedNotes } from '@/utils/storage';
 import { UserSettings } from '@/types';
 import { mockSpeechToText } from '@/utils/speech';
 import TemplateEntriesScreen from './TemplateEntriesScreen';
@@ -109,6 +109,8 @@ export default function NotesScreen() {
   const [currentNoteSegments, setCurrentNoteSegments] = useState<any[]>([]);
   const [currentNoteFontStyle, setCurrentNoteFontStyle] = useState<string | undefined>('default'); // State for font style
   const [categories, setCategories] = useState<Array<{id: string, name: string, createdAt: string}>>([]);
+  const [deletedNotes, setDeletedNotes] = useState<SimpleNote[]>([]);
+  const [selectedSection, setSelectedSection] = useState<'all' | 'deleted' | 'category'>('all');
   const [menuScrollOffset, setMenuScrollOffset] = useState(0);
   const menuFlatListRef = useRef<FlatList>(null);
 
@@ -117,6 +119,7 @@ export default function NotesScreen() {
     loadSettings();
     loadTemplates();
     loadCategories();
+    loadDeletedNotes();
   }, []);
 
   // Control tab bar visibility using Context
@@ -134,18 +137,26 @@ export default function NotesScreen() {
       loadTemplates();
       loadNotes(); // This will ensure categories are refreshed when returning from labels-edit
       loadCategories();
+      loadDeletedNotes();
     }, [])
   );
 
   useEffect(() => {
-    console.log('[NOTES] Search filter effect triggered - query:', searchQuery, 'notes count:', notes.length, 'selectedCategoryId:', selectedCategoryId);
+    console.log('[NOTES] Search filter effect triggered - query:', searchQuery, 'section:', selectedSection, 'notes count:', notes.length, 'deleted notes count:', deletedNotes.length, 'selectedCategoryId:', selectedCategoryId);
 
-    let notesToFilter = [...notes]; // Create a copy to avoid mutations
+    let notesToFilter: SimpleNote[] = [];
 
-    // First apply category filter if a category is selected
-    if (selectedCategoryId) {
+    // First determine which notes to use based on selected section
+    if (selectedSection === 'deleted') {
+      notesToFilter = [...deletedNotes];
+      console.log('[NOTES] Showing deleted notes:', notesToFilter.length);
+    } else if (selectedSection === 'category' && selectedCategoryId) {
       notesToFilter = notes.filter(note => note.categoryId === selectedCategoryId);
       console.log('[NOTES] Category filtered notes count:', notesToFilter.length, 'for category:', selectedCategoryId);
+    } else {
+      // Default to all notes
+      notesToFilter = [...notes];
+      console.log('[NOTES] Showing all notes:', notesToFilter.length);
     }
 
     // Then apply search filter if there's a search query
@@ -166,7 +177,7 @@ export default function NotesScreen() {
       setFilteredNotes(notesToFilter);
       setFilteredTemplates([...templates]);
     }
-  }, [searchQuery, notes, templates, selectedCategoryId]);
+  }, [searchQuery, notes, deletedNotes, templates, selectedSection, selectedCategoryId]);
 
   const loadNotes = async () => {
     try {
@@ -448,14 +459,23 @@ export default function NotesScreen() {
 
   const handleCategorySelect = (categoryId: string) => {
     console.log('[NOTES] Category selected:', categoryId);
+    setSelectedSection('category');
     setSelectedCategoryId(categoryId);
     setSearchQuery(''); // Clear search when switching categories
   };
 
   const handleShowAllNotes = () => {
     console.log('[NOTES] Showing all notes');
+    setSelectedSection('all');
     setSelectedCategoryId(null);
     setSearchQuery(''); // Clear search when showing all notes
+  };
+
+  const handleShowDeletedNotes = () => {
+    console.log('[NOTES] Showing deleted notes');
+    setSelectedSection('deleted');
+    setSelectedCategoryId(null);
+    setSearchQuery(''); // Clear search when showing deleted notes
   };
 
   // Handler for when the note editor is closed without saving
@@ -494,6 +514,36 @@ export default function NotesScreen() {
     } catch (error) {
       console.error('Error loading categories:', error);
       setCategories([]);
+    }
+  };
+
+  const loadDeletedNotes = async () => {
+    try {
+      console.log('[NOTES] Loading deleted notes from storage...');
+      const existingDeletedNotes = await getDeletedNotes();
+      console.log('[NOTES] Retrieved deleted notes from storage:', existingDeletedNotes.length);
+
+      const simpleDeletedNotes = existingDeletedNotes.map(note => ({
+        id: note.id,
+        title: note.title,
+        content: note.content || Object.values(note.fields || {}).join('\n'),
+        createdAt: note.createdAt,
+        updatedAt: note.updatedAt,
+        theme: note.theme,
+        gradient: note.gradient,
+        fontStyle: note.fontStyle,
+        isPinned: note.isPinned || false,
+        images: note.images || [],
+        categoryId: note.categoryId,
+      }));
+
+      const sortedDeletedNotes = simpleDeletedNotes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      console.log('[NOTES] Setting deleted notes state with', sortedDeletedNotes.length, 'notes');
+
+      setDeletedNotes(sortedDeletedNotes);
+      console.log('[NOTES] Deleted notes state updated successfully');
+    } catch (error) {
+      console.error('Error loading deleted notes:', error);
     }
   };
 
@@ -598,8 +648,26 @@ export default function NotesScreen() {
         onClose={closeMenu}
         title="Google Keep"
         titleIcon="logo-google"
-        selectedItemId={selectedCategoryId}
+        selectedItemId={selectedSection === 'all' ? 'all-notes' : selectedSection === 'deleted' ? 'deleted-notes' : selectedCategoryId}
         sections={[
+          {
+            items: [
+              {
+                id: 'all-notes',
+                name: 'All Notes',
+                icon: 'library-outline',
+                onPress: handleShowAllNotes,
+                isSelected: selectedSection === 'all'
+              },
+              {
+                id: 'deleted-notes',
+                name: `Deleted Notes${deletedNotes.length > 0 ? ` (${deletedNotes.length})` : ''}`,
+                icon: 'trash-outline',
+                onPress: handleShowDeletedNotes,
+                isSelected: selectedSection === 'deleted'
+              }
+            ]
+          },
           {
             title: "Categories",
             showEdit: true,
@@ -609,22 +677,13 @@ export default function NotesScreen() {
               const { router } = require('expo-router');
               router.push('/labels-edit?type=categories');
             },
-            items: [
-              {
-                id: 'all-notes',
-                name: 'All Notes',
-                icon: 'library-outline',
-                onPress: handleShowAllNotes,
-                isSelected: !selectedCategoryId
-              },
-              ...categories.map(category => ({
-                id: category.id,
-                name: category.name,
-                icon: 'apps-outline',
-                onPress: () => handleCategorySelect(category.id),
-                isSelected: selectedCategoryId === category.id
-              }))
-            ],
+            items: categories.map(category => ({
+              id: category.id,
+              name: category.name,
+              icon: 'apps-outline',
+              onPress: () => handleCategorySelect(category.id),
+              isSelected: selectedSection === 'category' && selectedCategoryId === category.id
+            })),
             showCreate: true,
             onCreateNew: () => {
               const { router } = require('expo-router');
