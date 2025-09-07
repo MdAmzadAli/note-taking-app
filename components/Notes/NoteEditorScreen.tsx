@@ -540,11 +540,7 @@ export default function NoteEditorScreen({
 
   const handleTakePhoto = async () => {
     try {
-      // Close the media modal first
-      setShowMediaModal(false);
-      
-      // Add a small delay to ensure modal is fully closed
-      await new Promise(resolve => setTimeout(resolve, 100));
+      console.log('handleTakePhoto called');
       
       const hasPermission = await requestPermission();
       if (!hasPermission) return;
@@ -573,11 +569,7 @@ export default function NoteEditorScreen({
 
   const handleAddImage = async () => {
     try {
-      // Close the media modal first
-      setShowMediaModal(false);
-      
-      // Add a small delay to ensure modal is fully closed
-      await new Promise(resolve => setTimeout(resolve, 100));
+      console.log('handleAddImage called');
       
       const hasPermission = await requestPermission();
       if (!hasPermission) return;
@@ -676,6 +668,7 @@ export default function NoteEditorScreen({
   };
 
   const handleRecording = () => {
+    console.log('handleRecording called');
     setShowAudioModal(true);
   };
 
@@ -711,8 +704,7 @@ export default function NoteEditorScreen({
   };
 
   const handleTickBoxes = () => {
-    // Close the media modal first
-    setShowMediaModal(false);
+    console.log('handleTickBoxes called');
     
     const newTickBoxGroup: TickBoxGroup = {
       id: Date.now().toString(),
