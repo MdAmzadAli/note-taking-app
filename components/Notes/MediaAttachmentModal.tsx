@@ -55,8 +55,10 @@ export default function MediaAttachmentModal({
     // Close modal immediately
     onClose();
     
-    // Execute action immediately without setTimeout which may cause issues
-    action();
+    // Execute action with a tiny delay to ensure modal closes first
+    setTimeout(() => {
+      action();
+    }, 50);
   }, [onClose]);
 
   const options = [

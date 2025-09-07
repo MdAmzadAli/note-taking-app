@@ -178,6 +178,8 @@ export default function NoteEditorScreen({
   const scrollViewRef = useRef<ScrollView>(null);
   const activeInputPosition = useRef<number>(0);
 
+  const [isProcessingMedia, setIsProcessingMedia] = useState(false);
+
   useEffect(() => {
     setInitialTitle(noteTitle);
     setInitialContent(noteContent);
@@ -516,7 +518,7 @@ export default function NoteEditorScreen({
 
       if (status !== 'granted' || cameraStatus.status !== 'granted') {
         Alert.alert(
-          'Permission required', 
+          'Permission required',
           'Please grant camera and photo library permissions to add images.',
           [
             { text: 'Cancel', style: 'cancel' },
@@ -539,11 +541,16 @@ export default function NoteEditorScreen({
   };
 
   const handleTakePhoto = async () => {
+    if (isProcessingMedia) return; // Prevent multiple calls
+    setIsProcessingMedia(true);
     try {
       console.log('handleTakePhoto called');
-      
+
       const hasPermission = await requestPermission();
-      if (!hasPermission) return;
+      if (!hasPermission) {
+        setIsProcessingMedia(false);
+        return;
+      }
 
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -564,15 +571,22 @@ export default function NoteEditorScreen({
     } catch (error) {
       console.error('Error taking photo:', error);
       Alert.alert('Error', 'Failed to take photo. Please try again.');
+    } finally {
+      setIsProcessingMedia(false);
     }
   };
 
   const handleAddImage = async () => {
+    if (isProcessingMedia) return; // Prevent multiple calls
+    setIsProcessingMedia(true);
     try {
       console.log('handleAddImage called');
-      
+
       const hasPermission = await requestPermission();
-      if (!hasPermission) return;
+      if (!hasPermission) {
+        setIsProcessingMedia(false);
+        return;
+      }
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -595,6 +609,8 @@ export default function NoteEditorScreen({
     } catch (error) {
       console.error('Error adding image:', error);
       Alert.alert('Error', 'Failed to add image. Please try again.');
+    } finally {
+      setIsProcessingMedia(false);
     }
   };
 
@@ -668,8 +684,11 @@ export default function NoteEditorScreen({
   };
 
   const handleRecording = () => {
+    if (isProcessingMedia) return; // Prevent multiple calls
+    setIsProcessingMedia(true);
     console.log('handleRecording called');
     setShowAudioModal(true);
+    // No need to set isProcessingMedia to false here as it's handled by AudioRecordingModal's onClose/onSave
   };
 
   // Helper function to handle modal opening with keyboard dismissal
@@ -697,6 +716,7 @@ export default function NoteEditorScreen({
     insertMediaAtCursor('audio', newAudio);
 
     setShowAudioModal(false);
+    setIsProcessingMedia(false); // Reset processing state after saving audio
   };
 
   const handleAudioDelete = (audioId: string) => {
@@ -704,8 +724,10 @@ export default function NoteEditorScreen({
   };
 
   const handleTickBoxes = () => {
+    if (isProcessingMedia) return; // Prevent multiple calls
+    setIsProcessingMedia(true);
     console.log('handleTickBoxes called');
-    
+
     const newTickBoxGroup: TickBoxGroup = {
       id: Date.now().toString(),
       items: [],
@@ -714,6 +736,7 @@ export default function NoteEditorScreen({
 
     setNoteTickBoxGroups([...noteTickBoxGroups, newTickBoxGroup]);
     insertMediaAtCursor('tickbox', newTickBoxGroup);
+    setIsProcessingMedia(false); // Reset processing state after adding tickboxes
   };
 
   const handleTickBoxGroupUpdate = (groupId: string, updatedItems: any[]) => {
@@ -1046,7 +1069,10 @@ export default function NoteEditorScreen({
       {/* Media Attachment Modal */}
       <MediaAttachmentModal
         visible={showMediaModal}
-        onClose={() => setShowMediaModal(false)}
+        onClose={() => {
+          setShowMediaModal(false);
+          setIsProcessingMedia(false); // Reset processing state when modal is closed
+        }}
         onTakePhoto={React.useCallback(handleTakePhoto, [])}
         onAddImage={React.useCallback(handleAddImage, [])}
         onDrawing={React.useCallback(handleDrawing, [])}
@@ -1119,7 +1145,10 @@ export default function NoteEditorScreen({
       {/* Audio Recording Modal */}
       <AudioRecordingModal
         visible={showAudioModal}
-        onClose={() => setShowAudioModal(false)}
+        onClose={() => {
+          setShowAudioModal(false);
+          setIsProcessingMedia(false); // Reset processing state when modal is closed
+        }}
         onSave={handleAudioSave}
       />
 
