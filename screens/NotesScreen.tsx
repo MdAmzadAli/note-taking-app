@@ -19,6 +19,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import FloatingActionButton from '@/components/ui/FloatingActionButton';
 import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSection, AudioAttachment, TickBoxGroup, SegmentType } from '@/types';
 import { saveNote, saveTemplate, getNotes, getTemplates, getCustomTemplates, deleteNote, updateNote, getUserSettings, saveCustomTemplate, saveTemplateEntry } from '@/utils/storage';
 import { UserSettings } from '@/types';
@@ -555,19 +556,19 @@ export default function NotesScreen() {
           {renderNotesGrid()}
         </ScrollView>
 
-        <TouchableOpacity 
-          style={[
-            styles.fab, 
-            { bottom: 64 + Math.max(16, insets.bottom) + 30 } // Tab bar height + safe area + margin
-          ]}
+        <FloatingActionButton
           onPress={() => {
             setIsCreating(true);
             setCurrentNotePinned(false);
           }}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="add" size={28} color="#000000" />
-        </TouchableOpacity>
+          iconName="add"
+          iconSize={28}
+          iconColor="#000000"
+          backgroundColor="#00FF7F"
+          shadowColor="#00FF7F"
+          right={30}
+          size={56}
+        />
 
 
       <SlideMenu
@@ -649,24 +650,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 20,
     marginBottom: 16,
-  },
-  fab: {
-    position: 'absolute',
-    right: 30,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#00FF7F',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 8,
-    shadowColor: '#00FF7F',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
   },
 
 
