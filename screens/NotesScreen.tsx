@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import FloatingActionButton from '@/components/ui/FloatingActionButton';
-import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSection, AudioAttachment, TickBoxGroup, SegmentType } from '@/types';
+import { Note, CustomTemplate, TemplateEntry, FieldType, WritingStyle, NoteSection, AudioAttachment, TickBoxGroup } from '@/types';
 import { saveNote, saveTemplate, getNotes, getTemplates, getCustomTemplates, deleteNote, updateNote, getUserSettings, saveCustomTemplate, saveTemplateEntry } from '@/utils/storage';
 import { UserSettings } from '@/types';
 import { mockSpeechToText } from '@/utils/speech';
@@ -28,7 +28,8 @@ import TemplateEntriesScreen from './TemplateEntriesScreen';
 import { eventBus, EVENTS } from '@/utils/eventBus';
 import NoteEditorScreen from '@/components/Notes/NoteEditorScreen';
 import NotesGrid from '@/components/Notes/NotesGrid';
-import SlideMenu from '@/components/Notes/SlideMenu';
+import SlideMenu from '@/components/ui/SlideMenu';
+import { getCategories } from '@/utils/storage';
 
 import WritingStyleSelector from '@/components/WritingStyleSelector';
 import WritingStyleEditor from '@/components/WritingStyleEditor';
@@ -107,7 +108,7 @@ export default function NotesScreen() {
   const [currentNoteTickBoxGroups, setCurrentNoteTickBoxGroups] = useState<any[]>([]);
   const [currentNoteSegments, setCurrentNoteSegments] = useState<any[]>([]);
   const [currentNoteFontStyle, setCurrentNoteFontStyle] = useState<string | undefined>('default'); // State for font style
-  const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
+  const [categories, setCategories] = useState<Array<{id: string, name: string, createdAt: string}>>([]);
   const [menuScrollOffset, setMenuScrollOffset] = useState(0);
   const menuFlatListRef = useRef<FlatList>(null);
 
@@ -115,6 +116,7 @@ export default function NotesScreen() {
     loadNotes();
     loadSettings();
     loadTemplates();
+    loadCategories();
   }, []);
 
   // Control tab bar visibility using Context
@@ -131,6 +133,7 @@ export default function NotesScreen() {
     React.useCallback(() => {
       loadTemplates();
       loadNotes(); // This will ensure categories are refreshed when returning from labels-edit
+      loadCategories();
     }, [])
   );
 
@@ -245,7 +248,7 @@ export default function NotesScreen() {
     categoryId?: string,
     audios?: AudioAttachment[],
     tickBoxGroups?: TickBoxGroup[],
-    segments?: SegmentType[],
+    segments?: any[],
     fontStyle?: string | undefined
   ) => {
     if (!currentNoteText.trim() && noteSections.length === 0 && (!tickBoxGroups || tickBoxGroups.length === 0)) {
@@ -437,21 +440,10 @@ export default function NotesScreen() {
 
   const openMenu = () => {
     setIsMenuVisible(true);
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
   };
 
   const closeMenu = () => {
-    Animated.timing(slideAnim, {
-      toValue: -Dimensions.get('window').width,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      setIsMenuVisible(false);
-    });
+    setIsMenuVisible(false);
   };
 
   const handleCategorySelect = (categoryId: string) => {
@@ -467,6 +459,44 @@ export default function NotesScreen() {
   };
 
   // Handler for when the note editor is closed without saving
+  const loadCategories = async () => {
+    try {
+      let categoriesData = await getCategories();
+      
+      // If no categories exist, create default ones
+      if (categoriesData.length === 0) {
+        const defaultCategories = [
+          { id: '1', name: 'Work', createdAt: new Date().toISOString() },
+          { id: '2', name: 'Personal', createdAt: new Date().toISOString() },
+          { id: '3', name: 'Ideas', createdAt: new Date().toISOString() },
+          { id: '4', name: 'Projects', createdAt: new Date().toISOString() },
+          { id: '5', name: 'Shopping', createdAt: new Date().toISOString() },
+          { id: '6', name: 'Health', createdAt: new Date().toISOString() },
+          { id: '7', name: 'Travel', createdAt: new Date().toISOString() },
+          { id: '8', name: 'Finance', createdAt: new Date().toISOString() },
+          { id: '9', name: 'Learning', createdAt: new Date().toISOString() },
+          { id: '10', name: 'Family', createdAt: new Date().toISOString() },
+          { id: '11', name: 'Goals', createdAt: new Date().toISOString() },
+        ];
+        
+        // Import saveCategory function
+        const { saveCategory } = await import('@/utils/storage');
+        
+        // Save default categories to storage
+        for (const category of defaultCategories) {
+          await saveCategory(category);
+        }
+        
+        setCategories(defaultCategories);
+      } else {
+        setCategories(categoriesData);
+      }
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      setCategories([]);
+    }
+  };
+
   const handleCloseEditor = () => {
     setIsCreating(false);
     setIsEditing(false);
@@ -508,7 +538,6 @@ export default function NotesScreen() {
         onImagesChange={setCurrentNoteImages}
         onAudiosChange={setCurrentNoteAudios}
         onTickBoxGroupsChange={setCurrentNoteTickBoxGroups}
-        onFontStyleChange={setCurrentNoteFontStyle} // Handler for font style change
       />
     );
   }
@@ -567,14 +596,42 @@ export default function NotesScreen() {
       <SlideMenu
         visible={isMenuVisible}
         onClose={closeMenu}
-        slideAnim={slideAnim}
-        onCreateTemplate={() => {
-          closeMenu();
-          setCurrentView('create-template');
-        }}
-        onCategorySelect={handleCategorySelect}
-        onShowAllNotes={handleShowAllNotes}
-        selectedCategoryId={selectedCategoryId}
+        title="Google Keep"
+        titleIcon="logo-google"
+        selectedItemId={selectedCategoryId}
+        sections={[
+          {
+            title: "Categories",
+            showEdit: true,
+            onEdit: () => {
+              closeMenu();
+              // Navigate to labels-edit for categories
+              const { router } = require('expo-router');
+              router.push('/labels-edit?type=categories');
+            },
+            items: [
+              {
+                id: 'all-notes',
+                name: 'All Notes',
+                icon: 'library-outline',
+                onPress: handleShowAllNotes,
+                isSelected: !selectedCategoryId
+              },
+              ...categories.map(category => ({
+                id: category.id,
+                name: category.name,
+                icon: 'apps-outline',
+                onPress: () => handleCategorySelect(category.id),
+                isSelected: selectedCategoryId === category.id
+              }))
+            ],
+            showCreate: true,
+            onCreateNew: () => {
+              const { router } = require('expo-router');
+              router.push('/labels-edit?type=categories');
+            }
+          }
+        ]}
       />
     </View>
 
