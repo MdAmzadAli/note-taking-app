@@ -566,7 +566,8 @@ export default function NoteEditorScreen({
           type: 'photo',
           createdAt: new Date().toISOString(),
         };
-        setNoteImages([...noteImages, newImage]);
+        const updatedImages = [...noteImages, newImage];
+        setNoteImages(updatedImages);
         insertMediaAtCursor('image', [newImage]);
       }
     } catch (error) {
@@ -604,7 +605,8 @@ export default function NoteEditorScreen({
           type: 'image',
           createdAt: new Date().toISOString(),
         }));
-        setNoteImages([...noteImages, ...newImages]);
+        const updatedImages = [...noteImages, ...newImages];
+        setNoteImages(updatedImages);
         insertMediaAtCursor('image', newImages);
       }
     } catch (error) {
@@ -625,7 +627,25 @@ export default function NoteEditorScreen({
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            setNoteImages(noteImages.filter(img => img.id !== imageId));
+            // Update noteImages state
+            const updatedImages = noteImages.filter(img => img.id !== imageId);
+            setNoteImages(updatedImages);
+            
+            // Update segments to remove the image from image segments
+            const updatedSegments = segments.map(segment => {
+              if (segment.type === 'image') {
+                const imageSegment = segment as ImageSegment;
+                const filteredImages = imageSegment.images.filter(img => img.id !== imageId);
+                if (filteredImages.length === 0) {
+                  // Remove the entire segment if no images left
+                  return null;
+                }
+                return { ...imageSegment, images: filteredImages };
+              }
+              return segment;
+            }).filter(segment => segment !== null) as SegmentType[];
+            
+            setSegments(updatedSegments);
             setShowFullImage(false);
           },
         },
@@ -769,6 +789,8 @@ export default function NoteEditorScreen({
   };
 
   const renderSegmentedContent = () => {
+    console.log('Rendering segmented content. Segments count:', segments.length);
+    
     if (segments.length === 0) {
       return (
         <TextInput
@@ -789,14 +811,18 @@ export default function NoteEditorScreen({
 
     // Sort segments by order to ensure proper display
     const sortedSegments = [...segments].sort((a, b) => a.order - b.order);
+    
+    console.log('Sorted segments:', sortedSegments.map(s => ({ type: s.type, id: s.id, order: s.order })));
 
     return (
       <View style={styles.segmentedContentContainer}>
         {sortedSegments.map((segment) => {
+          console.log('Rendering segment:', segment.type, segment.id);
           switch (segment.type) {
             case 'text':
               return renderTextSegment(segment as TextSegment);
             case 'image':
+              console.log('Rendering image segment with images:', (segment as ImageSegment).images.length);
               return renderImageSegment(segment as ImageSegment);
             case 'audio':
               return renderAudioSegment(segment as AudioSegment);
@@ -870,6 +896,12 @@ export default function NoteEditorScreen({
                   source={{ uri: image.uri }}
                   style={styles.inlineImage}
                   resizeMode="cover"
+                  onError={(error) => {
+                    console.error('Image load error:', error);
+                  }}
+                  onLoad={() => {
+                    console.log('Image loaded successfully:', image.uri);
+                  }}
                 />
               </TouchableOpacity>
             );
