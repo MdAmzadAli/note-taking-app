@@ -63,7 +63,6 @@ interface TickBoxGroup {
 interface SegmentedContent {
   id: string;
   type: 'text' | 'image' | 'audio' | 'tickbox';
-  order: number;
   createdAt: string;
 }
 
@@ -221,12 +220,27 @@ export default function NoteEditorScreen({
     };
   }, [pendingModalAction]); // Add pendingModalAction as dependency
 
+  // Cleanup segments periodically to merge adjacent text segments and remove empty ones
+  // Only run cleanup when not actively editing to avoid surprise changes
+  useEffect(() => {
+    const cleanupTimer = setTimeout(() => {
+      // Only cleanup if no active segment (not currently editing)
+      if (!activeSegmentId || !isKeyboardVisible) {
+        cleanupSegments();
+      }
+    }, 3000); // Cleanup after 3 seconds of inactivity
+
+    return () => clearTimeout(cleanupTimer);
+  }, [segments, activeSegmentId, isKeyboardVisible]);
+
   const initializeSegments = () => {
     // If we have saved segments, use them (this preserves inline positioning)
     if (initialSegments && initialSegments.length > 0) {
-      setSegments(initialSegments);
+      // Remove order property from legacy segments if it exists
+      const cleanedSegments = initialSegments.map(({ order, ...segment }: any) => segment);
+      setSegments(cleanedSegments);
       // Set focus to the first text segment
-      const firstTextSegment = initialSegments.find(seg => seg.type === 'text');
+      const firstTextSegment = cleanedSegments.find(seg => seg.type === 'text');
       if (firstTextSegment) {
         setActiveSegmentId(firstTextSegment.id);
       }
@@ -235,14 +249,12 @@ export default function NoteEditorScreen({
 
     // Otherwise, create initial structure for new/legacy notes
     const newSegments: SegmentType[] = [];
-    let order = 0;
 
     // Create initial text segment
     const initialTextSegment: TextSegment = {
       id: 'initial-text',
       type: 'text',
       content: noteContent || '',
-      order: order++,
       createdAt: new Date().toISOString(),
       isFocused: true,
     };
@@ -255,7 +267,6 @@ export default function NoteEditorScreen({
         id: `images-${Date.now()}`,
         type: 'image',
         images: noteImages,
-        order: order++,
         createdAt: new Date().toISOString(),
       });
     }
@@ -265,7 +276,6 @@ export default function NoteEditorScreen({
         id: `audio-${audio.id}`,
         type: 'audio',
         audio: audio,
-        order: order++,
         createdAt: new Date().toISOString(),
       });
     });
@@ -275,7 +285,6 @@ export default function NoteEditorScreen({
         id: `tickbox-${group.id}`,
         type: 'tickbox',
         tickBoxGroup: group,
-        order: order++,
         createdAt: new Date().toISOString(),
       });
     });
@@ -309,7 +318,9 @@ export default function NoteEditorScreen({
       return;
     }
 
-    const activeSegment = segments.find(seg => seg.id === activeSegmentId);
+    const activeSegmentIndex = segments.findIndex(seg => seg.id === activeSegmentId);
+    const activeSegment = segments[activeSegmentIndex];
+    
     if (!activeSegment || activeSegment.type !== 'text') {
       console.log('Active segment not found or not text type:', activeSegment?.type);
       return;
@@ -325,66 +336,53 @@ export default function NoteEditorScreen({
     const beforeText = currentText.substring(0, insertPosition);
     const afterText = currentText.substring(insertPosition);
 
-    const newSegments: SegmentType[] = [];
-    let orderCounter = 0;
+    // Create new segments array using splice for efficiency
+    const newSegments = [...segments];
+    const elementsToInsert: SegmentType[] = [];
 
-    // Process all segments before the active one
-    segments.forEach(segment => {
-      if (segment.order < textSegment.order) {
-        newSegments.push({ ...segment, order: orderCounter++ });
-      }
-    });
-
-    // Add text before cursor (if any)
-    if (beforeText) {
-      newSegments.push({
-        id: `text-before-${Date.now()}`,
-        type: 'text',
+    // Update current segment with text before cursor (preserve all whitespace)
+    if (beforeText.length > 0) {
+      newSegments[activeSegmentIndex] = {
+        ...textSegment,
         content: beforeText,
-        order: orderCounter++,
-        createdAt: new Date().toISOString(),
-      });
+      };
+    } else {
+      // Remove current segment only if completely empty
+      newSegments.splice(activeSegmentIndex, 1);
     }
 
-    // Add media segment at cursor position
-    const mediaSegment = createMediaSegment(mediaType, mediaData, orderCounter++);
-    console.log('Created media segment:', mediaSegment.type, mediaSegment.id, 'order:', mediaSegment.order);
+    // Create media segment
+    const mediaSegment = createMediaSegment(mediaType, mediaData);
+    console.log('Created media segment:', mediaSegment.type, mediaSegment.id);
     if (mediaType === 'image') {
       console.log('Image segment contains:', (mediaSegment as ImageSegment).images.length, 'images');
     }
-    newSegments.push(mediaSegment);
+    elementsToInsert.push(mediaSegment);
 
-    // Add text after cursor as new focused segment
+    // Always create text segment for content after cursor to maintain focus
     const newActiveSegmentId = `text-after-${Date.now()}`;
-    newSegments.push({
+    const newTextSegment: TextSegment = {
       id: newActiveSegmentId,
       type: 'text',
       content: afterText,
-      order: orderCounter++,
       createdAt: new Date().toISOString(),
       isFocused: true,
-    });
+    };
+    elementsToInsert.push(newTextSegment);
 
-    // Process all segments after the active one
-    segments.forEach(segment => {
-      if (segment.order > textSegment.order) {
-        newSegments.push({ ...segment, order: orderCounter++ });
-      }
-    });
+    // Insert new segments at the appropriate position
+    const insertIndex = beforeText.length > 0 ? activeSegmentIndex + 1 : activeSegmentIndex;
+    newSegments.splice(insertIndex, 0, ...elementsToInsert);
 
     console.log('New segments array length:', newSegments.length);
-    console.log('New segments breakdown:', newSegments.map(s => ({ type: s.type, id: s.id, order: s.order })));
+    console.log('New segments breakdown:', newSegments.map((s, i) => ({ index: i, type: s.type, id: s.id })));
 
     // Update segments and focus
     setSegments(newSegments);
-    setActiveSegmentId(newActiveSegmentId);
+    setActiveSegmentId(newActiveSegmentId); // Always focus the new trailing text segment
 
     // Update the main note content for saving
-    const combinedText = newSegments
-      .filter(seg => seg.type === 'text')
-      .map(seg => (seg as TextSegment).content)
-      .join('');
-    onContentChange(combinedText);
+    updateMainNoteContent(newSegments);
 
     // Focus the new text input after a brief delay
     setTimeout(() => {
@@ -402,7 +400,7 @@ export default function NoteEditorScreen({
     }, 100);
   };
 
-  const createMediaSegment = (mediaType: 'image' | 'audio' | 'tickbox', mediaData: any, order: number): SegmentType => {
+  const createMediaSegment = (mediaType: 'image' | 'audio' | 'tickbox', mediaData: any): SegmentType => {
     const timestamp = Date.now();
 
     switch (mediaType) {
@@ -411,7 +409,6 @@ export default function NoteEditorScreen({
           id: `image-${timestamp}`,
           type: 'image',
           images: Array.isArray(mediaData) ? mediaData : [mediaData],
-          order,
           createdAt: new Date().toISOString(),
         };
       case 'audio':
@@ -419,7 +416,6 @@ export default function NoteEditorScreen({
           id: `audio-${timestamp}`,
           type: 'audio',
           audio: mediaData,
-          order,
           createdAt: new Date().toISOString(),
         };
       case 'tickbox':
@@ -427,12 +423,20 @@ export default function NoteEditorScreen({
           id: `tickbox-${timestamp}`,
           type: 'tickbox',
           tickBoxGroup: mediaData,
-          order,
           createdAt: new Date().toISOString(),
         };
       default:
         throw new Error(`Unknown media type: ${mediaType}`);
     }
+  };
+
+  // Helper function to update main note content
+  const updateMainNoteContent = (segmentsArray: SegmentType[]) => {
+    const combinedText = segmentsArray
+      .filter(seg => seg.type === 'text')
+      .map(seg => (seg as TextSegment).content)
+      .join('');
+    onContentChange(combinedText);
   };
 
   const handleTextChange = (segmentId: string, text: string) => {
@@ -444,13 +448,60 @@ export default function NoteEditorScreen({
     });
 
     setSegments(updatedSegments);
+    updateMainNoteContent(updatedSegments);
+  };
 
-    // Update main note content
-    const combinedText = updatedSegments
-      .filter(seg => seg.type === 'text')
-      .map(seg => (seg as TextSegment).content)
-      .join('');
-    onContentChange(combinedText);
+  // Helper function to merge adjacent text segments
+  const mergeAdjacentTextSegments = (segmentsArray: SegmentType[]): SegmentType[] => {
+    const merged: SegmentType[] = [];
+    
+    for (let i = 0; i < segmentsArray.length; i++) {
+      const current = segmentsArray[i];
+      const next = segmentsArray[i + 1];
+      
+      if (current.type === 'text' && next?.type === 'text') {
+        const currentText = current as TextSegment;
+        const nextText = next as TextSegment;
+        
+        // Merge the text segments
+        const mergedSegment: TextSegment = {
+          ...currentText,
+          content: currentText.content + nextText.content,
+          isFocused: currentText.isFocused || nextText.isFocused,
+        };
+        
+        merged.push(mergedSegment);
+        i++; // Skip the next segment as it's been merged
+      } else {
+        merged.push(current);
+      }
+    }
+    
+    return merged;
+  };
+
+  // Helper function to remove only completely empty text segments
+  const removeEmptyTextSegments = (segmentsArray: SegmentType[]): SegmentType[] => {
+    return segmentsArray.filter(segment => {
+      if (segment.type === 'text') {
+        const textSegment = segment as TextSegment;
+        // Only remove segments that are completely empty (no content at all) and not focused
+        return textSegment.content.length > 0 || textSegment.isFocused;
+      }
+      return true;
+    });
+  };
+
+  // Function to clean up segments (merge adjacent text, remove empty segments)
+  const cleanupSegments = () => {
+    let cleaned = removeEmptyTextSegments(segments);
+    cleaned = mergeAdjacentTextSegments(cleaned);
+    
+    if (cleaned.length !== segments.length || 
+        JSON.stringify(cleaned) !== JSON.stringify(segments)) {
+      setSegments(cleaned);
+      updateMainNoteContent(cleaned);
+    }
   };
 
   const loadCategories = async () => {
@@ -826,20 +877,18 @@ export default function NoteEditorScreen({
       );
     }
 
-    // Sort segments by order to ensure proper display
-    const sortedSegments = [...segments].sort((a, b) => a.order - b.order);
-    
-    console.log('Sorted segments:', sortedSegments.map(s => ({ 
+    // Segments are already in the correct order by array index
+    console.log('Segments:', segments.map((s, i) => ({ 
+      index: i,
       type: s.type, 
-      id: s.id, 
-      order: s.order,
+      id: s.id,
       imageCount: s.type === 'image' ? (s as ImageSegment).images.length : 0
     })));
 
     return (
       <View style={styles.segmentedContentContainer}>
-        {sortedSegments.map((segment) => {
-          console.log('Processing segment for rendering:', segment.type, segment.id);
+        {segments.map((segment, index) => {
+          console.log('Processing segment for rendering:', segment.type, segment.id, 'at index:', index);
           switch (segment.type) {
             case 'text':
               console.log('Rendering text segment:', segment.id);
@@ -855,7 +904,7 @@ export default function NoteEditorScreen({
               console.log('Rendering tickbox segment:', segment.id);
               return renderTickBoxSegment(segment as TickBoxSegment);
             default:
-              console.log('Unknown segment type:', segment.type);
+              console.log('Unknown segment type:', (segment as any).type);
               return null;
           }
         })}
@@ -870,7 +919,7 @@ export default function NoteEditorScreen({
         ref={(ref) => { if (ref) textInputRefs.current[segment.id] = ref; }}
         style={[styles.textSegmentInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
         editable={!readOnly}
-        placeholder={segment.order === 0 ? "Start typing your note..." : "Continue typing..."}
+        placeholder="Continue typing..."
         placeholderTextColor="#888888"
         value={segment.content}
         onChangeText={(text) => handleTextChange(segment.id, text)}
