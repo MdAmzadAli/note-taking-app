@@ -323,12 +323,12 @@ export default function NoteEditorScreen({
   // Media insertion (Rules 2, 3, 4)
   const insertMediaAfterBlock = (afterBlockId: string, mediaType: 'image' | 'audio' | 'tickbox', mediaData: any) => {
     setEditorBlocks(prev => {
-      const afterIndex = prev.findIndex(block => block.id === afterBlockId);
-      const insertIndex = afterIndex + 1;
+      // Always insert at the end to ensure new media appears below previous ones
+      const insertIndex = prev.length;
 
       const newBlocks = [...prev];
 
-      // Insert media block
+      // Insert media block at the end
       const mediaBlock: EditorBlock = {
         id: generateBlockId(),
         type: mediaType,
