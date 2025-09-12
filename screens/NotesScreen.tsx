@@ -106,7 +106,6 @@ export default function NotesScreen() {
   const [currentNoteImages, setCurrentNoteImages] = useState<ImageAttachment[]>([]);
   const [currentNoteAudios, setCurrentNoteAudios] = useState<any[]>([]);
   const [currentNoteTickBoxGroups, setCurrentNoteTickBoxGroups] = useState<any[]>([]);
-  const [currentNoteSegments, setCurrentNoteSegments] = useState<any[]>([]);
   const [currentNoteFontStyle, setCurrentNoteFontStyle] = useState<string | undefined>('default'); // State for font style
   const [categories, setCategories] = useState<Array<{id: string, name: string, createdAt: string}>>([]);
   const [deletedNotes, setDeletedNotes] = useState<SimpleNote[]>([]);
@@ -259,7 +258,6 @@ export default function NotesScreen() {
     categoryId?: string,
     audios?: AudioAttachment[],
     tickBoxGroups?: TickBoxGroup[],
-    segments?: any[],
     fontStyle?: string | undefined
   ) => {
     if (!currentNoteText.trim() && noteSections.length === 0 && (!tickBoxGroups || tickBoxGroups.length === 0)) {
@@ -303,7 +301,6 @@ export default function NotesScreen() {
             images: images || currentNoteImages,
             audios: audios || [],
             tickBoxGroups: tickBoxGroups || [],
-            segments: segments || [], // Add segments support
             updatedAt: now,
             isPinned: isPinned !== undefined ? isPinned : existingNote.isPinned,
             categoryId: categoryId || existingNote.categoryId,
@@ -325,7 +322,6 @@ export default function NotesScreen() {
           images: images || currentNoteImages,
           audios: audios || [],
           tickBoxGroups: tickBoxGroups || [],
-          segments: segments || [], // Add segments support
           createdAt: now,
           updatedAt: now,
           isPinned: isPinned || false,
@@ -347,7 +343,6 @@ export default function NotesScreen() {
       setCurrentNoteImages([]);
       setCurrentNoteAudios([]);
       setCurrentNoteTickBoxGroups([]);
-      setCurrentNoteSegments([]);
       setCurrentNoteFontStyle(undefined); // Reset font style
       setIsCreating(false);
       setIsEditing(false);
@@ -382,7 +377,6 @@ export default function NotesScreen() {
         setCurrentNoteAudios(fullNote.audios || []);
         setCurrentNoteTickBoxGroups(fullNote.tickBoxGroups || []);
         setCurrentNotePinned(fullNote.isPinned || false);
-        setCurrentNoteSegments(fullNote.segments || []); // Load segments for inline positioning
       } else {
         setCurrentNoteText(note.content);
         setCurrentNoteTitle('');
@@ -429,7 +423,6 @@ export default function NotesScreen() {
         setCurrentNoteAudios(fullNote.audios || []);
         setCurrentNoteTickBoxGroups(fullNote.tickBoxGroups || []);
         setCurrentNotePinned(fullNote.isPinned || false);
-        setCurrentNoteSegments(fullNote.segments || []);
       } else {
         setCurrentNoteText(note.content);
         setCurrentNoteTitle(note.title || '');
@@ -650,7 +643,6 @@ export default function NotesScreen() {
         images={currentNoteImages}
         audios={currentNoteAudios}
         tickBoxGroups={currentNoteTickBoxGroups}
-        segments={currentNoteSegments}
         createdAt={editingNoteId ? notes.find(n => n.id === editingNoteId)?.createdAt : undefined}
         updatedAt={editingNoteId ? notes.find(n => n.id === editingNoteId)?.updatedAt : undefined}
         categoryId={editingNoteId ? notes.find(n => n.id === editingNoteId)?.categoryId || undefined : selectedCategoryId || undefined}

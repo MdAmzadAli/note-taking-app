@@ -47,7 +47,6 @@ export interface Note {
   images?: ImageAttachment[];
   audios?: AudioAttachment[];
   tickBoxGroups?: TickBoxGroup[];
-  segments?: any[]; // For inline media positioning
   isPinned?: boolean;
   categoryId?: string; // For category-based organization
   createdAt: string;
