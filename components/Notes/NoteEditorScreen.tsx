@@ -258,8 +258,20 @@ export default function NoteEditorScreen({
     const currentContent = noteContent;
     const insertPosition = cursorPosition.start;
     
-    // Create unique media ID and add to placeholders
-    const mediaId = `${mediaType}-${Date.now()}`;
+    // Use entity ID for consistent reference with deletion handlers
+    let entityId: string;
+    if (mediaType === 'image' && Array.isArray(mediaData)) {
+      entityId = mediaData[0]?.id || Date.now().toString();
+    } else if (mediaType === 'audio' && mediaData.id) {
+      entityId = mediaData.id;
+    } else if (mediaType === 'tickbox' && mediaData.id) {
+      entityId = mediaData.id;
+    } else {
+      entityId = Date.now().toString();
+    }
+    
+    // Create placeholder using entity ID for consistency with deletion
+    const mediaId = `${mediaType}-${entityId}`;
     const placeholder = `[MEDIA:${mediaType}:${mediaId}]`;
     
     // Add media data to placeholders
@@ -282,20 +294,50 @@ export default function NoteEditorScreen({
     // Update note content and cursor position
     onContentChange(newContent);
     
-    // Update cursor position state - the new inline rendering will handle positioning
+    // Update cursor position state - place cursor after inserted media
     const newCursorPosition = insertPosition + placeholder.length;
     setCursorPosition({ start: newCursorPosition, end: newCursorPosition });
     
-    console.log('Media placeholder inserted:', placeholder);
+    console.log('Media placeholder inserted:', placeholder, 'with entity ID:', entityId);
   };
 
   // Removed createMediaSegment - using new placeholder-based approach
 
-  // New custom editor helper functions
+  // Enhanced content parsing and cursor position helpers
   const parseContent = (content: string) => {
     // Split content by media placeholders while keeping the placeholders
     const parts = content.split(/(\[MEDIA:[^\]]+\])/);
     return parts.filter(part => part.length > 0);
+  };
+
+  // Get text segments from parsed content for TextInput values
+  const getTextSegments = (content: string): string[] => {
+    const parts = parseContent(content);
+    return parts.filter(part => !isMediaPlaceholder(part));
+  };
+
+  // Calculate absolute cursor position from relative position in text segment
+  const calculateAbsoluteCursorPosition = (textSegmentIndex: number, relativeCursor: { start: number; end: number }) => {
+    const parts = parseContent(noteContent);
+    let absoluteStart = 0;
+    let textSegmentCount = 0;
+    
+    for (const part of parts) {
+      if (isMediaPlaceholder(part)) {
+        absoluteStart += part.length;
+      } else {
+        if (textSegmentCount === textSegmentIndex) {
+          return {
+            start: absoluteStart + relativeCursor.start,
+            end: absoluteStart + relativeCursor.end
+          };
+        }
+        absoluteStart += part.length;
+        textSegmentCount++;
+      }
+    }
+    
+    return { start: absoluteStart, end: absoluteStart };
   };
 
   const isMediaPlaceholder = (text: string): boolean => {
@@ -613,16 +655,16 @@ export default function NoteEditorScreen({
     const updatedAudios = noteAudios.filter(audio => audio.id !== audioId);
     setNoteAudios(updatedAudios);
     
-    // Remove audio placeholder from content
-    const mediaId = `audio-${audioId}`;
-    const placeholderToRemove = `[MEDIA:audio:${mediaId}]`;
+    // Remove audio placeholder from content using consistent ID format
+    const audioMediaId = `audio-${audioId}`;
+    const placeholderToRemove = `[MEDIA:audio:${audioMediaId}]`;
     const updatedContent = noteContent.replace(placeholderToRemove, '');
     onContentChange(updatedContent);
     
     // Clean up media placeholders
     setMediaPlaceholders(prev => {
       const newPlaceholders = { ...prev };
-      delete newPlaceholders[mediaId];
+      delete newPlaceholders[audioMediaId];
       return newPlaceholders;
     });
   };
@@ -650,15 +692,15 @@ export default function NoteEditorScreen({
     );
     setNoteTickBoxGroups(updatedGroups);
     
-    // Update media placeholders with new data
-    const mediaId = `tickbox-${groupId}`;
+    // Update media placeholders with new data using consistent ID format
+    const tickboxMediaId = `tickbox-${groupId}`;
     setMediaPlaceholders(prev => {
-      if (prev[mediaId]) {
+      if (prev[tickboxMediaId]) {
         return {
           ...prev,
-          [mediaId]: {
-            ...prev[mediaId],
-            data: { ...prev[mediaId].data as TickBoxGroup, items: updatedItems }
+          [tickboxMediaId]: {
+            ...prev[tickboxMediaId],
+            data: { ...prev[tickboxMediaId].data as TickBoxGroup, items: updatedItems }
           }
         };
       }
@@ -672,105 +714,91 @@ export default function NoteEditorScreen({
     const updatedGroups = noteTickBoxGroups.filter(group => group.id !== groupId);
     setNoteTickBoxGroups(updatedGroups);
     
-    // Remove tickbox placeholder from content
-    const mediaId = `tickbox-${groupId}`;
-    const placeholderToRemove = `[MEDIA:tickbox:${mediaId}]`;
+    // Remove tickbox placeholder from content using consistent ID format
+    const tickboxMediaId = `tickbox-${groupId}`;
+    const placeholderToRemove = `[MEDIA:tickbox:${tickboxMediaId}]`;
     const updatedContent = noteContent.replace(placeholderToRemove, '');
     onContentChange(updatedContent);
     
     // Clean up media placeholders
     setMediaPlaceholders(prev => {
       const newPlaceholders = { ...prev };
-      delete newPlaceholders[mediaId];
+      delete newPlaceholders[tickboxMediaId];
       return newPlaceholders;
     });
   };
 
   const renderCustomEditor = () => {
-    console.log('Rendering custom editor with inline media support');
+    console.log('Rendering custom editor with fixed inline media support');
     
     const parts = parseContent(noteContent);
     const elements: React.ReactElement[] = [];
-    let currentTextSegment = '';
-    let textIndex = 0;
+    let textSegmentIndex = 0;
     
     parts.forEach((part, index) => {
       if (isMediaPlaceholder(part)) {
-        // First, render any accumulated text
-        if (currentTextSegment.length > 0) {
-          elements.push(
-            <TextInput
-              key={`text-${textIndex}`}
-              style={[styles.bodyInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
-              placeholder={elements.length === 0 && !readOnly ? "Start typing your note..." : ""}
-              editable={!readOnly}
-              placeholderTextColor="#888888"
-              value={currentTextSegment}
-              onChangeText={(text) => handleTextSegmentChange(textIndex, text)}
-              multiline={true}
-              textAlignVertical="top"
-              autoFocus={elements.length === 0}
-            />
-          );
-          currentTextSegment = '';
-          textIndex++;
-        }
-        
-        // Then render the media
+        // Render the media component
         const mediaInfo = parseMediaPlaceholder(part);
         if (mediaInfo && mediaPlaceholders[mediaInfo.id]) {
           const placeholder = mediaPlaceholders[mediaInfo.id];
           const mediaElement = renderMediaComponent(placeholder, index);
           if (mediaElement) {
             elements.push(mediaElement);
-            
-            // Add a new text input after media for continued writing
-            elements.push(
-              <TextInput
-                key={`text-after-media-${index}`}
-                style={[styles.bodyInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
-                placeholder="Continue writing..."
-                editable={!readOnly}
-                placeholderTextColor="#888888"
-                value=""
-                onChangeText={(text) => handleTextAfterMediaChange(index, text)}
-                multiline={true}
-                textAlignVertical="top"
-              />
-            );
           }
         }
       } else {
-        // Accumulate text parts
-        currentTextSegment += part;
+        // Render text input with value derived from actual content segment
+        const textValue = part;
+        const isLastTextSegment = textSegmentIndex === getTextSegments(noteContent).length - 1;
+        
+        elements.push(
+          <TextInput
+            key={`text-${textSegmentIndex}`}
+            ref={isLastTextSegment ? textInputRef : undefined}
+            style={[styles.bodyInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
+            placeholder={textSegmentIndex === 0 && !readOnly ? "Start typing your note..." : "Continue writing..."}
+            editable={!readOnly}
+            placeholderTextColor="#888888"
+            value={textValue}
+            onChangeText={(text) => handleTextSegmentChange(textSegmentIndex, text)}
+            onSelectionChange={(event) => {
+              const { start, end } = event.nativeEvent.selection;
+              const absolutePosition = calculateAbsoluteCursorPosition(textSegmentIndex, { start, end });
+              setCursorPosition(absolutePosition);
+            }}
+            onFocus={() => {
+              // Update cursor position when this input is focused
+              setTimeout(() => {
+                if (isKeyboardVisible) {
+                  scrollToInput();
+                }
+              }, 100);
+            }}
+            multiline={true}
+            textAlignVertical="top"
+            autoFocus={textSegmentIndex === 0 && elements.length === 1}
+          />
+        );
+        textSegmentIndex++;
       }
     });
     
-    // Render any remaining text
-    if (currentTextSegment.length > 0 || parts.length === 0) {
+    // If no content exists, render the initial text input
+    if (parts.length === 0) {
       elements.push(
         <TextInput
           ref={textInputRef}
-          key={`text-final-${textIndex}`}
+          key="text-initial"
           style={[styles.bodyInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
-          placeholder={elements.length === 0 && !readOnly ? "Start typing your note..." : "Continue writing..."}
+          placeholder={!readOnly ? "Start typing your note..." : ""}
           editable={!readOnly}
           placeholderTextColor="#888888"
-          value={currentTextSegment}
-          onChangeText={(text) => handleTextSegmentChange(textIndex, text)}
+          value=""
+          onChangeText={(text) => onContentChange(text)}
           onSelectionChange={handleTextSelection}
-          onFocus={() => {
-            if (textInputRef.current) {
-              textInputRef.current.measure((x, y, width, height, pageX, pageY) => {
-                if (isKeyboardVisible) {
-                  setTimeout(() => scrollToInput(), 100);
-                }
-              });
-            }
-          }}
           multiline={true}
           textAlignVertical="top"
-          autoFocus={elements.length === 0}
+          autoFocus={true}
         />
       );
     }
@@ -782,10 +810,8 @@ export default function NoteEditorScreen({
     );
   };
 
-  // Text segment change handlers for inline editing
+  // Enhanced text segment change handler for inline editing
   const handleTextSegmentChange = (segmentIndex: number, text: string) => {
-    // For now, we'll update the main content
-    // This is a simplified approach - a full implementation would need to track segments
     const parts = parseContent(noteContent);
     let textSegmentCount = 0;
     let newContent = '';
@@ -803,33 +829,15 @@ export default function NoteEditorScreen({
       }
     });
     
-    // If this is the final segment and no parts exist yet
-    if (parts.length === 0 && segmentIndex === 0) {
+    // Handle case where this is the initial or only text segment
+    if (parts.length === 0 || (parts.length === 1 && !isMediaPlaceholder(parts[0]))) {
       newContent = text;
     }
     
     onContentChange(newContent);
   };
-  
-  const handleTextAfterMediaChange = (mediaIndex: number, text: string) => {
-    // Insert text after the specified media element
-    const parts = parseContent(noteContent);
-    let newParts: string[] = [];
-    let mediaCount = 0;
-    
-    parts.forEach((part) => {
-      newParts.push(part);
-      if (isMediaPlaceholder(part)) {
-        if (mediaCount === mediaIndex) {
-          newParts.push(text);
-        }
-        mediaCount++;
-      }
-    });
-    
-    const newContent = newParts.join('');
-    onContentChange(newContent);
-  };
+
+  // Removed handleTextAfterMediaChange as it was causing the controlled/uncontrolled input issues
 
   const renderMediaComponent = (placeholder: MediaPlaceholder, index: number): React.ReactElement | null => {
     switch (placeholder.type) {
