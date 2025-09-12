@@ -97,10 +97,16 @@ export default function ImageViewerModal({
 
   // Pan responder for swipe gestures
   const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
+    onStartShouldSetPanResponder: () => images.length > 1,
     onMoveShouldSetPanResponder: (evt, gestureState) => {
       // Only respond to horizontal swipes with minimal vertical movement
-      return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dy) < 80;
+      return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dy) < 100;
+    },
+    onPanResponderGrant: () => {
+      // Grant the responder
+    },
+    onPanResponderMove: (evt, gestureState) => {
+      // Optional: Add visual feedback during swipe
     },
     onPanResponderRelease: (evt, gestureState) => {
       const { dx } = gestureState;
@@ -108,8 +114,10 @@ export default function ImageViewerModal({
 
       if (Math.abs(dx) > swipeThreshold && images.length > 1) {
         if (dx > 0 && currentImageIndex > 0) {
+          // Swiped right, go to previous image
           handlePreviousImage();
         } else if (dx < 0 && currentImageIndex < images.length - 1) {
+          // Swiped left, go to next image
           handleNextImage();
         }
       }
@@ -151,40 +159,13 @@ export default function ImageViewerModal({
         )}
 
         {/* Main image container */}
-        <TouchableWithoutFeedback>
-          <Animated.View style={styles.imageContainer} {...panResponder.panHandlers}>
-            <Image
-              source={{ uri: currentImage.uri }}
-              style={styles.fullImage}
-              resizeMode="contain"
-            />
-          </Animated.View>
-        </TouchableWithoutFeedback>
-
-        {/* Navigation arrows for multiple images */}
-        {images.length > 1 && (
-          <>
-            {/* Left arrow */}
-            {currentImageIndex > 0 && (
-              <TouchableOpacity
-                style={[styles.navigationButton, styles.leftButton]}
-                onPress={handlePreviousImage}
-              >
-                <Ionicons name="chevron-back" size={30} color="#FFFFFF" />
-              </TouchableOpacity>
-            )}
-
-            {/* Right arrow */}
-            {currentImageIndex < images.length - 1 && (
-              <TouchableOpacity
-                style={[styles.navigationButton, styles.rightButton]}
-                onPress={handleNextImage}
-              >
-                <Ionicons name="chevron-forward" size={30} color="#FFFFFF" />
-              </TouchableOpacity>
-            )}
-          </>
-        )}
+        <View style={styles.imageContainer} {...panResponder.panHandlers}>
+          <Image
+            source={{ uri: currentImage.uri }}
+            style={styles.fullImage}
+            resizeMode="contain"
+          />
+        </View>
 
         {/* Delete button at bottom */}
         <TouchableOpacity
@@ -219,7 +200,7 @@ const styles = StyleSheet.create({
   },
   topIndicators: {
     position: 'absolute',
-    top: 70,
+    top: 50,
     alignSelf: 'center',
     alignItems: 'center',
     zIndex: 5,
@@ -261,24 +242,6 @@ const styles = StyleSheet.create({
     height: screenHeight - 240,
     maxWidth: '100%',
     maxHeight: '100%',
-  },
-  navigationButton: {
-    position: 'absolute',
-    top: '50%',
-    marginTop: -25,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 5,
-  },
-  leftButton: {
-    left: 20,
-  },
-  rightButton: {
-    right: 20,
   },
   deleteButton: {
     position: 'absolute',
