@@ -726,7 +726,7 @@ export default function NoteEditorScreen({
               value={block.content || ''}
               onChangeText={text => handleTextChange(block.id, text)}
               onFocus={() => handleTextFocus(block.id)}
-              onLayout={(event) => handleTextInputLayout(block.id, event)}
+             // onLayout={(event) => handleTextInputLayout(block.id, event)}
               onContentSizeChange={(event) => handleTextContentSizeChange(block.id, event)}
               multiline={true}
               textAlignVertical="top"
