@@ -59,16 +59,18 @@ interface TickBoxGroup {
   createdAt: string;
 }
 
-// Media placeholder structure for inline embedding
-interface MediaPlaceholder {
-  id: string;
-  type: 'image' | 'audio' | 'tickbox';
-  data: ImageAttachment[] | AudioAttachment | TickBoxGroup;
-}
-
 interface Category {
   id: string;
   name: string;
+  createdAt: string;
+}
+
+// Clean block system - each block is either text or media
+interface EditorBlock {
+  id: string;
+  type: 'text' | 'image' | 'audio' | 'tickbox';
+  content?: string; // for text blocks
+  data?: ImageAttachment[] | AudioAttachment | TickBoxGroup; // for media blocks
   createdAt: string;
 }
 
@@ -83,11 +85,10 @@ interface NoteEditorScreenProps {
   images?: ImageAttachment[];
   audios?: AudioAttachment[];
   tickBoxGroups?: TickBoxGroup[];
-  // Removed segments - using new inline editor approach
   createdAt?: string;
   updatedAt?: string;
   categoryId?: string;
-  readOnly?: boolean; // Add read-only mode for deleted notes
+  readOnly?: boolean;
   onSave: (theme?: string, gradient?: string[], isPinned?: boolean, images?: ImageAttachment[], categoryId?: string, audios?: AudioAttachment[], tickBoxGroups?: TickBoxGroup[], fontStyle?: string | undefined) => void;
   onBack: () => void;
   onTitleChange: (title: string) => void;
@@ -96,7 +97,6 @@ interface NoteEditorScreenProps {
   onAudiosChange?: (audios: AudioAttachment[]) => void;
   onTickBoxGroupsChange?: (tickBoxGroups: TickBoxGroup[]) => void;
 }
-
 
 export default function NoteEditorScreen({
   isEditing,
@@ -121,254 +121,133 @@ export default function NoteEditorScreen({
   onAudiosChange,
   onTickBoxGroupsChange
 }: NoteEditorScreenProps) {
+  // State management
   const [isNotePinned, setIsNotePinned] = useState(isPinned);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState(noteTheme);
   const [selectedGradient, setSelectedGradient] = useState<string[] | null>(noteGradient);
-  const [selectedFontStyle, setSelectedFontStyle] = useState<string | undefined>(undefined);
+  const [selectedFontStyle, setSelectedFontStyle] = useState<string | undefined>(fontStyle);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [initialTitle, setInitialTitle] = useState(noteTitle);
   const [initialContent, setInitialContent] = useState(noteContent);
-  const [noteImages, setNoteImages] = useState<ImageAttachment[]>(images);
-  const [showMediaModal, setShowMediaModal] = useState(false);
-  const [fullImageUri, setFullImageUri] = useState<string | null>(null);
-  const [showFullImage, setShowFullImage] = useState(false);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(categoryId || null);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showMediaModal, setShowMediaModal] = useState(false);
   const [showAudioModal, setShowAudioModal] = useState(false);
-  const [noteAudios, setNoteAudios] = useState<AudioAttachment[]>(audios);
-  const [noteTickBoxGroups, setNoteTickBoxGroups] = useState<TickBoxGroup[]>(tickBoxGroups);
-
-  // Custom editor state for inline media embedding
-  const [cursorPosition, setCursorPosition] = useState({ start: 0, end: 0 });
+  const [fullImageUri, setFullImageUri] = useState<string | null>(null);
+  const [showFullImage, setShowFullImage] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [pendingModalAction, setPendingModalAction] = useState<(() => void) | null>(null);
-  const [mediaPlaceholders, setMediaPlaceholders] = useState<{[key: string]: MediaPlaceholder}>({});
-
-  const textInputRef = useRef<TextInput>(null);
-  const scrollViewRef = useRef<ScrollView>(null);
-
   const [isProcessingMedia, setIsProcessingMedia] = useState(false);
 
+  // Core editor state - array of blocks
+  const [editorBlocks, setEditorBlocks] = useState<EditorBlock[]>([]);
+  const [activeTextBlockId, setActiveTextBlockId] = useState<string>('');
+
+  const textInputRefs = useRef<{[key: string]: TextInput}>({});
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  // Initialize editor blocks on mount
   useEffect(() => {
-    setInitialTitle(noteTitle);
-    setInitialContent(noteContent);
-    setSelectedFontStyle(fontStyle);
+    initializeEditorBlocks();
     loadCategories();
-    initializeEditor();
 
-    // Add keyboard event listeners
-    const keyboardDidShowListener = Keyboard.addListener(
-      'keyboardDidShow',
-      (e) => {
-        setKeyboardHeight(e.endCoordinates.height);
-        setIsKeyboardVisible(true);
-        // Auto-scroll to active input after keyboard appears
+    // Keyboard listeners
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+      setIsKeyboardVisible(true);
+      setTimeout(() => scrollToActiveInput(), 100);
+    });
+
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+      setIsKeyboardVisible(false);
+      if (pendingModalAction) {
         setTimeout(() => {
-          scrollToInput();
-        }, 100);
+          pendingModalAction();
+          setPendingModalAction(null);
+        }, 200);
       }
-    );
-
-    const keyboardDidHideListener = Keyboard.addListener(
-      'keyboardDidHide',
-      () => {
-        setKeyboardHeight(0);
-        setIsKeyboardVisible(false);
-        // Execute pending modal action after keyboard has fully dismissed
-        if (pendingModalAction) {
-          setTimeout(() => {
-            pendingModalAction();
-            setPendingModalAction(null);
-          }, 200); // Increased delay for smoother transition
-        }
-      }
-    );
+    });
 
     return () => {
       keyboardDidShowListener?.remove();
       keyboardDidHideListener?.remove();
     };
-  }, [pendingModalAction]); // Add pendingModalAction as dependency
+  }, [pendingModalAction]);
 
-  // Initialize media placeholders from existing media
-  useEffect(() => {
-    const placeholders: {[key: string]: MediaPlaceholder} = {};
-    
-    // Add image placeholders
-    images.forEach(image => {
-      placeholders[`image-${image.id}`] = {
-        id: `image-${image.id}`,
-        type: 'image',
-        data: [image]
-      };
-    });
-    
-    // Add audio placeholders
-    audios.forEach(audio => {
-      placeholders[`audio-${audio.id}`] = {
-        id: `audio-${audio.id}`,
-        type: 'audio',
-        data: audio
-      };
-    });
-    
-    // Add tickbox placeholders
-    tickBoxGroups.forEach(group => {
-      placeholders[`tickbox-${group.id}`] = {
-        id: `tickbox-${group.id}`,
-        type: 'tickbox',
-        data: group
-      };
-    });
-    
-    setMediaPlaceholders(placeholders);
-  }, [images, audios, tickBoxGroups]);
+  // Initialize editor blocks from existing data
+  const initializeEditorBlocks = () => {
+    const blocks: EditorBlock[] = [];
 
-  const initializeEditor = () => {
-    // New custom editor initialization - no segments needed
-    console.log('Initializing custom editor with inline media support');
-  };
+    // Always start with a text block (Rule 1)
+    const initialTextBlock: EditorBlock = {
+      id: generateBlockId(),
+      type: 'text',
+      content: noteContent || '',
+      createdAt: new Date().toISOString(),
+    };
+    blocks.push(initialTextBlock);
+    setActiveTextBlockId(initialTextBlock.id);
 
-  const scrollToInput = () => {
-    if (scrollViewRef.current && textInputRef.current) {
-      const screenHeight = Dimensions.get('window').height;
-      const availableHeight = screenHeight - keyboardHeight - 200;
+    // Add existing media blocks if editing
+    if (isEditing) {
+      images.forEach(image => {
+        blocks.push({
+          id: generateBlockId(),
+          type: 'image',
+          data: [image],
+          createdAt: image.createdAt,
+        });
+        // Add text block after each media (Rule 4)
+        blocks.push({
+          id: generateBlockId(),
+          type: 'text',
+          content: '',
+          createdAt: new Date().toISOString(),
+        });
+      });
 
-      textInputRef.current.measure((x, y, width, height, pageX, pageY) => {
-        scrollViewRef.current?.scrollTo({
-          y: Math.max(0, pageY - availableHeight / 2),
-          animated: true,
+      audios.forEach(audio => {
+        blocks.push({
+          id: generateBlockId(),
+          type: 'audio',
+          data: audio,
+          createdAt: audio.createdAt,
+        });
+        // Add text block after each media (Rule 4)
+        blocks.push({
+          id: generateBlockId(),
+          type: 'text',
+          content: '',
+          createdAt: new Date().toISOString(),
+        });
+      });
+
+      tickBoxGroups.forEach(group => {
+        blocks.push({
+          id: generateBlockId(),
+          type: 'tickbox',
+          data: group,
+          createdAt: group.createdAt,
+        });
+        // Add text block after each media (Rule 4)
+        blocks.push({
+          id: generateBlockId(),
+          type: 'text',
+          content: '',
+          createdAt: new Date().toISOString(),
         });
       });
     }
+
+    setEditorBlocks(blocks);
   };
 
-  const handleTextSelection = (event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-    const { start, end } = event.nativeEvent.selection;
-    setCursorPosition({ start, end });
-  };
-
-  const insertMediaAtCursor = (mediaType: 'image' | 'audio' | 'tickbox', mediaData: any) => {
-    console.log('insertMediaAtCursor called with:', mediaType, 'cursor position:', cursorPosition);
-    
-    const currentContent = noteContent;
-    
-    // Use entity ID for consistent reference with deletion handlers
-    let entityId: string;
-    if (mediaType === 'image' && Array.isArray(mediaData)) {
-      entityId = mediaData[0]?.id || Date.now().toString();
-    } else if (mediaType === 'audio' && mediaData.id) {
-      entityId = mediaData.id;
-    } else if (mediaType === 'tickbox' && mediaData.id) {
-      entityId = mediaData.id;
-    } else {
-      entityId = Date.now().toString();
-    }
-    
-    // Create placeholder using entity ID for consistency with deletion
-    const mediaId = `${mediaType}-${entityId}`;
-    const placeholder = `[MEDIA:${mediaType}:${mediaId}]`;
-    
-    // Add media data to placeholders
-    const newPlaceholder: MediaPlaceholder = {
-      id: mediaId,
-      type: mediaType,
-      data: mediaData
-    };
-    
-    setMediaPlaceholders(prev => ({
-      ...prev,
-      [mediaId]: newPlaceholder
-    }));
-    
-    // Insert media at the current cursor position
-    let newContent;
-    const insertPosition = cursorPosition.start;
-    
-    if (currentContent.trim() === '') {
-      // If no content exists, just add the media followed by space for typing
-      newContent = placeholder + '\n\n';
-    } else {
-      // Insert at cursor position with proper line breaks
-      const beforeCursor = currentContent.substring(0, insertPosition);
-      const afterCursor = currentContent.substring(insertPosition);
-      
-      // Add line breaks around media for proper formatting
-      const mediaWithBreaks = beforeCursor.endsWith('\n') ? 
-        `${placeholder}\n\n` : 
-        `\n\n${placeholder}\n\n`;
-      
-      newContent = beforeCursor + mediaWithBreaks + afterCursor;
-    }
-    
-    // Update note content
-    onContentChange(newContent);
-    
-    // Set cursor position after the inserted media for continued typing
-    const newCursorPosition = insertPosition + placeholder.length + 4; // +4 for line breaks
-    setCursorPosition({ start: newCursorPosition, end: newCursorPosition });
-    
-    // Focus the text input after a short delay to ensure content is updated
-    setTimeout(() => {
-      if (textInputRef.current) {
-        textInputRef.current.focus();
-      }
-    }, 100);
-    
-    console.log('Media placeholder inserted:', placeholder, 'at position:', insertPosition, 'with entity ID:', entityId);
-  };
-
-  // Removed createMediaSegment - using new placeholder-based approach
-
-  // Enhanced content parsing and cursor position helpers
-  const parseContent = (content: string) => {
-    // Split content by media placeholders while keeping the placeholders
-    const parts = content.split(/(\[MEDIA:[^\]]+\])/);
-    return parts.filter(part => part.length > 0);
-  };
-
-  // Get text segments from parsed content for TextInput values
-  const getTextSegments = (content: string): string[] => {
-    const parts = parseContent(content);
-    return parts.filter(part => !isMediaPlaceholder(part));
-  };
-
-  // Calculate absolute cursor position from relative position in text segment
-  const calculateAbsoluteCursorPosition = (textSegmentIndex: number, relativeCursor: { start: number; end: number }) => {
-    const parts = parseContent(noteContent);
-    let absoluteStart = 0;
-    let textSegmentCount = 0;
-    
-    for (const part of parts) {
-      if (isMediaPlaceholder(part)) {
-        absoluteStart += part.length;
-      } else {
-        if (textSegmentCount === textSegmentIndex) {
-          return {
-            start: absoluteStart + relativeCursor.start,
-            end: absoluteStart + relativeCursor.end
-          };
-        }
-        absoluteStart += part.length;
-        textSegmentCount++;
-      }
-    }
-    
-    return { start: absoluteStart, end: absoluteStart };
-  };
-
-  const isMediaPlaceholder = (text: string): boolean => {
-    return /^\[MEDIA:[^\]]+\]$/.test(text);
-  };
-
-  const parseMediaPlaceholder = (placeholder: string): { type: string; id: string } | null => {
-    const match = placeholder.match(/^\[MEDIA:([^:]+):([^\]]+)\]$/);
-    return match ? { type: match[1], id: match[2] } : null;
-  };
+  const generateBlockId = () => `block_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   const loadCategories = async () => {
     try {
@@ -379,73 +258,260 @@ export default function NoteEditorScreen({
     }
   };
 
+  // Update content change detection
   useEffect(() => {
+    const currentContent = getContentFromBlocks();
     const titleChanged = noteTitle !== initialTitle;
-    const contentChanged = noteContent !== initialContent;
+    const contentChanged = currentContent !== initialContent;
     setHasUnsavedChanges(titleChanged || contentChanged);
-  }, [noteTitle, noteContent, initialTitle, initialContent]);
+  }, [noteTitle, editorBlocks, initialTitle, initialContent]);
 
-  const handleThemeSelect = (color: string) => {
-    setSelectedTheme(color);
-    setSelectedGradient(null);
-    // Don't close modal automatically - let user decide
+  // Convert blocks back to content string for saving
+  const getContentFromBlocks = (): string => {
+    return editorBlocks
+      .filter(block => block.type === 'text')
+      .map(block => block.content || '')
+      .join('\n');
   };
 
-  const handleGradientSelect = (gradient: string[]) => {
-    setSelectedGradient(gradient);
-    setSelectedTheme(gradient[0]);
-    // Don't close modal automatically - let user decide
+  // Extract media from blocks for saving
+  const getMediaFromBlocks = () => {
+    const images: ImageAttachment[] = [];
+    const audios: AudioAttachment[] = [];
+    const tickBoxGroups: TickBoxGroup[] = [];
+
+    editorBlocks.forEach(block => {
+      if (block.type === 'image' && block.data) {
+        const imageArray = block.data as ImageAttachment[];
+        images.push(...imageArray);
+      } else if (block.type === 'audio' && block.data) {
+        audios.push(block.data as AudioAttachment);
+      } else if (block.type === 'tickbox' && block.data) {
+        tickBoxGroups.push(block.data as TickBoxGroup);
+      }
+    });
+
+    return { images, audios, tickBoxGroups };
   };
 
-  const handleFontStyleSelect = (fontStyle: string | undefined) => {
-    setSelectedFontStyle(fontStyle);
-    // Don't close modal automatically - let user decide
+  // Handle text changes in blocks
+  const handleTextChange = (blockId: string, text: string) => {
+    setEditorBlocks(prev => prev.map(block => 
+      block.id === blockId ? { ...block, content: text } : block
+    ));
   };
 
-  const handleBack = () => {
-    if (hasUnsavedChanges) {
-      Alert.alert(
-        'Unsaved Changes',
-        'You have unsaved changes. Would you like to save before leaving?',
-        [
-          {
-            text: 'Don\'t Save',
-            style: 'destructive',
-            onPress: onBack,
-          },
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Save',
-            onPress: () => {
-              onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages, selectedCategoryId || undefined, noteAudios, noteTickBoxGroups, selectedFontStyle);
-              onImagesChange && onImagesChange(noteImages);
-              onAudiosChange && onAudiosChange(noteAudios);
-              onTickBoxGroupsChange && onTickBoxGroupsChange(noteTickBoxGroups);
-              onBack();
-            },
-          },
-        ]
-      );
-    } else {
-      onBack();
+  // Focus management
+  const handleTextFocus = (blockId: string) => {
+    setActiveTextBlockId(blockId);
+  };
+
+  const scrollToActiveInput = () => {
+    if (scrollViewRef.current && activeTextBlockId && textInputRefs.current[activeTextBlockId]) {
+      const textInput = textInputRefs.current[activeTextBlockId];
+      textInput.measure((x, y, width, height, pageX, pageY) => {
+        const screenHeight = Dimensions.get('window').height;
+        const availableHeight = screenHeight - keyboardHeight - 200;
+        scrollViewRef.current?.scrollTo({
+          y: Math.max(0, pageY - availableHeight / 2),
+          animated: true,
+        });
+      });
     }
   };
 
-  const handleSave = () => {
-    // Save without segments - using new inline approach
-    onSave(selectedTheme, selectedGradient || undefined, isNotePinned, noteImages, selectedCategoryId || undefined, noteAudios, noteTickBoxGroups, selectedFontStyle);
-    onImagesChange && onImagesChange(noteImages);
-    onAudiosChange && onAudiosChange(noteAudios);
-    onTickBoxGroupsChange && onTickBoxGroupsChange(noteTickBoxGroups);
-    setInitialTitle(noteTitle);
-    setInitialContent(noteContent);
-    setHasUnsavedChanges(false);
+  // Media insertion (Rules 2, 3, 4)
+  const insertMediaAfterBlock = (afterBlockId: string, mediaType: 'image' | 'audio' | 'tickbox', mediaData: any) => {
+    setEditorBlocks(prev => {
+      const afterIndex = prev.findIndex(block => block.id === afterBlockId);
+      const insertIndex = afterIndex + 1;
+
+      const newBlocks = [...prev];
+
+      // Insert media block
+      const mediaBlock: EditorBlock = {
+        id: generateBlockId(),
+        type: mediaType,
+        data: mediaData,
+        createdAt: new Date().toISOString(),
+      };
+      newBlocks.splice(insertIndex, 0, mediaBlock);
+
+      // Always add text block after media (Rule 4)
+      const textBlock: EditorBlock = {
+        id: generateBlockId(),
+        type: 'text',
+        content: '',
+        createdAt: new Date().toISOString(),
+      };
+      newBlocks.splice(insertIndex + 1, 0, textBlock);
+
+      // Focus the new text block
+      setTimeout(() => {
+        setActiveTextBlockId(textBlock.id);
+        if (textInputRefs.current[textBlock.id]) {
+          textInputRefs.current[textBlock.id].focus();
+        }
+      }, 100);
+
+      return newBlocks;
+    });
   };
 
+  // Media handlers
+  const handleTakePhoto = async () => {
+    if (isProcessingMedia) return;
+    setIsProcessingMedia(true);
 
+    try {
+      const hasPermission = await requestPermission();
+      if (!hasPermission) return;
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const newImage: ImageAttachment = {
+          id: Date.now().toString(),
+          uri: result.assets[0].uri,
+          type: 'photo',
+          createdAt: new Date().toISOString(),
+        };
+
+        insertMediaAfterBlock(activeTextBlockId, 'image', [newImage]);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      Alert.alert('Error', 'Failed to take photo. Please try again.');
+    } finally {
+      setIsProcessingMedia(false);
+    }
+  };
+
+  const handleAddImage = async () => {
+    if (isProcessingMedia) return;
+    setIsProcessingMedia(true);
+
+    try {
+      const hasPermission = await requestPermission();
+      if (!hasPermission) return;
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+        allowsMultipleSelection: true,
+        selectionLimit: 10,
+      });
+
+      if (!result.canceled && result.assets) {
+        const newImages: ImageAttachment[] = result.assets.map((asset, index) => ({
+          id: (Date.now() + index).toString(),
+          uri: asset.uri,
+          type: 'image',
+          createdAt: new Date().toISOString(),
+        }));
+
+        insertMediaAfterBlock(activeTextBlockId, 'image', newImages);
+      }
+    } catch (error) {
+      console.error('Error adding image:', error);
+      Alert.alert('Error', 'Failed to add image. Please try again.');
+    } finally {
+      setIsProcessingMedia(false);
+    }
+  };
+
+  const handleRecording = () => {
+    if (isProcessingMedia) return;
+    setIsProcessingMedia(true);
+    setShowAudioModal(true);
+  };
+
+  const handleAudioSave = (audioUri: string, duration: number = 0) => {
+    const newAudio: AudioAttachment = {
+      id: Date.now().toString(),
+      uri: audioUri,
+      duration: duration,
+      createdAt: new Date().toISOString(),
+    };
+
+    insertMediaAfterBlock(activeTextBlockId, 'audio', newAudio);
+    setShowAudioModal(false);
+    setIsProcessingMedia(false);
+  };
+
+  const handleTickBoxes = () => {
+    if (isProcessingMedia) return;
+    setIsProcessingMedia(true);
+
+    const newTickBoxGroup: TickBoxGroup = {
+      id: Date.now().toString(),
+      items: [],
+      createdAt: new Date().toISOString(),
+    };
+
+    insertMediaAfterBlock(activeTextBlockId, 'tickbox', newTickBoxGroup);
+    setIsProcessingMedia(false);
+  };
+
+  // Delete handlers
+  const handleDeleteImage = (imageId: string) => {
+    Alert.alert('Delete Image', 'Are you sure you want to delete this image?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          setEditorBlocks(prev => prev.filter(block => {
+            if (block.type === 'image' && block.data) {
+              const images = block.data as ImageAttachment[];
+              return !images.some(img => img.id === imageId);
+            }
+            return true;
+          }));
+          setShowFullImage(false);
+        },
+      },
+    ]);
+  };
+
+  const handleAudioDelete = (audioId: string) => {
+    setEditorBlocks(prev => prev.filter(block => {
+      if (block.type === 'audio' && block.data) {
+        const audio = block.data as AudioAttachment;
+        return audio.id !== audioId;
+      }
+      return true;
+    }));
+  };
+
+  const handleTickBoxGroupUpdate = (groupId: string, updatedItems: TickBoxItem[]) => {
+    setEditorBlocks(prev => prev.map(block => {
+      if (block.type === 'tickbox' && block.data) {
+        const group = block.data as TickBoxGroup;
+        if (group.id === groupId) {
+          return { ...block, data: { ...group, items: updatedItems } };
+        }
+      }
+      return block;
+    }));
+  };
+
+  const handleTickBoxGroupDelete = (groupId: string) => {
+    setEditorBlocks(prev => prev.filter(block => {
+      if (block.type === 'tickbox' && block.data) {
+        const group = block.data as TickBoxGroup;
+        return group.id !== groupId;
+      }
+      return true;
+    }));
+  };
+
+  // Permission helper
   const requestPermission = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -465,8 +531,6 @@ export default function NoteEditorScreen({
       return true;
     } catch (error) {
       console.error('Error requesting permissions:', error);
-      // On web or in development, permissions might not be fully supported
-      // Return true to allow the functionality to proceed
       if (Platform.OS === 'web') {
         return true;
       }
@@ -475,424 +539,87 @@ export default function NoteEditorScreen({
     }
   };
 
-  const handleTakePhoto = async () => {
-    if (isProcessingMedia) return; // Prevent multiple calls
-    setIsProcessingMedia(true);
-    try {
-      console.log('handleTakePhoto called');
-
-      const hasPermission = await requestPermission();
-      if (!hasPermission) {
-        setIsProcessingMedia(false);
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        const newImage: ImageAttachment = {
-          id: Date.now().toString(),
-          uri: result.assets[0].uri,
-          type: 'photo',
-          createdAt: new Date().toISOString(),
-        };
-        const updatedImages = [...noteImages, newImage];
-        setNoteImages(updatedImages);
-        insertMediaAtCursor('image', [newImage]);
-      }
-    } catch (error) {
-      console.error('Error taking photo:', error);
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
-    } finally {
-      setIsProcessingMedia(false);
-    }
-  };
-
-  const handleAddImage = async () => {
-    if (isProcessingMedia) return; // Prevent multiple calls
-    setIsProcessingMedia(true);
-    try {
-      console.log('handleAddImage called');
-
-      const hasPermission = await requestPermission();
-      if (!hasPermission) {
-        setIsProcessingMedia(false);
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.8,
-        allowsMultipleSelection: true,
-        selectionLimit: 10,
-      });
-
-      if (!result.canceled && result.assets) {
-        const newImages: ImageAttachment[] = result.assets.map((asset, index) => ({
-          id: (Date.now() + index).toString(),
-          uri: asset.uri,
-          type: 'image',
-          createdAt: new Date().toISOString(),
-        }));
-        const updatedImages = [...noteImages, ...newImages];
-        setNoteImages(updatedImages);
-        insertMediaAtCursor('image', newImages);
-      }
-    } catch (error) {
-      console.error('Error adding image:', error);
-      Alert.alert('Error', 'Failed to add image. Please try again.');
-    } finally {
-      setIsProcessingMedia(false);
-    }
-  };
-
-  const handleDeleteImage = (imageId: string) => {
-    Alert.alert(
-      'Delete Image',
-      'Are you sure you want to delete this image?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            // Update noteImages state
-            const updatedImages = noteImages.filter(img => img.id !== imageId);
-            setNoteImages(updatedImages);
-            
-            // Remove image placeholder from content
-            const imageMediaId = `image-${imageId}`;
-            const placeholderToRemove = `[MEDIA:image:${imageMediaId}]`;
-            const updatedContent = noteContent.replace(placeholderToRemove, '');
-            onContentChange(updatedContent);
-            
-            // Clean up media placeholders
-            setMediaPlaceholders(prev => {
-              const newPlaceholders = { ...prev };
-              delete newPlaceholders[imageMediaId];
-              return newPlaceholders;
-            });
-            
-            setShowFullImage(false);
-          },
-        },
-      ]
-    );
-  };
-
+  // Image viewing
   const handleImagePress = (imageUri: string) => {
-    const imageIndex = noteImages.findIndex(img => img.uri === imageUri);
+    const { images } = getMediaFromBlocks();
+    const imageIndex = images.findIndex(img => img.uri === imageUri);
     setCurrentImageIndex(imageIndex);
     setFullImageUri(imageUri);
     setShowFullImage(true);
   };
 
   const handlePreviousImage = () => {
+    const { images } = getMediaFromBlocks();
     if (currentImageIndex > 0) {
       const prevIndex = currentImageIndex - 1;
       setCurrentImageIndex(prevIndex);
-      setFullImageUri(noteImages[prevIndex].uri);
+      setFullImageUri(images[prevIndex].uri);
     }
   };
 
   const handleNextImage = () => {
-    if (currentImageIndex < noteImages.length - 1) {
+    const { images } = getMediaFromBlocks();
+    if (currentImageIndex < images.length - 1) {
       const nextIndex = currentImageIndex + 1;
       setCurrentImageIndex(nextIndex);
-      setFullImageUri(noteImages[nextIndex].uri);
+      setFullImageUri(images[nextIndex].uri);
     }
   };
 
-  // Fixed PanResponder for swipe gestures
-  const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: (evt, gestureState) => {
-      return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dy) < 80;
-    },
-    onPanResponderGrant: () => {},
-    onPanResponderMove: (evt, gestureState) => {},
-    onPanResponderRelease: (evt, gestureState) => {
-      const { dx } = gestureState;
-      const swipeThreshold = 50;
+  // Save and navigation
+  const handleSave = () => {
+    const content = getContentFromBlocks();
+    const { images, audios, tickBoxGroups } = getMediaFromBlocks();
 
-      if (Math.abs(dx) > swipeThreshold && noteImages.length > 1) {
-        if (dx > 0) {
-          handlePreviousImage();
-        } else {
-          handleNextImage();
-        }
-      }
-    },
-    onPanResponderTerminationRequest: () => false,
-    onShouldBlockNativeResponder: () => false,
-  });
+    onSave(selectedTheme, selectedGradient || undefined, isNotePinned, images, selectedCategoryId || undefined, audios, tickBoxGroups, selectedFontStyle);
+    onContentChange(content);
+    onImagesChange && onImagesChange(images);
+    onAudiosChange && onAudiosChange(audios);
+    onTickBoxGroupsChange && onTickBoxGroupsChange(tickBoxGroups);
 
-  const handleDrawing = () => {
-    Alert.alert('Drawing', 'Drawing feature coming soon!');
+    setInitialTitle(noteTitle);
+    setInitialContent(content);
+    setHasUnsavedChanges(false);
   };
 
-  const handleRecording = () => {
-    if (isProcessingMedia) return; // Prevent multiple calls
-    setIsProcessingMedia(true);
-    console.log('handleRecording called');
-    setShowAudioModal(true);
-    // No need to set isProcessingMedia to false here as it's handled by AudioRecordingModal's onClose/onSave
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      Alert.alert('Unsaved Changes', 'You have unsaved changes. Would you like to save before leaving?', [
+        { text: "Don't Save", style: 'destructive', onPress: onBack },
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Save', onPress: () => { handleSave(); onBack(); } },
+      ]);
+    } else {
+      onBack();
+    }
   };
 
-  // Helper function to handle modal opening with keyboard dismissal
+  // Theme handlers
+  const handleThemeSelect = (color: string) => {
+    setSelectedTheme(color);
+    setSelectedGradient(null);
+  };
+
+  const handleGradientSelect = (gradient: string[]) => {
+    setSelectedGradient(gradient);
+    setSelectedTheme(gradient[0]);
+  };
+
+  const handleFontStyleSelect = (fontStyle: string | undefined) => {
+    setSelectedFontStyle(fontStyle);
+  };
+
+  // Modal handler
   const handleModalOpen = (modalAction: () => void) => {
     if (isKeyboardVisible) {
-      // Store the action and dismiss keyboard
       setPendingModalAction(() => modalAction);
       Keyboard.dismiss();
     } else {
-      // Directly execute the action if keyboard is not visible
       modalAction();
     }
   };
 
-  const handleAudioSave = async (audioUri: string, duration: number = 0) => {
-    // Create new audio attachment
-    const newAudio: AudioAttachment = {
-      id: Date.now().toString(),
-      uri: audioUri,
-      duration: duration,
-      createdAt: new Date().toISOString(),
-    };
-
-    setNoteAudios([...noteAudios, newAudio]);
-    insertMediaAtCursor('audio', newAudio);
-
-    setShowAudioModal(false);
-    setIsProcessingMedia(false); // Reset processing state after saving audio
-  };
-
-  const handleAudioDelete = (audioId: string) => {
-    const updatedAudios = noteAudios.filter(audio => audio.id !== audioId);
-    setNoteAudios(updatedAudios);
-    
-    // Remove audio placeholder from content using consistent ID format
-    const audioMediaId = `audio-${audioId}`;
-    const placeholderToRemove = `[MEDIA:audio:${audioMediaId}]`;
-    const updatedContent = noteContent.replace(placeholderToRemove, '');
-    onContentChange(updatedContent);
-    
-    // Clean up media placeholders
-    setMediaPlaceholders(prev => {
-      const newPlaceholders = { ...prev };
-      delete newPlaceholders[audioMediaId];
-      return newPlaceholders;
-    });
-  };
-
-  const handleTickBoxes = () => {
-    if (isProcessingMedia) return; // Prevent multiple calls
-    setIsProcessingMedia(true);
-    console.log('handleTickBoxes called');
-
-    const newTickBoxGroup: TickBoxGroup = {
-      id: Date.now().toString(),
-      items: [],
-      createdAt: new Date().toISOString(),
-    };
-
-    setNoteTickBoxGroups([...noteTickBoxGroups, newTickBoxGroup]);
-    insertMediaAtCursor('tickbox', newTickBoxGroup);
-    setIsProcessingMedia(false); // Reset processing state after adding tickboxes
-  };
-
-  const handleTickBoxGroupUpdate = (groupId: string, updatedItems: TickBoxItem[]) => {
-    // Update tick box groups
-    const updatedGroups = noteTickBoxGroups.map(group =>
-      group.id === groupId ? { ...group, items: updatedItems } : group
-    );
-    setNoteTickBoxGroups(updatedGroups);
-    
-    // Update media placeholders with new data using consistent ID format
-    const tickboxMediaId = `tickbox-${groupId}`;
-    setMediaPlaceholders(prev => {
-      if (prev[tickboxMediaId]) {
-        return {
-          ...prev,
-          [tickboxMediaId]: {
-            ...prev[tickboxMediaId],
-            data: { ...prev[tickboxMediaId].data as TickBoxGroup, items: updatedItems }
-          }
-        };
-      }
-      return prev;
-    });
-
-    console.log('TickBox updated:', groupId, 'Items count:', updatedItems.length);
-  };
-
-  const handleTickBoxGroupDelete = (groupId: string) => {
-    const updatedGroups = noteTickBoxGroups.filter(group => group.id !== groupId);
-    setNoteTickBoxGroups(updatedGroups);
-    
-    // Remove tickbox placeholder from content using consistent ID format
-    const tickboxMediaId = `tickbox-${groupId}`;
-    const placeholderToRemove = `[MEDIA:tickbox:${tickboxMediaId}]`;
-    const updatedContent = noteContent.replace(placeholderToRemove, '');
-    onContentChange(updatedContent);
-    
-    // Clean up media placeholders
-    setMediaPlaceholders(prev => {
-      const newPlaceholders = { ...prev };
-      delete newPlaceholders[tickboxMediaId];
-      return newPlaceholders;
-    });
-  };
-
-  const renderCustomEditor = () => {
-    console.log('Rendering custom editor with fixed inline media support');
-    
-    const parts = parseContent(noteContent);
-    const elements: React.ReactElement[] = [];
-    
-    // If no content exists at all, render the initial text input
-    if (parts.length === 0 || (parts.length === 1 && parts[0].trim() === '')) {
-      elements.push(
-        <TextInput
-          ref={textInputRef}
-          key="text-initial"
-          style={[styles.bodyInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
-          placeholder={!readOnly ? "Start typing your note..." : ""}
-          editable={!readOnly}
-          placeholderTextColor="#888888"
-          value={noteContent}
-          onChangeText={(text) => onContentChange(text)}
-          onSelectionChange={handleTextSelection}
-          multiline={true}
-          textAlignVertical="top"
-          autoFocus={true}
-        />
-      );
-    } else {
-      // Render a single text input that handles the entire content with media placeholders
-      elements.push(
-        <TextInput
-          ref={textInputRef}
-          key="text-unified"
-          style={[styles.bodyInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
-          placeholder={!readOnly ? "Start typing your note..." : ""}
-          editable={!readOnly}
-          placeholderTextColor="#888888"
-          value={noteContent}
-          onChangeText={(text) => onContentChange(text)}
-          onSelectionChange={handleTextSelection}
-          multiline={true}
-          textAlignVertical="top"
-          autoFocus={false}
-        />
-      );
-      
-      // Render media components inline based on their position in content
-      parts.forEach((part, index) => {
-        if (isMediaPlaceholder(part)) {
-          const mediaInfo = parseMediaPlaceholder(part);
-          if (mediaInfo && mediaPlaceholders[mediaInfo.id]) {
-            const placeholder = mediaPlaceholders[mediaInfo.id];
-            const mediaElement = renderMediaComponent(placeholder, index);
-            if (mediaElement) {
-              elements.push(mediaElement);
-            }
-          }
-        }
-      });
-    }
-    
-    return (
-      <View style={styles.customEditorContainer}>
-        {elements}
-      </View>
-    );
-  };
-
-  
-
-  // Removed handleTextAfterMediaChange as it was causing the controlled/uncontrolled input issues
-
-  const renderMediaComponent = (placeholder: MediaPlaceholder, index: number): React.ReactElement | null => {
-    switch (placeholder.type) {
-      case 'image':
-        const images = Array.isArray(placeholder.data) ? placeholder.data as ImageAttachment[] : [placeholder.data as unknown as ImageAttachment];
-        return (
-          <View key={`${placeholder.id}-${index}`} style={styles.inlineImageContainer}>
-            <View style={styles.inlineImageGallery}>
-              {images.map((image, imgIndex) => (
-                <TouchableOpacity
-                  key={`${image.id}-${imgIndex}`}
-                  style={[
-                    styles.inlineImageCard,
-                    { marginLeft: imgIndex % 2 === 0 ? 0 : 8 }
-                  ]}
-                  onPress={() => handleImagePress(image.uri)}
-                  activeOpacity={0.8}
-                >
-                  <Image
-                    source={{ uri: image.uri }}
-                    style={styles.inlineImage}
-                    resizeMode="cover"
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        );
-      case 'audio':
-        const audio = placeholder.data as AudioAttachment;
-        return (
-          <View key={`${placeholder.id}-${index}`} style={styles.inlineAudioContainer}>
-            <AudioPlayerComponent
-              audioUri={audio.uri}
-              duration={audio.duration}
-              onDelete={() => handleAudioDelete(audio.id)}
-              isDarkMode={true}
-            />
-          </View>
-        );
-      case 'tickbox':
-        const tickBoxGroup = placeholder.data as TickBoxGroup;
-        return (
-          <View key={`${placeholder.id}-${index}`} style={styles.inlineTickBoxContainer}>
-            <TickBoxComponent
-              items={tickBoxGroup.items}
-              onItemsChange={(items) => handleTickBoxGroupUpdate(tickBoxGroup.id, items)}
-              isDarkMode={true}
-            />
-            <TouchableOpacity
-              style={styles.deleteTickBoxGroupButton}
-              onPress={() => handleTickBoxGroupDelete(tickBoxGroup.id)}
-            >
-              <Ionicons name="trash-outline" size={16} color="#FF4444" />
-              <Text style={styles.deleteTickBoxGroupText}>Delete checklist</Text>
-            </TouchableOpacity>
-          </View>
-        );
-      default:
-        return null;
-    }
-  };
-
-  // Removed renderTextSegment - using single TextInput in custom editor
-
-  // Removed renderImageSegment - now rendered inline in renderMediaComponent
-
-  // Removed renderAudioSegment - now rendered inline in renderMediaComponent
-
-  // Removed renderTickBoxSegment - now rendered inline in renderMediaComponent
-
-  const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
+  // Render methods
   const renderBackground = () => {
     if (selectedGradient) {
       return (
@@ -907,11 +634,125 @@ export default function NoteEditorScreen({
     return null;
   };
 
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Pan responder for image swiping
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (evt, gestureState) => {
+      return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dy) < 80;
+    },
+    onPanResponderRelease: (evt, gestureState) => {
+      const { dx } = gestureState;
+      const swipeThreshold = 50;
+      const { images } = getMediaFromBlocks();
+
+      if (Math.abs(dx) > swipeThreshold && images.length > 1) {
+        if (dx > 0) {
+          handlePreviousImage();
+        } else {
+          handleNextImage();
+        }
+      }
+    },
+    onPanResponderTerminationRequest: () => false,
+    onShouldBlockNativeResponder: () => false,
+  });
+
+  // Render editor blocks
+  const renderEditorBlocks = () => {
+    return editorBlocks.map((block, index) => {
+      switch (block.type) {
+        case 'text':
+          return (
+            <TextInput
+              key={block.id}
+              ref={ref => {
+                if (ref) textInputRefs.current[block.id] = ref;
+              }}
+              style={[styles.bodyInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
+              placeholder={index === 0 ? "Start typing your note..." : "Continue typing..."}
+              editable={!readOnly}
+              placeholderTextColor="#888888"
+              value={block.content || ''}
+              onChangeText={text => handleTextChange(block.id, text)}
+              onFocus={() => handleTextFocus(block.id)}
+              multiline={true}
+              textAlignVertical="top"
+              blurOnSubmit={false}
+            />
+          );
+
+        case 'image':
+          const images = block.data as ImageAttachment[];
+          return (
+            <View key={block.id} style={styles.inlineImageContainer}>
+              <View style={styles.inlineImageGallery}>
+                {images.map((image, imgIndex) => (
+                  <TouchableOpacity
+                    key={`${image.id}-${imgIndex}`}
+                    style={[
+                      styles.inlineImageCard,
+                      { marginLeft: imgIndex % 2 === 0 ? 0 : 8 }
+                    ]}
+                    onPress={() => handleImagePress(image.uri)}
+                    activeOpacity={0.8}
+                  >
+                    <Image
+                      source={{ uri: image.uri }}
+                      style={styles.inlineImage}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          );
+
+        case 'audio':
+          const audio = block.data as AudioAttachment;
+          return (
+            <View key={block.id} style={styles.inlineAudioContainer}>
+              <AudioPlayerComponent
+                audioUri={audio.uri}
+                duration={audio.duration}
+                onDelete={() => handleAudioDelete(audio.id)}
+                isDarkMode={true}
+              />
+            </View>
+          );
+
+        case 'tickbox':
+          const tickBoxGroup = block.data as TickBoxGroup;
+          return (
+            <View key={block.id} style={styles.inlineTickBoxContainer}>
+              <TickBoxComponent
+                items={tickBoxGroup.items}
+                onItemsChange={(items) => handleTickBoxGroupUpdate(tickBoxGroup.id, items)}
+                isDarkMode={true}
+              />
+              <TouchableOpacity
+                style={styles.deleteTickBoxGroupButton}
+                onPress={() => handleTickBoxGroupDelete(tickBoxGroup.id)}
+              >
+                <Ionicons name="trash-outline" size={16} color="#FF4444" />
+                <Text style={styles.deleteTickBoxGroupText}>Delete checklist</Text>
+              </TouchableOpacity>
+            </View>
+          );
+
+        default:
+          return null;
+      }
+    });
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: selectedGradient ? 'transparent' : selectedTheme }]}>
       {renderBackground()}
-      {/* <StatusBar barStyle="light-content" backgroundColor={selectedTheme} translucent={true} /> */}
 
       <View style={styles.safeAreaContainer}>
         {/* Header */}
@@ -951,7 +792,7 @@ export default function NoteEditorScreen({
         <KeyboardAvoidingView
           style={styles.keyboardAvoidingContainer}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          keyboardVerticalOffset={0}
         >
           <ScrollView
             ref={scrollViewRef}
@@ -963,53 +804,49 @@ export default function NoteEditorScreen({
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-          {/* Date/Time and Category Row */}
-          <View style={styles.metaInfoRow}>
-            <View style={styles.dateTimeInfo}>
-              {createdAt && (
-                <Text style={styles.dateTimeText}>
-                  Created: {formatDateTime(createdAt)}
+            {/* Meta info row */}
+            <View style={styles.metaInfoRow}>
+              <View style={styles.dateTimeInfo}>
+                {createdAt && (
+                  <Text style={styles.dateTimeText}>
+                    Created: {formatDateTime(createdAt)}
+                  </Text>
+                )}
+                {updatedAt && createdAt !== updatedAt && (
+                  <Text style={styles.dateTimeText}>
+                    Modified: {formatDateTime(updatedAt)}
+                  </Text>
+                )}
+              </View>
+
+              <TouchableOpacity
+                style={styles.categoryDropdownButton}
+                onPress={readOnly ? undefined : () => setShowCategoryDropdown(true)}
+                disabled={readOnly}
+              >
+                <Text style={styles.categoryButtonText}>
+                  {categories.find(cat => cat.id === selectedCategoryId)?.name || 'No Category'}
                 </Text>
-              )}
-              {updatedAt && createdAt !== updatedAt && (
-                <Text style={styles.dateTimeText}>
-                  Modified: {formatDateTime(updatedAt)}
-                </Text>
-              )}
+                <Ionicons name="chevron-down" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              style={styles.categoryDropdownButton}
-              onPress={readOnly ? undefined : () => setShowCategoryDropdown(true)}
-              disabled={readOnly}
-            >
-              <Text style={styles.categoryButtonText}>
-                {categories.find(cat => cat.id === selectedCategoryId)?.name || 'No Category'}
-              </Text>
-              <Ionicons name="chevron-down" size={16} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
+            {/* Title Input */}
+            <TextInput
+              style={[styles.titleInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
+              placeholder="Title"
+              editable={!readOnly}
+              placeholderTextColor="#888888"
+              value={noteTitle}
+              onChangeText={onTitleChange}
+              multiline={false}
+            />
 
-          {/* Title Input */}
-          <TextInput
-            style={[styles.titleInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
-            placeholder="Title"
-            editable={!readOnly}
-            placeholderTextColor="#888888"
-            value={noteTitle}
-            onChangeText={onTitleChange}
-            onFocus={() => {
-              if (isKeyboardVisible) {
-                setTimeout(() => scrollToInput(), 100);
-              }
-            }}
-            multiline={false}
-          />
-
-          {/* Segmented Content (Text + Media) */}
-          {renderCustomEditor()}
+            {/* Editor Blocks */}
+            {renderEditorBlocks()}
           </ScrollView>
         </KeyboardAvoidingView>
+
 
         {/* Bottom Toolbar - Hidden for read-only/deleted notes */}
         {!readOnly && (
@@ -1046,7 +883,7 @@ export default function NoteEditorScreen({
         }}
         onTakePhoto={React.useCallback(handleTakePhoto, [])}
         onAddImage={React.useCallback(handleAddImage, [])}
-        onDrawing={React.useCallback(handleDrawing, [])}
+        onDrawing={React.useCallback(handleRecording, [])}
         onRecording={React.useCallback(handleRecording, [])}
         onTickBoxes={React.useCallback(handleTickBoxes, [])}
       />
