@@ -756,7 +756,7 @@ export default function NoteEditorScreen({
                 style={styles.deleteTickBoxGroupButton}
                 onPress={() => handleTickBoxGroupDelete(tickBoxGroup.id)}
               >
-                <Ionicons name="trash-outline" size={16} color="#FF4444" />
+                <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
                 <Text style={styles.deleteTickBoxGroupText}>Delete checklist</Text>
               </TouchableOpacity>
             </View>
@@ -868,7 +868,9 @@ export default function NoteEditorScreen({
 
         {/* Bottom Toolbar - Hidden for read-only/deleted notes */}
         {!readOnly && (
+     
           <View style={styles.bottomBar}>
+        
             <View style={styles.bottomLeft}>
               <TouchableOpacity
                 style={styles.bottomButton}
@@ -888,7 +890,9 @@ export default function NoteEditorScreen({
             <TouchableOpacity style={styles.bottomButton}>
               <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
             </TouchableOpacity>
+             
           </View>
+      
         )}
       </View>
 
@@ -1105,7 +1109,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   deleteTickBoxGroupText: {
-    color: '#FF4444',
+    color: '#FFFFFF',
     fontSize: 12,
     marginLeft: 4,
   },
