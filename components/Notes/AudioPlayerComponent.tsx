@@ -282,7 +282,7 @@ export default function AudioPlayerComponent({
           <Ionicons 
             name="trash-outline" 
             size={18} 
-            color={isDarkMode ? "#FF4444" : "#CC0000"} 
+            color="#FFFFFF" 
           />
         </TouchableOpacity>
       </View>
@@ -336,12 +336,12 @@ const styles = StyleSheet.create({
     height: 56,
   },
   darkContainer: {
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   lightContainer: {
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },

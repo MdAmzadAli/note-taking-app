@@ -131,7 +131,7 @@ export default function TickBoxComponent({
         <Ionicons 
           name="close" 
           size={16} 
-          color={isDarkMode ? "#FF4444" : "#CC0000"} 
+          color="#FFFFFF" 
         />
       </TouchableOpacity>
     </View>
@@ -156,7 +156,7 @@ export default function TickBoxComponent({
             isDarkMode ? styles.darkInput : styles.lightInput
           ]}
           placeholder="List item"
-          placeholderTextColor={isDarkMode ? "#888888" : "#666666"}
+          placeholderTextColor="#FFFFFF"
           value={newItemText}
           onChangeText={setNewItemText}
           onSubmitEditing={addNewItem}
@@ -182,11 +182,11 @@ export default function TickBoxComponent({
             <Ionicons 
               name={showCompleted ? "chevron-down" : "chevron-forward"} 
               size={16} 
-              color={isDarkMode ? "#FFFFFF" : "#000000"} 
+              color="#FFFFFF" 
             />
             <Text style={[
               styles.completedHeaderText,
-              isDarkMode ? styles.darkText : styles.lightText
+              { color: '#FFFFFF' }
             ]}>
               {completedItems.length} checked items
             </Text>
@@ -211,11 +211,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   darkContainer: {
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   lightContainer: {
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   addSection: {
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    borderBottomColor: 'rgba(255,255,255,0.4)',
   },
   addButton: {
     width: 24,
@@ -236,11 +236,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   darkAddButton: {
-    backgroundColor: '#404040',
-    // borderColor:'white'
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   lightAddButton: {
-    backgroundColor: '#E0E0E0',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   newItemInput: {
     flex: 1,
@@ -336,7 +339,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+    borderTopColor: 'rgba(255,255,255,0.4)',
   },
   completedHeader: {
     flexDirection: 'row',
