@@ -1076,7 +1076,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontWeight: '400',
     lineHeight: 26,
-    minHeight: 100,
+    minHeight: 200,
     marginBottom: 4,
     // Fix text shifting on enter by ensuring consistent line height
     includeFontPadding: false,
