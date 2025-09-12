@@ -625,7 +625,6 @@ export default function NotesScreen() {
     setCurrentNoteImages([]);
     setCurrentNoteAudios([]);
     setCurrentNoteTickBoxGroups([]);
-    setCurrentNoteSegments([]);
     setCurrentNoteFontStyle(undefined); // Reset font style
   };
 
