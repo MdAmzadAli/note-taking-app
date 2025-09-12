@@ -282,13 +282,9 @@ export default function NoteEditorScreen({
     // Update note content and cursor position
     onContentChange(newContent);
     
-    // Set cursor position after the placeholder
+    // Update cursor position state - the new inline rendering will handle positioning
     const newCursorPosition = insertPosition + placeholder.length;
-    setTimeout(() => {
-      if (textInputRef.current) {
-        textInputRef.current.setSelection(newCursorPosition, newCursorPosition);
-      }
-    }, 100);
+    setCursorPosition({ start: newCursorPosition, end: newCursorPosition });
     
     console.log('Media placeholder inserted:', placeholder);
   };
@@ -693,16 +689,75 @@ export default function NoteEditorScreen({
   const renderCustomEditor = () => {
     console.log('Rendering custom editor with inline media support');
     
-    return (
-      <View style={styles.customEditorContainer}>
+    const parts = parseContent(noteContent);
+    const elements: React.ReactElement[] = [];
+    let currentTextSegment = '';
+    let textIndex = 0;
+    
+    parts.forEach((part, index) => {
+      if (isMediaPlaceholder(part)) {
+        // First, render any accumulated text
+        if (currentTextSegment.length > 0) {
+          elements.push(
+            <TextInput
+              key={`text-${textIndex}`}
+              style={[styles.bodyInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
+              placeholder={elements.length === 0 && !readOnly ? "Start typing your note..." : ""}
+              editable={!readOnly}
+              placeholderTextColor="#888888"
+              value={currentTextSegment}
+              onChangeText={(text) => handleTextSegmentChange(textIndex, text)}
+              multiline={true}
+              textAlignVertical="top"
+              autoFocus={elements.length === 0}
+            />
+          );
+          currentTextSegment = '';
+          textIndex++;
+        }
+        
+        // Then render the media
+        const mediaInfo = parseMediaPlaceholder(part);
+        if (mediaInfo && mediaPlaceholders[mediaInfo.id]) {
+          const placeholder = mediaPlaceholders[mediaInfo.id];
+          const mediaElement = renderMediaComponent(placeholder, index);
+          if (mediaElement) {
+            elements.push(mediaElement);
+            
+            // Add a new text input after media for continued writing
+            elements.push(
+              <TextInput
+                key={`text-after-media-${index}`}
+                style={[styles.bodyInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
+                placeholder="Continue writing..."
+                editable={!readOnly}
+                placeholderTextColor="#888888"
+                value=""
+                onChangeText={(text) => handleTextAfterMediaChange(index, text)}
+                multiline={true}
+                textAlignVertical="top"
+              />
+            );
+          }
+        }
+      } else {
+        // Accumulate text parts
+        currentTextSegment += part;
+      }
+    });
+    
+    // Render any remaining text
+    if (currentTextSegment.length > 0 || parts.length === 0) {
+      elements.push(
         <TextInput
           ref={textInputRef}
+          key={`text-final-${textIndex}`}
           style={[styles.bodyInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
-          placeholder={readOnly ? "" : "Start typing your note..."}
+          placeholder={elements.length === 0 && !readOnly ? "Start typing your note..." : "Continue writing..."}
           editable={!readOnly}
           placeholderTextColor="#888888"
-          value={noteContent}
-          onChangeText={onContentChange}
+          value={currentTextSegment}
+          onChangeText={(text) => handleTextSegmentChange(textIndex, text)}
           onSelectionChange={handleTextSelection}
           onFocus={() => {
             if (textInputRef.current) {
@@ -715,35 +770,65 @@ export default function NoteEditorScreen({
           }}
           multiline={true}
           textAlignVertical="top"
-          autoFocus
+          autoFocus={elements.length === 0}
         />
-        {renderInlineMedia()}
+      );
+    }
+    
+    return (
+      <View style={styles.customEditorContainer}>
+        {elements}
       </View>
     );
   };
 
-  const renderInlineMedia = () => {
+  // Text segment change handlers for inline editing
+  const handleTextSegmentChange = (segmentIndex: number, text: string) => {
+    // For now, we'll update the main content
+    // This is a simplified approach - a full implementation would need to track segments
     const parts = parseContent(noteContent);
-    const mediaElements: React.ReactElement[] = [];
+    let textSegmentCount = 0;
+    let newContent = '';
     
-    parts.forEach((part, index) => {
+    parts.forEach((part) => {
       if (isMediaPlaceholder(part)) {
-        const mediaInfo = parseMediaPlaceholder(part);
-        if (mediaInfo && mediaPlaceholders[mediaInfo.id]) {
-          const placeholder = mediaPlaceholders[mediaInfo.id];
-          const element = renderMediaComponent(placeholder, index);
-          if (element) {
-            mediaElements.push(element);
-          }
+        newContent += part;
+      } else {
+        if (textSegmentCount === segmentIndex) {
+          newContent += text;
+        } else {
+          newContent += part;
         }
+        textSegmentCount++;
       }
     });
     
-    return (
-      <View style={styles.inlineMediaContainer}>
-        {mediaElements}
-      </View>
-    );
+    // If this is the final segment and no parts exist yet
+    if (parts.length === 0 && segmentIndex === 0) {
+      newContent = text;
+    }
+    
+    onContentChange(newContent);
+  };
+  
+  const handleTextAfterMediaChange = (mediaIndex: number, text: string) => {
+    // Insert text after the specified media element
+    const parts = parseContent(noteContent);
+    let newParts: string[] = [];
+    let mediaCount = 0;
+    
+    parts.forEach((part) => {
+      newParts.push(part);
+      if (isMediaPlaceholder(part)) {
+        if (mediaCount === mediaIndex) {
+          newParts.push(text);
+        }
+        mediaCount++;
+      }
+    });
+    
+    const newContent = newParts.join('');
+    onContentChange(newContent);
   };
 
   const renderMediaComponent = (placeholder: MediaPlaceholder, index: number): React.ReactElement | null => {
@@ -1429,12 +1514,5 @@ const styles = StyleSheet.create({
   // Custom editor styles
   customEditorContainer: {
     flex: 1,
-  },
-  inlineMediaContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    pointerEvents: 'none', // Allow text input to receive touches
   },
 });
