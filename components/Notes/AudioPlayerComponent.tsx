@@ -354,14 +354,14 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   darkPlayButton: {
-    backgroundColor: '#404040',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
-    borderColor: '#555555',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   lightPlayButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
-    borderColor: '#CCCCCC',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   progressContainer: {
     flex: 1,
@@ -434,14 +434,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   darkDeleteButton: {
-    backgroundColor: '#404040',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
-    borderColor: '#555555',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   lightDeleteButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
-    borderColor: '#CCCCCC',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
 
   // Modal styles
