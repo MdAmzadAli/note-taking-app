@@ -336,14 +336,14 @@ const styles = StyleSheet.create({
     height: 56,
   },
   darkContainer: {
-    backgroundColor: '#2A2A2A',
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#404040',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   lightContainer: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   playButton: {
     width: 36,

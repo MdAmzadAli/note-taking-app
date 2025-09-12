@@ -211,12 +211,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   darkContainer: {
-    backgroundColor: '#2A2A2A',
-    borderColor: '#404040',
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   lightContainer: {
-    backgroundColor: '#F8F8F8',
-    borderColor: '#E0E0E0',
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   addSection: {
     flexDirection: 'row',
