@@ -30,6 +30,7 @@ import MediaAttachmentModal from './MediaAttachmentModal';
 import AudioRecordingModal from './AudioRecordingModal';
 import AudioPlayerComponent from './AudioPlayerComponent';
 import TickBoxComponent from './TickBoxComponent';
+import ImageViewerModal from './ImageViewerModal';
 import { getCategories } from '@/utils/storage';
 
 interface ImageAttachment {
@@ -135,9 +136,9 @@ export default function NoteEditorScreen({
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showMediaModal, setShowMediaModal] = useState(false);
   const [showAudioModal, setShowAudioModal] = useState(false);
-  const [fullImageUri, setFullImageUri] = useState<string | null>(null);
-  const [showFullImage, setShowFullImage] = useState(false);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showImageViewer, setShowImageViewer] = useState(false);
+  const [currentImageSection, setCurrentImageSection] = useState<ImageAttachment[]>([]);
+  const [selectedImageId, setSelectedImageId] = useState<string>('');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [pendingModalAction, setPendingModalAction] = useState<(() => void) | null>(null);
@@ -506,23 +507,23 @@ export default function NoteEditorScreen({
 
   // Delete handlers
   const handleDeleteImage = (imageId: string) => {
-    Alert.alert('Delete Image', 'Are you sure you want to delete this image?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          setEditorBlocks(prev => prev.filter(block => {
-            if (block.type === 'image' && block.data) {
-              const images = block.data as ImageAttachment[];
-              return !images.some(img => img.id === imageId);
-            }
-            return true;
-          }));
-          setShowFullImage(false);
-        },
-      },
-    ]);
+    setEditorBlocks(prev => prev.map(block => {
+      if (block.type === 'image' && block.data) {
+        const images = block.data as ImageAttachment[];
+        const updatedImages = images.filter(img => img.id !== imageId);
+        
+        // If no images left in this block, remove the entire block
+        if (updatedImages.length === 0) {
+          return null;
+        }
+        
+        return { ...block, data: updatedImages };
+      }
+      return block;
+    }).filter(Boolean) as EditorBlock[]);
+    
+    // Update current section images
+    setCurrentImageSection(prev => prev.filter(img => img.id !== imageId));
   };
 
   const handleAudioDelete = (audioId: string) => {
@@ -586,31 +587,21 @@ export default function NoteEditorScreen({
   };
 
   // Image viewing
-  const handleImagePress = (imageUri: string) => {
-    const { images } = getMediaFromBlocks();
-    const imageIndex = images.findIndex(img => img.uri === imageUri);
-    setCurrentImageIndex(imageIndex);
-    setFullImageUri(imageUri);
-    setShowFullImage(true);
-  };
-
-  const handlePreviousImage = () => {
-    const { images } = getMediaFromBlocks();
-    if (currentImageIndex > 0) {
-      const prevIndex = currentImageIndex - 1;
-      setCurrentImageIndex(prevIndex);
-      setFullImageUri(images[prevIndex].uri);
+  const handleImagePress = (imageId: string, blockId: string) => {
+    // Find the specific block containing this image
+    const imageBlock = editorBlocks.find(block => 
+      block.id === blockId && block.type === 'image'
+    );
+    
+    if (imageBlock && imageBlock.data) {
+      const images = imageBlock.data as ImageAttachment[];
+      setCurrentImageSection(images);
+      setSelectedImageId(imageId);
+      setShowImageViewer(true);
     }
   };
 
-  const handleNextImage = () => {
-    const { images } = getMediaFromBlocks();
-    if (currentImageIndex < images.length - 1) {
-      const nextIndex = currentImageIndex + 1;
-      setCurrentImageIndex(nextIndex);
-      setFullImageUri(images[nextIndex].uri);
-    }
-  };
+  
 
   // Save and navigation
   const handleSave = () => {
@@ -685,28 +676,7 @@ export default function NoteEditorScreen({
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Pan responder for image swiping
-  const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: (evt, gestureState) => {
-      return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dy) < 80;
-    },
-    onPanResponderRelease: (evt, gestureState) => {
-      const { dx } = gestureState;
-      const swipeThreshold = 50;
-      const { images } = getMediaFromBlocks();
-
-      if (Math.abs(dx) > swipeThreshold && images.length > 1) {
-        if (dx > 0) {
-          handlePreviousImage();
-        } else {
-          handleNextImage();
-        }
-      }
-    },
-    onPanResponderTerminationRequest: () => false,
-    onShouldBlockNativeResponder: () => false,
-  });
+  
 
   // Render editor blocks
   const renderEditorBlocks = () => {
@@ -746,7 +716,7 @@ export default function NoteEditorScreen({
                       styles.inlineImageCard,
                       { marginLeft: imgIndex % 2 === 0 ? 0 : 8 }
                     ]}
-                    onPress={() => handleImagePress(image.uri)}
+                    onPress={() => handleImagePress(image.id, block.id)}
                     activeOpacity={0.8}
                   >
                     <Image
@@ -936,56 +906,14 @@ export default function NoteEditorScreen({
         onTickBoxes={React.useCallback(handleTickBoxes, [])}
       />
 
-      {/* Full Image View Modal */}
-      <Modal
-        visible={showFullImage}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowFullImage(false)}
-      >
-        <View style={styles.fullImageOverlay}>
-          <TouchableOpacity
-            style={styles.fullImageCloseButton}
-            onPress={() => setShowFullImage(false)}
-          >
-            <Ionicons name="close" size={30} color="#FFFFFF" />
-          </TouchableOpacity>
-
-          {fullImageUri && (
-            <Animated.View style={styles.fullImageContainer} {...panResponder.panHandlers}>
-              <Image
-                source={{ uri: fullImageUri }}
-                style={styles.fullImage}
-                resizeMode="contain"
-              />
-
-              {noteImages.length > 1 && (
-                <View style={styles.imageIndicators}>
-                  <View style={styles.swipeHint}>
-                    <Text style={styles.swipeHintText}>Swipe to navigate</Text>
-                  </View>
-                  <Text style={styles.imageCounter}>
-                    {currentImageIndex + 1} / {noteImages.length}
-                  </Text>
-                </View>
-              )}
-
-              <TouchableOpacity
-                style={styles.deleteImageButton}
-                onPress={() => {
-                  const imageToDelete = noteImages.find(img => img.uri === fullImageUri);
-                  if (imageToDelete) {
-                    handleDeleteImage(imageToDelete.id);
-                  }
-                }}
-              >
-                <Ionicons name="trash" size={24} color="#FF4444" />
-                <Text style={styles.deleteButtonText}>Delete</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          )}
-        </View>
-      </Modal>
+      {/* Image Viewer Modal */}
+      <ImageViewerModal
+        visible={showImageViewer}
+        images={currentImageSection}
+        initialImageId={selectedImageId}
+        onClose={() => setShowImageViewer(false)}
+        onDeleteImage={handleDeleteImage}
+      />
 
       {/* Color Theme Picker Modal */}
       <ColorThemePicker
@@ -1200,75 +1128,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  fullImageOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fullImageCloseButton: {
-    position: 'absolute',
-    top: 15,
-    right: 20,
-    zIndex: 1,
-    padding: 10,
-  },
-  fullImageContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 120,
-  },
-  fullImage: {
-    width: Dimensions.get('window').width - 40,
-    height: Dimensions.get('window').height - 280,
-  },
-  deleteImageButton: {
-    position: 'absolute',
-    bottom: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 68, 68, 0.2)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: '#FF4444',
-  },
-  deleteButtonText: {
-    color: '#FF4444',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  imageIndicators: {
-    position: 'absolute',
-    top: 20,
-    alignSelf: 'center',
-    alignItems: 'center',
-  },
-  imageCounter: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-    marginBottom: 8,
-  },
-  swipeHint: {
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  swipeHintText: {
-    color: '#CCCCCC',
-    fontSize: 12,
-    textAlign: 'center',
-  },
+  
   metaInfoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
