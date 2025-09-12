@@ -1076,7 +1076,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontWeight: '400',
     lineHeight: 26,
-    minHeight: 400,
+    minHeight: 100,
+    marginBottom: 4,
     // Fix text shifting on enter by ensuring consistent line height
     includeFontPadding: false,
     textAlignVertical: 'top',
@@ -1297,10 +1298,10 @@ const styles = StyleSheet.create({
   },
   // Inline content styles
   inlineContentContainer: {
-    marginBottom: 16,
+    marginBottom: 8,
   },
   inlineImageContainer: {
-    marginVertical: 12,
+    marginVertical: 4,
   },
   inlineImageGallery: {
     flexDirection: 'row',
@@ -1330,10 +1331,10 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   inlineAudioContainer: {
-    marginVertical: 8,
+    marginVertical: 4,
   },
   inlineTickBoxContainer: {
-    marginVertical: 12,
+    marginVertical: 4,
   },
   // Custom editor styles
   customEditorContainer: {
