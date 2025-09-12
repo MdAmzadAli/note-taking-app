@@ -256,7 +256,6 @@ export default function NoteEditorScreen({
     console.log('insertMediaAtCursor called with:', mediaType);
     
     const currentContent = noteContent;
-    const insertPosition = cursorPosition.start;
     
     // Use entity ID for consistent reference with deletion handlers
     let entityId: string;
@@ -286,16 +285,21 @@ export default function NoteEditorScreen({
       [mediaId]: newPlaceholder
     }));
     
-    // Insert placeholder in text at cursor position
-    const beforeText = currentContent.substring(0, insertPosition);
-    const afterText = currentContent.substring(insertPosition);
-    const newContent = beforeText + placeholder + afterText;
+    // Always append media after existing content with proper line breaks
+    let newContent;
+    if (currentContent.trim() === '') {
+      // If no content exists, just add the media
+      newContent = placeholder;
+    } else {
+      // If content exists, add line breaks and append media, then add space for new text
+      newContent = currentContent + '\n\n' + placeholder + '\n\n';
+    }
     
-    // Update note content and cursor position
+    // Update note content
     onContentChange(newContent);
     
-    // Update cursor position state - place cursor after inserted media
-    const newCursorPosition = insertPosition + placeholder.length;
+    // Set cursor position at the end for continued typing
+    const newCursorPosition = newContent.length;
     setCursorPosition({ start: newCursorPosition, end: newCursorPosition });
     
     console.log('Media placeholder inserted:', placeholder, 'with entity ID:', entityId);
@@ -746,10 +750,10 @@ export default function NoteEditorScreen({
             elements.push(mediaElement);
           }
         }
-      } else {
-        // Render text input with value derived from actual content segment
+      } else if (part.trim() !== '') {
+        // Only render non-empty text segments
         const textValue = part;
-        const isLastTextSegment = textSegmentIndex === getTextSegments(noteContent).length - 1;
+        const isLastTextSegment = textSegmentIndex === getTextSegments(noteContent).filter(seg => seg.trim() !== '').length - 1;
         
         elements.push(
           <TextInput
@@ -776,15 +780,46 @@ export default function NoteEditorScreen({
             }}
             multiline={true}
             textAlignVertical="top"
-            autoFocus={textSegmentIndex === 0 && elements.length === 1}
+            autoFocus={textSegmentIndex === 0 && parts.length === 1}
           />
         );
         textSegmentIndex++;
       }
     });
     
-    // If no content exists, render the initial text input
-    if (parts.length === 0) {
+    // Always ensure there's a text input at the end for continued typing
+    const hasMediaContent = parts.some(part => isMediaPlaceholder(part));
+    const hasTextContent = parts.some(part => !isMediaPlaceholder(part) && part.trim() !== '');
+    
+    if (hasMediaContent || hasTextContent) {
+      // Add a final text input for continued typing
+      elements.push(
+        <TextInput
+          ref={textInputRef}
+          key={`text-final-${textSegmentIndex}`}
+          style={[styles.bodyInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
+          placeholder={!readOnly ? "Continue writing..." : ""}
+          editable={!readOnly}
+          placeholderTextColor="#888888"
+          value=""
+          onChangeText={(text) => {
+            if (text.trim() !== '') {
+              // Append new text to the content
+              const newContent = noteContent + text;
+              onContentChange(newContent);
+            }
+          }}
+          onSelectionChange={handleTextSelection}
+          multiline={true}
+          textAlignVertical="top"
+          autoFocus={false}
+        />
+      );
+    }
+    
+    // If no content exists at all, render the initial text input
+    if (parts.length === 0 || (!hasMediaContent && !hasTextContent)) {
+      elements.length = 0; // Clear any existing elements
       elements.push(
         <TextInput
           ref={textInputRef}
@@ -793,7 +828,7 @@ export default function NoteEditorScreen({
           placeholder={!readOnly ? "Start typing your note..." : ""}
           editable={!readOnly}
           placeholderTextColor="#888888"
-          value=""
+          value={noteContent}
           onChangeText={(text) => onContentChange(text)}
           onSelectionChange={handleTextSelection}
           multiline={true}
@@ -819,7 +854,8 @@ export default function NoteEditorScreen({
     parts.forEach((part) => {
       if (isMediaPlaceholder(part)) {
         newContent += part;
-      } else {
+      } else if (part.trim() !== '' || textSegmentCount === segmentIndex) {
+        // Only process non-empty text segments or the target segment
         if (textSegmentCount === segmentIndex) {
           newContent += text;
         } else {
