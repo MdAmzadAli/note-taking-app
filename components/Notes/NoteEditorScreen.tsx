@@ -142,6 +142,9 @@ export default function NoteEditorScreen({
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [pendingModalAction, setPendingModalAction] = useState<(() => void) | null>(null);
   const [isProcessingMedia, setIsProcessingMedia] = useState(false);
+  
+  // Dynamic height tracking for text inputs
+  const [textInputHeights, setTextInputHeights] = useState<{[key: string]: number}>({});
 
   // Core editor state - array of blocks
   const [editorBlocks, setEditorBlocks] = useState<EditorBlock[]>([]);
@@ -304,6 +307,49 @@ export default function NoteEditorScreen({
   // Focus management
   const handleTextFocus = (blockId: string) => {
     setActiveTextBlockId(blockId);
+    // Initialize height for this input if not already set
+    if (!textInputHeights[blockId]) {
+      setTextInputHeights(prev => ({ ...prev, [blockId]: 50 }));
+    }
+  };
+
+  // Dynamic height management
+  const handleTextInputLayout = (blockId: string, event: any) => {
+    const { height } = event.nativeEvent.layout;
+    const currentHeight = textInputHeights[blockId] || 50;
+    
+    // If content is approaching the bottom (within 20px), increase height
+    if (height >= currentHeight - 20) {
+      setTextInputHeights(prev => ({
+        ...prev,
+        [blockId]: Math.max(currentHeight + 50, 50)
+      }));
+    }
+  };
+
+  const handleTextContentSizeChange = (blockId: string, event: any) => {
+    const { height } = event.nativeEvent.contentSize;
+    const currentMinHeight = textInputHeights[blockId] || 50;
+    
+    // Increase height if content is approaching current minHeight
+    if (height >= currentMinHeight - 15) {
+      setTextInputHeights(prev => ({
+        ...prev,
+        [blockId]: currentMinHeight + 50
+      }));
+    }
+  };
+
+  const getTextInputStyle = (blockId: string, isFirstInput: boolean = false) => {
+    const baseHeight = textInputHeights[blockId] || 50;
+    return [
+      styles.bodyInput,
+      selectedFontStyle ? { fontFamily: selectedFontStyle } : {},
+      { 
+        minHeight: isFirstInput ? Math.max(baseHeight, 200) : baseHeight,
+        maxHeight: 600 // Prevent excessive growth
+      }
+    ];
   };
 
   const scrollToActiveInput = () => {
@@ -673,13 +719,15 @@ export default function NoteEditorScreen({
               ref={ref => {
                 if (ref) textInputRefs.current[block.id] = ref;
               }}
-              style={[styles.bodyInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
+              style={getTextInputStyle(block.id, index === 0)}
               placeholder={index === 0 ? "Start typing your note..." : "Continue typing..."}
               editable={!readOnly}
               placeholderTextColor="#888888"
               value={block.content || ''}
               onChangeText={text => handleTextChange(block.id, text)}
               onFocus={() => handleTextFocus(block.id)}
+              onLayout={(event) => handleTextInputLayout(block.id, event)}
+              onContentSizeChange={(event) => handleTextContentSizeChange(block.id, event)}
               multiline={true}
               textAlignVertical="top"
               blurOnSubmit={false}
@@ -1076,7 +1124,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontWeight: '400',
     lineHeight: 26,
-    minHeight: 200,
     marginBottom: 4,
     // Fix text shifting on enter by ensuring consistent line height
     includeFontPadding: false,
