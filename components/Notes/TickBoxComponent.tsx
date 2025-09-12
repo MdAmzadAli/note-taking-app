@@ -237,6 +237,7 @@ const styles = StyleSheet.create({
   },
   darkAddButton: {
     backgroundColor: '#404040',
+    // borderColor:'white'
   },
   lightAddButton: {
     backgroundColor: '#E0E0E0',
