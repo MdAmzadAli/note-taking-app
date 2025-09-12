@@ -253,7 +253,7 @@ export default function NoteEditorScreen({
   };
 
   const insertMediaAtCursor = (mediaType: 'image' | 'audio' | 'tickbox', mediaData: any) => {
-    console.log('insertMediaAtCursor called with:', mediaType);
+    console.log('insertMediaAtCursor called with:', mediaType, 'cursor position:', cursorPosition);
     
     const currentContent = noteContent;
     
@@ -285,24 +285,41 @@ export default function NoteEditorScreen({
       [mediaId]: newPlaceholder
     }));
     
-    // Always append media after existing content with proper line breaks
+    // Insert media at the current cursor position
     let newContent;
+    const insertPosition = cursorPosition.start;
+    
     if (currentContent.trim() === '') {
-      // If no content exists, just add the media
-      newContent = placeholder;
+      // If no content exists, just add the media followed by space for typing
+      newContent = placeholder + '\n\n';
     } else {
-      // If content exists, add line breaks and append media, then add space for new text
-      newContent = currentContent + '\n\n' + placeholder + '\n\n';
+      // Insert at cursor position with proper line breaks
+      const beforeCursor = currentContent.substring(0, insertPosition);
+      const afterCursor = currentContent.substring(insertPosition);
+      
+      // Add line breaks around media for proper formatting
+      const mediaWithBreaks = beforeCursor.endsWith('\n') ? 
+        `${placeholder}\n\n` : 
+        `\n\n${placeholder}\n\n`;
+      
+      newContent = beforeCursor + mediaWithBreaks + afterCursor;
     }
     
     // Update note content
     onContentChange(newContent);
     
-    // Set cursor position at the end for continued typing
-    const newCursorPosition = newContent.length;
+    // Set cursor position after the inserted media for continued typing
+    const newCursorPosition = insertPosition + placeholder.length + 4; // +4 for line breaks
     setCursorPosition({ start: newCursorPosition, end: newCursorPosition });
     
-    console.log('Media placeholder inserted:', placeholder, 'with entity ID:', entityId);
+    // Focus the text input after a short delay to ensure content is updated
+    setTimeout(() => {
+      if (textInputRef.current) {
+        textInputRef.current.focus();
+      }
+    }, 100);
+    
+    console.log('Media placeholder inserted:', placeholder, 'at position:', insertPosition, 'with entity ID:', entityId);
   };
 
   // Removed createMediaSegment - using new placeholder-based approach
@@ -737,89 +754,9 @@ export default function NoteEditorScreen({
     
     const parts = parseContent(noteContent);
     const elements: React.ReactElement[] = [];
-    let textSegmentIndex = 0;
-    
-    parts.forEach((part, index) => {
-      if (isMediaPlaceholder(part)) {
-        // Render the media component
-        const mediaInfo = parseMediaPlaceholder(part);
-        if (mediaInfo && mediaPlaceholders[mediaInfo.id]) {
-          const placeholder = mediaPlaceholders[mediaInfo.id];
-          const mediaElement = renderMediaComponent(placeholder, index);
-          if (mediaElement) {
-            elements.push(mediaElement);
-          }
-        }
-      } else if (part.trim() !== '') {
-        // Only render non-empty text segments
-        const textValue = part;
-        const isLastTextSegment = textSegmentIndex === getTextSegments(noteContent).filter(seg => seg.trim() !== '').length - 1;
-        
-        elements.push(
-          <TextInput
-            key={`text-${textSegmentIndex}`}
-            ref={isLastTextSegment ? textInputRef : undefined}
-            style={[styles.bodyInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
-            placeholder={textSegmentIndex === 0 && !readOnly ? "Start typing your note..." : "Continue writing..."}
-            editable={!readOnly}
-            placeholderTextColor="#888888"
-            value={textValue}
-            onChangeText={(text) => handleTextSegmentChange(textSegmentIndex, text)}
-            onSelectionChange={(event) => {
-              const { start, end } = event.nativeEvent.selection;
-              const absolutePosition = calculateAbsoluteCursorPosition(textSegmentIndex, { start, end });
-              setCursorPosition(absolutePosition);
-            }}
-            onFocus={() => {
-              // Update cursor position when this input is focused
-              setTimeout(() => {
-                if (isKeyboardVisible) {
-                  scrollToInput();
-                }
-              }, 100);
-            }}
-            multiline={true}
-            textAlignVertical="top"
-            autoFocus={textSegmentIndex === 0 && parts.length === 1}
-          />
-        );
-        textSegmentIndex++;
-      }
-    });
-    
-    // Always ensure there's a text input at the end for continued typing
-    const hasMediaContent = parts.some(part => isMediaPlaceholder(part));
-    const hasTextContent = parts.some(part => !isMediaPlaceholder(part) && part.trim() !== '');
-    
-    if (hasMediaContent || hasTextContent) {
-      // Add a final text input for continued typing
-      elements.push(
-        <TextInput
-          ref={textInputRef}
-          key={`text-final-${textSegmentIndex}`}
-          style={[styles.bodyInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
-          placeholder={!readOnly ? "Continue writing..." : ""}
-          editable={!readOnly}
-          placeholderTextColor="#888888"
-          value=""
-          onChangeText={(text) => {
-            if (text.trim() !== '') {
-              // Append new text to the content
-              const newContent = noteContent + text;
-              onContentChange(newContent);
-            }
-          }}
-          onSelectionChange={handleTextSelection}
-          multiline={true}
-          textAlignVertical="top"
-          autoFocus={false}
-        />
-      );
-    }
     
     // If no content exists at all, render the initial text input
-    if (parts.length === 0 || (!hasMediaContent && !hasTextContent)) {
-      elements.length = 0; // Clear any existing elements
+    if (parts.length === 0 || (parts.length === 1 && parts[0].trim() === '')) {
       elements.push(
         <TextInput
           ref={textInputRef}
@@ -836,6 +773,38 @@ export default function NoteEditorScreen({
           autoFocus={true}
         />
       );
+    } else {
+      // Render a single text input that handles the entire content with media placeholders
+      elements.push(
+        <TextInput
+          ref={textInputRef}
+          key="text-unified"
+          style={[styles.bodyInput, selectedFontStyle ? { fontFamily: selectedFontStyle } : {}]}
+          placeholder={!readOnly ? "Start typing your note..." : ""}
+          editable={!readOnly}
+          placeholderTextColor="#888888"
+          value={noteContent}
+          onChangeText={(text) => onContentChange(text)}
+          onSelectionChange={handleTextSelection}
+          multiline={true}
+          textAlignVertical="top"
+          autoFocus={false}
+        />
+      );
+      
+      // Render media components inline based on their position in content
+      parts.forEach((part, index) => {
+        if (isMediaPlaceholder(part)) {
+          const mediaInfo = parseMediaPlaceholder(part);
+          if (mediaInfo && mediaPlaceholders[mediaInfo.id]) {
+            const placeholder = mediaPlaceholders[mediaInfo.id];
+            const mediaElement = renderMediaComponent(placeholder, index);
+            if (mediaElement) {
+              elements.push(mediaElement);
+            }
+          }
+        }
+      });
     }
     
     return (
@@ -845,33 +814,7 @@ export default function NoteEditorScreen({
     );
   };
 
-  // Enhanced text segment change handler for inline editing
-  const handleTextSegmentChange = (segmentIndex: number, text: string) => {
-    const parts = parseContent(noteContent);
-    let textSegmentCount = 0;
-    let newContent = '';
-    
-    parts.forEach((part) => {
-      if (isMediaPlaceholder(part)) {
-        newContent += part;
-      } else if (part.trim() !== '' || textSegmentCount === segmentIndex) {
-        // Only process non-empty text segments or the target segment
-        if (textSegmentCount === segmentIndex) {
-          newContent += text;
-        } else {
-          newContent += part;
-        }
-        textSegmentCount++;
-      }
-    });
-    
-    // Handle case where this is the initial or only text segment
-    if (parts.length === 0 || (parts.length === 1 && !isMediaPlaceholder(parts[0]))) {
-      newContent = text;
-    }
-    
-    onContentChange(newContent);
-  };
+  
 
   // Removed handleTextAfterMediaChange as it was causing the controlled/uncontrolled input issues
 
