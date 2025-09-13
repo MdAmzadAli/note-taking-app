@@ -70,9 +70,7 @@ export default function AudioTranscriptionModal({
     try {
       const config: TranscriptionConfig = {
         provider: transcriptionProvider,
-        // Note: In production, this should be handled by a backend service
-        // For development, using environment variable (should be moved to backend)
-        apiKey: process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY,
+        // API key handled securely on the backend - no frontend keys needed
       };
       
       transcriptionService.current = new TranscriptionService(config);

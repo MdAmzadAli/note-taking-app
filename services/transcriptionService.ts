@@ -18,6 +18,7 @@ class AssemblyAIProvider implements TranscriptionProvider {
 
   constructor(config: TranscriptionConfig) {
     this.config = config;
+    // No API key needed on frontend - handled by backend proxy
   }
 
   async transcribe(audioUri: string): Promise<string> {
@@ -27,17 +28,20 @@ class AssemblyAIProvider implements TranscriptionProvider {
       
       console.log('[TRANSCRIPTION] Uploading audio to secure backend transcription service...');
 
-      // Create FormData for audio upload using standard web APIs
+      // Create FormData for audio upload using React Native compatible approach
       const formData = new FormData();
       
-      // Create a blob from the audio URI
-      const response = await fetch(audioUri);
-      if (!response.ok) {
-        throw new Error('Audio file not accessible');
-      }
+      // For React Native/Expo, handle the file URI differently
+      console.log('[TRANSCRIPTION] Audio URI:', audioUri);
       
-      const audioBlob = await response.blob();
-      formData.append('audio_file', audioBlob, 'recording.m4a');
+      // In React Native, we need to create a proper file object
+      const audioFile = {
+        uri: audioUri,
+        type: 'audio/m4a',
+        name: 'recording.m4a',
+      } as any;
+      
+      formData.append('audio_file', audioFile);
 
       // Upload audio file to secure backend proxy using standard fetch
       const uploadResponse = await fetch(`${backendUrl}/transcribe`, {
