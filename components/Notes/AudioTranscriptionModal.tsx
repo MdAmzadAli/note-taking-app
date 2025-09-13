@@ -593,12 +593,23 @@ export default function AudioTranscriptionModal({
 
   const renderTranscriptStep = () => (
     <View style={styles.transcriptDisplayContainer}>
+      {/* Close Button */}
+      <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
+        <Ionicons name="close" size={24} color="#FFFFFF" />
+      </TouchableOpacity>
+      
       <Text style={styles.transcriptDisplayTitle}>Your Transcript</Text>
       
       <ScrollView style={styles.transcriptDisplayScrollView} showsVerticalScrollIndicator={true}>
-        <Text style={styles.transcriptDisplayText}>
-          {transcript}
-        </Text>
+        <TextInput
+          style={styles.transcriptDisplayTextInput}
+          value={editedTranscript}
+          onChangeText={setEditedTranscript}
+          multiline
+          placeholder="Your transcript will appear here..."
+          placeholderTextColor="#666666"
+          textAlignVertical="top"
+        />
       </ScrollView>
 
       {/* Recording Save Option */}
@@ -629,16 +640,26 @@ export default function AudioTranscriptionModal({
 
       <View style={styles.transcriptDisplayActions}>
         <TouchableOpacity
-          style={styles.editTranscriptButton}
-          onPress={() => setCurrentStep('editing')}
+          style={styles.reRecordButton}
+          onPress={() => {
+            setCurrentStep('recording');
+            setTranscript('');
+            setEditedTranscript('');
+            setAudioUri(null);
+          }}
           activeOpacity={0.7}
         >
-          <Text style={styles.editTranscriptButtonText}>Edit Transcript</Text>
+          <Ionicons name="mic" size={18} color="#FFFFFF" style={styles.buttonIcon} />
+          <Text style={styles.reRecordButtonText}>Re-record</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.saveTranscriptButton}
+          style={[
+            styles.saveTranscriptButton,
+            !editedTranscript.trim() && styles.saveButtonDisabled,
+          ]}
           onPress={saveTranscriptAsNote}
+          disabled={!editedTranscript.trim()}
           activeOpacity={0.7}
         >
           <Text style={styles.saveTranscriptButtonText}>Save as Note</Text>
@@ -718,9 +739,19 @@ export default function AudioTranscriptionModal({
       visible={visible}
       transparent
       animationType="none"
-      onRequestClose={onClose}
+      onRequestClose={() => {
+        // Only allow closing via back button if not on transcript step
+        if (currentStep !== 'transcript') {
+          onClose();
+        }
+      }}
     >
-      <TouchableWithoutFeedback onPress={onClose}>
+      <TouchableWithoutFeedback onPress={() => {
+        // Only allow closing by clicking outside if not on transcript step
+        if (currentStep !== 'transcript') {
+          onClose();
+        }
+      }}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <Animated.View
@@ -1081,23 +1112,50 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     textAlign: 'left',
   },
+  transcriptDisplayTextInput: {
+    fontSize: 17,
+    lineHeight: 26,
+    color: '#FFFFFF',
+    fontFamily: 'Inter',
+    textAlign: 'left',
+    padding: 0,
+    margin: 0,
+    minHeight: 100,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    zIndex: 1000,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   transcriptDisplayActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 16,
   },
-  editTranscriptButton: {
+  reRecordButton: {
     flex: 1,
     paddingVertical: 16,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 68, 68, 0.8)',
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
-  editTranscriptButtonText: {
+  reRecordButtonText: {
     fontSize: 16,
     color: '#FFFFFF',
     fontWeight: '500',
     fontFamily: 'Inter',
+  },
+  buttonIcon: {
+    marginRight: 8,
   },
   saveTranscriptButton: {
     flex: 1,
