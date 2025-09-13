@@ -30,6 +30,7 @@ import NoteEditorScreen from '@/components/Notes/NoteEditorScreen';
 import NotesGrid from '@/components/Notes/NotesGrid';
 import SlideMenu from '@/components/ui/SlideMenu';
 import AudioTranscriptionModal from '@/components/Notes/AudioTranscriptionModal';
+import NotesHeader from '@/components/Notes/NotesHeader';
 import { getCategories } from '@/utils/storage';
 
 import WritingStyleSelector from '@/components/WritingStyleSelector';
@@ -674,20 +675,13 @@ export default function NotesScreen() {
     <View style={styles.fullScreenContainer}>
 
 
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.hamburgerButton} onPress={openMenu}>
-            <Ionicons name="menu" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-
-          <View style={styles.searchContainer}>
-            <TextInput
-              style={styles.searchInput}
-              placeholder={selectedSection === 'deleted' ? "Search deleted notes..." : "Search Keep"}
-              placeholderTextColor="#999999"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
+        <NotesHeader
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onMenuPress={openMenu}
+          onVoiceInput={() => setShowTranscriptionModal(true)}
+          isListening={showTranscriptionModal}
+        />
 
           {selectedSection === 'deleted' ? (
             <TouchableOpacity style={styles.micButton} onPress={handleDeleteAllNotes}>

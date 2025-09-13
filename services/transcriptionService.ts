@@ -26,7 +26,7 @@ class AssemblyAIProvider implements TranscriptionProvider {
     const apiKey = this.config.apiKey;
     
     if (!apiKey) {
-      throw new Error('AssemblyAI API key not configured. Please set up API key in settings or use backend proxy.');
+      throw new Error('Transcription service requires backend configuration. Please contact support for secure API setup.');
     }
 
     try {
