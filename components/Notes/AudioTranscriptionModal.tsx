@@ -759,11 +759,12 @@ export default function AudioTranscriptionModal({
         }
       }}>
         <View style={styles.overlay}>
-          <KeyboardAvoidingView 
+          {/* <KeyboardAvoidingView 
             style={styles.keyboardAvoidingFullContainer}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={0}
-          >
+          > */}
+          <View style={styles.keyboardAvoidingFullContainer}>
             <TouchableWithoutFeedback>
               <Animated.View
                 style={[
@@ -781,7 +782,8 @@ export default function AudioTranscriptionModal({
                 {currentStep === 'editing' && renderEditingStep()}
               </Animated.View>
             </TouchableWithoutFeedback>
-          </KeyboardAvoidingView>
+          </View>
+          {/* </KeyboardAvoidingView> */}
         </View>
       </TouchableWithoutFeedback>
     </Modal>
@@ -797,7 +799,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    // paddingHorizontal: 20,
   },
   modalContainer: {
     backgroundColor: '#1C1C1C',
@@ -911,6 +913,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2A2A2A',
     borderRadius: 12,
     marginBottom: 20,
+    // minHeight:'400',
   },
   transcriptInput: {
     color: '#FFFFFF',
@@ -928,10 +931,17 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    paddingVertical: 16,
+    // paddingVertical: 16,
     borderRadius: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
+    justifyContent: 'center',
+    marginTop:'8%',
+    // marginBottom:10,
+    width:'30%',
+    maxHeight:'15%',
+    minHeight:'15%',
+    // height:10,
   },
   cancelButtonText: {
     fontSize: 16,
@@ -994,7 +1004,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#006B3F', // Dark green for completed stages
   },
   progressStepLabel: {
-    fontSize: 12,
+    fontSize: 8,
     color: '#CCCCCC',
     fontFamily: 'Inter',
     textAlign: 'center',
@@ -1099,6 +1109,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingBottom: 20,
     height: '80%',
+    minHeight:800,
     width: '100%',
     maxWidth: 500,
   },
@@ -1138,7 +1149,7 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     padding: 0,
     margin: 0,
-    minHeight: 100,
+    minHeight: 400,
   },
   closeButton: {
     position: 'absolute',
