@@ -970,13 +970,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     marginVertical: 20,
+    paddingHorizontal: 10,
   },
   progressSteps: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
     marginBottom: 24,
-    paddingHorizontal: 20,
     alignItems: 'center',
   },
   progressStepContainer: {
@@ -986,7 +986,7 @@ const styles = StyleSheet.create({
   },
   progressStep: {
     alignItems: 'center',
-    flex: 1,
+    width: 80, // Fixed width for consistent spacing
   },
   progressStepIcon: {
     width: 32,
@@ -1004,10 +1004,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#006B3F', // Dark green for completed stages
   },
   progressStepLabel: {
-    fontSize: 8,
+    fontSize: 11,
     color: '#CCCCCC',
     fontFamily: 'Inter',
     textAlign: 'center',
+    lineHeight: 14,
+    flexWrap: 'wrap',
+    width: '100%',
   },
   progressStepLabelActive: {
     color: '#00FF7F',
@@ -1022,7 +1025,8 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 32,
     justifyContent: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
+    marginHorizontal: 4,
   },
   connectingLine: {
     height: 2,
