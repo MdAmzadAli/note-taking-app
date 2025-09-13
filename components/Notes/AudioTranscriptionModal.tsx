@@ -10,6 +10,8 @@ import {
   Alert,
   TextInput,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Audio } from 'expo-av';
@@ -54,7 +56,7 @@ export default function AudioTranscriptionModal({
   });
   const [saveRecordingOption, setSaveRecordingOption] = useState(false);
   const [completedStages, setCompletedStages] = useState<Set<string>>(new Set());
-  
+
   const slideAnim = useRef(new Animated.Value(600)).current;
   const recordingRef = useRef<Audio.Recording | null>(null);
   const durationTimer = useRef<number | null>(null);
@@ -89,7 +91,7 @@ export default function AudioTranscriptionModal({
         provider: transcriptionProvider,
         // API key handled securely on the backend - no frontend keys needed
       };
-      
+
       transcriptionService.current = new TranscriptionService(config);
     } catch (error) {
       console.error('[TRANSCRIPTION] Failed to initialize service:', error);
@@ -123,7 +125,7 @@ export default function AudioTranscriptionModal({
             progress: data.progress,
             message: data.message
           });
-          
+
           // Track stage completion
           if (data.stage_complete) {
             console.log('[SOCKET] Stage completed:', data.stage);
@@ -147,7 +149,7 @@ export default function AudioTranscriptionModal({
             }
             return prev;
           });
-          
+
           // Ensure cleaning stage is marked as completed
           setCompletedStages(prev => {
             const newCompleted = new Set(prev);
@@ -156,7 +158,7 @@ export default function AudioTranscriptionModal({
             console.log('[SOCKET] Completed stages:', Array.from(newCompleted));
             return newCompleted;
           });
-          
+
           // Brief delay to show final stage completion before transitioning
           setTimeout(() => {
             setTranscript(data.transcript);
@@ -214,12 +216,12 @@ export default function AudioTranscriptionModal({
       clearInterval(durationTimer.current);
       durationTimer.current = null;
     }
-    
+
     if (maxRecordingTimer.current) {
       clearTimeout(maxRecordingTimer.current);
       maxRecordingTimer.current = null;
     }
-    
+
     if (recordingRef.current) {
       try {
         await recordingRef.current.stopAndUnloadAsync();
@@ -234,7 +236,7 @@ export default function AudioTranscriptionModal({
       socketRef.current.disconnect();
       socketRef.current = null;
     }
-    
+
     resetModal();
   };
 
@@ -286,25 +288,25 @@ export default function AudioTranscriptionModal({
     try {
       await recordingRef.current.stopAndUnloadAsync();
       const uri = recordingRef.current.getURI();
-      
+
       if (uri) {
         setAudioUri(uri);
         await transcribeAudio(uri);
       }
-      
+
       recordingRef.current = null;
       setIsRecording(false);
-      
+
       if (durationTimer.current) {
         clearInterval(durationTimer.current);
         durationTimer.current = null;
       }
-      
+
       if (maxRecordingTimer.current) {
         clearTimeout(maxRecordingTimer.current);
         maxRecordingTimer.current = null;
       }
-      
+
     } catch (error) {
       console.error('Failed to stop recording', error);
       Alert.alert('Error', 'Failed to stop recording. Please try again.');
@@ -320,7 +322,7 @@ export default function AudioTranscriptionModal({
 
     setCurrentStep('transcribing');
     setIsTranscribing(true);
-    
+
     // Reset progress
     setTranscriptionProgress({
       stage: 'uploading',
@@ -336,7 +338,7 @@ export default function AudioTranscriptionModal({
         type: 'audio/m4a',
         name: 'recording.m4a',
       } as any;
-      
+
       formData.append('audio_file', audioFile);
 
       // Submit transcription job
@@ -354,7 +356,7 @@ export default function AudioTranscriptionModal({
       }
 
       const jobResponse = await uploadResponse.json();
-      
+
       if (!jobResponse.success) {
         throw new Error(jobResponse.error || 'Failed to submit transcription job');
       }
@@ -362,7 +364,7 @@ export default function AudioTranscriptionModal({
       // Store job ID for Socket.IO updates
       currentJobIdRef.current = jobResponse.job_id;
       console.log('[TRANSCRIPTION] Job submitted:', jobResponse.job_id);
-      
+
       // Progress will be updated via Socket.IO events
       setTranscriptionProgress({
         stage: 'uploading',
@@ -393,7 +395,7 @@ export default function AudioTranscriptionModal({
     try {
       const now = new Date().toISOString();
       const noteId = `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+
       const newNote: Note = {
         id: noteId,
         title: `Voice Note - ${new Date().toLocaleDateString()}`,
@@ -415,7 +417,7 @@ export default function AudioTranscriptionModal({
       };
 
       await saveNote(newNote);
-      
+
       if (onNoteSaved) {
         onNoteSaved(newNote);
       }
@@ -423,11 +425,11 @@ export default function AudioTranscriptionModal({
       const message = saveRecordingOption 
         ? 'Voice note saved with recording!' 
         : 'Transcript saved as note!';
-      
+
       Alert.alert('Success', message, [
         { text: 'OK', onPress: onClose }
       ]);
-      
+
     } catch (error) {
       console.error('Failed to save note:', error);
       Alert.alert('Error', 'Failed to save note. Please try again.');
@@ -447,7 +449,7 @@ export default function AudioTranscriptionModal({
   const renderRecordingStep = () => (
     <View style={styles.stepContainer}>
       <Text style={styles.title}>Voice to Text</Text>
-      
+
       <View style={styles.durationContainer}>
         <Text style={styles.durationText}>
           {formatDuration(recordingDuration)} / {getMaxDurationFormatted()}
@@ -492,7 +494,7 @@ export default function AudioTranscriptionModal({
 
   const renderProgressBar = () => {
     const { stage, progress, message } = transcriptionProgress;
-    
+
     // Stage colors
     const stageIcons = {
       uploading: 'cloud-upload-outline',
@@ -518,7 +520,7 @@ export default function AudioTranscriptionModal({
             const showConnectingLine = index < stages.length - 1;
             const nextStageCompleted = completedStages.has(stages[index + 1]);
             const connectingLineActive = isCompleted && (nextStageCompleted || stages[index + 1] === stage);
-            
+
             return (
               <View key={stepStage} style={styles.progressStepContainer}>
                 <View style={styles.progressStep}>
@@ -544,7 +546,7 @@ export default function AudioTranscriptionModal({
                     {stageLabels[stepStage]}
                   </Text>
                 </View>
-                
+
                 {/* Connecting Line */}
                 {showConnectingLine && (
                   <View style={styles.connectingLineContainer}>
@@ -581,7 +583,7 @@ export default function AudioTranscriptionModal({
   const renderTranscribingStep = () => (
     <View style={styles.stepContainer}>
       <Text style={styles.title}>Converting Speech to Text</Text>
-      
+
       <View style={styles.loadingContainer}>
         {renderProgressBar()}
         <Text style={styles.loadingSubtext}>
@@ -597,73 +599,83 @@ export default function AudioTranscriptionModal({
       <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
         <Ionicons name="close" size={24} color="#FFFFFF" />
       </TouchableOpacity>
-      
+
       <Text style={styles.transcriptDisplayTitle}>Your Transcript</Text>
-      
-      <ScrollView style={styles.transcriptDisplayScrollView} showsVerticalScrollIndicator={true}>
-        <TextInput
-          style={styles.transcriptDisplayTextInput}
-          value={editedTranscript}
-          onChangeText={setEditedTranscript}
-          multiline
-          placeholder="Your transcript will appear here..."
-          placeholderTextColor="#666666"
-          textAlignVertical="top"
-        />
-      </ScrollView>
 
-      {/* Recording Save Option */}
-      <View style={styles.recordingOptionContainer}>
-        <TouchableOpacity
-          style={styles.recordingOptionButton}
-          onPress={() => setSaveRecordingOption(!saveRecordingOption)}
-          activeOpacity={0.7}
-        >
-          <View style={[
-            styles.checkbox,
-            saveRecordingOption && styles.checkboxSelected
-          ]}>
-            {saveRecordingOption && (
-              <Ionicons name="checkmark" size={16} color="#000000" />
-            )}
-          </View>
-          <Text style={styles.recordingOptionText}>
-            Also save the recording with this note
+      {/* Expandable input area with keyboard handling */}
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 140 : 20}
+      >
+        <ScrollView style={styles.transcriptDisplayScrollView} showsVerticalScrollIndicator={true}>
+          <TextInput
+            style={styles.transcriptDisplayTextInput}
+            value={editedTranscript}
+            onChangeText={setEditedTranscript}
+            multiline
+            placeholder="Your transcript will appear here..."
+            placeholderTextColor="#666666"
+            textAlignVertical="top"
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* Fixed bottom section that stays at bottom */}
+      <View style={styles.fixedBottomSection}>
+        {/* Recording Save Option */}
+        <View style={styles.recordingOptionContainer}>
+          <TouchableOpacity
+            style={styles.recordingOptionButton}
+            onPress={() => setSaveRecordingOption(!saveRecordingOption)}
+            activeOpacity={0.7}
+          >
+            <View style={[
+              styles.checkbox,
+              saveRecordingOption && styles.checkboxSelected
+            ]}>
+              {saveRecordingOption && (
+                <Ionicons name="checkmark" size={16} color="#000000" />
+              )}
+            </View>
+            <Text style={styles.recordingOptionText}>
+              Also save the recording with this note
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.recordingOptionSubtext}>
+            {saveRecordingOption 
+              ? 'Recording will be saved with the transcript' 
+              : 'Only the transcript will be saved (default)'}
           </Text>
-        </TouchableOpacity>
-        <Text style={styles.recordingOptionSubtext}>
-          {saveRecordingOption 
-            ? 'Recording will be saved with the transcript' 
-            : 'Only the transcript will be saved (default)'}
-        </Text>
-      </View>
+        </View>
 
-      <View style={styles.transcriptDisplayActions}>
-        <TouchableOpacity
-          style={styles.reRecordButton}
-          onPress={() => {
-            setCurrentStep('recording');
-            setTranscript('');
-            setEditedTranscript('');
-            setAudioUri(null);
-          }}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="mic" size={18} color="#FFFFFF" style={styles.buttonIcon} />
-          <Text style={styles.reRecordButtonText}>Re-record</Text>
-        </TouchableOpacity>
+        <View style={styles.transcriptDisplayActions}>
+          <TouchableOpacity
+            style={styles.reRecordButton}
+            onPress={() => {
+              setCurrentStep('recording');
+              setTranscript('');
+              setEditedTranscript('');
+              setAudioUri(null);
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="mic" size={18} color="#FFFFFF" style={styles.buttonIcon} />
+            <Text style={styles.reRecordButtonText}>Re-record</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.saveTranscriptButton,
-            !editedTranscript.trim() && styles.saveButtonDisabled,
-          ]}
-          onPress={saveTranscriptAsNote}
-          disabled={!editedTranscript.trim()}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.saveTranscriptButtonText}>Save as Note</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.saveTranscriptButton,
+              !editedTranscript.trim() && styles.saveButtonDisabled,
+            ]}
+            onPress={saveTranscriptAsNote}
+            disabled={!editedTranscript.trim()}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.saveTranscriptButtonText}>Save as Note</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -671,7 +683,7 @@ export default function AudioTranscriptionModal({
   const renderEditingStep = () => (
     <View style={styles.stepContainer}>
       <Text style={styles.title}>Edit Your Transcript</Text>
-      
+
       <ScrollView style={styles.transcriptContainer}>
         <TextInput
           style={styles.transcriptInput}
@@ -763,7 +775,7 @@ export default function AudioTranscriptionModal({
               ]}
             >
               <View style={styles.handle} />
-              
+
               {currentStep === 'recording' && renderRecordingStep()}
               {currentStep === 'transcribing' && renderTranscribingStep()}
               {currentStep === 'transcript' && renderTranscriptStep()}
@@ -1169,5 +1181,20 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontWeight: '600',
     fontFamily: 'Inter',
+  },
+  // Styles for the fixed bottom section
+  keyboardAvoidingContainer: {
+    flex: 1,
+    minHeight: '40%',
+  },
+  transcriptDisplayScrollView: {
+    flex: 1,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    padding: 20,
+  },
+  fixedBottomSection: {
+    backgroundColor: '#1A1A1A',
+    paddingTop: 20,
   },
 });
