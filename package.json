@@ -40,6 +40,7 @@
     "cloudinary": "^2.7.0",
     "dotenv": "^17.2.1",
     "expo": "^53.0.22",
+    "expo-audio": "^1.0.11",
     "expo-av": "^15.1.7",
     "expo-blur": "~14.1.4",
     "expo-constants": "~17.1.6",
