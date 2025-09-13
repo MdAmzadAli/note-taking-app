@@ -46,7 +46,7 @@ export default function AudioTranscriptionModal({
   const [audioUri, setAudioUri] = useState<string | null>(null);
   const [transcript, setTranscript] = useState('');
   const [editedTranscript, setEditedTranscript] = useState('');
-  const [currentStep, setCurrentStep] = useState<'recording' | 'transcribing' | 'editing'>('recording');
+  const [currentStep, setCurrentStep] = useState<'recording' | 'transcribing' | 'transcript' | 'editing'>('recording');
   const [transcriptionProgress, setTranscriptionProgress] = useState<TranscriptionProgress>({
     stage: 'uploading',
     progress: 0,
@@ -161,7 +161,7 @@ export default function AudioTranscriptionModal({
           setTimeout(() => {
             setTranscript(data.transcript);
             setEditedTranscript(data.transcript);
-            setCurrentStep('editing');
+            setCurrentStep('transcript');
             setIsTranscribing(false);
           }, 1000); // Allow time for final progress animation
         }
@@ -591,6 +591,62 @@ export default function AudioTranscriptionModal({
     </View>
   );
 
+  const renderTranscriptStep = () => (
+    <View style={styles.transcriptDisplayContainer}>
+      <Text style={styles.transcriptDisplayTitle}>Your Transcript</Text>
+      
+      <ScrollView style={styles.transcriptDisplayScrollView}>
+        <Text style={styles.transcriptDisplayText}>
+          {transcript}
+        </Text>
+      </ScrollView>
+
+      {/* Recording Save Option */}
+      <View style={styles.recordingOptionContainer}>
+        <TouchableOpacity
+          style={styles.recordingOptionButton}
+          onPress={() => setSaveRecordingOption(!saveRecordingOption)}
+          activeOpacity={0.7}
+        >
+          <View style={[
+            styles.checkbox,
+            saveRecordingOption && styles.checkboxSelected
+          ]}>
+            {saveRecordingOption && (
+              <Ionicons name="checkmark" size={16} color="#000000" />
+            )}
+          </View>
+          <Text style={styles.recordingOptionText}>
+            Also save the recording with this note
+          </Text>
+        </TouchableOpacity>
+        <Text style={styles.recordingOptionSubtext}>
+          {saveRecordingOption 
+            ? 'Recording will be saved with the transcript' 
+            : 'Only the transcript will be saved (default)'}
+        </Text>
+      </View>
+
+      <View style={styles.transcriptDisplayActions}>
+        <TouchableOpacity
+          style={styles.editTranscriptButton}
+          onPress={() => setCurrentStep('editing')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.editTranscriptButtonText}>Edit Transcript</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.saveTranscriptButton}
+          onPress={saveTranscriptAsNote}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.saveTranscriptButtonText}>Save as Note</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   const renderEditingStep = () => (
     <View style={styles.stepContainer}>
       <Text style={styles.title}>Edit Your Transcript</Text>
@@ -636,22 +692,22 @@ export default function AudioTranscriptionModal({
       <View style={styles.actionButtons}>
         <TouchableOpacity
           style={styles.cancelButton}
-          onPress={() => setCurrentStep('recording')}
+          onPress={() => setCurrentStep('transcript')}
           activeOpacity={0.7}
         >
-          <Text style={styles.cancelButtonText}>Re-record</Text>
+          <Text style={styles.cancelButtonText}>Back to Transcript</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[
-            styles.saveButton,
+            styles.saveTranscriptButton,
             !editedTranscript.trim() && styles.saveButtonDisabled,
           ]}
           onPress={saveTranscriptAsNote}
           disabled={!editedTranscript.trim()}
           activeOpacity={0.7}
         >
-          <Text style={styles.saveButtonText}>Save as Note</Text>
+          <Text style={styles.saveTranscriptButtonText}>Save as Note</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -669,7 +725,7 @@ export default function AudioTranscriptionModal({
           <TouchableWithoutFeedback>
             <Animated.View
               style={[
-                styles.modalContainer,
+                currentStep === 'transcript' ? styles.transcriptModalContainer : styles.modalContainer,
                 {
                   transform: [{ translateY: slideAnim }],
                 },
@@ -679,6 +735,7 @@ export default function AudioTranscriptionModal({
               
               {currentStep === 'recording' && renderRecordingStep()}
               {currentStep === 'transcribing' && renderTranscribingStep()}
+              {currentStep === 'transcript' && renderTranscriptStep()}
               {currentStep === 'editing' && renderEditingStep()}
             </Animated.View>
           </TouchableWithoutFeedback>
@@ -986,5 +1043,71 @@ const styles = StyleSheet.create({
     color: '#CCCCCC',
     fontFamily: 'Inter',
     marginLeft: 32,
+  },
+  // Transcript Display Styles (80% height modal)
+  transcriptModalContainer: {
+    backgroundColor: '#1A1A1A',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 20,
+    height: '80%',
+    width: '100%',
+  },
+  transcriptDisplayContainer: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'space-between',
+  },
+  transcriptDisplayTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 20,
+    fontFamily: 'Inter',
+  },
+  transcriptDisplayScrollView: {
+    flex: 1,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+  transcriptDisplayText: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#FFFFFF',
+    fontFamily: 'Inter',
+  },
+  transcriptDisplayActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  editTranscriptButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+  },
+  editTranscriptButtonText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: '500',
+    fontFamily: 'Inter',
+  },
+  saveTranscriptButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 12,
+    backgroundColor: '#00FF7F',
+    alignItems: 'center',
+  },
+  saveTranscriptButtonText: {
+    fontSize: 16,
+    color: '#000000',
+    fontWeight: '600',
+    fontFamily: 'Inter',
   },
 });
