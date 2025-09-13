@@ -21,107 +21,61 @@ class AssemblyAIProvider implements TranscriptionProvider {
   }
 
   async transcribe(audioUri: string): Promise<string> {
-    // Note: This should eventually be routed through a backend to hide API keys
-    // For now, using environment variable (user should use backend proxy)
-    const apiKey = this.config.apiKey;
-    
-    if (!apiKey) {
-      throw new Error('Transcription service requires backend configuration. Please contact support for secure API setup.');
-    }
-
     try {
-      // Read audio file using expo-file-system for React Native compatibility
+      // Check if audio file exists
       const audioInfo = await FileSystem.getInfoAsync(audioUri);
       if (!audioInfo.exists) {
         throw new Error('Audio file not found');
       }
 
-      // Upload audio file to AssemblyAI using binary content upload
-      const uploadResponse = await FileSystem.uploadAsync('https://api.assemblyai.com/v2/upload', audioUri, {
+      // Get the backend URL from environment (use Replit domain without port for HTTPS)
+      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://e445f705-fe6f-4740-b33c-e63ec51e8933-00-3ilxh8qybvctl.picard.replit.dev';
+      
+      console.log('[TRANSCRIPTION] Uploading audio to secure backend transcription service...');
+
+      // Upload audio file to secure backend proxy
+      const uploadResponse = await FileSystem.uploadAsync(`${backendUrl}/transcribe`, audioUri, {
         httpMethod: 'POST',
-        uploadType: 0, // BINARY_CONTENT
+        uploadType: 1, // MULTIPART
+        fieldName: 'audio_file',
         headers: {
-          'authorization': apiKey,
-          'content-type': 'application/octet-stream',
+          'Accept': 'application/json',
         },
       });
 
       if (uploadResponse.status !== 200) {
-        throw new Error(`Upload failed: ${uploadResponse.status}`);
+        console.error('[TRANSCRIPTION] Backend transcription failed:', uploadResponse.status, uploadResponse.body);
+        throw new Error(`Transcription failed: ${uploadResponse.status}`);
       }
 
-      const uploadData = JSON.parse(uploadResponse.body);
+      const responseData = JSON.parse(uploadResponse.body);
       
-      // Request transcription
-      const transcriptResponse = await fetch('https://api.assemblyai.com/v2/transcript', {
-        method: 'POST',
-        headers: {
-          'authorization': apiKey,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          audio_url: uploadData.upload_url,
-          language_code: 'en',
-        }),
-      });
-
-      if (!transcriptResponse.ok) {
-        throw new Error(`Transcription request failed: ${transcriptResponse.statusText}`);
+      if (!responseData.success) {
+        throw new Error(responseData.error || 'Transcription failed');
       }
 
-      const transcriptData = await transcriptResponse.json();
-      const transcriptId = transcriptData.id;
+      console.log('[TRANSCRIPTION] ✅ Transcription completed via secure backend');
+      return TranscriptionService.cleanTranscript(responseData.transcript || '');
 
-      // Poll for completion with extended timeout for long recordings
-      return await this.pollForCompletion(transcriptId, apiKey);
-      
     } catch (error) {
-      console.error('[TRANSCRIPTION] AssemblyAI error:', error);
-      throw new Error(`Transcription failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  private async pollForCompletion(transcriptId: string, apiKey: string): Promise<string> {
-    const maxAttempts = 300; // 300 attempts * 2s = 10 minutes max
-    const pollInterval = 2000; // 2 seconds between polls
-    let attempts = 0;
-
-    while (attempts < maxAttempts) {
-      try {
-        const statusResponse = await fetch(`https://api.assemblyai.com/v2/transcript/${transcriptId}`, {
-          headers: {
-            'authorization': apiKey,
-          },
-        });
-
-        if (!statusResponse.ok) {
-          throw new Error(`Status check failed: ${statusResponse.statusText}`);
-        }
-
-        const statusData = await statusResponse.json();
-        
-        if (statusData.status === 'completed') {
-          return statusData.text || '';
-        } else if (statusData.status === 'error') {
-          throw new Error(`Transcription failed: ${statusData.error}`);
-        }
-
-        // Wait before next poll with exponential backoff for long waits
-        const delay = attempts > 30 ? 5000 : pollInterval; // 5s delay after 1 minute
-        await new Promise(resolve => setTimeout(resolve, delay));
-        attempts++;
-        
-      } catch (error) {
-        console.error(`[TRANSCRIPTION] Polling attempt ${attempts} failed:`, error);
-        attempts++;
-        
-        // If we're having connection issues, wait longer before retry
-        await new Promise(resolve => setTimeout(resolve, pollInterval * 2));
+      console.error('[TRANSCRIPTION] Backend transcription error:', error);
+      
+      // Provide user-friendly error messages
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('Network request failed')) {
+        throw new Error('Unable to connect to transcription service. Please check your internet connection.');
+      } else if (errorMessage.includes('500')) {
+        throw new Error('Transcription service temporarily unavailable. Please try again later.');
+      } else if (errorMessage.includes('408')) {
+        throw new Error('Transcription timeout - please try with shorter audio recordings.');
       }
+      
+      throw error;
     }
-
-    throw new Error('Transcription timeout - the audio file may be too long or there may be service issues. Please try again or use a shorter recording.');
   }
+
+  // No longer needed - backend handles polling internally
+  // private async pollForCompletion...
 }
 
 // Future providers can be added here

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 import aiofiles
 import uvicorn
+import requests
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
@@ -26,22 +27,15 @@ env_path = Path(__file__).parent / '.env'
 print(f"🔧 ENV: Loading environment variables from: {env_path}")
 print(f"🔧 ENV: .env file exists: {env_path.exists()}")
 
-if env_path.exists():
-    with open(env_path, 'r') as f:
-        env_content = f.read()
-        print(f"🔧 ENV: .env file content preview (first 200 chars):")
-        print(f"🔧 ENV: {env_content[:200]}...")
-        print(f"🔧 ENV: Total .env file length: {len(env_content)} characters")
-
 load_dotenv(dotenv_path=env_path)
-print(f"🔧 ENV: load_dotenv() called with path: {env_path}")
+print(f"🔧 ENV: Environment variables loaded successfully")
 
-# Log critical environment variables after loading
+# Log critical environment variables status (secure - no values)
 print("🔧 ENV: Critical environment variables status:")
-print(f"   QDRANT_URL: {'✅ Set' if os.getenv('QDRANT_URL') else '❌ Not set'} ({os.getenv('QDRANT_URL', 'None')})")
-print(f"   QDRANT_API_KEY: {'✅ Set' if os.getenv('QDRANT_API_KEY') else '❌ Not set'} ({'*' * min(len(os.getenv('QDRANT_API_KEY', '')), 8) if os.getenv('QDRANT_API_KEY') else 'None'})")
-print(f"   GEMINI_EMBEDDING_API_KEY: {'✅ Set' if os.getenv('GEMINI_EMBEDDING_API_KEY') else '❌ Not set'} ({'*' * min(len(os.getenv('GEMINI_EMBEDDING_API_KEY', '')), 8) if os.getenv('GEMINI_EMBEDDING_API_KEY') else 'None'})")
-print(f"   GEMINI_CHAT_API_KEY: {'✅ Set' if os.getenv('GEMINI_CHAT_API_KEY') else '❌ Not set'} ({'*' * min(len(os.getenv('GEMINI_CHAT_API_KEY', '')), 8) if os.getenv('GEMINI_CHAT_API_KEY') else 'None'})")
+print(f"   QDRANT_URL: {'✅ Set' if os.getenv('QDRANT_URL') else '❌ Not set'}")
+print(f"   QDRANT_API_KEY: {'✅ Set' if os.getenv('QDRANT_API_KEY') else '❌ Not set'}")
+print(f"   GEMINI_EMBEDDING_API_KEY: {'✅ Set' if os.getenv('GEMINI_EMBEDDING_API_KEY') else '❌ Not set'}")
+print(f"   GEMINI_CHAT_API_KEY: {'✅ Set' if os.getenv('GEMINI_CHAT_API_KEY') else '❌ Not set'}")
 
 # Import services with logging AFTER environment variables are loaded
 print("🔧 Starting Python backend imports...")
@@ -277,6 +271,11 @@ class RAGQueryRequest(BaseModel):
     fileIds: Optional[List[str]] = None
     workspaceId: Optional[str] = None
 
+class TranscriptionResponse(BaseModel):
+    success: bool
+    transcript: Optional[str] = None
+    error: Optional[str] = None
+
 # Middleware for logging
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -310,6 +309,155 @@ async def health_check():
         "rag_detailed": detailed_status,
         "timestamp": datetime.now().isoformat()
     }
+
+# Audio transcription endpoint
+@app.post("/transcribe")
+async def transcribe_audio(audio_file: UploadFile = File(...)):
+    """
+    Secure transcription endpoint that handles AssemblyAI integration server-side
+    This prevents API key exposure in the client application
+    """
+    print(f"🎤 Transcription request received: {audio_file.filename}")
+    
+    try:
+        # Get AssemblyAI API key from server environment
+        api_key = os.getenv("ASSEMBLYAI_API_KEY")
+        if not api_key:
+            print("❌ AssemblyAI API key not configured on server")
+            return TranscriptionResponse(
+                success=False,
+                error="Transcription service not configured. Contact administrator."
+            )
+        
+        # Save uploaded audio file temporarily
+        audio_id = f"audio_{int(time.time() * 1000)}_{str(uuid.uuid4())[:8]}"
+        temp_audio_path = UPLOADS_DIR / f"{audio_id}_{audio_file.filename}"
+        
+        print(f"💾 Saving audio file: {temp_audio_path}")
+        async with aiofiles.open(temp_audio_path, 'wb') as f:
+            content = await audio_file.read()
+            await f.write(content)
+        
+        print(f"📤 Uploading to AssemblyAI...")
+        
+        # Upload audio to AssemblyAI using raw binary upload
+        with open(temp_audio_path, 'rb') as f:
+            file_content = f.read()
+            upload_response = requests.post(
+                'https://api.assemblyai.com/v2/upload',
+                data=file_content,
+                headers={
+                    'authorization': api_key,
+                    'content-type': 'application/octet-stream'
+                },
+                timeout=60
+            )
+        
+        if upload_response.status_code != 200:
+            print(f"❌ Upload failed: {upload_response.status_code}")
+            return TranscriptionResponse(
+                success=False,
+                error=f"Audio upload failed with status {upload_response.status_code}"
+            )
+        
+        upload_url = upload_response.json()['upload_url']
+        print(f"✅ Audio uploaded successfully")
+        
+        # Request transcription
+        transcript_request = {
+            'audio_url': upload_url,
+            'language_code': 'en',
+            'punctuate': True,
+            'format_text': True
+        }
+        
+        transcript_response = requests.post(
+            'https://api.assemblyai.com/v2/transcript',
+            json=transcript_request,
+            headers={'authorization': api_key},
+            timeout=30
+        )
+        
+        if transcript_response.status_code != 200:
+            print(f"❌ Transcription request failed: {transcript_response.status_code}")
+            return TranscriptionResponse(
+                success=False,
+                error=f"Transcription request failed with status {transcript_response.status_code}"
+            )
+        
+        transcript_id = transcript_response.json()['id']
+        print(f"🔄 Transcription started, ID: {transcript_id}")
+        
+        # Poll for completion with proper timeout
+        max_attempts = 60  # 5 minutes max (5 seconds * 60)
+        attempt = 0
+        
+        while attempt < max_attempts:
+            print(f"📊 Polling attempt {attempt + 1}/{max_attempts}")
+            
+            status_response = requests.get(
+                f'https://api.assemblyai.com/v2/transcript/{transcript_id}',
+                headers={'authorization': api_key},
+                timeout=30
+            )
+            
+            if status_response.status_code != 200:
+                print(f"❌ Status check failed: {status_response.status_code}")
+                break
+            
+            result = status_response.json()
+            status = result['status']
+            
+            if status == 'completed':
+                transcript_text = result.get('text', '')
+                print(f"✅ Transcription completed: {len(transcript_text)} characters")
+                
+                # Clean up temporary file
+                try:
+                    temp_audio_path.unlink()
+                    print(f"🗑️ Temporary audio file deleted")
+                except Exception as cleanup_error:
+                    print(f"⚠️ Failed to cleanup temp file: {cleanup_error}")
+                
+                return TranscriptionResponse(
+                    success=True,
+                    transcript=transcript_text
+                )
+            
+            elif status == 'error':
+                error_msg = result.get('error', 'Unknown transcription error')
+                print(f"❌ Transcription failed: {error_msg}")
+                return TranscriptionResponse(
+                    success=False,
+                    error=f"Transcription failed: {error_msg}"
+                )
+            
+            # Wait before next poll (with backoff)
+            wait_time = min(5 + (attempt * 0.5), 10)  # Increase wait time gradually, max 10s
+            await asyncio.sleep(wait_time)
+            attempt += 1
+        
+        # Timeout reached
+        print(f"⏰ Transcription timeout after {max_attempts} attempts")
+        return TranscriptionResponse(
+            success=False,
+            error="Transcription timeout - please try with shorter audio"
+        )
+        
+    except Exception as error:
+        print(f"❌ Transcription error: {error}")
+        return TranscriptionResponse(
+            success=False,
+            error=f"Transcription failed: {str(error)}"
+        )
+    finally:
+        # Ensure cleanup on any exit
+        try:
+            if 'temp_audio_path' in locals() and temp_audio_path.exists():
+                temp_audio_path.unlink()
+                print(f"🗑️ Cleanup: Temporary audio file deleted")
+        except Exception as cleanup_error:
+            print(f"⚠️ Final cleanup failed: {cleanup_error}")
 
 # List all files
 @app.get("/files")
