@@ -602,24 +602,18 @@ export default function AudioTranscriptionModal({
 
       <Text style={styles.transcriptDisplayTitle}>Your Transcript</Text>
 
-      {/* Expandable input area with keyboard handling */}
-      <KeyboardAvoidingView 
-        style={styles.keyboardAvoidingContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 140 : 20}
-      >
-        <ScrollView style={styles.transcriptDisplayScrollView} showsVerticalScrollIndicator={true}>
-          <TextInput
-            style={styles.transcriptDisplayTextInput}
-            value={editedTranscript}
-            onChangeText={setEditedTranscript}
-            multiline
-            placeholder="Your transcript will appear here..."
-            placeholderTextColor="#666666"
-            textAlignVertical="top"
-          />
-        </ScrollView>
-      </KeyboardAvoidingView>
+      {/* Expandable input area */}
+      <ScrollView style={styles.transcriptDisplayScrollView} showsVerticalScrollIndicator={true}>
+        <TextInput
+          style={styles.transcriptDisplayTextInput}
+          value={editedTranscript}
+          onChangeText={setEditedTranscript}
+          multiline
+          placeholder="Your transcript will appear here..."
+          placeholderTextColor="#666666"
+          textAlignVertical="top"
+        />
+      </ScrollView>
 
       {/* Fixed bottom section that stays at bottom */}
       <View style={styles.fixedBottomSection}>
@@ -765,23 +759,29 @@ export default function AudioTranscriptionModal({
         }
       }}>
         <View style={styles.overlay}>
-          <TouchableWithoutFeedback>
-            <Animated.View
-              style={[
-                currentStep === 'transcript' || currentStep === 'editing' ? styles.transcriptModalContainer : styles.modalContainer,
-                {
-                  transform: [{ translateY: slideAnim }],
-                },
-              ]}
-            >
-              <View style={styles.handle} />
+          <KeyboardAvoidingView 
+            style={styles.keyboardAvoidingFullContainer}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={0}
+          >
+            <TouchableWithoutFeedback>
+              <Animated.View
+                style={[
+                  currentStep === 'transcript' || currentStep === 'editing' ? styles.transcriptModalContainer : styles.modalContainer,
+                  {
+                    transform: [{ translateY: slideAnim }],
+                  },
+                ]}
+              >
+                <View style={styles.handle} />
 
-              {currentStep === 'recording' && renderRecordingStep()}
-              {currentStep === 'transcribing' && renderTranscribingStep()}
-              {currentStep === 'transcript' && renderTranscriptStep()}
-              {currentStep === 'editing' && renderEditingStep()}
-            </Animated.View>
-          </TouchableWithoutFeedback>
+                {currentStep === 'recording' && renderRecordingStep()}
+                {currentStep === 'transcribing' && renderTranscribingStep()}
+                {currentStep === 'transcript' && renderTranscriptStep()}
+                {currentStep === 'editing' && renderEditingStep()}
+              </Animated.View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
         </View>
       </TouchableWithoutFeedback>
     </Modal>
@@ -792,6 +792,9 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  keyboardAvoidingFullContainer: {
+    flex: 1,
     justifyContent: 'flex-end',
   },
   modalContainer: {
@@ -1183,15 +1186,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
   // Styles for the fixed bottom section
-  keyboardAvoidingContainer: {
-    flex: 1,
-    minHeight: '40%',
-  },
   transcriptDisplayScrollView: {
     flex: 1,
     backgroundColor: '#2A2A2A',
     borderRadius: 12,
     padding: 20,
+    marginBottom: 20,
+    maxHeight: '60%',
   },
   fixedBottomSection: {
     backgroundColor: '#1A1A1A',
