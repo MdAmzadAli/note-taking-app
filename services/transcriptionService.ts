@@ -43,8 +43,8 @@ class AssemblyAIProvider implements TranscriptionProvider {
       
       formData.append('audio_file', audioFile);
 
-      // Upload audio file to secure backend proxy using standard fetch
-      const uploadResponse = await fetch(`${backendUrl}/transcribe`, {
+      // Submit transcription job to secure backend (non-blocking)
+      const uploadResponse = await fetch(`${backendUrl}/transcribe/async`, {
         method: 'POST',
         body: formData,
         headers: {
@@ -54,18 +54,58 @@ class AssemblyAIProvider implements TranscriptionProvider {
 
       if (!uploadResponse.ok) {
         const errorText = await uploadResponse.text();
-        console.error('[TRANSCRIPTION] Backend transcription failed:', uploadResponse.status, errorText);
-        throw new Error(`Transcription failed: ${uploadResponse.status}`);
+        console.error('[TRANSCRIPTION] Backend job submission failed:', uploadResponse.status, errorText);
+        throw new Error(`Transcription job submission failed: ${uploadResponse.status}`);
       }
 
-      const responseData = await uploadResponse.json();
+      const jobResponse = await uploadResponse.json();
       
-      if (!responseData.success) {
-        throw new Error(responseData.error || 'Transcription failed');
+      if (!jobResponse.success) {
+        throw new Error(jobResponse.error || 'Failed to submit transcription job');
       }
 
-      console.log('[TRANSCRIPTION] ✅ Transcription completed via secure backend');
-      return TranscriptionService.cleanTranscript(responseData.transcript || '');
+      const jobId = jobResponse.job_id;
+      console.log('[TRANSCRIPTION] 🚀 Job submitted successfully, polling for completion:', jobId);
+
+      // Poll for job completion
+      const maxPolls = 60; // 5 minutes max
+      const pollInterval = 5000; // 5 seconds
+      
+      for (let attempt = 1; attempt <= maxPolls; attempt++) {
+        console.log(`[TRANSCRIPTION] 📊 Polling attempt ${attempt}/${maxPolls}`);
+        
+        // Check job status
+        const statusResponse = await fetch(`${backendUrl}/transcribe/${jobId}`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          },
+        });
+
+        if (!statusResponse.ok) {
+          console.warn('[TRANSCRIPTION] Status check failed, retrying...');
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          continue;
+        }
+
+        const status = await statusResponse.json();
+        
+        if (status.status === 'completed') {
+          console.log('[TRANSCRIPTION] ✅ Transcription completed via secure backend');
+          return TranscriptionService.cleanTranscript(status.transcript || '');
+        } else if (status.status === 'error') {
+          throw new Error(status.error || 'Transcription failed');
+        } else if (status.status === 'timeout') {
+          throw new Error('Transcription timeout - please try with shorter audio');
+        }
+        
+        // Job is still processing, wait before next poll
+        console.log(`[TRANSCRIPTION] Job status: ${status.status}, waiting ${pollInterval/1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      }
+      
+      // If we reach here, polling timed out
+      throw new Error('Transcription polling timeout - job may still be processing');
 
     } catch (error) {
       console.error('[TRANSCRIPTION] Backend transcription error:', error);

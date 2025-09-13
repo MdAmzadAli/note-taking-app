@@ -7,6 +7,7 @@ from typing import Optional, List, Dict, Any
 import aiofiles
 import uvicorn
 import requests
+import aiohttp
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
@@ -276,6 +277,23 @@ class TranscriptionResponse(BaseModel):
     transcript: Optional[str] = None
     error: Optional[str] = None
 
+class TranscriptionJobResponse(BaseModel):
+    success: bool
+    job_id: Optional[str] = None
+    error: Optional[str] = None
+
+class TranscriptionJobStatus(BaseModel):
+    job_id: str
+    status: str  # 'queued', 'uploading', 'processing', 'completed', 'error', 'timeout'
+    transcript: Optional[str] = None
+    error: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+# Job tracking for async transcription
+transcription_jobs: Dict[str, Dict[str, Any]] = {}
+job_lock = asyncio.Lock()
+
 # Middleware for logging
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -310,12 +328,223 @@ async def health_check():
         "timestamp": datetime.now().isoformat()
     }
 
-# Audio transcription endpoint
-@app.post("/transcribe")
-async def transcribe_audio(audio_file: UploadFile = File(...)):
+# Async transcription background processing
+async def process_transcription_job(job_id: str, audio_file_path: Path):
     """
-    Secure transcription endpoint that handles AssemblyAI integration server-side
-    This prevents API key exposure in the client application
+    Process transcription in background without blocking the main thread
+    """
+    api_key = os.getenv("ASSEMBLYAI_API_KEY")
+    
+    async with job_lock:
+        transcription_jobs[job_id]['status'] = 'uploading'
+        transcription_jobs[job_id]['updated_at'] = datetime.now().isoformat()
+    
+    try:
+        # Use aiohttp for non-blocking HTTP requests
+        async with aiohttp.ClientSession() as session:
+            print(f"📤 [Job {job_id}] Uploading to AssemblyAI...")
+            
+            # Read audio file asynchronously
+            async with aiofiles.open(audio_file_path, 'rb') as f:
+                audio_data = await f.read()
+            
+            # Upload to AssemblyAI
+            async with session.post(
+                'https://api.assemblyai.com/v2/upload',
+                data=audio_data,
+                headers={
+                    'authorization': api_key,
+                    'content-type': 'application/octet-stream'
+                },
+                timeout=aiohttp.ClientTimeout(total=60)
+            ) as upload_response:
+                if upload_response.status != 200:
+                    error_text = await upload_response.text()
+                    raise Exception(f"Upload failed: {upload_response.status} - {error_text}")
+                
+                upload_result = await upload_response.json()
+                upload_url = upload_result['upload_url']
+                print(f"✅ [Job {job_id}] Audio uploaded successfully")
+            
+            # Update job status
+            async with job_lock:
+                transcription_jobs[job_id]['status'] = 'processing'
+                transcription_jobs[job_id]['updated_at'] = datetime.now().isoformat()
+            
+            # Request transcription
+            transcript_request = {
+                'audio_url': upload_url,
+                'language_code': 'en',
+                'punctuate': True,
+                'format_text': True
+            }
+            
+            async with session.post(
+                'https://api.assemblyai.com/v2/transcript',
+                json=transcript_request,
+                headers={'authorization': api_key},
+                timeout=aiohttp.ClientTimeout(total=30)
+            ) as transcript_response:
+                if transcript_response.status != 200:
+                    error_text = await transcript_response.text()
+                    raise Exception(f"Transcription request failed: {transcript_response.status} - {error_text}")
+                
+                transcript_result = await transcript_response.json()
+                transcript_id = transcript_result['id']
+                print(f"🔄 [Job {job_id}] Transcription started, ID: {transcript_id}")
+            
+            # Poll for completion asynchronously (non-blocking with sleep)
+            max_polls = 60
+            poll_count = 0
+            
+            while poll_count < max_polls:
+                await asyncio.sleep(5)  # Non-blocking sleep
+                poll_count += 1
+                print(f"📊 [Job {job_id}] Polling attempt {poll_count}/{max_polls}")
+                
+                async with session.get(
+                    f'https://api.assemblyai.com/v2/transcript/{transcript_id}',
+                    headers={'authorization': api_key},
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as status_response:
+                    if status_response.status != 200:
+                        continue
+                    
+                    status_result = await status_response.json()
+                    status = status_result.get('status')
+                    
+                    if status == 'completed':
+                        transcript_text = status_result.get('text', '')
+                        print(f"✅ [Job {job_id}] Transcription completed: {len(transcript_text)} characters")
+                        
+                        # Update job with success
+                        async with job_lock:
+                            transcription_jobs[job_id]['status'] = 'completed'
+                            transcription_jobs[job_id]['transcript'] = transcript_text
+                            transcription_jobs[job_id]['updated_at'] = datetime.now().isoformat()
+                        
+                        # Emit Socket.IO event if available
+                        if sio:
+                            await sio.emit('transcription_completed', {
+                                'job_id': job_id,
+                                'transcript': transcript_text
+                            })
+                        
+                        return
+                        
+                    elif status == 'error':
+                        error_msg = status_result.get('error', 'Unknown transcription error')
+                        raise Exception(f"AssemblyAI transcription error: {error_msg}")
+            
+            # Timeout
+            raise Exception("Transcription timeout - took longer than expected")
+            
+    except Exception as e:
+        error_msg = str(e)
+        print(f"❌ [Job {job_id}] Transcription failed: {error_msg}")
+        
+        # Update job with error
+        async with job_lock:
+            transcription_jobs[job_id]['status'] = 'error'
+            transcription_jobs[job_id]['error'] = error_msg
+            transcription_jobs[job_id]['updated_at'] = datetime.now().isoformat()
+        
+        # Emit Socket.IO error event if available
+        if sio:
+            await sio.emit('transcription_error', {
+                'job_id': job_id,
+                'error': error_msg
+            })
+    
+    finally:
+        # Clean up temp file
+        try:
+            if audio_file_path.exists():
+                audio_file_path.unlink()
+                print(f"🗑️ [Job {job_id}] Temporary audio file deleted")
+        except Exception as e:
+            print(f"⚠️ [Job {job_id}] Failed to delete temp file: {e}")
+
+# New async transcription endpoints
+@app.post("/transcribe/async")
+async def transcribe_audio_async(audio_file: UploadFile = File(...)) -> TranscriptionJobResponse:
+    """
+    Non-blocking transcription endpoint that returns job ID immediately
+    """
+    print(f"🎤 [Async] Transcription request received: {audio_file.filename}")
+    
+    try:
+        # Get AssemblyAI API key from server environment
+        api_key = os.getenv("ASSEMBLYAI_API_KEY")
+        if not api_key:
+            print("❌ AssemblyAI API key not configured on server")
+            return TranscriptionJobResponse(
+                success=False,
+                error="Transcription service not configured. Contact administrator."
+            )
+        
+        # Create job ID
+        job_id = f"transcribe_{int(time.time() * 1000)}_{str(uuid.uuid4())[:8]}"
+        
+        # Save uploaded audio file temporarily
+        audio_id = f"audio_{int(time.time() * 1000)}_{str(uuid.uuid4())[:8]}"
+        temp_audio_path = UPLOADS_DIR / f"{audio_id}_{audio_file.filename or 'recording.m4a'}"
+        
+        print(f"💾 [Job {job_id}] Saving audio file: {temp_audio_path}")
+        async with aiofiles.open(temp_audio_path, 'wb') as f:
+            content = await audio_file.read()
+            await f.write(content)
+        
+        # Create job entry
+        job_entry = {
+            'job_id': job_id,
+            'status': 'queued',
+            'transcript': None,
+            'error': None,
+            'created_at': datetime.now().isoformat(),
+            'updated_at': datetime.now().isoformat()
+        }
+        
+        async with job_lock:
+            transcription_jobs[job_id] = job_entry
+        
+        # Start background processing (non-blocking)
+        asyncio.create_task(process_transcription_job(job_id, temp_audio_path))
+        
+        print(f"🚀 [Job {job_id}] Transcription job queued for background processing")
+        
+        return TranscriptionJobResponse(
+            success=True,
+            job_id=job_id
+        )
+        
+    except Exception as e:
+        error_msg = str(e)
+        print(f"❌ [Async] Failed to queue transcription job: {error_msg}")
+        return TranscriptionJobResponse(
+            success=False,
+            error=f"Failed to queue transcription: {error_msg}"
+        )
+
+@app.get("/transcribe/{job_id}")
+async def get_transcription_status(job_id: str) -> TranscriptionJobStatus:
+    """
+    Get the status of a transcription job
+    """
+    async with job_lock:
+        job = transcription_jobs.get(job_id)
+    
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    return TranscriptionJobStatus(**job)
+
+# Main transcription endpoint (now async and non-blocking)
+@app.post("/transcribe")
+async def transcribe_audio(audio_file: UploadFile = File(...)) -> TranscriptionJobResponse:
+    """
+    Non-blocking transcription endpoint that returns job ID immediately.
+    This prevents blocking the main thread and allows concurrent processing.
     """
     print(f"🎤 Transcription request received: {audio_file.filename}")
     
@@ -350,7 +579,7 @@ async def transcribe_audio(audio_file: UploadFile = File(...)):
                     'authorization': api_key,
                     'content-type': 'application/octet-stream'
                 },
-                timeout=60
+                # timeout=60
             )
         
         if upload_response.status_code != 200:
