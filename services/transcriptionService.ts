@@ -1,3 +1,5 @@
+import { API_ENDPOINTS } from '../config/api';
+
 export interface TranscriptionProvider {
   name: string;
   transcribe: (audioUri: string) => Promise<string>;
@@ -20,8 +22,8 @@ class AssemblyAIProvider implements TranscriptionProvider {
 
   async transcribe(audioUri: string): Promise<string> {
     try {
-      // Get the backend URL from environment (use current Replit domain with backend port)
-      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://39ff833d-3e96-4e04-ad54-114c70830a48-00-v8d1cqibad2d.worf.replit.dev:8000';
+      // Use the same API base URL that the rest of the app uses
+      const backendUrl = API_ENDPOINTS.base;
       
       console.log('[TRANSCRIPTION] Uploading audio to secure backend transcription service...');
 
