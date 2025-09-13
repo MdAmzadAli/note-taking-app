@@ -31,6 +31,8 @@ const getApiBaseUrl = () => {
 
 const API_BASE_URL = getApiBaseUrl();
 
+export { getApiBaseUrl };
+
 export const API_ENDPOINTS = {
   base: API_BASE_URL,
   upload: `${API_BASE_URL}/upload`,

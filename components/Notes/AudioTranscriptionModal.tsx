@@ -10,13 +10,14 @@ import {
   Alert,
   TextInput,
   ScrollView,
-  ActivityIndicator,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Audio } from 'expo-av';
 import { Note } from '@/types';
 import { saveNote } from '@/utils/storage';
 import { TranscriptionService, TranscriptionConfig } from '@/services/transcriptionService';
+import io, { Socket } from 'socket.io-client';
+import { getApiBaseUrl } from '@/config/api';
 
 interface AudioTranscriptionModalProps {
   visible: boolean;
@@ -24,6 +25,12 @@ interface AudioTranscriptionModalProps {
   onNoteSaved?: (note: Note) => void;
   maxRecordingMinutes?: number;
   transcriptionProvider?: 'assemblyai' | 'whisper' | 'google';
+}
+
+interface TranscriptionProgress {
+  stage: 'uploading' | 'transcribing' | 'cleaning';
+  progress: number; // 0-100
+  message: string;
 }
 
 export default function AudioTranscriptionModal({
@@ -40,12 +47,20 @@ export default function AudioTranscriptionModal({
   const [transcript, setTranscript] = useState('');
   const [editedTranscript, setEditedTranscript] = useState('');
   const [currentStep, setCurrentStep] = useState<'recording' | 'transcribing' | 'editing'>('recording');
+  const [transcriptionProgress, setTranscriptionProgress] = useState<TranscriptionProgress>({
+    stage: 'uploading',
+    progress: 0,
+    message: 'Preparing to upload...'
+  });
+  const [saveRecordingOption, setSaveRecordingOption] = useState(false);
   
   const slideAnim = useRef(new Animated.Value(600)).current;
   const recordingRef = useRef<Audio.Recording | null>(null);
   const durationTimer = useRef<number | null>(null);
   const maxRecordingTimer = useRef<number | null>(null);
   const transcriptionService = useRef<TranscriptionService | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const currentJobIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -55,6 +70,7 @@ export default function AudioTranscriptionModal({
         useNativeDriver: true,
       }).start();
       initializeTranscriptionService();
+      initializeSocket();
       resetModal();
     } else {
       Animated.timing(slideAnim, {
@@ -84,6 +100,65 @@ export default function AudioTranscriptionModal({
     }
   };
 
+  const initializeSocket = () => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      socketRef.current = io(baseUrl, {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+      });
+
+      socketRef.current.on('connect', () => {
+        console.log('[SOCKET] Connected to transcription server');
+      });
+
+      socketRef.current.on('transcription_progress', (data) => {
+        console.log('[SOCKET] Progress update:', data);
+        if (data.job_id === currentJobIdRef.current) {
+          setTranscriptionProgress({
+            stage: data.stage,
+            progress: data.progress,
+            message: data.message
+          });
+        }
+      });
+
+      socketRef.current.on('transcription_completed', (data) => {
+        console.log('[SOCKET] Transcription completed:', data);
+        if (data.job_id === currentJobIdRef.current) {
+          setTranscript(data.transcript);
+          setEditedTranscript(data.transcript);
+          setCurrentStep('editing');
+          setIsTranscribing(false);
+        }
+      });
+
+      socketRef.current.on('transcription_error', (data) => {
+        console.log('[SOCKET] Transcription error:', data);
+        if (data.job_id === currentJobIdRef.current) {
+          setIsTranscribing(false);
+          Alert.alert(
+            'Transcription Failed',
+            data.error || 'An error occurred during transcription',
+            [
+              { text: 'Retry', onPress: () => audioUri && transcribeAudio(audioUri) },
+              { text: 'Cancel', onPress: () => setCurrentStep('recording') }
+            ]
+          );
+        }
+      });
+
+      socketRef.current.on('disconnect', () => {
+        console.log('[SOCKET] Disconnected from transcription server');
+      });
+
+    } catch (error) {
+      console.error('[SOCKET] Failed to initialize Socket.IO:', error);
+    }
+  };
+
   const resetModal = () => {
     setCurrentStep('recording');
     setIsRecording(false);
@@ -92,6 +167,13 @@ export default function AudioTranscriptionModal({
     setAudioUri(null);
     setTranscript('');
     setEditedTranscript('');
+    setSaveRecordingOption(false);
+    setTranscriptionProgress({
+      stage: 'uploading',
+      progress: 0,
+      message: 'Preparing to upload...'
+    });
+    currentJobIdRef.current = null;
   };
 
   const cleanup = async () => {
@@ -112,6 +194,12 @@ export default function AudioTranscriptionModal({
         console.log('Error stopping recording:', error);
       }
       recordingRef.current = null;
+    }
+
+    // Disconnect socket
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
     }
     
     resetModal();
@@ -199,16 +287,59 @@ export default function AudioTranscriptionModal({
 
     setCurrentStep('transcribing');
     setIsTranscribing(true);
+    
+    // Reset progress
+    setTranscriptionProgress({
+      stage: 'uploading',
+      progress: 0,
+      message: 'Preparing to upload audio...'
+    });
 
     try {
-      const rawTranscript = await transcriptionService.current.transcribe(audioUri);
-      const cleanedTranscript = TranscriptionService.cleanTranscript(rawTranscript);
+      // Create FormData for file upload
+      const formData = new FormData();
+      const audioFile = {
+        uri: audioUri,
+        type: 'audio/m4a',
+        name: 'recording.m4a',
+      } as any;
       
-      setTranscript(cleanedTranscript);
-      setEditedTranscript(cleanedTranscript);
-      setCurrentStep('editing');
+      formData.append('audio_file', audioFile);
+
+      // Submit transcription job
+      const baseUrl = getApiBaseUrl();
+      const uploadResponse = await fetch(`${baseUrl}/transcribe/async`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Transcription job submission failed: ${uploadResponse.status}`);
+      }
+
+      const jobResponse = await uploadResponse.json();
+      
+      if (!jobResponse.success) {
+        throw new Error(jobResponse.error || 'Failed to submit transcription job');
+      }
+
+      // Store job ID for Socket.IO updates
+      currentJobIdRef.current = jobResponse.job_id;
+      console.log('[TRANSCRIPTION] Job submitted:', jobResponse.job_id);
+      
+      // Progress will be updated via Socket.IO events
+      setTranscriptionProgress({
+        stage: 'uploading',
+        progress: 30,
+        message: 'Audio uploaded, starting transcription...'
+      });
+
     } catch (error) {
       console.error('Transcription failed:', error);
+      setIsTranscribing(false);
       Alert.alert(
         'Transcription Failed', 
         error instanceof Error ? error.message : 'An unknown error occurred. Please try again.',
@@ -217,8 +348,6 @@ export default function AudioTranscriptionModal({
           { text: 'Cancel', onPress: () => setCurrentStep('recording') }
         ]
       );
-    } finally {
-      setIsTranscribing(false);
     }
   };
 
@@ -241,7 +370,8 @@ export default function AudioTranscriptionModal({
         theme: '#1C1C1C',
         isPinned: false,
         images: [],
-        audios: audioUri ? [{
+        // Only include audio if user chose to save recording
+        audios: (audioUri && saveRecordingOption) ? [{
           id: `audio_${Date.now()}`,
           uri: audioUri,
           duration: recordingDuration,
@@ -257,7 +387,11 @@ export default function AudioTranscriptionModal({
         onNoteSaved(newNote);
       }
 
-      Alert.alert('Success', 'Voice note saved successfully!', [
+      const message = saveRecordingOption 
+        ? 'Voice note saved with recording!' 
+        : 'Transcript saved as note!';
+      
+      Alert.alert('Success', message, [
         { text: 'OK', onPress: onClose }
       ]);
       
@@ -323,15 +457,79 @@ export default function AudioTranscriptionModal({
     </View>
   );
 
+  const renderProgressBar = () => {
+    const { stage, progress, message } = transcriptionProgress;
+    
+    // Stage colors
+    const stageIcons = {
+      uploading: 'cloud-upload-outline',
+      transcribing: 'mic-outline', 
+      cleaning: 'sparkles-outline'
+    };
+
+    const stageLabels = {
+      uploading: 'Uploading',
+      transcribing: 'Transcribing', 
+      cleaning: 'Cleaning'
+    };
+
+    return (
+      <View style={styles.progressContainer}>
+        {/* Progress Steps */}
+        <View style={styles.progressSteps}>
+          {(['uploading', 'transcribing', 'cleaning'] as const).map((stepStage, index) => {
+            const isActive = stepStage === stage;
+            const isCompleted = ['uploading', 'transcribing', 'cleaning'].indexOf(stage) > index;
+            
+            return (
+              <View key={stepStage} style={styles.progressStep}>
+                <View style={[
+                  styles.progressStepIcon,
+                  isCompleted && styles.progressStepIconCompleted,
+                  isActive && styles.progressStepIconActive
+                ]}>
+                  <Ionicons 
+                    name={stageIcons[stepStage]} 
+                    size={16} 
+                    color={isCompleted || isActive ? '#000000' : '#666666'} 
+                  />
+                </View>
+                <Text style={[
+                  styles.progressStepLabel,
+                  isActive && styles.progressStepLabelActive
+                ]}>
+                  {stageLabels[stepStage]}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+
+        {/* Progress Bar */}
+        <View style={styles.progressBarContainer}>
+          <View style={styles.progressBarBackground}>
+            <Animated.View 
+              style={[
+                styles.progressBarFill, 
+                { width: `${Math.max(progress, 5)}%` }
+              ]} 
+            />
+          </View>
+          <Text style={styles.progressPercentage}>{Math.round(progress)}%</Text>
+        </View>
+
+        {/* Current Message */}
+        <Text style={styles.progressMessage}>{message}</Text>
+      </View>
+    );
+  };
+
   const renderTranscribingStep = () => (
     <View style={styles.stepContainer}>
       <Text style={styles.title}>Converting Speech to Text</Text>
       
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>
-          Transcribing your audio using {transcriptionService.current?.getProviderName() || 'transcription service'}...
-        </Text>
+        {renderProgressBar()}
         <Text style={styles.loadingSubtext}>
           This may take a moment depending on the audio length.
         </Text>
@@ -354,6 +552,32 @@ export default function AudioTranscriptionModal({
           textAlignVertical="top"
         />
       </ScrollView>
+
+      {/* Recording Save Option */}
+      <View style={styles.recordingOptionContainer}>
+        <TouchableOpacity
+          style={styles.recordingOptionButton}
+          onPress={() => setSaveRecordingOption(!saveRecordingOption)}
+          activeOpacity={0.7}
+        >
+          <View style={[
+            styles.checkbox,
+            saveRecordingOption && styles.checkboxSelected
+          ]}>
+            {saveRecordingOption && (
+              <Ionicons name="checkmark" size={16} color="#000000" />
+            )}
+          </View>
+          <Text style={styles.recordingOptionText}>
+            Also save the recording with this note
+          </Text>
+        </TouchableOpacity>
+        <Text style={styles.recordingOptionSubtext}>
+          {saveRecordingOption 
+            ? 'Recording will be saved with the transcript' 
+            : 'Only the transcript will be saved (default)'}
+        </Text>
+      </View>
 
       <View style={styles.actionButtons}>
         <TouchableOpacity
@@ -570,5 +794,118 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
     fontFamily: 'Inter',
+  },
+  // Progress Bar Styles
+  progressContainer: {
+    alignItems: 'center',
+    width: '100%',
+    marginVertical: 20,
+  },
+  progressSteps: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 24,
+    paddingHorizontal: 20,
+  },
+  progressStep: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  progressStepIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  progressStepIconActive: {
+    backgroundColor: '#00FF7F',
+  },
+  progressStepIconCompleted: {
+    backgroundColor: '#00FF7F',
+  },
+  progressStepLabel: {
+    fontSize: 12,
+    color: '#CCCCCC',
+    fontFamily: 'Inter',
+    textAlign: 'center',
+  },
+  progressStepLabelActive: {
+    color: '#00FF7F',
+    fontWeight: '600',
+  },
+  progressBarContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  progressBarBackground: {
+    width: '100%',
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#00FF7F',
+    borderRadius: 4,
+  },
+  progressPercentage: {
+    fontSize: 14,
+    color: '#00FF7F',
+    fontWeight: '600',
+    fontFamily: 'Inter',
+  },
+  progressMessage: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    fontFamily: 'Inter',
+    marginTop: 8,
+  },
+  // Recording Option Styles
+  recordingOptionContainer: {
+    width: '100%',
+    marginBottom: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+  },
+  recordingOptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#666666',
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxSelected: {
+    backgroundColor: '#00FF7F',
+    borderColor: '#00FF7F',
+  },
+  recordingOptionText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontFamily: 'Inter',
+    flex: 1,
+  },
+  recordingOptionSubtext: {
+    fontSize: 14,
+    color: '#CCCCCC',
+    fontFamily: 'Inter',
+    marginLeft: 32,
   },
 });

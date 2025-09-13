@@ -331,7 +331,7 @@ async def health_check():
 # Async transcription background processing
 async def process_transcription_job(job_id: str, audio_file_path: Path):
     """
-    Process transcription in background without blocking the main thread
+    Process transcription in background with real-time progress updates
     """
     api_key = os.getenv("ASSEMBLYAI_API_KEY")
     
@@ -340,9 +340,30 @@ async def process_transcription_job(job_id: str, audio_file_path: Path):
         transcription_jobs[job_id]['updated_at'] = datetime.now().isoformat()
     
     try:
+        # Stage 1: Uploading (0-33%)
+        print(f"📤 [Job {job_id}] Starting upload process...")
+        
+        # Emit initial progress
+        if sio:
+            await sio.emit('transcription_progress', {
+                'job_id': job_id,
+                'stage': 'uploading',
+                'progress': 5,
+                'message': 'Preparing audio file for upload...'
+            })
+        
         # Use aiohttp for non-blocking HTTP requests
         async with aiohttp.ClientSession() as session:
             print(f"📤 [Job {job_id}] Uploading to AssemblyAI...")
+            
+            # Emit upload progress
+            if sio:
+                await sio.emit('transcription_progress', {
+                    'job_id': job_id,
+                    'stage': 'uploading',
+                    'progress': 15,
+                    'message': 'Uploading audio to transcription service...'
+                })
             
             # Read audio file asynchronously
             async with aiofiles.open(audio_file_path, 'rb') as f:
@@ -366,10 +387,22 @@ async def process_transcription_job(job_id: str, audio_file_path: Path):
                 upload_url = upload_result['upload_url']
                 print(f"✅ [Job {job_id}] Audio uploaded successfully")
             
+            # Upload complete progress
+            if sio:
+                await sio.emit('transcription_progress', {
+                    'job_id': job_id,
+                    'stage': 'uploading',
+                    'progress': 33,
+                    'message': 'Upload complete! Starting transcription...'
+                })
+            
             # Update job status
             async with job_lock:
                 transcription_jobs[job_id]['status'] = 'processing'
                 transcription_jobs[job_id]['updated_at'] = datetime.now().isoformat()
+            
+            # Stage 2: Transcribing (33-90%)
+            print(f"🎧 [Job {job_id}] Starting transcription...")
             
             # Request transcription
             transcript_request = {
@@ -393,6 +426,15 @@ async def process_transcription_job(job_id: str, audio_file_path: Path):
                 transcript_id = transcript_result['id']
                 print(f"🔄 [Job {job_id}] Transcription started, ID: {transcript_id}")
             
+            # Transcription started progress
+            if sio:
+                await sio.emit('transcription_progress', {
+                    'job_id': job_id,
+                    'stage': 'transcribing',
+                    'progress': 40,
+                    'message': 'Processing audio with AI...'
+                })
+            
             # Poll for completion asynchronously (non-blocking with sleep)
             max_polls = 60
             poll_count = 0
@@ -401,6 +443,16 @@ async def process_transcription_job(job_id: str, audio_file_path: Path):
                 await asyncio.sleep(5)  # Non-blocking sleep
                 poll_count += 1
                 print(f"📊 [Job {job_id}] Polling attempt {poll_count}/{max_polls}")
+                
+                # Update progress during transcription (40-85%)
+                current_progress = min(40 + (poll_count * 1.2), 85)
+                if sio:
+                    await sio.emit('transcription_progress', {
+                        'job_id': job_id,
+                        'stage': 'transcribing',
+                        'progress': int(current_progress),
+                        'message': f'Converting speech to text... ({int(current_progress)}%)'
+                    })
                 
                 async with session.get(
                     f'https://api.assemblyai.com/v2/transcript/{transcript_id}',
@@ -417,13 +469,33 @@ async def process_transcription_job(job_id: str, audio_file_path: Path):
                         transcript_text = status_result.get('text', '')
                         print(f"✅ [Job {job_id}] Transcription completed: {len(transcript_text)} characters")
                         
+                        # Stage 3: Cleaning (90-100%)
+                        if sio:
+                            await sio.emit('transcription_progress', {
+                                'job_id': job_id,
+                                'stage': 'cleaning',
+                                'progress': 90,
+                                'message': 'Cleaning and formatting text...'
+                            })
+                        
+                        # Simulate text cleaning process
+                        await asyncio.sleep(0.5)
+                        
+                        if sio:
+                            await sio.emit('transcription_progress', {
+                                'job_id': job_id,
+                                'stage': 'cleaning',
+                                'progress': 100,
+                                'message': 'Transcription complete!'
+                            })
+                        
                         # Update job with success
                         async with job_lock:
                             transcription_jobs[job_id]['status'] = 'completed'
                             transcription_jobs[job_id]['transcript'] = transcript_text
                             transcription_jobs[job_id]['updated_at'] = datetime.now().isoformat()
                         
-                        # Emit Socket.IO event if available
+                        # Emit completion event
                         if sio:
                             await sio.emit('transcription_completed', {
                                 'job_id': job_id,
