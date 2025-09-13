@@ -20,8 +20,8 @@ class AssemblyAIProvider implements TranscriptionProvider {
 
   async transcribe(audioUri: string): Promise<string> {
     try {
-      // Get the backend URL from environment (use Replit domain without port for HTTPS)
-      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://e445f705-fe6f-4740-b33c-e63ec51e8933-00-3ilxh8qybvctl.picard.replit.dev';
+      // Get the backend URL from environment (use current Replit domain with backend port)
+      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://39ff833d-3e96-4e04-ad54-114c70830a48-00-v8d1cqibad2d.worf.replit.dev:8000';
       
       console.log('[TRANSCRIPTION] Uploading audio to secure backend transcription service...');
 
