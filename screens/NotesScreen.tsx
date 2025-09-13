@@ -683,25 +683,6 @@ export default function NotesScreen() {
           isListening={showTranscriptionModal}
         />
 
-          {selectedSection === 'deleted' ? (
-            <TouchableOpacity style={styles.micButton} onPress={handleDeleteAllNotes}>
-              <Ionicons 
-                name="ellipsis-horizontal" 
-                size={20} 
-                color="#FFFFFF" 
-              />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={styles.micButton} onPress={handleVoiceInput}>
-              <Ionicons 
-                name="mic" 
-                size={20} 
-                color={isListening ? "#00FF7F" : "#FFFFFF"} 
-              />
-            </TouchableOpacity>
-          )}
-        </View>
-
         <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
           {renderNotesGrid()}
         </ScrollView>
