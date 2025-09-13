@@ -29,6 +29,7 @@ import { eventBus, EVENTS } from '@/utils/eventBus';
 import NoteEditorScreen from '@/components/Notes/NoteEditorScreen';
 import NotesGrid from '@/components/Notes/NotesGrid';
 import SlideMenu from '@/components/ui/SlideMenu';
+import AudioTranscriptionModal from '@/components/Notes/AudioTranscriptionModal';
 import { getCategories } from '@/utils/storage';
 
 import WritingStyleSelector from '@/components/WritingStyleSelector';
@@ -112,6 +113,7 @@ export default function NotesScreen() {
   const [selectedSection, setSelectedSection] = useState<'all' | 'deleted' | 'category'>('all');
   const [menuScrollOffset, setMenuScrollOffset] = useState(0);
   const menuFlatListRef = useRef<FlatList>(null);
+  const [showTranscriptionModal, setShowTranscriptionModal] = useState(false);
 
   useEffect(() => {
     loadNotes();
@@ -503,16 +505,15 @@ export default function NotesScreen() {
     }
   };
 
-  const handleVoiceInput = async () => {
-    try {
-      setIsListening(true);
-      const speechText = await mockSpeechToText();
-      setSearchQuery(speechText);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to convert speech to text');
-    } finally {
-      setIsListening(false);
-    }
+  // Handle voice input for transcription
+  const handleVoiceInput = () => {
+    setShowTranscriptionModal(true);
+  };
+
+  // Handle when a note is saved from transcription
+  const handleTranscriptionNoteSaved = (note: Note) => {
+    console.log('[NOTES] Voice note saved:', note.title);
+    loadNotes(); // Refresh the notes list
   };
 
   const openMenu = () => {
@@ -767,6 +768,15 @@ export default function NotesScreen() {
             }
           }
         ]}
+      />
+
+      {/* Audio Transcription Modal */}
+      <AudioTranscriptionModal
+        visible={showTranscriptionModal}
+        onClose={() => setShowTranscriptionModal(false)}
+        onNoteSaved={handleTranscriptionNoteSaved}
+        maxRecordingMinutes={20}
+        transcriptionProvider={settings.speechProvider?.includes('assemblyai') ? 'assemblyai' : 'assemblyai'}
       />
     </View>
 
