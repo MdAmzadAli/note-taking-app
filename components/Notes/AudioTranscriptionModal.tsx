@@ -595,7 +595,7 @@ export default function AudioTranscriptionModal({
     <View style={styles.transcriptDisplayContainer}>
       <Text style={styles.transcriptDisplayTitle}>Your Transcript</Text>
       
-      <ScrollView style={styles.transcriptDisplayScrollView}>
+      <ScrollView style={styles.transcriptDisplayScrollView} showsVerticalScrollIndicator={true}>
         <Text style={styles.transcriptDisplayText}>
           {transcript}
         </Text>
@@ -725,7 +725,7 @@ export default function AudioTranscriptionModal({
           <TouchableWithoutFeedback>
             <Animated.View
               style={[
-                currentStep === 'transcript' ? styles.transcriptModalContainer : styles.modalContainer,
+                currentStep === 'transcript' || currentStep === 'editing' ? styles.transcriptModalContainer : styles.modalContainer,
                 {
                   transform: [{ translateY: slideAnim }],
                 },
@@ -1070,14 +1070,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#2A2A2A',
     borderRadius: 12,
-    padding: 16,
+    padding: 20,
     marginBottom: 20,
+    maxHeight: '60%',
   },
   transcriptDisplayText: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 17,
+    lineHeight: 26,
     color: '#FFFFFF',
     fontFamily: 'Inter',
+    textAlign: 'left',
   },
   transcriptDisplayActions: {
     flexDirection: 'row',
