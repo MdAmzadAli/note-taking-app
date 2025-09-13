@@ -53,6 +53,7 @@ export default function AudioTranscriptionModal({
     message: 'Preparing to upload...'
   });
   const [saveRecordingOption, setSaveRecordingOption] = useState(false);
+  const [completedStages, setCompletedStages] = useState<Set<string>>(new Set());
   
   const slideAnim = useRef(new Animated.Value(600)).current;
   const recordingRef = useRef<Audio.Recording | null>(null);
@@ -122,16 +123,47 @@ export default function AudioTranscriptionModal({
             progress: data.progress,
             message: data.message
           });
+          
+          // Track stage completion
+          if (data.stage_complete) {
+            console.log('[SOCKET] Stage completed:', data.stage);
+            setCompletedStages(prev => new Set([...prev, data.stage]));
+          }
         }
       });
 
       socketRef.current.on('transcription_completed', (data) => {
         console.log('[SOCKET] Transcription completed:', data);
         if (data.job_id === currentJobIdRef.current) {
-          setTranscript(data.transcript);
-          setEditedTranscript(data.transcript);
-          setCurrentStep('editing');
-          setIsTranscribing(false);
+          // If we haven't seen cleaning stage yet, force it to appear
+          setTranscriptionProgress(prev => {
+            if (prev.stage !== 'cleaning') {
+              console.log('[SOCKET] Forcing cleaning stage to show');
+              return {
+                stage: 'cleaning',
+                progress: 95,
+                message: 'Finalizing transcript...'
+              };
+            }
+            return prev;
+          });
+          
+          // Ensure cleaning stage is marked as completed
+          setCompletedStages(prev => {
+            const newCompleted = new Set(prev);
+            newCompleted.add('transcribing');
+            newCompleted.add('cleaning');
+            console.log('[SOCKET] Completed stages:', Array.from(newCompleted));
+            return newCompleted;
+          });
+          
+          // Brief delay to show final stage completion before transitioning
+          setTimeout(() => {
+            setTranscript(data.transcript);
+            setEditedTranscript(data.transcript);
+            setCurrentStep('editing');
+            setIsTranscribing(false);
+          }, 1000); // Allow time for final progress animation
         }
       });
 
@@ -168,6 +200,7 @@ export default function AudioTranscriptionModal({
     setTranscript('');
     setEditedTranscript('');
     setSaveRecordingOption(false);
+    setCompletedStages(new Set());
     setTranscriptionProgress({
       stage: 'uploading',
       progress: 0,
@@ -473,33 +506,54 @@ export default function AudioTranscriptionModal({
       cleaning: 'Cleaning'
     };
 
+    const stages = ['uploading', 'transcribing', 'cleaning'] as const;
+
     return (
       <View style={styles.progressContainer}>
-        {/* Progress Steps */}
+        {/* Progress Steps with Connecting Lines */}
         <View style={styles.progressSteps}>
-          {(['uploading', 'transcribing', 'cleaning'] as const).map((stepStage, index) => {
+          {stages.map((stepStage, index) => {
             const isActive = stepStage === stage;
-            const isCompleted = ['uploading', 'transcribing', 'cleaning'].indexOf(stage) > index;
+            const isCompleted = completedStages.has(stepStage);
+            const showConnectingLine = index < stages.length - 1;
+            const nextStageCompleted = completedStages.has(stages[index + 1]);
+            const connectingLineActive = isCompleted && (nextStageCompleted || stages[index + 1] === stage);
             
             return (
-              <View key={stepStage} style={styles.progressStep}>
-                <View style={[
-                  styles.progressStepIcon,
-                  isCompleted && styles.progressStepIconCompleted,
-                  isActive && styles.progressStepIconActive
-                ]}>
-                  <Ionicons 
-                    name={stageIcons[stepStage]} 
-                    size={16} 
-                    color={isCompleted || isActive ? '#000000' : '#666666'} 
-                  />
+              <View key={stepStage} style={styles.progressStepContainer}>
+                <View style={styles.progressStep}>
+                  <View style={[
+                    styles.progressStepIcon,
+                    isCompleted && styles.progressStepIconCompleted,
+                    isActive && styles.progressStepIconActive
+                  ]}>
+                    <Ionicons 
+                      name={stageIcons[stepStage]} 
+                      size={16} 
+                      color={
+                        isCompleted ? '#000000' : 
+                        isActive ? '#000000' : '#666666'
+                      } 
+                    />
+                  </View>
+                  <Text style={[
+                    styles.progressStepLabel,
+                    isCompleted && styles.progressStepLabelCompleted,
+                    isActive && styles.progressStepLabelActive
+                  ]}>
+                    {stageLabels[stepStage]}
+                  </Text>
                 </View>
-                <Text style={[
-                  styles.progressStepLabel,
-                  isActive && styles.progressStepLabelActive
-                ]}>
-                  {stageLabels[stepStage]}
-                </Text>
+                
+                {/* Connecting Line */}
+                {showConnectingLine && (
+                  <View style={styles.connectingLineContainer}>
+                    <View style={[
+                      styles.connectingLine,
+                      connectingLineActive && styles.connectingLineActive
+                    ]} />
+                  </View>
+                )}
               </View>
             );
           })}
@@ -807,6 +861,12 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 24,
     paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  progressStepContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   progressStep: {
     alignItems: 'center',
@@ -825,7 +885,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#00FF7F',
   },
   progressStepIconCompleted: {
-    backgroundColor: '#00FF7F',
+    backgroundColor: '#006B3F', // Dark green for completed stages
   },
   progressStepLabel: {
     fontSize: 12,
@@ -836,6 +896,25 @@ const styles = StyleSheet.create({
   progressStepLabelActive: {
     color: '#00FF7F',
     fontWeight: '600',
+  },
+  progressStepLabelCompleted: {
+    color: '#006B3F', // Dark green for completed stages
+    fontWeight: '600',
+  },
+  // Connecting Lines
+  connectingLineContainer: {
+    flex: 1,
+    height: 32,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  connectingLine: {
+    height: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: '100%',
+  },
+  connectingLineActive: {
+    backgroundColor: '#006B3F', // Dark green for active connecting lines
   },
   progressBarContainer: {
     width: '100%',
