@@ -10,6 +10,8 @@ import {
   Alert,
   TextInput,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Audio } from 'expo-av';
@@ -600,17 +602,24 @@ export default function AudioTranscriptionModal({
       
       <Text style={styles.transcriptDisplayTitle}>Your Transcript</Text>
       
-      <ScrollView style={styles.transcriptDisplayScrollView} showsVerticalScrollIndicator={true}>
-        <TextInput
-          style={styles.transcriptDisplayTextInput}
-          value={editedTranscript}
-          onChangeText={setEditedTranscript}
-          multiline
-          placeholder="Your transcript will appear here..."
-          placeholderTextColor="#666666"
-          textAlignVertical="top"
-        />
-      </ScrollView>
+      {/* Keyboard Avoiding View only around the input section */}
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+      >
+        <ScrollView style={styles.transcriptDisplayScrollView} showsVerticalScrollIndicator={true}>
+          <TextInput
+            style={styles.transcriptDisplayTextInput}
+            value={editedTranscript}
+            onChangeText={setEditedTranscript}
+            multiline
+            placeholder="Your transcript will appear here..."
+            placeholderTextColor="#666666"
+            textAlignVertical="top"
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Recording Save Option */}
       <View style={styles.recordingOptionContainer}>
@@ -1097,13 +1106,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     fontFamily: 'Inter',
   },
+  keyboardAvoidingContainer: {
+    flex: 1,
+    maxHeight: '60%',
+  },
   transcriptDisplayScrollView: {
     flex: 1,
     backgroundColor: '#2A2A2A',
     borderRadius: 12,
     padding: 20,
     marginBottom: 20,
-    maxHeight: '60%',
   },
   transcriptDisplayText: {
     fontSize: 17,
