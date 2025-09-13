@@ -1,5 +1,3 @@
-import * as FileSystem from 'expo-file-system';
-
 export interface TranscriptionProvider {
   name: string;
   transcribe: (audioUri: string) => Promise<string>;
@@ -22,33 +20,39 @@ class AssemblyAIProvider implements TranscriptionProvider {
 
   async transcribe(audioUri: string): Promise<string> {
     try {
-      // Check if audio file exists
-      const audioInfo = await FileSystem.getInfoAsync(audioUri);
-      if (!audioInfo.exists) {
-        throw new Error('Audio file not found');
-      }
-
       // Get the backend URL from environment (use Replit domain without port for HTTPS)
       const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://e445f705-fe6f-4740-b33c-e63ec51e8933-00-3ilxh8qybvctl.picard.replit.dev';
       
       console.log('[TRANSCRIPTION] Uploading audio to secure backend transcription service...');
 
-      // Upload audio file to secure backend proxy
-      const uploadResponse = await FileSystem.uploadAsync(`${backendUrl}/transcribe`, audioUri, {
-        httpMethod: 'POST',
-        uploadType: 1, // MULTIPART
-        fieldName: 'audio_file',
+      // Create FormData for audio upload using standard web APIs
+      const formData = new FormData();
+      
+      // Create a blob from the audio URI
+      const response = await fetch(audioUri);
+      if (!response.ok) {
+        throw new Error('Audio file not accessible');
+      }
+      
+      const audioBlob = await response.blob();
+      formData.append('audio_file', audioBlob, 'recording.m4a');
+
+      // Upload audio file to secure backend proxy using standard fetch
+      const uploadResponse = await fetch(`${backendUrl}/transcribe`, {
+        method: 'POST',
+        body: formData,
         headers: {
           'Accept': 'application/json',
         },
       });
 
-      if (uploadResponse.status !== 200) {
-        console.error('[TRANSCRIPTION] Backend transcription failed:', uploadResponse.status, uploadResponse.body);
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        console.error('[TRANSCRIPTION] Backend transcription failed:', uploadResponse.status, errorText);
         throw new Error(`Transcription failed: ${uploadResponse.status}`);
       }
 
-      const responseData = JSON.parse(uploadResponse.body);
+      const responseData = await uploadResponse.json();
       
       if (!responseData.success) {
         throw new Error(responseData.error || 'Transcription failed');
@@ -62,12 +66,14 @@ class AssemblyAIProvider implements TranscriptionProvider {
       
       // Provide user-friendly error messages
       const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('Network request failed')) {
+      if (errorMessage.includes('Network request failed') || errorMessage.includes('fetch')) {
         throw new Error('Unable to connect to transcription service. Please check your internet connection.');
       } else if (errorMessage.includes('500')) {
         throw new Error('Transcription service temporarily unavailable. Please try again later.');
       } else if (errorMessage.includes('408')) {
         throw new Error('Transcription timeout - please try with shorter audio recordings.');
+      } else if (errorMessage.includes('Audio file not accessible')) {
+        throw new Error('Unable to access the recorded audio. Please try recording again.');
       }
       
       throw error;
