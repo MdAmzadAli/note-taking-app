@@ -708,7 +708,7 @@ async def transcribe_audio(audio_file: UploadFile = File(...)) -> TranscriptionJ
         
         print(f"📤 Uploading to AssemblyAI...")
         
-        # Upload audio to AssemblyAI using raw binary upload
+        # Upload audio to AssemblyAI using raw binary uploadsuidhshdh
         with open(temp_audio_path, 'rb') as f:
             file_content = f.read()
             upload_response = requests.post(
