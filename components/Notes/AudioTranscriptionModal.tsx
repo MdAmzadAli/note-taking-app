@@ -595,11 +595,6 @@ export default function AudioTranscriptionModal({
 
   const renderTranscriptStep = () => (
     <View style={styles.transcriptDisplayContainer}>
-      {/* Close Button */}
-      <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
-        <Ionicons name="close" size={24} color="#FFFFFF" />
-      </TouchableOpacity>
-
       <Text style={styles.transcriptDisplayTitle}>Your Transcript</Text>
 
       {/* Expandable input area */}
@@ -774,7 +769,12 @@ export default function AudioTranscriptionModal({
                   },
                 ]}
               >
-                <View style={styles.handle} />
+                {/* Close Button for transcript modal - positioned absolutely at top-right */}
+                {currentStep === 'transcript' && (
+                  <TouchableOpacity style={styles.transcriptCloseButton} onPress={onClose} activeOpacity={0.7}>
+                    <Ionicons name="close" size={24} color="#FFFFFF" />
+                  </TouchableOpacity>
+                )}
 
                 {currentStep === 'recording' && renderRecordingStep()}
                 {currentStep === 'transcribing' && renderTranscribingStep()}
@@ -810,15 +810,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
   },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#666666',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 20,
-  },
+  
   stepContainer: {
     paddingHorizontal: 24,
     alignItems: 'center',
@@ -1155,10 +1147,10 @@ const styles = StyleSheet.create({
     margin: 0,
     minHeight: 400,
   },
-  closeButton: {
+  transcriptCloseButton: {
     position: 'absolute',
-    top: 20,
-    right: 20,
+    top: 16,
+    right: 16,
     zIndex: 1000,
     width: 36,
     height: 36,
