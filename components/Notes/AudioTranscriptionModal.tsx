@@ -795,15 +795,18 @@ const styles = StyleSheet.create({
   },
   keyboardAvoidingFullContainer: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
   },
   modalContainer: {
     backgroundColor: '#1C1C1C',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderRadius: 20,
     paddingBottom: 40,
     maxHeight: '80%',
     minHeight: '50%',
+    width: '100%',
+    maxWidth: 400,
   },
   handle: {
     width: 40,
@@ -1093,11 +1096,11 @@ const styles = StyleSheet.create({
   // Transcript Display Styles (80% height modal)
   transcriptModalContainer: {
     backgroundColor: '#1A1A1A',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderRadius: 20,
     paddingBottom: 20,
     height: '80%',
     width: '100%',
+    maxWidth: 500,
   },
   transcriptDisplayContainer: {
     flex: 1,
