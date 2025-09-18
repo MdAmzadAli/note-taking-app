@@ -178,12 +178,12 @@ export default function ChatInterface({
   }, [selectedFile, selectedWorkspace]);
 
   // Update display messages when workspace chatMessages prop changes
-  useEffect(() => {
-    if (selectedWorkspace && !selectedFile) {
-      setDisplayChatMessages(chatMessages);
-    }
-  }, [chatMessages, selectedWorkspace, selectedFile]);
-    };
+  // useEffect(() => {
+  //   if (selectedWorkspace && !selectedFile) {
+  //     setDisplayChatMessages(chatMessages);
+  //   }
+  // }, []);
+    
 
     // Handle RAG messages with internal state management
   const handleInternalRAGMessage = useCallback(async (message: string) => {
@@ -265,7 +265,7 @@ export default function ChatInterface({
       );
     }
   }, [selectedFile, selectedWorkspace]);
-
+// selectedFile, selectedWorkspace
   const getFileSize = (file: SingleFile) => {
     if (!file.size) return 'Unknown';
     const kb = file.size / 1024;
@@ -678,43 +678,44 @@ export default function ChatInterface({
   }, []); // Only connect once - don't include files as dependency to avoid reconnections
 
   // Clear summary when files change - summaries are now automatically generated via WebSocket
-  useEffect(() => {
-    console.log('📋 Summary state reset for new files:', files.map(f => ({ id: f.id, name: f.name })));
+  
+  // useEffect(() => {
+  //   console.log('📋 Summary state reset for new files:', files.map(f => ({ id: f.id, name: f.name })));
 
-    // Always reset when files change
-    setSummary(''); // Clear previous summary
-    setSummaries({}); // Clear all summaries
-    setSelectedSummaryFile(null);
+  //   // Always reset when files change
+  //   setSummary(''); // Clear previous summary
+  //   setSummaries({}); // Clear all summaries
+  //   setSelectedSummaryFile(null);
 
-    if (files.length > 0) {
-      // Set loading state - summaries will arrive via WebSocket automatically
-      setIsSummaryLoading(true);
+  //   if (files.length > 0) {
+  //     // Set loading state - summaries will arrive via WebSocket automatically
+  //     setIsSummaryLoading(true);
 
-      if (files.length === 1) {
-        // Single file mode - summary will be received via WebSocket
-        console.log('📄 Single file mode - waiting for automatic summary for:', files[0].id);
-      } else {
-        // Workspace mode - summaries will be received via WebSocket
-        console.log('📁 Workspace mode - waiting for automatic summaries for', files.length, 'files');
-        // Set first file as selected for initial display
-        setSelectedSummaryFile(files[0]);
-      }
+  //     if (files.length === 1) {
+  //       // Single file mode - summary will be received via WebSocket
+  //       console.log('📄 Single file mode - waiting for automatic summary for:', files[0].id);
+  //     } else {
+  //       // Workspace mode - summaries will be received via WebSocket
+  //       console.log('📁 Workspace mode - waiting for automatic summaries for', files.length, 'files');
+  //       // Set first file as selected for initial display
+  //       setSelectedSummaryFile(files[0]);
+  //     }
 
-      // Set a timeout to stop loading state if no summary arrives within reasonable time
-      const summaryTimeout = setTimeout(() => {
-        setIsSummaryLoading(false);
-        console.log('⚠️ Summary loading timeout - summaries may still arrive via WebSocket');
-      }, 30000); // 30 second timeout
+  //     // Set a timeout to stop loading state if no summary arrives within reasonable time
+  //     const summaryTimeout = setTimeout(() => {
+  //       setIsSummaryLoading(false);
+  //       console.log('⚠️ Summary loading timeout - summaries may still arrive via WebSocket');
+  //     }, 30000); // 30 second timeout
 
-      // Cleanup timeout on unmount or when files change
-      return () => {
-        clearTimeout(summaryTimeout);
-      };
-    } else {
-      // No files, clear loading state just checking
-      setIsSummaryLoading(false);
-    }
-  }, [files, selectedFile, selectedWorkspace]); // Properly depend on files and workspace changes
+  //     // Cleanup timeout on unmount or when files change
+  //     return () => {
+  //       clearTimeout(summaryTimeout);
+  //     };
+  //   } else {
+  //     // No files, clear loading state just checking
+  //     setIsSummaryLoading(false);
+  //   }
+  // }, [files, selectedFile, selectedWorkspace]); // Properly depend on files and workspace changes
 
   return (
     <View style={styles.pdfChatContainer}>
@@ -934,14 +935,14 @@ export default function ChatInterface({
                 contentContainerStyle={styles.pdfChatMessagesContent}
               >
                 {/* Welcome Message */}
-                {displayMessages.length === 0 && (
+                {displayChatMessages.length === 0 && (
                   <View style={styles.pdfWelcomeMessage}>
                     <Text style={styles.pdfWelcomeText}>Ask me anything</Text>
                   </View>
                 )}
 
                 {/* Chat Messages */}
-                {displayMessages.map((msg, index) => (
+                {displayChatMessages.map((msg, index) => (
                   <View key={index} style={styles.pdfMessageGroup}>
                     {/* User Message */}
                     <View style={styles.pdfUserMessageContainer}>
