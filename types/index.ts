@@ -211,3 +211,22 @@ export interface SearchFilters {
     end: string;
   };
 }
+
+// Chat Session Interface for Expert Tab Single File Mode
+export interface ChatMessage {
+  id: string;
+  user: string;
+  ai: string;
+  sources?: any[]; // RAG sources
+  timestamp: string;
+  isLoading?: boolean;
+}
+
+export interface ChatSession {
+  id: string; // Unique chat session ID  
+  single_file_id: string; // Foreign key - matches the single file's actual backend ID
+  summary: string; // Generated summary for the file
+  chats: ChatMessage[]; // Array of all chat messages in order
+  createdAt: string;
+  updatedAt: string;
+}
