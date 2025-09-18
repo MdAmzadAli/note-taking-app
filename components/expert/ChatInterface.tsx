@@ -714,7 +714,7 @@ export default function ChatInterface({
       // No files, clear loading state just checking
       setIsSummaryLoading(false);
     }
-  }, []); // Properly depend on files and workspace changes
+  }, [files, selectedFile, selectedWorkspace]); // Properly depend on files and workspace changes
 
   return (
     <View style={styles.pdfChatContainer}>
