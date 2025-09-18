@@ -117,17 +117,17 @@ export default function ChatInterface({
   const [localChatMessages, setLocalChatMessages] = useState<ChatMessageType[]>([]);
 
   // Function to reload messages from localStorage (to sync with external updates)
-  const reloadChatMessages = async () => {
-    if (selectedFile) {
-      try {
-        const session = await ChatSessionStorage.getOrCreateSession(selectedFile.id);
-        setLocalChatMessages(session.chats);
-        console.log('🔄 Reloaded chat messages from localStorage:', session.chats.length);
-      } catch (error) {
-        console.error('❌ Error reloading chat messages:', error);
-      }
-    }
-  };
+  // const reloadChatMessages = async () => {
+  //   if (selectedFile) {
+  //     try {
+  //       const session = await ChatSessionStorage.getOrCreateSession(selectedFile.id);
+  //       setLocalChatMessages(session.chats);
+  //       console.log('🔄 Reloaded chat messages from localStorage:', session.chats.length);
+  //     } catch (error) {
+  //       console.error('❌ Error reloading chat messages:', error);
+  //     }
+  //   }
+  // };
   
   // Get tab bar context to hide bottom navigation
   const { hideTabBar, showTabBar } = useTabBar();
@@ -177,12 +177,12 @@ export default function ChatInterface({
   }, [selectedFile, selectedWorkspace]);
 
   // Periodically check for new messages in localStorage (in case they're added from outside this component)
-  useEffect(() => {
-    if (selectedFile) {
-      const interval = setInterval(reloadChatMessages, 1000); // Check every second
-      return () => clearInterval(interval);
-    }
-  }, [selectedFile]);
+  // useEffect(() => {
+  //   if (selectedFile) {
+  //     const interval = setInterval(reloadChatMessages, 1000); // Check every second
+  //     return () => clearInterval(interval);
+  //   }
+  // }, [selectedFile]);
 
   const getFileSize = (file: SingleFile) => {
     if (!file.size) return 'Unknown';
@@ -496,7 +496,9 @@ export default function ChatInterface({
       }, 100);
     }
   }, [displayMessages]);
+  const [onGoingMessage,setOnGoingMessage]=useState(displayMessages);
 
+  // const [currentMessage,setCurrentMessage]=useState(displayMessages);
   // Socket.IO connection for summary notifications
   useEffect(() => {
   
