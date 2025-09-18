@@ -436,11 +436,12 @@ class FileService {
       // - Local uploads folder cleanup for all files
       // - Metadata file deletion for all files
       // - Cloudinary cleanup (if configured)
-      const response = await fetch(API_ENDPOINTS.deleteWorkspace(workspace), {
+      const response = await fetch(`${API_ENDPOINTS.deleteWorkspace(workspace.id)}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify(workspace)
       });
 
       if (!response.ok) {
