@@ -21,6 +21,8 @@ import { ragService, RAGSource } from '@/services/ragService';
 import io, { Socket } from 'socket.io-client';
 import { useTabBar } from '@/contexts/TabBarContext';
 import {API_ENDPOINTS} from '@/config/api'
+import { ChatSession, ChatMessage as ChatMessageType } from '@/types';
+import { ChatSessionStorage } from '@/utils/chatStorage';
 interface SingleFile {
   id: string;
   name: string;
@@ -109,6 +111,10 @@ export default function ChatInterface({
   const [activeTab, setActiveTab] = useState<'chat' | 'summary' | 'quiz'>('chat');
   const scrollViewRef = useRef<ScrollView>(null);
   const socketRef = useRef<Socket | null>(null);
+
+  // New state for chat session management
+  const [currentChatSession, setCurrentChatSession] = useState<ChatSession | null>(null);
+  const [localChatMessages, setLocalChatMessages] = useState<ChatMessageType[]>([]);
   
   // Get tab bar context to hide bottom navigation
   const { hideTabBar, showTabBar } = useTabBar();
@@ -121,6 +127,41 @@ export default function ChatInterface({
       showTabBar();
     };
   }, [hideTabBar, showTabBar]);
+
+  // Load chat session when component mounts or file changes
+  useEffect(() => {
+    const loadChatSession = async () => {
+      if (selectedFile) {
+        console.log('📂 Loading chat session for single file:', selectedFile.id);
+        try {
+          const session = await ChatSessionStorage.getOrCreateSession(selectedFile.id);
+          setCurrentChatSession(session);
+          setLocalChatMessages(session.chats);
+          
+          // Load stored summary if available
+          if (session.summary) {
+            setSummary(session.summary);
+            setSummaries(prev => ({
+              ...prev,
+              [selectedFile.id]: session.summary
+            }));
+            console.log('✅ Loaded stored summary for file:', selectedFile.id);
+          }
+          
+          console.log('✅ Chat session loaded with', session.chats.length, 'messages');
+        } catch (error) {
+          console.error('❌ Error loading chat session:', error);
+        }
+      } else if (selectedWorkspace) {
+        // For workspace mode, use existing logic (no localStorage persistence)
+        console.log('📁 Workspace mode - using existing chat logic');
+        setCurrentChatSession(null);
+        setLocalChatMessages([]);
+      }
+    };
+
+    loadChatSession();
+  }, [selectedFile, selectedWorkspace]);
 
   const getFileSize = (file: SingleFile) => {
     if (!file.size) return 'Unknown';
@@ -431,7 +472,7 @@ export default function ChatInterface({
   useEffect(() => {
   
 
-    const handleSummaryNotification = (notification: any) => {
+    const handleSummaryNotification = async (notification: any) => {
       console.log('📨 Received summary notification via Socket.IO:', notification);
 
       // Check if this summary is for one of our files using current state
@@ -457,6 +498,14 @@ export default function ChatInterface({
           if (currentFiles.length === 1) {
             console.log('✅ Single file summary received - applying to current file:', currentFiles[0].name);
             console.log('🔍 Backend file ID:', notification.fileId, 'Frontend file ID:', currentFiles[0].id);
+            
+            // Save summary to localStorage immediately for single file mode
+            if (selectedFile && selectedFile.id === notification.fileId) {
+              ChatSessionStorage.updateSessionSummary(selectedFile.id, notification.summary)
+                .then(() => console.log('✅ Summary saved to localStorage for file:', selectedFile.id))
+                .catch(error => console.error('❌ Failed to save summary to localStorage:', error));
+            }
+            
             return notification.summary;
           }
 
