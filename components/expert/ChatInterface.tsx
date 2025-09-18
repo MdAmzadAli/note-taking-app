@@ -460,13 +460,21 @@ export default function ChatInterface({
   const files = selectedFile ? [selectedFile] : selectedWorkspace?.files || [];
   const workspaceId = selectedWorkspace?.id;
 
+  // Determine which messages to display: localStorage messages for single file mode, or prop messages for workspace mode
+  const displayMessages = selectedFile ? localChatMessages.map(msg => ({
+    user: msg.user,
+    ai: msg.ai,
+    sources: msg.sources,
+    isLoading: false
+  })) : chatMessages;
+
   useEffect(() => {
-    if (chatMessages.length > 0) {
+    if (displayMessages.length > 0) {
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
-  }, [chatMessages]);
+  }, [displayMessages]);
 
   // Socket.IO connection for summary notifications
   useEffect(() => {
@@ -836,7 +844,7 @@ export default function ChatInterface({
                 )}
 
                 {/* Chat Messages */}
-                {chatMessages.map((msg, index) => (
+                {displayMessages.map((msg, index) => (
                   <View key={index} style={styles.pdfMessageGroup}>
                     {/* User Message */}
                     <View style={styles.pdfUserMessageContainer}>

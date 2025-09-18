@@ -21,6 +21,10 @@ import FloatingActionButton from '../../components/ui/FloatingActionButton';
 // Import RAG service
 import { ragService } from '../../services/ragService';
 
+// Import chat session storage
+import { ChatSessionStorage } from '../../utils/chatStorage';
+import { ChatMessage as ChatMessageType } from '../../types';
+
 // Define API_BASE_URL if it's not already defined elsewhere
 const API_BASE_URL = 'http://localhost:5000'; // Example URL, replace with your actual backend URL
 
@@ -477,37 +481,73 @@ export default function ExpertTab() {
       // Query RAG service
       const response = await ragService.queryDocuments(message, fileIds, workspaceId);
 
+      const finalMessage = {
+        user: message,
+        ai: response.success
+          ? response.answer || 'No response generated'
+          : response.error || 'Failed to generate response',
+        sources: response.sources || [],
+        isLoading: false
+      };
+
       // Update message with response
       setChatMessages(prev =>
         prev.map((msg, index) =>
-          index === prev.length - 1
-            ? {
-                ...msg,
-                ai: response.success
-                  ? response.answer || 'No response generated'
-                  : response.error || 'Failed to generate response',
-                sources: response.sources || [],
-                isLoading: false
-              }
-            : msg
+          index === prev.length - 1 ? finalMessage : msg
         )
       );
+
+      // Save to localStorage for single file mode
+      if (selectedFile) {
+        try {
+          const chatMessageForStorage: ChatMessageType = {
+            id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            user: message,
+            ai: finalMessage.ai,
+            sources: response.sources || [],
+            timestamp: new Date().toISOString()
+          };
+          
+          await ChatSessionStorage.addMessageToSession(selectedFile.id, chatMessageForStorage);
+          console.log('✅ Message saved to localStorage for file:', selectedFile.id);
+        } catch (storageError) {
+          console.error('❌ Failed to save message to localStorage:', storageError);
+        }
+      }
 
     } catch (error) {
       console.error('RAG message error:', error);
 
+      const errorMessage = {
+        user: message,
+        ai: 'Sorry, I encountered an error while processing your request. Please try again.',
+        isLoading: false
+      };
+
       // Update with error message
       setChatMessages(prev =>
         prev.map((msg, index) =>
-          index === prev.length - 1
-            ? {
-                ...msg,
-                ai: 'Sorry, I encountered an error while processing your request. Please try again.',
-                isLoading: false
-              }
-            : msg
+          index === prev.length - 1 ? errorMessage : msg
         )
       );
+
+      // Save error message to localStorage for single file mode
+      if (selectedFile) {
+        try {
+          const chatMessageForStorage: ChatMessageType = {
+            id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            user: message,
+            ai: errorMessage.ai,
+            sources: [],
+            timestamp: new Date().toISOString()
+          };
+          
+          await ChatSessionStorage.addMessageToSession(selectedFile.id, chatMessageForStorage);
+          console.log('✅ Error message saved to localStorage for file:', selectedFile.id);
+        } catch (storageError) {
+          console.error('❌ Failed to save error message to localStorage:', storageError);
+        }
+      }
     }
   };
 
