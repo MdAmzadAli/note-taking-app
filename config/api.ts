@@ -9,7 +9,7 @@ const getApiBaseUrl = () => {
     if (hostname.includes('.exp.direct')) {
       // For Expo Go/tunnel, use the current Replit domain for backend
       // https://39ff833d-3e96-4e04-ad54-114c70830a48-00-v8d1cqibad2d.worf.replit.dev:8000/
-      const baseUrl = 'https://aa62d7f1-9e07-42a5-b6f2-90acc19d2870-00-3id758uxrusz7.riker.replit.dev:8000';
+      const baseUrl = 'https://1554beee-78e1-4f3f-b6ef-e3eab248f69b-00-b97adeohjmvl.janeway.replit.dev:8000';
       console.log('🔗 API Base URL (Expo Go - Replit Backend):', baseUrl);
       return baseUrl;
     }
