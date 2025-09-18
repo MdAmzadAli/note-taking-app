@@ -697,12 +697,11 @@ export default function ExpertTab() {
       // Delete all files in the workspace from backend if connected
       const workspaceToDelete = workspaces.find(w => w.id === workspaceId);
       if (isBackendConnected && workspaceToDelete) {
-        for (const file of workspaceToDelete.files) {
-          try {
-            await fileService.deleteFile(file.id);
-          } catch (error) {
-            console.warn('⚠️ Failed to delete file from backend:', file.id, error);
-          }
+        try{
+          await fileService.deleteWorkspace(workspaceToDelete);
+        }catch(error){
+          console.error('❌ Error deleting workspace:', error);
+          Alert.alert('Error', 'Failed to delete workspace');
         }
       }
 

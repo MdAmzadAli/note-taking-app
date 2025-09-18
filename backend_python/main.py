@@ -888,85 +888,17 @@ async def delete_file(file_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(error)}")
 
 # Delete workspace and all its files
-@app.delete("/workspace/{workspace_id}")
-async def delete_workspace(workspace_id: str):
-    print(f'🌐 DELETE /workspace/{workspace_id} - Content-Type: application/json - Origin: None')
-    print(f'🗑️ Deleting workspace: {workspace_id}')
-
-    try:
-        print(f'🗑️ Starting complete workspace deletion for: {workspace_id}')
-        
-        # First, get all files in this workspace
-        if not file_service:
-            raise HTTPException(status_code=500, detail="File service not available")
-        
-        all_files = await file_service.list_files()
-        workspace_files = [f for f in all_files if f.get('workspaceId') == workspace_id]
-        
-        print(f'📄 Found {len(workspace_files)} files in workspace {workspace_id}')
-        
-        deleted_files = []
-        failed_deletions = []
-        
-        # Delete each file in the workspace
-        for file_info in workspace_files:
-            file_id = file_info['id']
-            try:
-                print(f'🗑️ Deleting file: {file_id} ({file_info.get("originalName", "Unknown")})')
-                
-                # Remove from vector database first
-                try:
-                    if rag_service:
-                        detailed_status = rag_service.get_detailed_status()
-                        if rag_service.is_ready_for_deletion():
-                            print(f'🗑️ Removing from vector database: {file_id}')
-                            await rag_service.vector_database_service.remove_document(file_id)
-                            print(f'✅ Removed from vector database: {file_id}')
-                        else:
-                            print(f'⚠️ RAG service not ready for deletion. Status: {detailed_status}')
-                    else:
-                        print(f'⚠️ RAG service not available for document {file_id}')
-                except Exception as vector_error:
-                    print(f'⚠️ Vector database removal failed: {vector_error} for document {file_id}')
-                
-                # Delete local file and metadata
-                await file_service.delete_local_file_only(file_id)
-                print(f"✅ Local file and metadata deleted successfully: {file_id}")
-                deleted_files.append(file_id)
-                
-            except Exception as file_error:
-                print(f"❌ Failed to delete file {file_id}: {file_error}")
-                failed_deletions.append({"file_id": file_id, "error": str(file_error)})
-        
-        # Remove workspace metadata from vector database
-        try:
-            if rag_service and rag_service.is_ready_for_deletion():
-                print(f'🗑️ Removing workspace metadata from vector database: {workspace_id}')
-                await rag_service.vector_database_service.remove_workspace_metadata(workspace_id)
-                print(f'✅ Removed workspace metadata from vector database: {workspace_id}')
-        except Exception as workspace_error:
-            print(f'⚠️ Workspace metadata removal failed: {workspace_error}')
-        
-        result = {
-            "success": True,
-            "message": f"Workspace {workspace_id} deleted successfully",
-            "deleted_files": deleted_files,
-            "deleted_count": len(deleted_files),
-            "failed_count": len(failed_deletions)
-        }
-        
-        if failed_deletions:
-            result["failed_deletions"] = failed_deletions
-            result["message"] += f" ({len(failed_deletions)} files failed to delete)"
-        
-        print(f"✅ Workspace deletion completed: {workspace_id} - {len(deleted_files)} files deleted")
-        return result
-        
-    except HTTPException as http_exc:
-        raise http_exc
-    except Exception as error:
-        print(f"❌ Failed to delete workspace: {error}")
-        raise HTTPException(status_code=500, detail=f"Failed to delete workspace: {str(error)}")
+@app.delete("/workspace/{workspace}")
+async def delete_workspace(workspace):
+ print(f"Deleting workspace: {workspace}")
+ try:
+  for file in workspace.files:
+     print(f"Deleting file: {file}")
+     await delete_file(file.id)
+  return {"success": True, "message": "Workspace deleted successfully"}
+ except Exception as error:
+  print(f"❌ Failed to delete workspace: {error}")
+  raise HTTPException(status_code=500, detail=f"Failed to delete workspace: {str(error)}")
 
 # Workspace mixed file and URL upload endpoint
 @app.post("/upload/workspace")

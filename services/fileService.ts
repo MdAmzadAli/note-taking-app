@@ -1,18 +1,6 @@
-import { API_ENDPOINTS, ApiResponse, FileUploadResponse, FileMetadata } from '../config/api';
+import { API_ENDPOINTS, ApiResponse, FileMetadata } from '../config/api';
 
-export interface FileUploadResponse {
-  id: string;
-  originalName: string;
-  mimetype: string;
-  size: number;
-  uploadDate: string;
-  cloudinary?: {
-    thumbnailUrl: string;
-    pageUrls: string[];
-    fullPdfUrl: string;
-    totalPages: number;
-  };
-}
+
 // sdsjdjs
 export interface FileUploadResponse {
   id: string;
@@ -437,9 +425,9 @@ class FileService {
     }
   }
 
-  async deleteWorkspace(workspaceId: string): Promise<boolean> {
+  async deleteWorkspace(workspace: any): Promise<boolean> {
     try {
-      console.log('🗑️ Starting complete workspace deletion for:', workspaceId);
+      console.log('🗑️ Starting complete workspace deletion for:', workspace.id);
       console.log('🗑️ Making single API call for complete workspace deletion from all sources...');
 
       // Single call to backend - it handles ALL deletions:
@@ -448,7 +436,7 @@ class FileService {
       // - Local uploads folder cleanup for all files
       // - Metadata file deletion for all files
       // - Cloudinary cleanup (if configured)
-      const response = await fetch(API_ENDPOINTS.deleteWorkspace(workspaceId), {
+      const response = await fetch(API_ENDPOINTS.deleteWorkspace(workspace), {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -463,7 +451,7 @@ class FileService {
 
       const result = await response.json();
       console.log('✅ Complete workspace deletion successful:', result);
-      console.log(`✅ Workspace removed: ${result.deleted_count} files deleted from Vector DB + Uploads + Metadata + Cloudinary`);
+      // console.log(`✅ Workspace removed: ${result.deleted_count} files deleted from Vector DB + Uploads + Metadata + Cloudinary`);
       return true;
 
     } catch (error) {
