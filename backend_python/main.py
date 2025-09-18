@@ -888,8 +888,9 @@ async def delete_file(file_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(error)}")
 
 # Delete workspace and all its files
-@app.delete("/workspace/{workspace}")
-async def delete_workspace(workspace):
+@app.delete("/workspace/{workspace_id}")
+async def delete_workspace(workspace_id):
+ workspace = await requests.json()
  print(f"Deleting workspace: {workspace}")
  try:
   for file in workspace.files:
