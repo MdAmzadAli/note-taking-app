@@ -889,8 +889,8 @@ async def delete_file(file_id: str):
 
 # Delete workspace and all its files
 @app.delete("/workspace/{workspace_id}")
-async def delete_workspace(workspace_id):
- workspace = await requests.json()
+async def delete_workspace(workspace_id,request:Request):
+ workspace = await request.json()
  print(f"Deleting workspace: {workspace}")
  try:
   for file in workspace.files:
