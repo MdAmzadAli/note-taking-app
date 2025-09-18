@@ -1189,7 +1189,7 @@ async def upload_workspace(
 
                 print(f"✅ RAG indexing completed for item {item_metadata['id']}: {index_result.get('chunksCount', 0)} chunks")
                 indexed_count += 1
-
+                
                 # Start background summary generation (non-blocking)
                 asyncio.create_task(generate_file_summary_background(
                     item_metadata['id'],
