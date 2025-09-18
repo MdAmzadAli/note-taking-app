@@ -509,7 +509,7 @@ export default function ChatInterface({
     setSelectedSources(sources);
     setShowSourceModal(true);
   };
-
+// git pushing
   const handleFilePreview = (file: SingleFile) => {
     console.log('🔍 Opening file preview in chat interface for:', {
       fileName: file.name,
