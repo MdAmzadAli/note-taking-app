@@ -893,9 +893,9 @@ async def delete_workspace(workspace_id,request:Request):
  workspace = await request.json()
  print(f"Deleting workspace: {workspace}")
  try:
-  for file in workspace.files:
+  for file in workspace["files"]:
      print(f"Deleting file: {file}")
-     await delete_file(file.id)
+     await delete_file(str(file["id"]))
   return {"success": True, "message": "Workspace deleted successfully"}
  except Exception as error:
   print(f"❌ Failed to delete workspace: {error}")
