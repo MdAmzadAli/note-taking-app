@@ -720,6 +720,8 @@ export default function ExpertTab() {
   };
 
   const handleAddWorkspaceFile = async (workspaceId: string, fileItem?: any) => {
+    if (!fileItem) return;
+
     if (!isBackendConnected) {
       Alert.alert('Backend Not Available', 'Backend server is not connected. Please check the connection.');
       return;
@@ -730,28 +732,31 @@ export default function ExpertTab() {
       console.log('📤 Adding file to workspace:', workspaceId, fileItem);
 
       // Use fileService.uploadWorkspaceMixed for consistent /upload/workspace endpoint
-      const uploadedFiles = await fileService.uploadWorkspaceMixed([fileItem], workspaceId);
+      const uploadResponse = await fileService.uploadWorkspaceMixed([fileItem], workspaceId);
 
-      if (uploadedFiles && uploadedFiles.length > 0) {
-        const backendFile = uploadedFiles[0];
-        const newFile: SingleFile = {
-          id: backendFile.id,
-          name: backendFile.originalName,
+      console.log('📨 Upload response:', uploadResponse);
+
+      if (uploadResponse && uploadResponse.length > 0) {
+        // Use the actual file details returned by the backend
+        const backendFile = uploadResponse[0]; // Get the first uploaded file
+        const processedFile: SingleFile = {
+          id: backendFile.id, // Use the ACTUAL file ID from backend
+          name: backendFile.originalName || fileItem.file?.name || 'uploaded_file.pdf',
           uploadDate: new Date(backendFile.uploadDate).toLocaleDateString(),
-          mimetype: backendFile.mimetype,
-          size: backendFile.size,
+          mimetype: backendFile.mimetype || 'application/pdf',
+          size: backendFile.size || 0,
           isUploaded: true,
-          source: fileItem.type === 'device' ? 'device' : fileItem.type,
+          source: fileItem.type === 'device' ? 'device' : fileItem.type, // Store the source type
           cloudinary: backendFile.cloudinary,
         };
 
-        console.log('✅ Processed file for workspace:', newFile);
+        console.log('✅ Processed file for workspace:', processedFile);
 
         const updatedWorkspaces = workspaces.map(workspace => {
           if (workspace.id === workspaceId && workspace.files.length < 5) {
             return {
               ...workspace,
-              files: [...workspace.files, newFile]
+              files: [...workspace.files, processedFile]
             };
           }
           return workspace;
@@ -766,21 +771,15 @@ export default function ExpertTab() {
         }
 
         await saveData(singleFiles, updatedWorkspaces);
-        
-        // Index the document for RAG after successful upload
-        try {
-          console.log(`🔄 Starting RAG indexing for workspace file ${newFile.id}...`);
-          const indexResult = await ragService.indexDocument(newFile.id, workspaceId);
-          console.log('✅ RAG indexing completed:', indexResult);
-        } catch (ragError) {
-          console.warn('⚠️ RAG indexing failed for workspace file (continuing anyway):', ragError.message);
-        }
 
+        console.log('✅ File added to workspace successfully');
         Alert.alert('Success', 'File added to workspace successfully!');
+      } else {
+        throw new Error('No files were processed successfully');
       }
     } catch (error) {
       console.error('❌ Error adding file to workspace:', error);
-      Alert.alert('Error', `Failed to add file to workspace: ${error.message}`);
+      Alert.alert('Error', `Failed to add file to workspace: ${error.message || 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
