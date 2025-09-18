@@ -712,57 +712,73 @@ export default function ChatInterface({
       // Check if this summary is for one of our files using current state
       setIsSummaryLoading(false); // Always stop loading when any summary arrives
 
-      // Store summary for specific file using backend file ID
-      setSummaries(prev => ({
-        ...prev,
-        [notification.fileId]: notification.summary
-      }));
+      // ==================== SINGLE FILE MODE SUMMARY HANDLING ====================
+      if (selectedFile) {
+        // Store summary for specific file using backend file ID
+        setSummaries(prev => ({
+          ...prev,
+          [notification.fileId]: notification.summary
+        }));
 
-      // Update relevant UI state based on current files
-      setSelectedSummaryFile(currentSelected => {
-        setSummary(currentSummary => {
-          // Get current files from the files state
-          const currentFiles = files;
-          
-          // For file ID matching, we need to check if this notification is for any of our current files
-          // The notification.fileId is the actual backend file ID, but our display files might have different IDs
-          // We'll try to match based on the file being recently uploaded or being the only file
-          
-          // For single file mode, if we have exactly one file, assume it's for that file
-          if (currentFiles.length === 1) {
-            console.log('✅ Single file summary received - applying to current file:', currentFiles[0].name);
-            console.log('🔍 Backend file ID:', notification.fileId, 'Frontend file ID:', currentFiles[0].id);
-            
-            // Save summary to localStorage immediately for single file mode
-            if (selectedFile && selectedFile.id === notification.fileId) {
-              ChatSessionStorage.updateSessionSummary(selectedFile.id, notification.summary)
-                .then(() => console.log('✅ Summary saved to localStorage for file:', selectedFile.id))
-                .catch(error => console.error('❌ Failed to save summary to localStorage:', error));
-            }
-            
-            return notification.summary;
+        // Save summary to localStorage immediately for single file mode
+        if (selectedFile.id === notification.fileId) {
+          try {
+            await ChatSessionStorage.updateSessionSummary(selectedFile.id, notification.summary);
+            setSummary(notification.summary);
+            console.log('✅ Single file summary saved to localStorage for file:', selectedFile.id);
+          } catch (error) {
+            console.error('❌ Failed to save single file summary to localStorage:', error);
           }
+        }
+      }
+      // ==================== WORKSPACE MODE SUMMARY HANDLING ====================
+      else if (selectedWorkspace) {
+        // Update workspace file summaries state
+        setWorkspaceFileSummaries(prev => ({
+          ...prev,
+          [notification.fileId]: notification.summary
+        }));
 
-          // For workspace mode with multiple files, try to match by name or assume it's for the latest file
-          if (currentFiles.length > 1) {
-            // If no file is selected yet, select the first one
+        // Update global summaries state for UI consistency
+        setSummaries(prev => ({
+          ...prev,
+          [notification.fileId]: notification.summary
+        }));
+
+        // Save summary to workspace localStorage
+        try {
+          await ChatSessionStorage.updateWorkspaceFileSummary(
+            selectedWorkspace.id, 
+            notification.fileId, 
+            notification.summary
+          );
+          console.log('✅ Workspace file summary saved to localStorage for workspace:', selectedWorkspace.id, 'file:', notification.fileId);
+
+          // Update UI state if this is the currently selected summary file
+          setSelectedSummaryFile(currentSelected => {
+            const currentFiles = selectedWorkspace.files;
+            
+            // If no file is selected yet, select the file that just got a summary
             if (!currentSelected) {
-              setSelectedSummaryFile(currentFiles[0]);
-              console.log('✅ First workspace summary - selected first file:', currentFiles[0].name);
-              return notification.summary;
+              const fileWithNewSummary = currentFiles.find(f => f.id === notification.fileId);
+              if (fileWithNewSummary) {
+                setSummary(notification.summary);
+                console.log('✅ Auto-selected file with new summary:', fileWithNewSummary.name);
+                return fileWithNewSummary;
+              }
             }
-            // If we have a selected file, apply the summary to it
-            else {
-              console.log('✅ Workspace summary applied to selected file:', currentSelected.name);
-              return notification.summary;
+            // If the currently selected file got a new summary, update the summary display
+            else if (currentSelected.id === notification.fileId) {
+              setSummary(notification.summary);
+              console.log('✅ Updated summary for currently selected file:', currentSelected.name);
             }
-          }
-
-          return currentSummary;
-        });
-
-        return currentSelected;
-      });
+            
+            return currentSelected;
+          });
+        } catch (error) {
+          console.error('❌ Failed to save workspace file summary to localStorage:', error);
+        }
+      }
 
       console.log('✅ Summary processed for file:', notification.fileId);
     };
