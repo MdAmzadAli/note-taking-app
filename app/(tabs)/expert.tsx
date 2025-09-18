@@ -719,7 +719,7 @@ export default function ExpertTab() {
     }
   };
 
-  const handleAddWorkspaceFile = async (workspaceId: string) => {
+  const handleAddWorkspaceFile = async (workspaceId: string, fileItem?: any) => {
     if (!isBackendConnected) {
       Alert.alert('Backend Not Available', 'Backend server is not connected. Please check the connection.');
       return;
@@ -727,43 +727,60 @@ export default function ExpertTab() {
 
     try {
       setIsLoading(true);
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/pdf',
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
+      console.log('📤 Adding file to workspace:', workspaceId, fileItem);
 
-      if (!result.canceled && result.assets.length > 0) {
-        const file = result.assets[0];
+      // Use fileService.uploadWorkspaceMixed for consistent /upload/workspace endpoint
+      const uploadedFiles = await fileService.uploadWorkspaceMixed([fileItem], workspaceId);
 
-        const newFile = await handleFileUpload(file, workspaceId); // Use handleFileUpload for consistency
+      if (uploadedFiles && uploadedFiles.length > 0) {
+        const backendFile = uploadedFiles[0];
+        const newFile: SingleFile = {
+          id: backendFile.id,
+          name: backendFile.originalName,
+          uploadDate: new Date(backendFile.uploadDate).toLocaleDateString(),
+          mimetype: backendFile.mimetype,
+          size: backendFile.size,
+          isUploaded: true,
+          source: fileItem.type === 'device' ? 'device' : fileItem.type,
+          cloudinary: backendFile.cloudinary,
+        };
 
-        if (newFile) {
-          const updatedWorkspaces = workspaces.map(workspace => {
-            if (workspace.id === workspaceId && workspace.files.length < 5) {
-              return {
-                ...workspace,
-                files: [...workspace.files, newFile]
-              };
-            }
-            return workspace;
-          });
+        console.log('✅ Processed file for workspace:', newFile);
 
-          setWorkspaces(updatedWorkspaces);
-
-          // Update selected workspace if it's the current one
-          if (selectedWorkspace && selectedWorkspace.id === workspaceId) {
-            const updatedWorkspace = updatedWorkspaces.find(w => w.id === workspaceId);
-            setSelectedWorkspace(updatedWorkspace || null);
+        const updatedWorkspaces = workspaces.map(workspace => {
+          if (workspace.id === workspaceId && workspace.files.length < 5) {
+            return {
+              ...workspace,
+              files: [...workspace.files, newFile]
+            };
           }
+          return workspace;
+        });
 
-          await saveData(singleFiles, updatedWorkspaces);
-          Alert.alert('Success', 'File added to workspace successfully!');
+        setWorkspaces(updatedWorkspaces);
+
+        // Update selected workspace if it's the current one
+        if (selectedWorkspace && selectedWorkspace.id === workspaceId) {
+          const updatedWorkspace = updatedWorkspaces.find(w => w.id === workspaceId);
+          setSelectedWorkspace(updatedWorkspace || null);
         }
+
+        await saveData(singleFiles, updatedWorkspaces);
+        
+        // Index the document for RAG after successful upload
+        try {
+          console.log(`🔄 Starting RAG indexing for workspace file ${newFile.id}...`);
+          const indexResult = await ragService.indexDocument(newFile.id, workspaceId);
+          console.log('✅ RAG indexing completed:', indexResult);
+        } catch (ragError) {
+          console.warn('⚠️ RAG indexing failed for workspace file (continuing anyway):', ragError.message);
+        }
+
+        Alert.alert('Success', 'File added to workspace successfully!');
       }
     } catch (error) {
-      console.error('Error adding file to workspace:', error);
-      Alert.alert('Error', 'Failed to add file to workspace');
+      console.error('❌ Error adding file to workspace:', error);
+      Alert.alert('Error', `Failed to add file to workspace: ${error.message}`);
     } finally {
       setIsLoading(false);
     }

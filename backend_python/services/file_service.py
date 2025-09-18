@@ -148,16 +148,16 @@ class FileService:
             else:
                 print(f"⚠️ Physical file not found: {file_path}")
 
-            # Step 2: Delete from Cloudinary if exists
-            try:
-                cloudinary_data = file_info.get('cloudinary')
-                if cloudinary_data and cloudinary_data.get('publicId'):
-                    await self.cloudinary_service.delete_file(cloudinary_data['publicId'])
-                    print(f"✅ Deleted from Cloudinary: {cloudinary_data['publicId']}")
-                else:
-                    print("ℹ️ No Cloudinary data found for file")
-            except Exception as cloudinary_error:
-                print(f"⚠️ Cloudinary deletion failed (continuing): {cloudinary_error}")
+            # # Step 2: Delete from Cloudinary if exists
+            # try:
+            #     cloudinary_data = file_info.get('cloudinary')
+            #     if cloudinary_data and cloudinary_data.get('publicId'):
+            #         await self.cloudinary_service.delete_file(cloudinary_data['publicId'])
+            #         print(f"✅ Deleted from Cloudinary: {cloudinary_data['publicId']}")
+            #     else:
+            #         print("ℹ️ No Cloudinary data found for file")
+            # except Exception as cloudinary_error:
+            #     print(f"⚠️ Cloudinary deletion failed (continuing): {cloudinary_error}")
 
             # Step 3: Delete metadata file
             metadata_file_path = os.path.join('metadata', f'{file_id}.json')

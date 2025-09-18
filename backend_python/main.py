@@ -876,8 +876,8 @@ async def delete_file(file_id: str):
             print(f'⚠️ Vector database removal failed: {vector_error} for document {file_id}')
 
         # Now delete only the local file and metadata (without vector DB deletion)
-        await file_service.delete_local_file_only(file_id)
-        print(f"✅ Local file and metadata deleted successfully: {file_id}")
+        # await file_service.delete_local_file_only(file_id)
+        # print(f"✅ Local file and metadata deleted successfully: {file_id}")
 
         return {"success": True, "message": "File deleted successfully"}
     except HTTPException as http_exc:
@@ -1189,7 +1189,7 @@ async def upload_workspace(
 
                 print(f"✅ RAG indexing completed for item {item_metadata['id']}: {index_result.get('chunksCount', 0)} chunks")
                 indexed_count += 1
-                
+                await file_service.delete_local_file_only(item_metadata['id'])
                 # Start background summary generation (non-blocking)
                 asyncio.create_task(generate_file_summary_background(
                     item_metadata['id'],
