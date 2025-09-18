@@ -230,3 +230,14 @@ export interface ChatSession {
   createdAt: string;
   updatedAt: string;
 }
+
+// Workspace Chat Session Interface for Expert Tab Workspace Mode
+export interface WorkspaceChatSession {
+  id: string; // Unique workspace chat session ID
+  workspace_id: string; // Foreign key - matches the workspace's actual ID
+  file_summaries: { [fileId: string]: string }; // File-specific summaries mapping
+  chats: ChatMessage[]; // Array of all chat messages in workspace context
+  active_files: string[]; // Track current files in workspace for sync
+  createdAt: string;
+  updatedAt: string;
+}
