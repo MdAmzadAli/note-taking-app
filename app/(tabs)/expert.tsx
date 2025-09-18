@@ -497,23 +497,7 @@ export default function ExpertTab() {
         )
       );
 
-      // Save to localStorage for single file mode
-      if (selectedFile) {
-        try {
-          const chatMessageForStorage: ChatMessageType = {
-            id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            user: message,
-            ai: finalMessage.ai,
-            sources: response.sources || [],
-            timestamp: new Date().toISOString()
-          };
-          
-          await ChatSessionStorage.addMessageToSession(selectedFile.id, chatMessageForStorage);
-          console.log('✅ Message saved to localStorage for file:', selectedFile.id);
-        } catch (storageError) {
-          console.error('❌ Failed to save message to localStorage:', storageError);
-        }
-      }
+      // Note: localStorage saving is now handled in ChatInterface's handleNewRAGMessage
 
     } catch (error) {
       console.error('RAG message error:', error);

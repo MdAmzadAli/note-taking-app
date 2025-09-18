@@ -61,6 +61,7 @@ interface ChatInterfaceProps {
   setCurrentMessage: (message: string) => void;
   onSendMessage: () => void;
   onSendRAGMessage?: (message: string) => Promise<void>;
+  onRAGResponse?: (message: string, response: any) => void;
   onBack: () => void;
   onFilePreview?: (file: SingleFile) => void;
   onDeleteWorkspaceFile?: (workspaceId: string, fileId: string) => void;
@@ -115,19 +116,9 @@ export default function ChatInterface({
   // New state for chat session management
   const [currentChatSession, setCurrentChatSession] = useState<ChatSession | null>(null);
   const [localChatMessages, setLocalChatMessages] = useState<ChatMessageType[]>([]);
-
-  // Function to reload messages from localStorage (to sync with external updates)
-  // const reloadChatMessages = async () => {
-  //   if (selectedFile) {
-  //     try {
-  //       const session = await ChatSessionStorage.getOrCreateSession(selectedFile.id);
-  //       setLocalChatMessages(session.chats);
-  //       console.log('🔄 Reloaded chat messages from localStorage:', session.chats.length);
-  //     } catch (error) {
-  //       console.error('❌ Error reloading chat messages:', error);
-  //     }
-  //   }
-  // };
+  
+  // Unified state for displaying messages - starts with localStorage, gets updated with ongoing messages
+  const [displayChatMessages, setDisplayChatMessages] = useState<ChatMessage[]>([]);
   
   // Get tab bar context to hide bottom navigation
   const { hideTabBar, showTabBar } = useTabBar();
@@ -151,6 +142,15 @@ export default function ChatInterface({
           setCurrentChatSession(session);
           setLocalChatMessages(session.chats);
           
+          // Initialize display messages with localStorage messages
+          const displayMessages = session.chats.map(msg => ({
+            user: msg.user,
+            ai: msg.ai,
+            sources: msg.sources,
+            isLoading: false
+          }));
+          setDisplayChatMessages(displayMessages);
+          
           // Load stored summary if available
           if (session.summary) {
             setSummary(session.summary);
@@ -170,19 +170,101 @@ export default function ChatInterface({
         console.log('📁 Workspace mode - using existing chat logic');
         setCurrentChatSession(null);
         setLocalChatMessages([]);
+        setDisplayChatMessages(chatMessages); // Use prop messages for workspace mode
       }
     };
 
     loadChatSession();
   }, [selectedFile, selectedWorkspace]);
 
-  // Periodically check for new messages in localStorage (in case they're added from outside this component)
-  // useEffect(() => {
-  //   if (selectedFile) {
-  //     const interval = setInterval(reloadChatMessages, 1000); // Check every second
-  //     return () => clearInterval(interval);
-  //   }
-  // }, [selectedFile]);
+  // Update display messages when workspace chatMessages prop changes
+  useEffect(() => {
+    if (selectedWorkspace && !selectedFile) {
+      setDisplayChatMessages(chatMessages);
+    }
+  }, [chatMessages, selectedWorkspace, selectedFile]);
+    };
+
+    // Handle RAG messages with internal state management
+  const handleInternalRAGMessage = useCallback(async (message: string) => {
+    if (!message.trim()) return;
+
+    // Add loading message to display
+    const loadingMessage: ChatMessage = {
+      user: message,
+      ai: '',
+      isLoading: true
+    };
+    
+    setDisplayChatMessages(prev => [...prev, loadingMessage]);
+    setCurrentMessage('');
+
+    try {
+      // Determine context for RAG query
+      let fileIds: string[] | undefined;
+      let workspaceId: string | undefined;
+
+      if (selectedFile) {
+        fileIds = [selectedFile.id];
+      } else if (selectedWorkspace) {
+        fileIds = selectedWorkspace.files.map(f => f.id);
+        workspaceId = selectedWorkspace.id;
+      }
+
+      // Query RAG service
+      const response = await ragService.queryDocuments(message, fileIds, workspaceId);
+
+      const finalMessage: ChatMessage = {
+        user: message,
+        ai: response.success
+          ? response.answer || 'No response generated'
+          : response.error || 'Failed to generate response',
+        sources: response.sources || [],
+        isLoading: false
+      };
+
+      // Update display messages
+      setDisplayChatMessages(prev =>
+        prev.map((msg, index) =>
+          index === prev.length - 1 ? finalMessage : msg
+        )
+      );
+
+      // Save to localStorage for single file mode
+      if (selectedFile) {
+        try {
+          const chatMessageForStorage: ChatMessageType = {
+            id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            user: message,
+            ai: finalMessage.ai,
+            sources: response.sources || [],
+            timestamp: new Date().toISOString()
+          };
+          
+          await ChatSessionStorage.addMessageToSession(selectedFile.id, chatMessageForStorage);
+          console.log('✅ Message saved to localStorage for file:', selectedFile.id);
+        } catch (storageError) {
+          console.error('❌ Failed to save message to localStorage:', storageError);
+        }
+      }
+
+    } catch (error) {
+      console.error('RAG message error:', error);
+
+      const errorMessage: ChatMessage = {
+        user: message,
+        ai: 'Sorry, I encountered an error while processing your request.',
+        sources: [],
+        isLoading: false
+      };
+
+      setDisplayChatMessages(prev =>
+        prev.map((msg, index) =>
+          index === prev.length - 1 ? errorMessage : msg
+        )
+      );
+    }
+  }, [selectedFile, selectedWorkspace]);
 
   const getFileSize = (file: SingleFile) => {
     if (!file.size) return 'Unknown';
@@ -481,13 +563,8 @@ export default function ChatInterface({
   const files = selectedFile ? [selectedFile] : selectedWorkspace?.files || [];
   const workspaceId = selectedWorkspace?.id;
 
-  // Determine which messages to display: localStorage messages for single file mode, or prop messages for workspace mode
-  const displayMessages = selectedFile ? localChatMessages.map(msg => ({
-    user: msg.user,
-    ai: msg.ai,
-    sources: msg.sources,
-    isLoading: false
-  })) : chatMessages;
+  // Use unified display messages state
+  const displayMessages = selectedFile ? displayChatMessages : chatMessages;
 
   useEffect(() => {
     if (displayMessages.length > 0) {
@@ -496,9 +573,6 @@ export default function ChatInterface({
       }, 100);
     }
   }, [displayMessages]);
-  const [onGoingMessage,setOnGoingMessage]=useState(displayMessages);
-
-  // const [currentMessage,setCurrentMessage]=useState(displayMessages);
   // Socket.IO connection for summary notifications
   useEffect(() => {
   
@@ -1017,8 +1091,16 @@ export default function ChatInterface({
             <TouchableOpacity 
               style={styles.pdfSendButton} 
               onPress={() => {
-                if ((ragHealth.status === 'healthy' || ragHealth.status === 'degraded') && onSendRAGMessage) {
-                  onSendRAGMessage(currentMessage);
+                if ((ragHealth.status === 'healthy' || ragHealth.status === 'degraded')) {
+                  if (selectedFile) {
+                    // Use internal handler for single file mode
+                    handleInternalRAGMessage(currentMessage);
+                  } else if (onSendRAGMessage) {
+                    // Use parent handler for workspace mode
+                    onSendRAGMessage(currentMessage);
+                  } else {
+                    onSendMessage();
+                  }
                 } else {
                   onSendMessage();
                 }
