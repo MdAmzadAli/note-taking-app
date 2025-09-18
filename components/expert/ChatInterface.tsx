@@ -21,7 +21,7 @@ import { ragService, RAGSource } from '@/services/ragService';
 import io, { Socket } from 'socket.io-client';
 import { useTabBar } from '@/contexts/TabBarContext';
 import {API_ENDPOINTS} from '@/config/api'
-import { ChatSession, ChatMessage as ChatMessageType } from '@/types';
+import { ChatSession, ChatMessage as ChatMessageType, WorkspaceChatSession } from '@/types';
 import { ChatSessionStorage } from '@/utils/chatStorage';
 interface SingleFile {
   id: string;
@@ -117,6 +117,11 @@ export default function ChatInterface({
   const [currentChatSession, setCurrentChatSession] = useState<ChatSession | null>(null);
   const [localChatMessages, setLocalChatMessages] = useState<ChatMessageType[]>([]);
   
+  // ==================== WORKSPACE CHAT SESSION STATE ====================
+  const [currentWorkspaceChatSession, setCurrentWorkspaceChatSession] = useState<WorkspaceChatSession | null>(null);
+  const [workspaceDisplayChatMessages, setWorkspaceDisplayChatMessages] = useState<ChatMessage[]>([]);
+  const [workspaceFileSummaries, setWorkspaceFileSummaries] = useState<{[fileId: string]: string}>({});
+  
   // Unified state for displaying messages - starts with localStorage, gets updated with ongoing messages
   const [displayChatMessages, setDisplayChatMessages] = useState<ChatMessage[]>([]);
   
@@ -166,11 +171,52 @@ export default function ChatInterface({
           console.error('❌ Error loading chat session:', error);
         }
       } else if (selectedWorkspace) {
-        // For workspace mode, use existing logic (no localStorage persistence)
-        console.log('📁 Workspace mode - using existing chat logic');
-        setCurrentChatSession(null);
-        setLocalChatMessages([]);
-        setDisplayChatMessages(chatMessages); // Use prop messages for workspace mode
+        // ==================== WORKSPACE MODE WITH LOCALSTORAGE PERSISTENCE ====================
+        console.log('📁 Loading workspace chat session:', selectedWorkspace.id);
+        try {
+          const currentFileIds = selectedWorkspace.files.map(f => f.id);
+          
+          // Sync workspace files (handle deletions/modifications)
+          await ChatSessionStorage.syncWorkspaceFiles(selectedWorkspace.id, currentFileIds);
+          
+          // Get or create workspace session
+          const workspaceSession = await ChatSessionStorage.getOrCreateWorkspaceSession(
+            selectedWorkspace.id, 
+            currentFileIds
+          );
+          
+          setCurrentWorkspaceChatSession(workspaceSession);
+          
+          // Initialize workspace display messages with localStorage messages
+          const workspaceDisplayMessages = workspaceSession.chats.map(msg => ({
+            user: msg.user,
+            ai: msg.ai,
+            sources: msg.sources,
+            isLoading: false
+          }));
+          setWorkspaceDisplayChatMessages(workspaceDisplayMessages);
+          setDisplayChatMessages(workspaceDisplayMessages);
+          
+          // Load workspace file summaries
+          setWorkspaceFileSummaries(workspaceSession.file_summaries);
+          setSummaries(workspaceSession.file_summaries);
+          
+          // Set first file with summary as selected summary file if available
+          const filesWithSummaries = selectedWorkspace.files.filter(f => workspaceSession.file_summaries[f.id]);
+          if (filesWithSummaries.length > 0 && !selectedSummaryFile) {
+            setSelectedSummaryFile(filesWithSummaries[0]);
+            setSummary(workspaceSession.file_summaries[filesWithSummaries[0].id]);
+          }
+          
+          console.log('✅ Workspace chat session loaded with', workspaceSession.chats.length, 'messages and', Object.keys(workspaceSession.file_summaries).length, 'file summaries');
+        } catch (error) {
+          console.error('❌ Error loading workspace chat session:', error);
+          // Fallback to reset state
+          setCurrentWorkspaceChatSession(null);
+          setWorkspaceDisplayChatMessages([]);
+          setDisplayChatMessages([]);
+          setWorkspaceFileSummaries({});
+        }
       }
     };
 
@@ -265,6 +311,89 @@ export default function ChatInterface({
       );
     }
   }, [selectedFile, selectedWorkspace]);
+
+  // ==================== WORKSPACE RAG MESSAGE HANDLER ====================
+  const handleWorkspaceRAGMessage = useCallback(async (message: string) => {
+    if (!message.trim() || !selectedWorkspace) return;
+
+    // Add loading message to workspace display
+    const loadingMessage: ChatMessage = {
+      user: message,
+      ai: '',
+      isLoading: true
+    };
+    
+    setWorkspaceDisplayChatMessages(prev => [...prev, loadingMessage]);
+    setDisplayChatMessages(prev => [...prev, loadingMessage]);
+    setCurrentMessage('');
+
+    try {
+      // Determine context for workspace RAG query
+      const fileIds = selectedWorkspace.files.map(f => f.id);
+      const workspaceId = selectedWorkspace.id;
+
+      // Query RAG service
+      const response = await ragService.queryDocuments(message, fileIds, workspaceId);
+
+      const finalMessage: ChatMessage = {
+        user: message,
+        ai: response.success
+          ? response.answer || 'No response generated'
+          : response.error || 'Failed to generate response',
+        sources: response.sources || [],
+        isLoading: false
+      };
+
+      // Update workspace display messages
+      setWorkspaceDisplayChatMessages(prev =>
+        prev.map((msg, index) =>
+          index === prev.length - 1 ? finalMessage : msg
+        )
+      );
+      setDisplayChatMessages(prev =>
+        prev.map((msg, index) =>
+          index === prev.length - 1 ? finalMessage : msg
+        )
+      );
+
+      // Save to localStorage for workspace mode
+      try {
+        const chatMessageForStorage: ChatMessageType = {
+          id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          user: message,
+          ai: finalMessage.ai,
+          sources: response.sources || [],
+          timestamp: new Date().toISOString()
+        };
+        
+        await ChatSessionStorage.addMessageToWorkspaceSession(workspaceId, chatMessageForStorage);
+        console.log('✅ Message saved to workspace localStorage for workspace:', workspaceId);
+      } catch (storageError) {
+        console.error('❌ Failed to save message to workspace localStorage:', storageError);
+      }
+
+    } catch (error) {
+      console.error('Workspace RAG message error:', error);
+
+      const errorMessage: ChatMessage = {
+        user: message,
+        ai: 'Sorry, I encountered an error while processing your request.',
+        sources: [],
+        isLoading: false
+      };
+
+      setWorkspaceDisplayChatMessages(prev =>
+        prev.map((msg, index) =>
+          index === prev.length - 1 ? errorMessage : msg
+        )
+      );
+      setDisplayChatMessages(prev =>
+        prev.map((msg, index) =>
+          index === prev.length - 1 ? errorMessage : msg
+        )
+      );
+    }
+  }, [selectedWorkspace]);
 // selectedFile, selectedWorkspace
   const getFileSize = (file: SingleFile) => {
     if (!file.size) return 'Unknown';
@@ -1096,9 +1225,9 @@ export default function ChatInterface({
                   if (selectedFile) {
                     // Use internal handler for single file mode
                     handleInternalRAGMessage(currentMessage);
-                  } else if (onSendRAGMessage) {
-                    // Use parent handler for workspace mode
-                    onSendRAGMessage(currentMessage);
+                  } else if (selectedWorkspace) {
+                    // Use workspace-specific handler for workspace mode
+                    handleWorkspaceRAGMessage(currentMessage);
                   } else {
                     onSendMessage();
                   }
