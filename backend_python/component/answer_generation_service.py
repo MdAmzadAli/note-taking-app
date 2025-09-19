@@ -36,12 +36,12 @@ class AnswerGenerationService:
                 }
 
             # Step 1: Reasoning complexity classification
-            complexity_result = await self.step1_reasoning_complexity_router(query, relevant_chunks, is_single_file_mode, is_workspace_mode)
+            complexity_result = await self.step1_reasoning_complexity_router(query, relevant_chunks, bool(is_single_file_mode), bool(is_workspace_mode))
 
             print(f'🧠 Step 1 Result: Complexity={complexity_result["complexity"]}, Mode={"Single" if is_single_file_mode else "Workspace" if is_workspace_mode else "Unknown"}, Reasoning="{complexity_result["reasoning"]}"')
 
             # Step 2: Unified answer generation based on complexity
-            return await self.step2_unified_answer_generation(query, relevant_chunks, complexity_result, is_single_file_mode, is_workspace_mode)
+            return await self.step2_unified_answer_generation(query, relevant_chunks, complexity_result, bool(is_single_file_mode), bool(is_workspace_mode))
 
         except Exception as error:
             print(f'❌ 2-step answer generation failed: {error}')
