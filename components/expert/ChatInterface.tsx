@@ -1177,19 +1177,7 @@ export default function ChatInterface({
                             {renderFormattedText(msg.ai, msg.sources)}
                             
                             {/* Follow-up Questions inside message container */}
-                            {followUpQuestions.length > 0 && index === displayChatMessages.length - 1 && (
-                              <View style={styles.followUpContainerInsideMessage}>
-                                {followUpQuestions.map((question, qIndex) => (
-                                  <TouchableOpacity 
-                                    key={qIndex}
-                                    style={styles.followUpQuestionInsideMessage}
-                                    onPress={() => handleFollowUpQuestionPress(question)}
-                                  >
-                                    <Text style={styles.followUpQuestionTextInsideMessage}>{question}</Text>
-                                  </TouchableOpacity>
-                                ))}
-                              </View>
-                            )}
+                            
                             
                             {/* {msg.sources && msg.sources.length > 0 && (
                               <TouchableOpacity 
@@ -1205,6 +1193,19 @@ export default function ChatInterface({
                           </>
                         )}
                       </View>
+                      {followUpQuestions.length > 0 && index === displayChatMessages.length - 1 && (
+                        <View style={styles.followUpContainerInsideMessage}>
+                          {followUpQuestions.map((question, qIndex) => (
+                            <TouchableOpacity 
+                              key={qIndex}
+                              style={styles.followUpQuestionInsideMessage}
+                              onPress={() => handleFollowUpQuestionPress(question)}
+                            >
+                              <Text style={styles.followUpQuestionTextInsideMessage}>{question}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
                     </View>
                   </View>
                 ))}
