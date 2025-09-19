@@ -247,6 +247,7 @@ Return ONLY this JSON format:
         - Questions that would provide deeper understanding
         - Specific to the documents and context provided
         - Phrased as complete questions ready for the user to ask
+        - MAXIMUM 60 characters per question (keep them small and concise)
         
         Format your complete response as:
         ANSWER: [Your main answer here]
@@ -274,6 +275,7 @@ Return ONLY this JSON format:
         - Questions that would provide deeper understanding
         - Specific to the document and context provided
         - Phrased as complete questions ready for the user to ask
+        - MAXIMUM 60 characters per question (keep them small and concise)
         
         Format your complete response as:
         ANSWER: [Your main answer here]
@@ -334,6 +336,7 @@ Return ONLY this JSON format:
         - Questions that would provide deeper understanding
         - Specific to the documents and context provided
         - Phrased as complete questions ready for the user to ask
+        - MAXIMUM 60 characters per question (keep them small and concise)
         
         Format your complete response as:
         ANSWER: [Your main answer here]
@@ -362,6 +365,7 @@ Return ONLY this JSON format:
         - Questions that would provide deeper understanding
         - Specific to the document and context provided
         - Phrased as complete questions ready for the user to ask
+        - MAXIMUM 60 characters per question (keep them small and concise)
         
         Format your complete response as:
         ANSWER: [Your main answer here]
@@ -428,6 +432,7 @@ Return ONLY this JSON format:
         - Questions that would provide deeper understanding
         - Specific to the documents and context provided
         - Phrased as complete questions ready for the user to ask
+        - MAXIMUM 60 characters per question (keep them small and concise)
         
         Format your complete response as:
         ANSWER: [Your main answer here]
@@ -458,6 +463,7 @@ Return ONLY this JSON format:
         - Questions that would provide deeper understanding
         - Specific to the document and context provided
         - Phrased as complete questions ready for the user to ask
+        - MAXIMUM 60 characters per question (keep them small and concise)
         
         Format your complete response as:
         ANSWER: [Your main answer here]
