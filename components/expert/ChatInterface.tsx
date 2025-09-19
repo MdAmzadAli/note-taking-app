@@ -274,9 +274,9 @@ export default function ChatInterface({
         isLoading: false
       };
       
-      // Extract follow-up questions from AI response
-      if (response.success && aiResponse) {
-        const questions = extractFollowUpQuestions(aiResponse);
+      // Extract follow-up questions from backend response
+      if (response.success) {
+        const questions = extractFollowUpQuestionsFromResponse(response);
         setFollowUpQuestions(questions);
       }
 
@@ -357,9 +357,9 @@ export default function ChatInterface({
         isLoading: false
       };
       
-      // Extract follow-up questions from AI response
-      if (response.success && aiResponse) {
-        const questions = extractFollowUpQuestions(aiResponse);
+      // Extract follow-up questions from backend response
+      if (response.success) {
+        const questions = extractFollowUpQuestionsFromResponse(response);
         setFollowUpQuestions(questions);
       }
 
@@ -414,35 +414,13 @@ export default function ChatInterface({
     }
   }, [selectedWorkspace]);
   
-  // Function to extract follow-up questions from AI response
-  const extractFollowUpQuestions = (aiResponse: string): string[] => {
-    // Generate 3 relevant follow-up questions based on the AI response
-    // This is a simplified implementation - in a real app, you might use AI to generate these
-    const questions: string[] = [];
-    
-    // Look for common patterns that suggest follow-up questions
-    const response = aiResponse.toLowerCase();
-    
-    if (response.includes('summary') || response.includes('overview')) {
-      questions.push('Can you provide more details about this?');
-      questions.push('What are the key takeaways?');
-      questions.push('Are there any related topics I should know about?');
-    } else if (response.includes('process') || response.includes('steps')) {
-      questions.push('Can you explain the first step in more detail?');
-      questions.push('What could go wrong in this process?');
-      questions.push('Are there alternative approaches?');
-    } else if (response.includes('definition') || response.includes('concept')) {
-      questions.push('Can you give me an example?');
-      questions.push('How does this relate to other concepts?');
-      questions.push('Where is this commonly used?');
-    } else {
-      // Default follow-up questions
-      questions.push('Can you elaborate on this?');
-      questions.push('What are the implications?');
-      questions.push('How can I apply this information?');
+  // Function to extract follow-up questions from backend response
+  const extractFollowUpQuestionsFromResponse = (response: any): string[] => {
+    // Use AI-generated follow-up questions from backend
+    if (response.follow_up_questions && Array.isArray(response.follow_up_questions)) {
+      return response.follow_up_questions;
     }
-    
-    return questions.slice(0, 3); // Always return exactly 3 questions
+    return [];
   };
   
   // Handle follow-up question click

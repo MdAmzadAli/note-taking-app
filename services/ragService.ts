@@ -7,6 +7,7 @@ export interface RAGResponse {
   answer?: string;
   sources?: RAGSource[];
   confidence?: number;
+  follow_up_questions?: string[];
   error?: string;
   details?: string;
 }

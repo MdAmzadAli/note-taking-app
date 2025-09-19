@@ -240,7 +240,18 @@ Return ONLY this JSON format:
         - Use **bold** for key information and important details
         - Every fact or claim must have context citations
         - Keep response focused and concise
-        ANSWER:"""
+        
+        FOLLOW-UP QUESTIONS:
+        After your answer, generate exactly 3 highly relevant follow-up questions that the user might want to ask based on your response. These should be:
+        - Directly related to the content you just discussed
+        - Questions that would provide deeper understanding
+        - Specific to the documents and context provided
+        - Phrased as complete questions ready for the user to ask
+        
+        Format your complete response as:
+        ANSWER: [Your main answer here]
+        
+        FOLLOW_UP_QUESTIONS: [Question 1] | [Question 2] | [Question 3]"""
         else:  # Single file mode
             simple_prompt = f"""Answer this straightforward question using the document content below.
         USER QUERY: {user_query}
@@ -256,7 +267,18 @@ Return ONLY this JSON format:
         - Use **bold** for key terms and important information
         - Provide direct answers without unnecessary complexity
         - Every fact or claim must have context citations
-        ANSWER:"""
+        
+        FOLLOW-UP QUESTIONS:
+        After your answer, generate exactly 3 highly relevant follow-up questions that the user might want to ask based on your response. These should be:
+        - Directly related to the content you just discussed
+        - Questions that would provide deeper understanding
+        - Specific to the document and context provided
+        - Phrased as complete questions ready for the user to ask
+        
+        Format your complete response as:
+        ANSWER: [Your main answer here]
+        
+        FOLLOW_UP_QUESTIONS: [Question 1] | [Question 2] | [Question 3]"""
             
         try:
             response = await asyncio.to_thread(
@@ -305,7 +327,18 @@ Return ONLY this JSON format:
         - Keep analysis precise and focused on what the user specifically asks
         - Every fact or claim must have context citations
         - Ensure both sections directly address the user's question
-        ANSWER:"""
+        
+        FOLLOW-UP QUESTIONS:
+        After your answer, generate exactly 3 highly relevant follow-up questions that the user might want to ask based on your response. These should be:
+        - Directly related to the content you just discussed
+        - Questions that would provide deeper understanding
+        - Specific to the documents and context provided
+        - Phrased as complete questions ready for the user to ask
+        
+        Format your complete response as:
+        ANSWER: [Your main answer here]
+        
+        FOLLOW_UP_QUESTIONS: [Question 1] | [Question 2] | [Question 3]"""
         else:  # Single file mode
             medium_prompt = f"""Analyze and answer this question requiring moderate reasoning using the single document provided.
         USER QUERY: {user_query}
@@ -322,7 +355,18 @@ Return ONLY this JSON format:
         - Use **bold** for key terms, numbers, and important findings
         - Structure response logically with clear explanations
         - Every fact or claim must have context citations
-        ANSWER:"""
+        
+        FOLLOW-UP QUESTIONS:
+        After your answer, generate exactly 3 highly relevant follow-up questions that the user might want to ask based on your response. These should be:
+        - Directly related to the content you just discussed
+        - Questions that would provide deeper understanding
+        - Specific to the document and context provided
+        - Phrased as complete questions ready for the user to ask
+        
+        Format your complete response as:
+        ANSWER: [Your main answer here]
+        
+        FOLLOW_UP_QUESTIONS: [Question 1] | [Question 2] | [Question 3]"""
             
         try:
             response = await asyncio.to_thread(
@@ -377,7 +421,18 @@ Return ONLY this JSON format:
         - Ensure thorough, well-reasoned analysis with clear logical flow
         - Every claim must be supported with context citations
         - Address complexity and nuance in the user's question
-        ANSWER:"""
+        
+        FOLLOW-UP QUESTIONS:
+        After your answer, generate exactly 3 highly relevant follow-up questions that the user might want to ask based on your response. These should be:
+        - Directly related to the content you just discussed
+        - Questions that would provide deeper understanding
+        - Specific to the documents and context provided
+        - Phrased as complete questions ready for the user to ask
+        
+        Format your complete response as:
+        ANSWER: [Your main answer here]
+        
+        FOLLOW_UP_QUESTIONS: [Question 1] | [Question 2] | [Question 3]"""
         else:  # Single file mode
             complex_prompt = f"""Provide a comprehensive, in-depth analysis for this complex question using the document provided.
         USER QUERY: {user_query}
@@ -396,7 +451,18 @@ Return ONLY this JSON format:
         - Use **bold** for critical points, key findings, and important data
         - Provide comprehensive analysis while maintaining clarity
         - Every major point must be supported with context citations
-        ANSWER:"""
+        
+        FOLLOW-UP QUESTIONS:
+        After your answer, generate exactly 3 highly relevant follow-up questions that the user might want to ask based on your response. These should be:
+        - Directly related to the content you just discussed
+        - Questions that would provide deeper understanding
+        - Specific to the document and context provided
+        - Phrased as complete questions ready for the user to ask
+        
+        Format your complete response as:
+        ANSWER: [Your main answer here]
+        
+        FOLLOW_UP_QUESTIONS: [Question 1] | [Question 2] | [Question 3]"""
             
         try:
             response = await asyncio.to_thread(
@@ -449,9 +515,38 @@ Return ONLY this JSON format:
     def _process_response_and_build_result(self, full_response: str, relevant_chunks: List[Dict], 
                                           complexity_result: Dict[str, Any], model_name: str, mode_info: str) -> Dict[str, Any]:
         """Process LLM response and build standardized result"""
-        # Extract used contexts and clean answer
+        # Extract the main answer and follow-up questions
         answer = full_response
+        follow_up_questions = []
         used_context_numbers = []
+        
+        # Extract follow-up questions first - improved parsing
+        follow_up_match = re.search(r'FOLLOW_UP_QUESTIONS:\s*(.+)', full_response, re.DOTALL)
+        if follow_up_match:
+            follow_up_text = follow_up_match.group(1).strip()
+            # Split by pipe separator and clean up questions
+            raw_questions = follow_up_text.split('|')
+            follow_up_questions = []
+            for q in raw_questions:
+                cleaned = q.strip()
+                # Remove any remaining formatting or brackets
+                cleaned = re.sub(r'^[\[\(]*\s*', '', cleaned)  # Remove leading brackets/parentheses
+                cleaned = re.sub(r'\s*[\]\)]*$', '', cleaned)  # Remove trailing brackets/parentheses
+                cleaned = cleaned.strip()
+                if cleaned and not cleaned.lower().startswith('answer:'):  # Exclude the ANSWER section
+                    follow_up_questions.append(cleaned)
+            
+            # Limit to exactly 3 questions
+            follow_up_questions = follow_up_questions[:3]
+            print(f'✨ Extracted {len(follow_up_questions)} follow-up questions: {follow_up_questions}')
+        
+        # Extract main answer (remove follow-up questions section)
+        answer_match = re.search(r'ANSWER:\s*(.*?)(?:\n\s*FOLLOW_UP_QUESTIONS:|$)', full_response, re.DOTALL)
+        if answer_match:
+            answer = answer_match.group(1).strip()
+        else:
+            # Fallback: remove follow-up questions section if present
+            answer = re.sub(r'\n\s*FOLLOW_UP_QUESTIONS:.*$', '', full_response, flags=re.DOTALL).strip()
 
         contexts_used_match = re.search(r'CONTEXTS_USED:\s*\[(.*?)\]', full_response)
         if contexts_used_match:
@@ -461,7 +556,7 @@ Return ONLY this JSON format:
                 if s.strip().isdigit() and 1 <= int(s.strip()) <= len(relevant_chunks)
             ]
 
-            answer = re.sub(r'---\s*CONTEXTS_USED:.*$', '', full_response, flags=re.DOTALL).strip()
+            answer = re.sub(r'---\s*CONTEXTS_USED:.*$', '', answer, flags=re.DOTALL).strip()
             print(f'🎯 Used {len(used_context_numbers)} contexts: [{", ".join(map(str, used_context_numbers))}]')
         else:
             print('⚠️ Could not extract CONTEXTS_USED, using all contexts')
@@ -486,6 +581,7 @@ Return ONLY this JSON format:
             'answer': answer,
             'sources': sources,
             'confidence': relevant_chunks[0]['score'] if relevant_chunks else 0,
+            'follow_up_questions': follow_up_questions,
             'analysisType': analysis_type,
             'processingStats': {
                 'complexity': complexity,
