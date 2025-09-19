@@ -1175,6 +1175,22 @@ export default function ChatInterface({
                         ) : (
                           <>
                             {renderFormattedText(msg.ai, msg.sources)}
+                            
+                            {/* Follow-up Questions inside message container */}
+                            {followUpQuestions.length > 0 && index === displayChatMessages.length - 1 && (
+                              <View style={styles.followUpContainerInsideMessage}>
+                                {followUpQuestions.map((question, qIndex) => (
+                                  <TouchableOpacity 
+                                    key={qIndex}
+                                    style={styles.followUpQuestionInsideMessage}
+                                    onPress={() => handleFollowUpQuestionPress(question)}
+                                  >
+                                    <Text style={styles.followUpQuestionTextInsideMessage}>{question}</Text>
+                                  </TouchableOpacity>
+                                ))}
+                              </View>
+                            )}
+                            
                             {/* {msg.sources && msg.sources.length > 0 && (
                               <TouchableOpacity 
                                 style={styles.pdfSourceButton}
@@ -1293,27 +1309,7 @@ export default function ChatInterface({
         {/* Chat Input Section - Only show for chat tab */}
         {activeTab === 'chat' && (
           <View style={styles.pdfChatInputContainer}>
-            {/* Follow-up Questions */}
-            {followUpQuestions.length > 0 && (
-              <View style={styles.followUpContainer}>
-                <ScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.followUpScrollContent}
-                  style={styles.followUpScrollView}
-                >
-                  {followUpQuestions.map((question, index) => (
-                    <TouchableOpacity 
-                      key={index}
-                      style={styles.followUpQuestion}
-                      onPress={() => handleFollowUpQuestionPress(question)}
-                    >
-                      <Text style={styles.followUpQuestionText} numberOfLines={2}>{question}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
+            {/* Follow-up Questions removed from here - now inside message container */}
             
           <View style={styles.pdfChatInputWrapper}>
             <TextInput
@@ -1854,6 +1850,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#FFFFFF',
     textAlign: 'center',
+  },
+  // New styles for follow-up questions inside message container
+  followUpContainerInsideMessage: {
+    marginTop: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#333333',
+  },
+  followUpQuestionInsideMessage: {
+    backgroundColor: '#2A2A2A',
+    borderWidth: 1,
+    borderColor: '#444444',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginVertical: 3,
+    width: '100%',
+  },
+  followUpQuestionTextInsideMessage: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    lineHeight: 16,
   },
   workspaceFilesContainer: {
     marginHorizontal: 16,
