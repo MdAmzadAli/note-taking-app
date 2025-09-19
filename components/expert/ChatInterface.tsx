@@ -123,7 +123,7 @@ export default function ChatInterface({
   const [workspaceFileSummaries, setWorkspaceFileSummaries] = useState<{[fileId: string]: string}>({});
   
   // Follow-up questions state
-  const [followUpQuestions, setFollowUpQuestions] = useState<string[]>(["what is questions","what is question","what is question","what is question","what is question","what is question","what is question","what is question","what is question","what is question","what is question","what is question","what is question","what is question","what is question"]);
+  const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
   
   // Unified state for displaying messages - starts with localStorage, gets updated with ongoing messages
   const [displayChatMessages, setDisplayChatMessages] = useState<ChatMessage[]>([]);
@@ -1848,7 +1848,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginHorizontal: 4,
     minWidth: 120,
-    maxWidth: 200,
+    // maxWidth: 200,
   },
   followUpQuestionText: {
     fontSize: 12,

@@ -416,14 +416,14 @@ Return ONLY this JSON format:
         ## **CONCLUSIONS & IMPLICATIONS**
         Summarize key takeaways and their broader significance based on the comprehensive analysis.
         FORMATTING REQUIREMENTS:
-        - Place context citations at the END of each statement: [Context 1,2], except for follow up questions
+        - Place context citations at the END of each statement: [Context 1,2]
         - Use **bold** for critical findings, numbers, and key concepts
         - Ensure thorough, well-reasoned analysis with clear logical flow
-        - Every claim must be supported with context citations except for follow up questions
+        - Every claim must be supported with context citations
         - Address complexity and nuance in the user's question
         
         FOLLOW-UP QUESTIONS:
-        After your answer, generate exactly 3 highly relevant follow-up questions that the user might want to ask based on your response. These should be:
+        After your answer, generate exactly 3 highly relevant follow-up questions that the user might want to ask based on your response but critical don't include any context reference in it . These should be:
         - Directly related to the content you just discussed
         - Questions that would provide deeper understanding
         - Specific to the documents and context provided
@@ -529,13 +529,13 @@ Return ONLY this JSON format:
             follow_up_questions = []
             for q in raw_questions:
                 cleaned = q.strip()
-                # Remove any remaining formatting or brackets
-                cleaned = re.sub(r'^[\[\(]*\s*', '', cleaned)  # Remove leading brackets/parentheses
-                cleaned = re.sub(r'\s*[\]\)]*$', '', cleaned)  # Remove trailing brackets/parentheses
                 # Remove context references like [Context 1], [Context 1,2], etc.
                 cleaned = re.sub(r'\[Context\s+[\d,\s]+\]', '', cleaned, flags=re.IGNORECASE)
                 # Remove any other citation patterns like [1], [1,2], etc. at the end
                 cleaned = re.sub(r'\[\d+(?:,\s*\d+)*\]$', '', cleaned)
+                # Remove any remaining formatting or brackets
+                cleaned = re.sub(r'^[\[\(]*\s*', '', cleaned)  # Remove leading brackets/parentheses
+                cleaned = re.sub(r'\s*[\]\)]*$', '', cleaned)  # Remove trailing brackets/parentheses
                 cleaned = cleaned.strip()
                 if cleaned and not cleaned.lower().startswith('answer:'):  # Exclude the ANSWER section
                     follow_up_questions.append(cleaned)
