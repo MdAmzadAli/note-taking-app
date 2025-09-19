@@ -123,7 +123,7 @@ export default function ChatInterface({
   const [workspaceFileSummaries, setWorkspaceFileSummaries] = useState<{[fileId: string]: string}>({});
   
   // Follow-up questions state
-  const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
+  const [followUpQuestions, setFollowUpQuestions] = useState<string[]>(["what is questions","what is question","what is question","what is question","what is question","what is question","what is question","what is question","what is question","what is question","what is question","what is question","what is question","what is question","what is question"]);
   
   // Unified state for displaying messages - starts with localStorage, gets updated with ongoing messages
   const [displayChatMessages, setDisplayChatMessages] = useState<ChatMessage[]>([]);
@@ -417,7 +417,9 @@ export default function ChatInterface({
   // Function to extract follow-up questions from backend response
   const extractFollowUpQuestionsFromResponse = (response: any): string[] => {
     // Use AI-generated follow-up questions from backend
+    console.log("✅✅✅Inside extraction",response.follow_up_questions);
     if (response.follow_up_questions && Array.isArray(response.follow_up_questions)) {
+      console.log('✅ Extracted follow-up questions from backend response:', response.follow_up_questions);
       return response.follow_up_questions;
     }
     return [];

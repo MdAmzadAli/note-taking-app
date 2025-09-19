@@ -537,7 +537,7 @@ Return ONLY this JSON format:
                     follow_up_questions.append(cleaned)
             
             # Limit to exactly 3 questions
-            follow_up_questions = follow_up_questions[:3]
+            # follow_up_questions = follow_up_questions[:3]
             print(f'✨ Extracted {len(follow_up_questions)} follow-up questions: {follow_up_questions}')
         
         # Extract main answer (remove follow-up questions section)
