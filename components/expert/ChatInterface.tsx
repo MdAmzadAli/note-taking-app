@@ -122,6 +122,9 @@ export default function ChatInterface({
   const [workspaceDisplayChatMessages, setWorkspaceDisplayChatMessages] = useState<ChatMessage[]>([]);
   const [workspaceFileSummaries, setWorkspaceFileSummaries] = useState<{[fileId: string]: string}>({});
   
+  // Follow-up questions state
+  const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
+  
   // Unified state for displaying messages - starts with localStorage, gets updated with ongoing messages
   const [displayChatMessages, setDisplayChatMessages] = useState<ChatMessage[]>([]);
   
@@ -260,14 +263,22 @@ export default function ChatInterface({
       // Query RAG service
       const response = await ragService.queryDocuments(message, fileIds, workspaceId);
 
+      const aiResponse = response.success
+        ? response.answer || 'No response generated'
+        : response.error || 'Failed to generate response';
+      
       const finalMessage: ChatMessage = {
         user: message,
-        ai: response.success
-          ? response.answer || 'No response generated'
-          : response.error || 'Failed to generate response',
+        ai: aiResponse,
         sources: response.sources || [],
         isLoading: false
       };
+      
+      // Extract follow-up questions from AI response
+      if (response.success && aiResponse) {
+        const questions = extractFollowUpQuestions(aiResponse);
+        setFollowUpQuestions(questions);
+      }
 
       // Update display messages
       setDisplayChatMessages(prev =>
@@ -335,14 +346,22 @@ export default function ChatInterface({
       // Query RAG service
       const response = await ragService.queryDocuments(message, fileIds, workspaceId);
 
+      const aiResponse = response.success
+        ? response.answer || 'No response generated'
+        : response.error || 'Failed to generate response';
+      
       const finalMessage: ChatMessage = {
         user: message,
-        ai: response.success
-          ? response.answer || 'No response generated'
-          : response.error || 'Failed to generate response',
+        ai: aiResponse,
         sources: response.sources || [],
         isLoading: false
       };
+      
+      // Extract follow-up questions from AI response
+      if (response.success && aiResponse) {
+        const questions = extractFollowUpQuestions(aiResponse);
+        setFollowUpQuestions(questions);
+      }
 
       // Update workspace display messages
       setWorkspaceDisplayChatMessages(prev =>
@@ -394,6 +413,57 @@ export default function ChatInterface({
       );
     }
   }, [selectedWorkspace]);
+  
+  // Function to extract follow-up questions from AI response
+  const extractFollowUpQuestions = (aiResponse: string): string[] => {
+    // Generate 3 relevant follow-up questions based on the AI response
+    // This is a simplified implementation - in a real app, you might use AI to generate these
+    const questions: string[] = [];
+    
+    // Look for common patterns that suggest follow-up questions
+    const response = aiResponse.toLowerCase();
+    
+    if (response.includes('summary') || response.includes('overview')) {
+      questions.push('Can you provide more details about this?');
+      questions.push('What are the key takeaways?');
+      questions.push('Are there any related topics I should know about?');
+    } else if (response.includes('process') || response.includes('steps')) {
+      questions.push('Can you explain the first step in more detail?');
+      questions.push('What could go wrong in this process?');
+      questions.push('Are there alternative approaches?');
+    } else if (response.includes('definition') || response.includes('concept')) {
+      questions.push('Can you give me an example?');
+      questions.push('How does this relate to other concepts?');
+      questions.push('Where is this commonly used?');
+    } else {
+      // Default follow-up questions
+      questions.push('Can you elaborate on this?');
+      questions.push('What are the implications?');
+      questions.push('How can I apply this information?');
+    }
+    
+    return questions.slice(0, 3); // Always return exactly 3 questions
+  };
+  
+  // Handle follow-up question click
+  const handleFollowUpQuestionPress = (question: string) => {
+    setCurrentMessage(question);
+    setFollowUpQuestions([]); // Clear follow-up questions
+    
+    // Handle the question the same way as a regular query
+    if ((ragHealth.status === 'healthy' || ragHealth.status === 'degraded')) {
+      if (selectedFile) {
+        handleInternalRAGMessage(question);
+      } else if (selectedWorkspace) {
+        handleWorkspaceRAGMessage(question);
+      } else {
+        onSendMessage();
+      }
+    } else {
+      onSendMessage();
+    }
+  };
+  
 // selectedFile, selectedWorkspace
   const getFileSize = (file: SingleFile) => {
     if (!file.size) return 'Unknown';
@@ -481,7 +551,7 @@ export default function ChatInterface({
       } catch (error) {
         console.error('❌ RAG health check failed:', error);
         console.error('❌ Setting RAG health to error state');
-        setRagHealth({ status: 'error', qdrant: false, gemini: false, initialized: false });
+        setRagHealth({ status: 'error', qdrant: false, gemini: false });
       }
     };
 
@@ -1243,6 +1313,28 @@ export default function ChatInterface({
         {/* Chat Input Section - Only show for chat tab */}
         {activeTab === 'chat' && (
           <View style={styles.pdfChatInputContainer}>
+            {/* Follow-up Questions */}
+            {followUpQuestions.length > 0 && (
+              <View style={styles.followUpContainer}>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.followUpScrollContent}
+                  style={styles.followUpScrollView}
+                >
+                  {followUpQuestions.map((question, index) => (
+                    <TouchableOpacity 
+                      key={index}
+                      style={styles.followUpQuestion}
+                      onPress={() => handleFollowUpQuestionPress(question)}
+                    >
+                      <Text style={styles.followUpQuestionText} numberOfLines={2}>{question}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+            
           <View style={styles.pdfChatInputWrapper}>
             <TextInput
               style={styles.pdfChatInput}
@@ -1255,6 +1347,9 @@ export default function ChatInterface({
             <TouchableOpacity 
               style={styles.pdfSendButton} 
               onPress={() => {
+                // Clear follow-up questions when sending a new message
+                setFollowUpQuestions([]);
+                
                 if ((ragHealth.status === 'healthy' || ragHealth.status === 'degraded')) {
                   if (selectedFile) {
                     // Use internal handler for single file mode
@@ -1753,6 +1848,32 @@ const styles = StyleSheet.create({
     color: '#10B981',
     marginLeft: 4,
     fontWeight: '500',
+  },
+  followUpContainer: {
+    marginBottom: 12,
+  },
+  followUpScrollView: {
+    maxHeight: 50,
+  },
+  followUpScrollContent: {
+    paddingHorizontal: 4,
+    alignItems: 'center',
+  },
+  followUpQuestion: {
+    backgroundColor: '#333333',
+    borderWidth: 1,
+    borderColor: '#555555',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    marginHorizontal: 4,
+    minWidth: 120,
+    maxWidth: 200,
+  },
+  followUpQuestionText: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    textAlign: 'center',
   },
   workspaceFilesContainer: {
     marginHorizontal: 16,
