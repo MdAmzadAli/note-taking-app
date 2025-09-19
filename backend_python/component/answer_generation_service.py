@@ -11,7 +11,7 @@ class AnswerGenerationService:
     async def generate_answer(self, query: str, file_ids: Optional[List[str]] = None, 
                             workspace_id: Optional[str] = None) -> Dict[str, Any]:
         try:
-            print(f'🤖 Starting structured 3-step LLM flow for: "{query}"')
+            print(f'🤖 Starting new 2-step LLM flow for: "{query}"')
 
             # Determine if this is single file mode or workspace mode
             is_single_file_mode = workspace_id and workspace_id.startswith("single_")
@@ -35,26 +35,169 @@ class AnswerGenerationService:
                     'confidence': 0
                 }
 
-            # Step 0: Query recognition and refinement with mode context
-            step0_result = await self.step0_query_recognition(query, relevant_chunks, is_single_file_mode, is_workspace_mode)
+            # Step 1: Reasoning complexity classification
+            complexity_result = await self.step1_reasoning_complexity_router(query, relevant_chunks, is_single_file_mode, is_workspace_mode)
 
-            print(f'📊 Step 0 Result: Type={step0_result["queryType"]}, Mode={"Single" if is_single_file_mode else "Workspace" if is_workspace_mode else "Unknown"}, Refined="{step0_result["refinedQuery"]}"')
+            print(f'🧠 Step 1 Result: Complexity={complexity_result["complexity"]}, Mode={"Single" if is_single_file_mode else "Workspace" if is_workspace_mode else "Unknown"}, Reasoning="{complexity_result["reasoning"]}"')
 
-            # Route to appropriate processing based on enhanced query type
-            query_type = step0_result['queryType']
-
-            if query_type == 'computational':
-                return await self.process_computational_query(step0_result['refinedQuery'], query, relevant_chunks)
-            elif query_type == 'factual-table':
-                return await self.process_factual_table_query(step0_result['refinedQuery'], query, relevant_chunks, step0_result)
-            elif query_type == 'mixed':
-                return await self.process_mixed_query(step0_result['refinedQuery'], query, relevant_chunks, step0_result)
-            else:  # factual-text
-                return await self.process_factual_query(step0_result['refinedQuery'], query, relevant_chunks)
+            # Step 2: Unified answer generation based on complexity
+            return await self.step2_unified_answer_generation(query, relevant_chunks, complexity_result, is_single_file_mode, is_workspace_mode)
 
         except Exception as error:
-            print(f'❌ Structured answer generation failed: {error}')
+            print(f'❌ 2-step answer generation failed: {error}')
             raise error
+
+    async def step1_reasoning_complexity_router(self, user_query: str, relevant_chunks: List[Dict], 
+                                               is_single_file_mode: bool = False, is_workspace_mode: bool = False) -> Dict[str, Any]:
+        print(f'🧠 Step 1: Reasoning complexity classification (Single: {is_single_file_mode}, Workspace: {is_workspace_mode})...')
+
+        if not self.embedding_service.chat_client:
+            raise Exception("Google GenAI Chat client not initialized")
+
+        # Analyze document context for complexity assessment
+        document_types = list(set(chunk['metadata']['fileName'] for chunk in relevant_chunks))
+        has_table_content = any(chunk['metadata'].get('hasTableContent', False) for chunk in relevant_chunks)
+        has_json_tables = any(chunk['metadata'].get('has_json_tables', False) for chunk in relevant_chunks)
+        has_financial_data = any(chunk['metadata'].get('hasFinancialData', False) for chunk in relevant_chunks)
+        has_structured_tables = any(chunk.get('structured_tables') for chunk in relevant_chunks)
+        
+        # Count table chunks and analyze numerical content
+        table_chunks = [chunk for chunk in relevant_chunks if chunk['metadata'].get('hasTableContent', False)]
+        table_count = len(table_chunks)
+        
+        # Analyze table metadata for complexity indicators
+        table_headers = []
+        table_currencies = []
+        for chunk in table_chunks:
+            numeric_metadata = chunk['metadata'].get('numeric_metadata', {})
+            if numeric_metadata:
+                table_headers.extend(numeric_metadata.get('table_context_headings', []))
+                table_currencies.extend(numeric_metadata.get('currencies', []))
+
+        mode_info = "Single file mode" if is_single_file_mode else "Workspace mode" if is_workspace_mode else "Standard mode"
+        context_info = f"Mode: {mode_info}. Documents: {', '.join(document_types)}. Tables: {table_count} chunks, JSON tables: {has_json_tables}, Structured tables: {has_structured_tables}. Financial data: {has_financial_data}. Table contexts: {table_headers[:3]}."
+
+        complexity_router_prompt = f"""You are an expert query complexity analyzer. Analyze the user query and document context to determine the reasoning complexity level required to answer this query effectively.
+
+USER QUERY: {user_query}
+DOCUMENT CONTEXT: {context_info}
+
+COMPLEXITY LEVELS TO CLASSIFY:
+
+1. **SIMPLE**: Basic information retrieval or straightforward questions
+   - Direct fact lookup from text or tables
+   - Simple definitions or explanations
+   - Single-step information extraction
+   - Questions with clear, direct answers
+   - Examples: "What is the company name?", "List the cities in the table", "What is the definition of X?"
+
+2. **MEDIUM**: Moderate analysis requiring some reasoning or synthesis
+   - Comparative questions requiring multiple data points
+   - Summarization of information across sections
+   - Basic calculations or simple aggregations
+   - Questions requiring understanding of relationships
+   - Cross-referencing between different parts of documents
+   - Examples: "Compare these two products", "What are the main themes?", "Calculate the total of these amounts"
+
+3. **COMPLEX**: Advanced reasoning requiring deep analysis or multi-step processing
+   - Multi-step computational analysis with complex calculations
+   - Advanced comparative analysis across multiple documents
+   - Questions requiring interpretation and inference
+   - Complex financial or statistical analysis
+   - Synthesis of information from multiple sources with sophisticated reasoning
+   - Questions involving ranking, optimization, or complex decision-making
+   - Examples: "Which investment strategy would be most profitable and why?", "Analyze the financial trends and provide recommendations", "What are the interconnected impacts of these policy changes?"
+
+CLASSIFICATION RULES:
+- Single file mode: Focus on individual document complexity
+- Workspace mode: Consider cross-document complexity and comparison needs
+- Table-heavy queries: Medium complexity unless requiring advanced calculations
+- Financial/computational queries: Medium to Complex based on calculation sophistication
+- Multi-document comparison in workspace mode: Generally Medium or Complex
+- If query requires deep reasoning, inference, or multi-step analysis: Complex
+- If query asks for simple facts or basic data retrieval: Simple
+- If query requires moderate analysis or synthesis: Medium
+
+Return ONLY this JSON format:
+{{
+  "complexity": "simple" | "medium" | "complex",
+  "reasoning": "Brief explanation of why this complexity level was chosen",
+  "confidenceScore": 0.0-1.0,
+  "keyIndicators": ["list", "of", "key", "factors", "that", "influenced", "classification"],
+  "processingMode": "{mode_info}",
+  "documentFeatures": {{
+    "hasTableContent": {has_table_content},
+    "hasFinancialData": {has_financial_data},
+    "documentCount": {len(document_types)},
+    "tableCount": {table_count}
+  }}
+}}"""
+
+        try:
+            # Use gemini-1.5-flash-8b for Step 1 router
+            response = await asyncio.to_thread(
+                self.embedding_service.chat_client.models.generate_content,
+                model='gemini-1.5-flash-8b',
+                contents=[complexity_router_prompt],
+                config=self.embedding_service.genai_types.GenerateContentConfig(
+                    temperature=0.1,
+                    top_p=0.8,
+                    max_output_tokens=512
+                )
+            )
+
+            response_text = response.text
+            print(f'🧠 Step 1: Raw complexity response: {response_text}')
+            json_match = re.search(r'\{[\s\S]*\}', response_text)
+
+            if json_match:
+                result = json.loads(json_match.group())
+                print(f'✅ Step 1: {result["complexity"]} complexity identified - {result["reasoning"]}')
+                return result
+
+        except Exception as parse_error:
+            print(f'⚠️ Step 1: JSON parsing failed, using fallback classification: {parse_error}')
+
+        # Enhanced fallback classification based on query analysis
+        query_lower = user_query.lower()
+        
+        # Define complexity indicators
+        simple_keywords = ['what is', 'define', 'list', 'show', 'find', 'name', 'who', 'when', 'where']
+        medium_keywords = ['compare', 'analyze', 'summary', 'total', 'average', 'difference', 'calculate', 'how many']
+        complex_keywords = ['strategy', 'recommendation', 'optimize', 'evaluate', 'assess', 'trend', 'impact', 'relationship', 'correlation']
+        
+        # Count indicators
+        simple_count = sum(1 for keyword in simple_keywords if keyword in query_lower)
+        medium_count = sum(1 for keyword in medium_keywords if keyword in query_lower)
+        complex_count = sum(1 for keyword in complex_keywords if keyword in query_lower)
+        
+        # Determine complexity based on various factors
+        complexity = 'simple'  # default
+        reasoning = f'Fallback classification ({mode_info})'
+        
+        if complex_count > 0 or (is_workspace_mode and len(document_types) > 3):
+            complexity = 'complex'
+            reasoning += ': Complex keywords or multi-document workspace analysis'
+        elif medium_count > 0 or has_financial_data or table_count > 2:
+            complexity = 'medium' 
+            reasoning += ': Medium keywords, financial data, or multiple tables'
+        elif simple_count > 0:
+            complexity = 'simple'
+            reasoning += ': Simple keywords and straightforward query'
+        
+        return {
+            'complexity': complexity,
+            'reasoning': reasoning,
+            'confidenceScore': 0.7,
+            'keyIndicators': [f'simple_count={simple_count}', f'medium_count={medium_count}', f'complex_count={complex_count}'],
+            'processingMode': mode_info,
+            'documentFeatures': {
+                'hasTableContent': has_table_content,
+                'hasFinancialData': has_financial_data,
+                'documentCount': len(document_types),
+                'tableCount': table_count
+            }
+        }
 
     async def step0_query_recognition(self, user_query: str, relevant_chunks: List[Dict], 
                                      is_single_file_mode: bool = False, is_workspace_mode: bool = False) -> Dict[str, Any]:
