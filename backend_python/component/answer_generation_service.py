@@ -532,6 +532,10 @@ Return ONLY this JSON format:
                 # Remove any remaining formatting or brackets
                 cleaned = re.sub(r'^[\[\(]*\s*', '', cleaned)  # Remove leading brackets/parentheses
                 cleaned = re.sub(r'\s*[\]\)]*$', '', cleaned)  # Remove trailing brackets/parentheses
+                # Remove context references like [Context 1], [Context 1,2], etc.
+                cleaned = re.sub(r'\[Context\s+[\d,\s]+\]', '', cleaned, flags=re.IGNORECASE)
+                # Remove any other citation patterns like [1], [1,2], etc. at the end
+                cleaned = re.sub(r'\[\d+(?:,\s*\d+)*\]$', '', cleaned)
                 cleaned = cleaned.strip()
                 if cleaned and not cleaned.lower().startswith('answer:'):  # Exclude the ANSWER section
                     follow_up_questions.append(cleaned)
