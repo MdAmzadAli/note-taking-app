@@ -199,6 +199,182 @@ Return ONLY this JSON format:
             }
         }
 
+    async def step2_unified_answer_generation(self, user_query: str, relevant_chunks: List[Dict], 
+                                             complexity_result: Dict[str, Any], is_single_file_mode: bool = False, 
+                                             is_workspace_mode: bool = False) -> Dict[str, Any]:
+        print(f'📝 Step 2: Unified answer generation with {complexity_result["complexity"]} complexity...')
+
+        if not self.embedding_service.chat_client:
+            raise Exception("Google GenAI Chat client not initialized")
+
+        complexity = complexity_result['complexity']
+        
+        # Select model based on complexity
+        if complexity == 'simple':
+            model_name = 'gemini-2.0-flash-lite'
+            temperature = 0.2
+        elif complexity == 'medium':
+            model_name = 'gemini-2.5-flash-lite'
+            temperature = 0.3
+        else:  # complex
+            model_name = 'gemini-2.5-flash'
+            temperature = 0.1
+
+        print(f'🤖 Using model: {model_name} for {complexity} complexity query')
+
+        # Build enhanced context with numbered references
+        context_parts = []
+        for index, chunk in enumerate(relevant_chunks):
+            confidence = f"{chunk['score'] * 100:.1f}"
+            location_info = ''
+
+            # Build location info only if page/line data exists
+            if chunk['metadata'].get('pageNumber') is not None:
+                location_info = f"Page {chunk['metadata']['pageNumber']}"
+                if chunk['metadata'].get('startLine') is not None:
+                    location_info += f", Lines {chunk['metadata']['startLine']}-{chunk['metadata']['endLine']}"
+            else:
+                location_info = 'Content'
+
+            # Highlight special content types
+            content_tags = []
+            if chunk['metadata'].get('hasTableContent', False):
+                content_tags.append('TABLE')
+            if chunk['metadata'].get('hasFinancialData', False):
+                content_tags.append('FINANCIAL')
+            if chunk.get('structured_tables'):
+                content_tags.append('STRUCTURED')
+            
+            tag_info = f" [{','.join(content_tags)}]" if content_tags else ""
+            
+            context_parts.append(f"[Context {index + 1} - {chunk['metadata']['fileName']} - {location_info}{tag_info} - Relevance: {confidence}%]: {chunk['text']}")
+
+        context = '\n\n'.join(context_parts)
+
+        # Create unified prompt that adapts to complexity and mode
+        mode_info = "Single file mode" if is_single_file_mode else "Workspace mode" if is_workspace_mode else "Standard mode"
+        
+        unified_prompt = f"""You are an expert AI assistant providing accurate, comprehensive answers based on document content. You are operating in {mode_info} and handling a {complexity} complexity query.
+
+USER QUERY: {user_query}
+COMPLEXITY LEVEL: {complexity.upper()}
+PROCESSING MODE: {mode_info}
+COMPLEXITY REASONING: {complexity_result.get('reasoning', 'N/A')}
+
+CONTEXT FROM DOCUMENTS:
+{context}
+
+INSTRUCTIONS BASED ON COMPLEXITY:
+
+FOR SIMPLE QUERIES:
+- Provide direct, clear answers with minimal elaboration
+- Focus on factual information retrieval
+- Use straightforward language and structure
+- Reference specific contexts when citing information
+
+FOR MEDIUM QUERIES:
+- Provide well-structured answers with moderate analysis
+- Include comparisons, calculations, or synthesis as needed
+- Use **bold text** for important headings and key terms
+- Organize information with bullet points or numbered lists
+- Show your reasoning process for calculations or comparisons
+
+FOR COMPLEX QUERIES:
+- Provide comprehensive, in-depth analysis
+- Include multi-step reasoning and sophisticated synthesis
+- Create detailed sections with clear organization
+- Perform advanced calculations, trend analysis, or strategic reasoning
+- Provide recommendations or insights based on deep analysis
+- Use multiple formatting elements for clarity
+
+UNIVERSAL REQUIREMENTS:
+1. Answer using ONLY the provided context - do not add external information
+2. Be precise and accurate in your citations
+3. Use **bold text** for important headings, numbers, and key terms
+4. Structure your answer appropriately for the complexity level
+5. Reference context numbers when citing specific information (e.g., [Context 1,3] or [Context 2])
+6. For {mode_info}: {"Focus on individual document analysis" if is_single_file_mode else "Consider cross-document analysis and comparisons" if is_workspace_mode else "Standard document processing"}
+7. Handle table data, financial information, and structured content appropriately
+8. If multiple documents provide different perspectives, present them clearly
+
+CRITICAL: After your answer, identify which contexts you actually used:
+
+---
+CONTEXTS_USED: [list only the context numbers (e.g., "1,3,5") that you referenced in your answer]
+
+ANSWER:"""
+
+        try:
+            # Generate response using selected model
+            response = await asyncio.to_thread(
+                self.embedding_service.chat_client.models.generate_content,
+                model=model_name,
+                contents=[unified_prompt],
+                config=self.embedding_service.genai_types.GenerateContentConfig(
+                    temperature=temperature,
+                    top_p=0.8,
+                    max_output_tokens=3072 if complexity == 'complex' else 2048
+                )
+            )
+
+            full_response = response.text
+            print(f'📝 Step 2: Generated response with {model_name}')
+
+            # Extract used contexts and clean answer
+            answer = full_response
+            used_context_numbers = []
+
+            contexts_used_match = re.search(r'CONTEXTS_USED:\s*\[(.*?)\]', full_response)
+            if contexts_used_match:
+                contexts_used_str = contexts_used_match.group(1)
+                used_context_numbers = [
+                    int(s.strip()) for s in contexts_used_str.split(',') 
+                    if s.strip().isdigit() and 1 <= int(s.strip()) <= len(relevant_chunks)
+                ]
+
+                answer = re.sub(r'---\s*CONTEXTS_USED:.*$', '', full_response, flags=re.DOTALL).strip()
+                print(f'🎯 Step 2: Used {len(used_context_numbers)} contexts: [{", ".join(map(str, used_context_numbers))}]')
+            else:
+                print('⚠️ Could not extract CONTEXTS_USED, using all contexts')
+                used_context_numbers = list(range(1, len(relevant_chunks) + 1))
+
+            # Build sources from used contexts
+            sources = self._build_sources_from_context_numbers(relevant_chunks, used_context_numbers)
+
+            # Determine analysis type based on complexity and features
+            analysis_type = f"{complexity}-complexity"
+            if complexity_result['documentFeatures'].get('hasTableContent', False):
+                analysis_type += "-table-aware"
+            if complexity_result['documentFeatures'].get('hasFinancialData', False):
+                analysis_type += "-financial"
+            if is_workspace_mode:
+                analysis_type += "-workspace"
+            elif is_single_file_mode:
+                analysis_type += "-single-file"
+
+            result = {
+                'answer': answer,
+                'sources': sources,
+                'confidence': relevant_chunks[0]['score'] if relevant_chunks else 0,
+                'analysisType': analysis_type,
+                'processingStats': {
+                    'complexity': complexity,
+                    'modelUsed': model_name,
+                    'totalContexts': len(relevant_chunks),
+                    'usedContexts': len(used_context_numbers),
+                    'processingMode': mode_info,
+                    'confidenceScore': complexity_result.get('confidenceScore', 0.0),
+                    'documentFeatures': complexity_result.get('documentFeatures', {})
+                }
+            }
+
+            print(f'✅ Step 2: Successfully generated {complexity} complexity answer using {model_name}')
+            return result
+
+        except Exception as generation_error:
+            print(f'❌ Step 2: Answer generation failed: {generation_error}')
+            raise generation_error
+
     async def step0_query_recognition(self, user_query: str, relevant_chunks: List[Dict], 
                                      is_single_file_mode: bool = False, is_workspace_mode: bool = False) -> Dict[str, Any]:
         print(f'🔍 Step 0: Enhanced query recognition and refinement (Single: {is_single_file_mode}, Workspace: {is_workspace_mode})...')
