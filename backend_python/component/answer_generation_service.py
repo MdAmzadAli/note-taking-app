@@ -416,10 +416,10 @@ Return ONLY this JSON format:
         ## **CONCLUSIONS & IMPLICATIONS**
         Summarize key takeaways and their broader significance based on the comprehensive analysis.
         FORMATTING REQUIREMENTS:
-        - Place context citations at the END of each statement: [Context 1,2]
+        - Place context citations at the END of each statement: [Context 1,2], except for follow up questions
         - Use **bold** for critical findings, numbers, and key concepts
         - Ensure thorough, well-reasoned analysis with clear logical flow
-        - Every claim must be supported with context citations
+        - Every claim must be supported with context citations except for follow up questions
         - Address complexity and nuance in the user's question
         
         FOLLOW-UP QUESTIONS:
