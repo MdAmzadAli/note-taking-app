@@ -226,23 +226,38 @@ Return ONLY this JSON format:
         context = self._build_context_for_query(relevant_chunks)
         mode_info = "Single file mode" if is_single_file_mode else "Workspace mode" if is_workspace_mode else "Standard mode"
 
-        simple_prompt = f"""Answer this straightforward question using the document content below.
-
-USER QUERY: {user_query}
-
-CONTEXT FROM DOCUMENTS:
-{context}
-
-INSTRUCTIONS:
-- Provide a direct, clear answer
-- Use simple, straightforward language  
-- Quote specific information from the documents
-- Reference context numbers when citing and be very precise on it, to give the most relevant contexts and also their format as  [Context 2] or [Context 1,3]
-- Keep the answer concise and focused
-
-
-ANSWER:"""
-
+        if is_workspace_mode:
+            simple_prompt = f"""Answer this straightforward question using information from multiple documents in the workspace.
+        USER QUERY: {user_query}
+        CONTEXT FROM DOCUMENTS:
+        {context}
+        WORKSPACE MODE RESPONSE:
+        Provide a clear, direct answer that consolidates information from all relevant documents. If the answer varies across documents, briefly mention the key differences.
+        FORMATTING REQUIREMENTS:
+        - Give a direct, comprehensive answer addressing the user's question
+        - Use simple, clear language that combines findings from all documents
+        - Place context citations at the END of statements: [Context 1,2]
+        - Use **bold** for key information and important details
+        - Every fact or claim must have context citations
+        - Keep response focused and concise
+        ANSWER:"""
+        else:  # Single file mode
+            simple_prompt = f"""Answer this straightforward question using the document content below.
+        USER QUERY: {user_query}
+        CONTEXT FROM DOCUMENT:
+        {context}
+        SINGLE FILE MODE INSTRUCTIONS:
+        - Provide a direct, clear answer using specific information from the document
+        - Use simple, straightforward language
+        - Quote or reference specific details when relevant
+        - Keep the answer concise and focused
+        FORMATTING REQUIREMENTS:
+        - Place context citations at the END of statements: [Context 1,2]
+        - Use **bold** for key terms and important information
+        - Provide direct answers without unnecessary complexity
+        - Every fact or claim must have context citations
+        ANSWER:"""
+            
         try:
             response = await asyncio.to_thread(
                 self.embedding_service.chat_client.models.generate_content,
@@ -273,26 +288,42 @@ ANSWER:"""
         context = self._build_context_for_query(relevant_chunks)
         mode_info = "Single file mode" if is_single_file_mode else "Workspace mode" if is_workspace_mode else "Standard mode"
 
-        medium_prompt = f"""Analyze and answer this question requiring moderate reasoning using the document content.
-
-USER QUERY: {user_query}
-
-CONTEXT FROM DOCUMENTS:
-{context}
-
-INSTRUCTIONS:
-- Provide a well-structured answer with analysis
-- Include comparisons, calculations, or synthesis as needed
-- Use **bold text** for key terms and important numbers
-- Organize with bullet points or numbered lists when appropriate
--Reference context numbers when citing and be very precise on it, to give the most relevant contexts and also their format as  [Context 2] or [Context 1,3]
-- Show your reasoning process clearly
-- {"Focus on individual document analysis" if is_single_file_mode else "Compare across documents when relevant" if is_workspace_mode else "Standard analysis"}
-
-
-
-ANSWER:"""
-
+        if is_workspace_mode:
+            medium_prompt = f"""Analyze this question requiring moderate reasoning across multiple documents in the workspace.
+        USER QUERY: {user_query}
+        CONTEXT FROM DOCUMENTS:
+        {context}
+        WORKSPACE MODE RESPONSE STRUCTURE:
+        You must structure your response in exactly two sections:
+        ## **OVERALL RESULT**
+        Provide a combined/synthesized finding that directly answers the user's question by integrating information from all relevant documents. This should be a comprehensive summary that addresses the core question.
+        ## **DETAILED ANALYSIS**
+        Provide concise and precise analysis with specific details as required by the user's question. Break down key findings, comparisons, or explanations that support the overall result.
+        FORMATTING REQUIREMENTS:
+        - Place context citations at the END of each statement: [Context 1,2]
+        - Use **bold** for key terms, numbers, and important findings
+        - Keep analysis precise and focused on what the user specifically asks
+        - Every fact or claim must have context citations
+        - Ensure both sections directly address the user's question
+        ANSWER:"""
+        else:  # Single file mode
+            medium_prompt = f"""Analyze and answer this question requiring moderate reasoning using the single document provided.
+        USER QUERY: {user_query}
+        CONTEXT FROM DOCUMENT:
+        {context}
+        SINGLE FILE MODE INSTRUCTIONS:
+        Provide a focused, comprehensive response that:
+        - Directly addresses the user's question with moderate analytical depth
+        - Use specific information and details from the document
+        - Maintains concise but thorough explanations
+        - Demonstrates clear reasoning and connections
+        FORMATTING REQUIREMENTS:
+        - Place context citations at the END of each statement: [Context 1,2]
+        - Use **bold** for key terms, numbers, and important findings
+        - Structure response logically with clear explanations
+        - Every fact or claim must have context citations
+        ANSWER:"""
+            
         try:
             response = await asyncio.to_thread(
                 self.embedding_service.chat_client.models.generate_content,
@@ -323,31 +354,50 @@ ANSWER:"""
         context = self._build_context_for_query(relevant_chunks)
         mode_info = "Single file mode" if is_single_file_mode else "Workspace mode" if is_workspace_mode else "Standard mode"
 
-        complex_prompt = f"""Provide comprehensive analysis for this complex question requiring deep reasoning.
-
-USER QUERY: {user_query}
-
-CONTEXT FROM DOCUMENTS:
-{context}
-
-INSTRUCTIONS:
-- Deliver in-depth, sophisticated analysis
-- Include multi-step reasoning and synthesis
-- Create clear sections with detailed organization
-- Perform advanced calculations, trend analysis, or strategic reasoning
-- Provide recommendations or insights based on thorough analysis
--Reference context numbers when citing and be very precise on it, to give the most relevant contexts and also their format as  [Context 2] or [Context 1,3]
-- Use multiple formatting elements (**bold**, bullet points, sections)
-- {"Analyze patterns within the document" if is_single_file_mode else "Synthesize insights across multiple documents" if is_workspace_mode else "Comprehensive document analysis"}
-
-STRUCTURE YOUR RESPONSE:
-1. **Executive Summary** (key findings)
-2. **Detailed Analysis** (with evidence)
-3. **Conclusions/Recommendations** (if applicable)
-
-
-ANSWER:"""
-
+        if is_workspace_mode:
+            complex_prompt = f"""Provide a comprehensive analysis for this complex question requiring deep reasoning across multiple documents in the workspace.
+        USER QUERY: {user_query}
+        CONTEXT FROM DOCUMENTS:
+        {context}
+        WORKSPACE MODE COMPREHENSIVE ANALYSIS:
+        Structure your response with the following sections:
+        ## **EXECUTIVE SUMMARY**
+        Provide a high-level synthesis that directly answers the user's complex question by integrating insights from all relevant documents.
+        ## **DETAILED FINDINGS**
+        Present thorough analysis organized by key themes, patterns, or document-specific insights. Include:
+        - Cross-document comparisons and contrasts
+        - Trends and patterns identified across sources
+        - Conflicting information and reconciliation attempts
+        - Supporting evidence and detailed explanations
+        ## **CONCLUSIONS & IMPLICATIONS**
+        Summarize key takeaways and their broader significance based on the comprehensive analysis.
+        FORMATTING REQUIREMENTS:
+        - Place context citations at the END of each statement: [Context 1,2]
+        - Use **bold** for critical findings, numbers, and key concepts
+        - Ensure thorough, well-reasoned analysis with clear logical flow
+        - Every claim must be supported with context citations
+        - Address complexity and nuance in the user's question
+        ANSWER:"""
+        else:  # Single file mode
+            complex_prompt = f"""Provide a comprehensive, in-depth analysis for this complex question using the document provided.
+        USER QUERY: {user_query}
+        CONTEXT FROM DOCUMENT:
+        {context}
+        SINGLE FILE COMPLEX ANALYSIS:
+        Provide a thorough, well-structured response that:
+        - Demonstrates deep understanding and analysis of the document content
+        - Addresses all aspects and nuances of the complex question
+        - Shows clear reasoning and logical connections
+        - Provides detailed explanations with supporting evidence
+        - Considers implications and broader significance of findings
+        FORMATTING REQUIREMENTS:
+        - Structure response logically with clear progression of ideas
+        - Place context citations at the END of each statement: [Context 1,2]
+        - Use **bold** for critical points, key findings, and important data
+        - Provide comprehensive analysis while maintaining clarity
+        - Every major point must be supported with context citations
+        ANSWER:"""
+            
         try:
             response = await asyncio.to_thread(
                 self.embedding_service.chat_client.models.generate_content,

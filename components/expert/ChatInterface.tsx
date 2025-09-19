@@ -572,6 +572,24 @@ export default function ChatInterface({
   };
 
   // Helper function to render formatted text with markdown-like styling and context references
+  // Helper function to get the correct frontend filename using fileId
+  const getCorrectFileName = (fileId: string): string => {
+    // For single file mode
+    if (selectedFile && selectedFile.id === fileId) {
+      return selectedFile.name;
+    }
+
+    // For workspace mode
+    if (selectedWorkspace) {
+      const file = selectedWorkspace.files.find(f => f.id === fileId);
+      if (file) {
+        return file.name;
+      }
+    }
+
+    // Fallback to backend filename if no match found
+    return 'Unknown File';
+  };
   const renderFormattedText = (text: string, sources?: RAGSource[]) => {
     const lines = text.split('\n');
     const elements: React.ReactNode[] = [];
@@ -1107,7 +1125,7 @@ export default function ChatInterface({
                         ) : (
                           <>
                             {renderFormattedText(msg.ai, msg.sources)}
-                            {msg.sources && msg.sources.length > 0 && (
+                            {/* {msg.sources && msg.sources.length > 0 && (
                               <TouchableOpacity 
                                 style={styles.pdfSourceButton}
                                 onPress={() => handleSourceClick(msg.sources!)}
@@ -1117,7 +1135,7 @@ export default function ChatInterface({
                                   {msg.sources.length} Source{msg.sources.length > 1 ? 's' : ''}
                                 </Text>
                               </TouchableOpacity>
-                            )}
+                            )} */}
                           </>
                         )}
                       </View>
@@ -1461,7 +1479,7 @@ export default function ChatInterface({
                   <View key={context.id || index}>
                     <View style={styles.contextSourceInfo}>
                       <View style={styles.contextHeaderRow}>
-                        <Text style={styles.contextFileName}>{context.fileName}</Text>
+                        <Text style={styles.contextFileName}>{getCorrectFileName(context.fileId)}</Text>
                         {/* <Text style={styles.contextNumberBadge}>Context {context.contextNumber}</Text> */}
                       </View>
                       {context.pageNumber && (
@@ -1673,7 +1691,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 20,
     borderBottomLeftRadius:2,
-    maxWidth: '85%',
+    minWidth: '85%',
+    maxWidth:'85%',
     
   },
   pdfAiMessageText: {

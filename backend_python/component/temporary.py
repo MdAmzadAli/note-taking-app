@@ -218,11 +218,15 @@ def create_single_chunkObject(chunk, page_num, heading):
     chunk_text = " ".join([word["text"] for word in chunk])
     return {
         "text": chunk_text,
-        "total_chars": len(chunk_text),
-        "tokens_est": math.ceil(len(chunk_text) / 4),
-        "page_num": page_num,
-        "headings": list(heading),
+        "metadata": {
+            "pageNumber": page_num,  # ← Use camelCase and nested structure
+            "page_number": page_num,  # ← Keep snake_case for compatibility
+            "total_chars": len(chunk_text),
+            "tokens_est": math.ceil(len(chunk_text) / 4),
+            "headings": list(heading),
+        }
     }
+
 
 
 def create_chunks(words2d, avg, page_num):
