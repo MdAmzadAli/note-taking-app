@@ -1543,6 +1543,7 @@ async def rag_query(request: RAGQueryRequest):
             "answer": result.get("answer"),
             "sources": result.get("sources"),
             "confidence": result.get("confidence"),
+            "follow_up_questions": result.get("follow_up_questions", []),
             "processingTime": processing_time
         }
 
