@@ -152,7 +152,8 @@ task = "shell.exec"
 args = "npx expo start --tunnel"
 
 [deployment]
-run = ["sh", "-c", "npm run start"]
+run = ["bash", "-c", "cd backend_python && python start.py & npx expo start --web --port 5000"]
+deploymentTarget = "vm"
 
 [agent]
 expertMode = true
