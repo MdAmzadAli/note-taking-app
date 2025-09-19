@@ -51,6 +51,7 @@ interface ChatMessage {
   ai: string;
   sources?: RAGSource[];
   isLoading?: boolean;
+  followUpQuestions?: string[];
 }
 
 interface ChatInterfaceProps {
@@ -122,8 +123,6 @@ export default function ChatInterface({
   const [workspaceDisplayChatMessages, setWorkspaceDisplayChatMessages] = useState<ChatMessage[]>([]);
   const [workspaceFileSummaries, setWorkspaceFileSummaries] = useState<{[fileId: string]: string}>({});
   
-  // Follow-up questions state
-  const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
   
   // Unified state for displaying messages - starts with localStorage, gets updated with ongoing messages
   const [displayChatMessages, setDisplayChatMessages] = useState<ChatMessage[]>([]);
@@ -267,18 +266,16 @@ export default function ChatInterface({
         ? response.answer || 'No response generated'
         : response.error || 'Failed to generate response';
       
+      // Extract follow-up questions from backend response
+      const questions = response.success ? extractFollowUpQuestionsFromResponse(response) : [];
+      
       const finalMessage: ChatMessage = {
         user: message,
         ai: aiResponse,
         sources: response.sources || [],
-        isLoading: false
+        isLoading: false,
+        followUpQuestions: questions
       };
-      
-      // Extract follow-up questions from backend response
-      if (response.success) {
-        const questions = extractFollowUpQuestionsFromResponse(response);
-        setFollowUpQuestions(questions);
-      }
 
       // Update display messages
       setDisplayChatMessages(prev =>
@@ -350,18 +347,16 @@ export default function ChatInterface({
         ? response.answer || 'No response generated'
         : response.error || 'Failed to generate response';
       
+      // Extract follow-up questions from backend response
+      const questions = response.success ? extractFollowUpQuestionsFromResponse(response) : [];
+      
       const finalMessage: ChatMessage = {
         user: message,
         ai: aiResponse,
         sources: response.sources || [],
-        isLoading: false
+        isLoading: false,
+        followUpQuestions: questions
       };
-      
-      // Extract follow-up questions from backend response
-      if (response.success) {
-        const questions = extractFollowUpQuestionsFromResponse(response);
-        setFollowUpQuestions(questions);
-      }
 
       // Update workspace display messages
       setWorkspaceDisplayChatMessages(prev =>
@@ -428,7 +423,6 @@ export default function ChatInterface({
   // Handle follow-up question click
   const handleFollowUpQuestionPress = (question: string) => {
     setCurrentMessage(question);
-    setFollowUpQuestions([]); // Clear follow-up questions
     
     // Handle the question the same way as a regular query
     if ((ragHealth.status === 'healthy' || ragHealth.status === 'degraded')) {
@@ -1186,6 +1180,21 @@ export default function ChatInterface({
                                 </Text>
                               </TouchableOpacity>
                             )} */}
+                            
+                            {/* Follow-up Questions - One per row */}
+                            {msg.followUpQuestions && msg.followUpQuestions.length > 0 && (
+                              <View style={styles.followUpQuestionsContainer}>
+                                {msg.followUpQuestions.map((question, qIndex) => (
+                                  <TouchableOpacity 
+                                    key={qIndex}
+                                    style={styles.followUpQuestionRow}
+                                    onPress={() => handleFollowUpQuestionPress(question)}
+                                  >
+                                    <Text style={styles.followUpQuestionRowText}>{question}</Text>
+                                  </TouchableOpacity>
+                                ))}
+                              </View>
+                            )}
                           </>
                         )}
                       </View>
@@ -1293,28 +1302,6 @@ export default function ChatInterface({
         {/* Chat Input Section - Only show for chat tab */}
         {activeTab === 'chat' && (
           <View style={styles.pdfChatInputContainer}>
-            {/* Follow-up Questions */}
-            {followUpQuestions.length > 0 && (
-              <View style={styles.followUpContainer}>
-                <ScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.followUpScrollContent}
-                  style={styles.followUpScrollView}
-                >
-                  {followUpQuestions.map((question, index) => (
-                    <TouchableOpacity 
-                      key={index}
-                      style={styles.followUpQuestion}
-                      onPress={() => handleFollowUpQuestionPress(question)}
-                    >
-                      <Text style={styles.followUpQuestionText} numberOfLines={2}>{question}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-            
           <View style={styles.pdfChatInputWrapper}>
             <TextInput
               style={styles.pdfChatInput}
@@ -1327,9 +1314,6 @@ export default function ChatInterface({
             <TouchableOpacity 
               style={styles.pdfSendButton} 
               onPress={() => {
-                // Clear follow-up questions when sending a new message
-                setFollowUpQuestions([]);
-                
                 if ((ragHealth.status === 'healthy' || ragHealth.status === 'degraded')) {
                   if (selectedFile) {
                     // Use internal handler for single file mode
@@ -1854,6 +1838,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#FFFFFF',
     textAlign: 'center',
+  },
+  // New styles for follow-up questions inside message containers
+  followUpQuestionsContainer: {
+    marginTop: 12,
+  },
+  followUpQuestionRow: {
+    backgroundColor: '#333333',
+    borderWidth: 1,
+    borderColor: '#555555',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginBottom: 6,
+  },
+  followUpQuestionRowText: {
+    fontSize: 12,
+    color: '#FFFFFF',
   },
   workspaceFilesContainer: {
     marginHorizontal: 16,
