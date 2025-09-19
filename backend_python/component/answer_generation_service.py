@@ -237,12 +237,9 @@ INSTRUCTIONS:
 - Provide a direct, clear answer
 - Use simple, straightforward language  
 - Quote specific information from the documents
-- Reference context numbers when citing (e.g., [Context 2])
+- Reference context numbers when citing and be very precise on it, to give the most relevant contexts and also their format as  [Context 2] or [Context 1,3]
 - Keep the answer concise and focused
 
-CRITICAL: After your answer, list which contexts you used:
----
-CONTEXTS_USED: [list context numbers you referenced (e.g., "1,3")]
 
 ANSWER:"""
 
@@ -288,12 +285,11 @@ INSTRUCTIONS:
 - Include comparisons, calculations, or synthesis as needed
 - Use **bold text** for key terms and important numbers
 - Organize with bullet points or numbered lists when appropriate
+-Reference context numbers when citing and be very precise on it, to give the most relevant contexts and also their format as  [Context 2] or [Context 1,3]
 - Show your reasoning process clearly
 - {"Focus on individual document analysis" if is_single_file_mode else "Compare across documents when relevant" if is_workspace_mode else "Standard analysis"}
 
-CRITICAL: After your answer, list which contexts you used:
----
-CONTEXTS_USED: [list context numbers you referenced (e.g., "1,3,5")]
+
 
 ANSWER:"""
 
@@ -340,6 +336,7 @@ INSTRUCTIONS:
 - Create clear sections with detailed organization
 - Perform advanced calculations, trend analysis, or strategic reasoning
 - Provide recommendations or insights based on thorough analysis
+-Reference context numbers when citing and be very precise on it, to give the most relevant contexts and also their format as  [Context 2] or [Context 1,3]
 - Use multiple formatting elements (**bold**, bullet points, sections)
 - {"Analyze patterns within the document" if is_single_file_mode else "Synthesize insights across multiple documents" if is_workspace_mode else "Comprehensive document analysis"}
 
@@ -348,9 +345,6 @@ STRUCTURE YOUR RESPONSE:
 2. **Detailed Analysis** (with evidence)
 3. **Conclusions/Recommendations** (if applicable)
 
-CRITICAL: After your answer, list which contexts you used:
----
-CONTEXTS_USED: [list context numbers you referenced (e.g., "1,2,4,6")]
 
 ANSWER:"""
 

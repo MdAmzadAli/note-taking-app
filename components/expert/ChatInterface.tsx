@@ -1462,14 +1462,14 @@ export default function ChatInterface({
                     <View style={styles.contextSourceInfo}>
                       <View style={styles.contextHeaderRow}>
                         <Text style={styles.contextFileName}>{context.fileName}</Text>
-                        <Text style={styles.contextNumberBadge}>Context {context.contextNumber}</Text>
+                        {/* <Text style={styles.contextNumberBadge}>Context {context.contextNumber}</Text> */}
                       </View>
                       {context.pageNumber && (
                         <Text style={styles.contextPageInfo}>Page {context.pageNumber}</Text>
                       )}
-                      {context.lineRange && (
+                      {/* {context.lineRange && (
                         <Text style={styles.contextLineInfo}>{context.lineRange}</Text>
-                      )}
+                      )} */}
                       <Text style={styles.contextRelevance}>
                         Relevance: {context.confidencePercentage || Math.round(context.relevanceScore * 100)}%
                       </Text>
@@ -1659,7 +1659,7 @@ const styles = StyleSheet.create({
     maxWidth: '80%',
   },
   pdfUserMessageText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#FFFFFF',
   },
   pdfAiMessageContainer: {
@@ -1674,9 +1674,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderBottomLeftRadius:2,
     maxWidth: '85%',
+    
   },
   pdfAiMessageText: {
-    fontSize: 16,
+    fontSize: 13,
     color: '#FFFFFF',
     lineHeight: 22,
   },
@@ -2026,7 +2027,7 @@ const styles = StyleSheet.create({
   },
   // New styles for formatted text
   headingText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
     marginVertical: 8,
@@ -2044,7 +2045,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   bulletText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#FFFFFF',
     lineHeight: 22,
     flex: 1,
@@ -2185,7 +2186,7 @@ const styles = StyleSheet.create({
   },
   summaryFormattedContainer: {
     paddingVertical: 8,
-
+    fontSize:14,
     // marginHorizontal: 16,
     marginBottom: 16,
   },
@@ -2272,17 +2273,17 @@ const styles = StyleSheet.create({
   },
   // Context button and modal styles
   contextButton: {
-    backgroundColor: 'rgba(0, 122, 255, 0.2)',
-    borderRadius: 10,
+    // backgroundColor: '#00FF7F',
+    borderRadius: 60,
     paddingHorizontal: 6,
     paddingVertical: 2,
     marginHorizontal: 2,
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: '#00FF7F',
   },
   contextButtonText: {
-    color: '#007AFF',
-    fontSize: 12,
+    color: '#00FF7F',
+    fontSize: 10,
     fontWeight: 'bold',
   },
   contextReferenceText: {
@@ -2358,9 +2359,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
   },
   contextFileName: {
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: '600',
-    color: '#00FF7F',
+    color: '#ffffff',
     marginBottom: 4,
   },
   contextPageInfo: {
@@ -2375,7 +2376,7 @@ const styles = StyleSheet.create({
   },
   contextRelevance: {
     fontSize: 12,
-    color: '#007AFF',
+    color: '#00FF7F',
     fontWeight: '500',
   },
   contextTextContainer: {
