@@ -202,27 +202,178 @@ Return ONLY this JSON format:
     async def step2_unified_answer_generation(self, user_query: str, relevant_chunks: List[Dict], 
                                              complexity_result: Dict[str, Any], is_single_file_mode: bool = False, 
                                              is_workspace_mode: bool = False) -> Dict[str, Any]:
-        print(f'📝 Step 2: Unified answer generation with {complexity_result["complexity"]} complexity...')
+        print(f'📝 Step 2: Routing to {complexity_result["complexity"]} complexity handler...')
+
+        complexity = complexity_result['complexity']
+        
+        # Route to specific complexity handler
+        if complexity == 'simple':
+            return await self.step2_simple_query(user_query, relevant_chunks, complexity_result, is_single_file_mode, is_workspace_mode)
+        elif complexity == 'medium':
+            return await self.step2_medium_query(user_query, relevant_chunks, complexity_result, is_single_file_mode, is_workspace_mode)
+        else:  # complex
+            return await self.step2_complex_query(user_query, relevant_chunks, complexity_result, is_single_file_mode, is_workspace_mode)
+
+    async def step2_simple_query(self, user_query: str, relevant_chunks: List[Dict], 
+                                complexity_result: Dict[str, Any], is_single_file_mode: bool = False, 
+                                is_workspace_mode: bool = False) -> Dict[str, Any]:
+        print(f'📖 Step 2: Simple query processing...')
 
         if not self.embedding_service.chat_client:
             raise Exception("Google GenAI Chat client not initialized")
 
-        complexity = complexity_result['complexity']
-        
-        # Select model based on complexity
-        if complexity == 'simple':
-            model_name = 'gemini-2.0-flash-lite'
-            temperature = 0.2
-        elif complexity == 'medium':
-            model_name = 'gemini-2.5-flash-lite'
-            temperature = 0.3
-        else:  # complex
-            model_name = 'gemini-2.5-flash'
-            temperature = 0.1
+        # Build context for simple queries
+        context = self._build_context_for_query(relevant_chunks)
+        mode_info = "Single file mode" if is_single_file_mode else "Workspace mode" if is_workspace_mode else "Standard mode"
 
-        print(f'🤖 Using model: {model_name} for {complexity} complexity query')
+        simple_prompt = f"""Answer this straightforward question using the document content below.
 
-        # Build enhanced context with numbered references
+USER QUERY: {user_query}
+
+CONTEXT FROM DOCUMENTS:
+{context}
+
+INSTRUCTIONS:
+- Provide a direct, clear answer
+- Use simple, straightforward language  
+- Quote specific information from the documents
+- Reference context numbers when citing (e.g., [Context 2])
+- Keep the answer concise and focused
+
+CRITICAL: After your answer, list which contexts you used:
+---
+CONTEXTS_USED: [list context numbers you referenced (e.g., "1,3")]
+
+ANSWER:"""
+
+        try:
+            response = await asyncio.to_thread(
+                self.embedding_service.chat_client.models.generate_content,
+                model='gemini-2.0-flash-lite',
+                contents=[simple_prompt],
+                config=self.embedding_service.genai_types.GenerateContentConfig(
+                    temperature=0.2,
+                    top_p=0.8,
+                    max_output_tokens=1024
+                )
+            )
+
+            return self._process_response_and_build_result(response.text, relevant_chunks, complexity_result, 'gemini-2.0-flash-lite', mode_info)
+
+        except Exception as error:
+            print(f'❌ Simple query processing failed: {error}')
+            raise error
+
+    async def step2_medium_query(self, user_query: str, relevant_chunks: List[Dict], 
+                                complexity_result: Dict[str, Any], is_single_file_mode: bool = False, 
+                                is_workspace_mode: bool = False) -> Dict[str, Any]:
+        print(f'🔍 Step 2: Medium query processing...')
+
+        if not self.embedding_service.chat_client:
+            raise Exception("Google GenAI Chat client not initialized")
+
+        # Build enhanced context for medium queries
+        context = self._build_context_for_query(relevant_chunks)
+        mode_info = "Single file mode" if is_single_file_mode else "Workspace mode" if is_workspace_mode else "Standard mode"
+
+        medium_prompt = f"""Analyze and answer this question requiring moderate reasoning using the document content.
+
+USER QUERY: {user_query}
+
+CONTEXT FROM DOCUMENTS:
+{context}
+
+INSTRUCTIONS:
+- Provide a well-structured answer with analysis
+- Include comparisons, calculations, or synthesis as needed
+- Use **bold text** for key terms and important numbers
+- Organize with bullet points or numbered lists when appropriate
+- Show your reasoning process clearly
+- {"Focus on individual document analysis" if is_single_file_mode else "Compare across documents when relevant" if is_workspace_mode else "Standard analysis"}
+
+CRITICAL: After your answer, list which contexts you used:
+---
+CONTEXTS_USED: [list context numbers you referenced (e.g., "1,3,5")]
+
+ANSWER:"""
+
+        try:
+            response = await asyncio.to_thread(
+                self.embedding_service.chat_client.models.generate_content,
+                model='gemini-2.5-flash-lite',
+                contents=[medium_prompt],
+                config=self.embedding_service.genai_types.GenerateContentConfig(
+                    temperature=0.3,
+                    top_p=0.8,
+                    max_output_tokens=2048
+                )
+            )
+
+            return self._process_response_and_build_result(response.text, relevant_chunks, complexity_result, 'gemini-2.5-flash-lite', mode_info)
+
+        except Exception as error:
+            print(f'❌ Medium query processing failed: {error}')
+            raise error
+
+    async def step2_complex_query(self, user_query: str, relevant_chunks: List[Dict], 
+                                 complexity_result: Dict[str, Any], is_single_file_mode: bool = False, 
+                                 is_workspace_mode: bool = False) -> Dict[str, Any]:
+        print(f'🧠 Step 2: Complex query processing...')
+
+        if not self.embedding_service.chat_client:
+            raise Exception("Google GenAI Chat client not initialized")
+
+        # Build comprehensive context for complex queries
+        context = self._build_context_for_query(relevant_chunks)
+        mode_info = "Single file mode" if is_single_file_mode else "Workspace mode" if is_workspace_mode else "Standard mode"
+
+        complex_prompt = f"""Provide comprehensive analysis for this complex question requiring deep reasoning.
+
+USER QUERY: {user_query}
+
+CONTEXT FROM DOCUMENTS:
+{context}
+
+INSTRUCTIONS:
+- Deliver in-depth, sophisticated analysis
+- Include multi-step reasoning and synthesis
+- Create clear sections with detailed organization
+- Perform advanced calculations, trend analysis, or strategic reasoning
+- Provide recommendations or insights based on thorough analysis
+- Use multiple formatting elements (**bold**, bullet points, sections)
+- {"Analyze patterns within the document" if is_single_file_mode else "Synthesize insights across multiple documents" if is_workspace_mode else "Comprehensive document analysis"}
+
+STRUCTURE YOUR RESPONSE:
+1. **Executive Summary** (key findings)
+2. **Detailed Analysis** (with evidence)
+3. **Conclusions/Recommendations** (if applicable)
+
+CRITICAL: After your answer, list which contexts you used:
+---
+CONTEXTS_USED: [list context numbers you referenced (e.g., "1,2,4,6")]
+
+ANSWER:"""
+
+        try:
+            response = await asyncio.to_thread(
+                self.embedding_service.chat_client.models.generate_content,
+                model='gemini-2.5-flash',
+                contents=[complex_prompt],
+                config=self.embedding_service.genai_types.GenerateContentConfig(
+                    temperature=0.1,
+                    top_p=0.8,
+                    max_output_tokens=3072
+                )
+            )
+
+            return self._process_response_and_build_result(response.text, relevant_chunks, complexity_result, 'gemini-2.5-flash', mode_info)
+
+        except Exception as error:
+            print(f'❌ Complex query processing failed: {error}')
+            raise error
+
+    def _build_context_for_query(self, relevant_chunks: List[Dict]) -> str:
+        """Build context string for queries with enhanced metadata"""
         context_parts = []
         for index, chunk in enumerate(relevant_chunks):
             confidence = f"{chunk['score'] * 100:.1f}"
@@ -249,131 +400,59 @@ Return ONLY this JSON format:
             
             context_parts.append(f"[Context {index + 1} - {chunk['metadata']['fileName']} - {location_info}{tag_info} - Relevance: {confidence}%]: {chunk['text']}")
 
-        context = '\n\n'.join(context_parts)
+        return '\n\n'.join(context_parts)
 
-        # Create unified prompt that adapts to complexity and mode
-        mode_info = "Single file mode" if is_single_file_mode else "Workspace mode" if is_workspace_mode else "Standard mode"
-        
-        unified_prompt = f"""You are an expert AI assistant providing accurate, comprehensive answers based on document content. You are operating in {mode_info} and handling a {complexity} complexity query.
+    def _process_response_and_build_result(self, full_response: str, relevant_chunks: List[Dict], 
+                                          complexity_result: Dict[str, Any], model_name: str, mode_info: str) -> Dict[str, Any]:
+        """Process LLM response and build standardized result"""
+        # Extract used contexts and clean answer
+        answer = full_response
+        used_context_numbers = []
 
-USER QUERY: {user_query}
-COMPLEXITY LEVEL: {complexity.upper()}
-PROCESSING MODE: {mode_info}
-COMPLEXITY REASONING: {complexity_result.get('reasoning', 'N/A')}
+        contexts_used_match = re.search(r'CONTEXTS_USED:\s*\[(.*?)\]', full_response)
+        if contexts_used_match:
+            contexts_used_str = contexts_used_match.group(1)
+            used_context_numbers = [
+                int(s.strip()) for s in contexts_used_str.split(',') 
+                if s.strip().isdigit() and 1 <= int(s.strip()) <= len(relevant_chunks)
+            ]
 
-CONTEXT FROM DOCUMENTS:
-{context}
+            answer = re.sub(r'---\s*CONTEXTS_USED:.*$', '', full_response, flags=re.DOTALL).strip()
+            print(f'🎯 Used {len(used_context_numbers)} contexts: [{", ".join(map(str, used_context_numbers))}]')
+        else:
+            print('⚠️ Could not extract CONTEXTS_USED, using all contexts')
+            used_context_numbers = list(range(1, len(relevant_chunks) + 1))
 
-INSTRUCTIONS BASED ON COMPLEXITY:
+        # Build sources from used contexts
+        sources = self._build_sources_from_context_numbers(relevant_chunks, used_context_numbers)
 
-FOR SIMPLE QUERIES:
-- Provide direct, clear answers with minimal elaboration
-- Focus on factual information retrieval
-- Use straightforward language and structure
-- Reference specific contexts when citing information
+        # Determine analysis type based on complexity and features
+        complexity = complexity_result['complexity']
+        analysis_type = f"{complexity}-complexity"
+        if complexity_result['documentFeatures'].get('hasTableContent', False):
+            analysis_type += "-table-aware"
+        if complexity_result['documentFeatures'].get('hasFinancialData', False):
+            analysis_type += "-financial"
+        if "Workspace" in mode_info:
+            analysis_type += "-workspace"
+        elif "Single file" in mode_info:
+            analysis_type += "-single-file"
 
-FOR MEDIUM QUERIES:
-- Provide well-structured answers with moderate analysis
-- Include comparisons, calculations, or synthesis as needed
-- Use **bold text** for important headings and key terms
-- Organize information with bullet points or numbered lists
-- Show your reasoning process for calculations or comparisons
-
-FOR COMPLEX QUERIES:
-- Provide comprehensive, in-depth analysis
-- Include multi-step reasoning and sophisticated synthesis
-- Create detailed sections with clear organization
-- Perform advanced calculations, trend analysis, or strategic reasoning
-- Provide recommendations or insights based on deep analysis
-- Use multiple formatting elements for clarity
-
-UNIVERSAL REQUIREMENTS:
-1. Answer using ONLY the provided context - do not add external information
-2. Be precise and accurate in your citations
-3. Use **bold text** for important headings, numbers, and key terms
-4. Structure your answer appropriately for the complexity level
-5. Reference context numbers when citing specific information (e.g., [Context 1,3] or [Context 2])
-6. For {mode_info}: {"Focus on individual document analysis" if is_single_file_mode else "Consider cross-document analysis and comparisons" if is_workspace_mode else "Standard document processing"}
-7. Handle table data, financial information, and structured content appropriately
-8. If multiple documents provide different perspectives, present them clearly
-
-CRITICAL: After your answer, identify which contexts you actually used:
-
----
-CONTEXTS_USED: [list only the context numbers (e.g., "1,3,5") that you referenced in your answer]
-
-ANSWER:"""
-
-        try:
-            # Generate response using selected model
-            response = await asyncio.to_thread(
-                self.embedding_service.chat_client.models.generate_content,
-                model=model_name,
-                contents=[unified_prompt],
-                config=self.embedding_service.genai_types.GenerateContentConfig(
-                    temperature=temperature,
-                    top_p=0.8,
-                    max_output_tokens=3072 if complexity == 'complex' else 2048
-                )
-            )
-
-            full_response = response.text
-            print(f'📝 Step 2: Generated response with {model_name}')
-
-            # Extract used contexts and clean answer
-            answer = full_response
-            used_context_numbers = []
-
-            contexts_used_match = re.search(r'CONTEXTS_USED:\s*\[(.*?)\]', full_response)
-            if contexts_used_match:
-                contexts_used_str = contexts_used_match.group(1)
-                used_context_numbers = [
-                    int(s.strip()) for s in contexts_used_str.split(',') 
-                    if s.strip().isdigit() and 1 <= int(s.strip()) <= len(relevant_chunks)
-                ]
-
-                answer = re.sub(r'---\s*CONTEXTS_USED:.*$', '', full_response, flags=re.DOTALL).strip()
-                print(f'🎯 Step 2: Used {len(used_context_numbers)} contexts: [{", ".join(map(str, used_context_numbers))}]')
-            else:
-                print('⚠️ Could not extract CONTEXTS_USED, using all contexts')
-                used_context_numbers = list(range(1, len(relevant_chunks) + 1))
-
-            # Build sources from used contexts
-            sources = self._build_sources_from_context_numbers(relevant_chunks, used_context_numbers)
-
-            # Determine analysis type based on complexity and features
-            analysis_type = f"{complexity}-complexity"
-            if complexity_result['documentFeatures'].get('hasTableContent', False):
-                analysis_type += "-table-aware"
-            if complexity_result['documentFeatures'].get('hasFinancialData', False):
-                analysis_type += "-financial"
-            if is_workspace_mode:
-                analysis_type += "-workspace"
-            elif is_single_file_mode:
-                analysis_type += "-single-file"
-
-            result = {
-                'answer': answer,
-                'sources': sources,
-                'confidence': relevant_chunks[0]['score'] if relevant_chunks else 0,
-                'analysisType': analysis_type,
-                'processingStats': {
-                    'complexity': complexity,
-                    'modelUsed': model_name,
-                    'totalContexts': len(relevant_chunks),
-                    'usedContexts': len(used_context_numbers),
-                    'processingMode': mode_info,
-                    'confidenceScore': complexity_result.get('confidenceScore', 0.0),
-                    'documentFeatures': complexity_result.get('documentFeatures', {})
-                }
+        return {
+            'answer': answer,
+            'sources': sources,
+            'confidence': relevant_chunks[0]['score'] if relevant_chunks else 0,
+            'analysisType': analysis_type,
+            'processingStats': {
+                'complexity': complexity,
+                'modelUsed': model_name,
+                'totalContexts': len(relevant_chunks),
+                'usedContexts': len(used_context_numbers),
+                'processingMode': mode_info,
+                'confidenceScore': complexity_result.get('confidenceScore', 0.0),
+                'documentFeatures': complexity_result.get('documentFeatures', {})
             }
-
-            print(f'✅ Step 2: Successfully generated {complexity} complexity answer using {model_name}')
-            return result
-
-        except Exception as generation_error:
-            print(f'❌ Step 2: Answer generation failed: {generation_error}')
-            raise generation_error
+        }
 
     async def step0_query_recognition(self, user_query: str, relevant_chunks: List[Dict], 
                                      is_single_file_mode: bool = False, is_workspace_mode: bool = False) -> Dict[str, Any]:
