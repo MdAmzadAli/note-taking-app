@@ -967,6 +967,12 @@ export default function ChatInterface({
     setShowWorkspaceDeleteModal(false);
   };
 
+  // Helper function to clean context references from text
+  const cleanContextReferences = (text: string): string => {
+    // Remove context references like [Context 1], [Context 1,2], [context 1,3] etc.
+    return text.replace(/\[Context\s+[\d,\s]+\]/gi, '').replace(/\[context\s+[\d,\s]+\]/gi, '').trim();
+  };
+
   // Helper function to render formatted text with markdown-like styling and context references
   // Helper function to get the correct frontend filename using fileId
   const getCorrectFileName = (fileId: string): string => {
@@ -1750,7 +1756,7 @@ export default function ChatInterface({
               ) : summary ? (
                 <ScrollView style={styles.summaryScrollView} showsVerticalScrollIndicator={false}>
                   <View style={styles.summaryFormattedContainer}>
-                    {renderFormattedText(summary)}
+                    {renderFormattedText(cleanContextReferences(summary))}
                   </View>
                 </ScrollView>
               ) : files.length > 0 ? (
