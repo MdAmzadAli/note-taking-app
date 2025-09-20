@@ -1307,7 +1307,7 @@ export default function ChatInterface({
                 {/* Chat Data Loading */}
                 {isChatDataLoading && (
                   <View style={styles.pdfLoadingContainer}>
-                    <ActivityIndicator size="large" color="#007AFF" />
+                    <ActivityIndicator size="large" color="#00FF7F" />
                     <Text style={styles.pdfLoadingText}>Loading previous chats...</Text>
                   </View>
                 )}
@@ -1358,32 +1358,34 @@ export default function ChatInterface({
                         )}
                       </View>
                     </View>
-                    {/* Action Buttons - Copy, Share, Take note */}
-                    <View style={styles.actionButtonsContainer}>
-                      <TouchableOpacity 
-                        style={styles.actionButton}
-                        onPress={() => handleCopyAnswer(msg.ai)}
-                      >
-                        <IconSymbol size={16} name="copy.outline" color="#ffffff" />
-                        {/* <Text style={styles.actionButtonText}>Copy</Text> */}
-                      </TouchableOpacity>
+                    {/* Action Buttons - Copy, Share, Take note - Only show when response is successful */}
+                    {!msg.isLoading && msg.ai && msg.ai.trim() && (
+                      <View style={styles.actionButtonsContainer}>
+                        <TouchableOpacity 
+                          style={styles.actionButton}
+                          onPress={() => handleCopyAnswer(msg.ai)}
+                        >
+                          <IconSymbol size={16} name="copy.outline" color="#ffffff" />
+                          {/* <Text style={styles.actionButtonText}>Copy</Text> */}
+                        </TouchableOpacity>
 
-                      <TouchableOpacity 
-                        style={styles.actionButton}
-                        onPress={() => handleShareAnswer(msg.ai)}
-                      >
-                        <IconSymbol size={16} name="square.and.arrow.up" color="#ffffff" />
-                        {/* <Text style={styles.actionButtonText}>Share</Text> */}
-                      </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={styles.actionButton}
+                          onPress={() => handleShareAnswer(msg.ai)}
+                        >
+                          <IconSymbol size={16} name="square.and.arrow.up" color="#ffffff" />
+                          {/* <Text style={styles.actionButtonText}>Share</Text> */}
+                        </TouchableOpacity>
 
-                      <TouchableOpacity 
-                        style={styles.actionButton}
-                        onPress={() => handleTakeNote(msg.ai)}
-                      >
-                        <IconSymbol size={16} name="note.text" color="#ffffff" />
-                        {/* <Text style={styles.actionButtonText}>Take note</Text> */}
-                      </TouchableOpacity>
-                    </View>
+                        <TouchableOpacity 
+                          style={styles.actionButton}
+                          onPress={() => handleTakeNote(msg.ai)}
+                        >
+                          <IconSymbol size={16} name="note.text" color="#ffffff" />
+                          {/* <Text style={styles.actionButtonText}>Take note</Text> */}
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
                 ))}
               </ScrollView>
