@@ -78,6 +78,7 @@ export default function ExpertTab() {
   const [isBackendConnected, setIsBackendConnected] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchActive, setIsSearchActive] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState(true);
 
   // Check backend connectivity on mount
   useEffect(() => {
@@ -112,6 +113,7 @@ export default function ExpertTab() {
   };
 
   const loadData = async () => {
+    setIsDataLoading(true);
     try {
       const filesData = await AsyncStorage.getItem('expert_single_files');
       const workspacesData = await AsyncStorage.getItem('expert_workspaces');
@@ -124,6 +126,8 @@ export default function ExpertTab() {
       }
     } catch (error) {
       console.error('Error loading data:', error);
+    } finally {
+      setIsDataLoading(false);
     }
   };
 
@@ -879,6 +883,7 @@ export default function ExpertTab() {
         onRenameFile={handleRenameSingleFile}
         searchQuery={searchQuery}
         isSearchActive={isSearchActive}
+        isDataLoading={isDataLoading}
       />
 
       <SlideMenu

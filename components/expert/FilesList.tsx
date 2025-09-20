@@ -5,6 +5,7 @@ import { summaryService } from '../../services/summaryService';
 import FileActionsModal from './FileActionsModal';
 import RenameModal from './RenameModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { FileCardSkeleton } from '@/components/ui/SkeletonLoader';
 
 interface SingleFile {
   id: string;
@@ -33,6 +34,7 @@ interface FilesListProps {
   onRenameFile?: (fileId: string, newName: string) => void;
   searchQuery: string;
   isSearchActive: boolean;
+  isDataLoading?: boolean;
 }
 
 export default function FilesList({ 
@@ -44,7 +46,8 @@ export default function FilesList({
   onDeleteFile,
   onRenameFile,
   searchQuery,
-  isSearchActive
+  isSearchActive,
+  isDataLoading = false
 }: FilesListProps) {
   const [selectedFile, setSelectedFile] = useState<SingleFile | null>(null);
   const [showSummaryDropdown, setShowSummaryDropdown] = useState<string | null>(null);
@@ -61,10 +64,12 @@ export default function FilesList({
   const [editingFile, setEditingFile] = useState<string | null>(null);
   const [editingFileName, setEditingFileName] = useState<string>('');
 
-  // Filter files based on search query
+  // Filter files based on search query and reverse order to show latest first
   useEffect(() => {
     if (!searchQuery.trim()) {
-      setFilteredFiles(files);
+      // Reverse files to show latest first
+      const reversedFiles = [...files].reverse();
+      setFilteredFiles(reversedFiles);
       return;
     }
 
@@ -74,13 +79,16 @@ export default function FilesList({
       getFileTypeText(file).toLowerCase().includes(query) ||
       (file.source && file.source.toLowerCase().includes(query))
     );
-    setFilteredFiles(filtered);
+    // Also reverse filtered results to maintain latest-first order
+    setFilteredFiles([...filtered].reverse());
   }, [searchQuery, files]);
 
   // Reset search when files change
   useEffect(() => {
     if (!isSearchActive) {
-      setFilteredFiles(files);
+      // Reverse files to show latest first
+      const reversedFiles = [...files].reverse();
+      setFilteredFiles(reversedFiles);
     }
   }, [files, isSearchActive]);
 
@@ -414,7 +422,14 @@ export default function FilesList({
       </View>
 
       {/* Files List */}
-      {files.length === 0 ? (
+      {isDataLoading ? (
+        // Show skeleton loaders while data is loading
+        <View>
+          {[...Array(3)].map((_, index) => (
+            <FileCardSkeleton key={`skeleton-${index}`} />
+          ))}
+        </View>
+      ) : files.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>No files uploaded yet</Text>
           <Text style={styles.emptySubtext}>
@@ -743,7 +758,7 @@ const styles = StyleSheet.create({
     lineHeight: 25.6,
   },
   filesList: {
-    paddingBottom: 20,
+    paddingBottom: 100, // Increased padding to account for bottom navigation bar
   },
   modalOverlay: {
     flex: 1,

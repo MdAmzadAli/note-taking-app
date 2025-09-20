@@ -145,6 +145,9 @@ export default function ChatInterface({
   const [noteTitleToSave, setNoteTitleToSave] = useState('');
   const [selectedCategoryForNote, setSelectedCategoryForNote] = useState<string | undefined>(undefined);
   
+  // Loading state for chat data
+  const [isChatDataLoading, setIsChatDataLoading] = useState(false);
+  
   // Get tab bar context to hide bottom navigation
   const { hideTabBar, showTabBar } = useTabBar();
 
@@ -160,6 +163,7 @@ export default function ChatInterface({
   // Load chat session when component mounts or file changes
   useEffect(() => {
     const loadChatSession = async () => {
+      setIsChatDataLoading(true);
       if (selectedFile) {
         console.log('📂 Loading chat session for single file:', selectedFile.id);
         try {
@@ -238,6 +242,7 @@ export default function ChatInterface({
           setWorkspaceFileSummaries({});
         }
       }
+      setIsChatDataLoading(false);
     };
 
     loadChatSession();
@@ -1299,15 +1304,23 @@ export default function ChatInterface({
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.pdfChatMessagesContent}
               >
+                {/* Chat Data Loading */}
+                {isChatDataLoading && (
+                  <View style={styles.pdfLoadingContainer}>
+                    <ActivityIndicator size="large" color="#007AFF" />
+                    <Text style={styles.pdfLoadingText}>Loading previous chats...</Text>
+                  </View>
+                )}
+
                 {/* Welcome Message */}
-                {displayChatMessages.length === 0 && (
+                {!isChatDataLoading && displayChatMessages.length === 0 && (
                   <View style={styles.pdfWelcomeMessage}>
                     <Text style={styles.pdfWelcomeText}>Ask me anything</Text>
                   </View>
                 )}
 
                 {/* Chat Messages */}
-                {displayChatMessages.map((msg, index) => (
+                {!isChatDataLoading && displayChatMessages.map((msg, index) => (
                   <View key={index} style={styles.pdfMessageGroup}>
                     {/* User Message */}
                     <View style={styles.pdfUserMessageContainer}>
@@ -2000,6 +2013,17 @@ const styles = StyleSheet.create({
   pdfWelcomeText: {
     fontSize: 16,
     color: '#FFFFFF',
+  },
+  pdfLoadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  pdfLoadingText: {
+    fontSize: 16,
+    color: '#8E8E93',
+    textAlign: 'center',
+    marginTop: 12,
   },
   pdfMessageGroup: {
     marginBottom: 20,
