@@ -1755,7 +1755,7 @@ export default function ChatInterface({
                 </ScrollView>
               ) : files.length > 0 ? (
                 <View style={styles.summaryWaitingContainer}>
-                  <IconSymbol name="clock" size={20} color="#00FF7F" />
+                  <ActivityIndicator size="small" color="#00FF7F" />
                   <Text style={styles.summaryWaitingText}>
                     {files.length > 1 ? 'Summaries are being generated automatically...' : 'Summary is being generated automatically...'}
                   </Text>
@@ -1850,10 +1850,10 @@ export default function ChatInterface({
               )}
             </TouchableOpacity>
           </View>
-          <View style={styles.pdfStrictlyFromFileContainer}>
+          {/* <View style={styles.pdfStrictlyFromFileContainer}>
             <IconSymbol size={12} name="lock" color="#10B981" />
             <Text style={styles.pdfStrictlyFromFileText}>Strictly from file (Faster)</Text>
-          </View>
+          </View> */}
         </View>
         )}
       </KeyboardAvoidingView>
@@ -2330,20 +2330,20 @@ const styles = StyleSheet.create({
   },
   loadMoreContainer: {
     alignItems: 'center',
-    marginVertical: 16,
+    marginVertical: 10,
   },
   loadMoreButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#007AFF',
+    backgroundColor: '#555555',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#0056CC',
+    // borderWidth: 1,
+    // borderColor: '#0056CC',
   },
   loadMoreText: {
-    fontSize: 14,
+    fontSize: 10,
     color: '#ffffff',
     fontWeight: '500',
     marginLeft: 8,
