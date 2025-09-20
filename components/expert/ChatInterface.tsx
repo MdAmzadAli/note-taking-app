@@ -409,25 +409,28 @@ export default function ChatInterface({
         )
       );
       
-      // Update allChatMessages with the new message
+      // Update allChatMessages with the new message and calculate hasMoreMessages correctly
       setAllChatMessages(prev => {
         const updated = [...prev];
-        if (updated.length === 0 || updated[updated.length - 1].user !== message) {
+        const isNewMessage = updated.length === 0 || updated[updated.length - 1].user !== message;
+        
+        if (isNewMessage) {
           updated.push(finalMessage);
         } else {
           // Replace the loading message with the final message
           updated[updated.length - 1] = finalMessage;
         }
+        
+        // Calculate hasMoreMessages based on the updated message count
+        const newTotalMessages = updated.length;
+        const currentLoadedCount = loadedMessageCount + (isNewMessage ? 1 : 0);
+        setHasMoreMessages(newTotalMessages > currentLoadedCount);
+        
         return updated;
       });
       
-      // Update loaded count and hasMore state
-      setLoadedMessageCount(prev => {
-        const newCount = prev + 1;
-        // Recalculate hasMoreMessages based on whether there are more messages than currently loaded
-        setHasMoreMessages(allChatMessages.length > newCount);
-        return newCount;
-      });
+      // Update loaded count
+      setLoadedMessageCount(prev => prev + 1);
 
       // Save to localStorage for single file mode
       if (selectedFile) {
@@ -518,25 +521,28 @@ export default function ChatInterface({
         )
       );
       
-      // Update allChatMessages with the new message
+      // Update allChatMessages with the new message and calculate hasMoreMessages correctly
       setAllChatMessages(prev => {
         const updated = [...prev];
-        if (updated.length === 0 || updated[updated.length - 1].user !== message) {
+        const isNewMessage = updated.length === 0 || updated[updated.length - 1].user !== message;
+        
+        if (isNewMessage) {
           updated.push(finalMessage);
         } else {
           // Replace the loading message with the final message
           updated[updated.length - 1] = finalMessage;
         }
+        
+        // Calculate hasMoreMessages based on the updated message count
+        const newTotalMessages = updated.length;
+        const currentLoadedCount = loadedMessageCount + (isNewMessage ? 1 : 0);
+        setHasMoreMessages(newTotalMessages > currentLoadedCount);
+        
         return updated;
       });
       
-      // Update loaded count and hasMore state
-      setLoadedMessageCount(prev => {
-        const newCount = prev + 1;
-        // Recalculate hasMoreMessages based on whether there are more messages than currently loaded
-        setHasMoreMessages(allChatMessages.length > newCount);
-        return newCount;
-      });
+      // Update loaded count
+      setLoadedMessageCount(prev => prev + 1);
 
       // Save to localStorage for workspace mode
       try {
