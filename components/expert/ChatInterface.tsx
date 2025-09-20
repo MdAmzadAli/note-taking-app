@@ -1112,8 +1112,8 @@ export default function ChatInterface({
   const files = selectedFile ? [selectedFile] : selectedWorkspace?.files || [];
   const workspaceId = selectedWorkspace?.id;
 
-  // Use unified display messages state
-  const displayMessages = selectedFile ? displayChatMessages : chatMessages;
+  // Use unified display messages state - handle both single file and workspace modes
+  const displayMessages = selectedFile ? displayChatMessages : (selectedWorkspace ? workspaceDisplayChatMessages : chatMessages);
 
   // Store scroll metrics for position preservation
   const scrollMetricsRef = useRef({ 
