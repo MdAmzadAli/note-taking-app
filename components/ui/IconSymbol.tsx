@@ -46,7 +46,9 @@ type IconSymbolName =
   | 'pencil'
   | 'person.crop.circle.badge.plus'
   | 'envelope.fill'
-  | 'envelope.open';
+  | 'envelope.open'
+  | 'share'
+  | 'square.and.arrow.up';
 
 /**
  * Add your SF Symbols to Ionicons mappings here.
@@ -94,6 +96,8 @@ const MAPPING: IconMapping = {
   'gearshape': 'settings',
   'document.badge.plus': 'document-attach',
   'checklist': 'list',
+  'share': 'share-outline',
+  'square.and.arrow.up': 'share-outline',
 } as const;
 
 /**

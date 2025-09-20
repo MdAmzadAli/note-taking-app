@@ -587,7 +587,7 @@ export default function ChatInterface({
     try {
       const cleanedText = cleanAIResponseText(aiResponse);
       await Clipboard.setString(cleanedText);
-      Alert.alert('Copied!', 'AI answer has been copied to clipboard.');
+      // Alert.alert('Copied!', 'AI answer has been copied to clipboard.');
     } catch (error) {
       console.error('Error copying to clipboard:', error);
       Alert.alert('Error', 'Failed to copy to clipboard.');
