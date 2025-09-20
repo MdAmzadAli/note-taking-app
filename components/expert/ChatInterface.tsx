@@ -22,8 +22,9 @@ import FilePreviewModal from './FilePreviewModal';
 import UploadModal from './UploadModal';
 import RenameModal from './RenameModal';
 import { ragService, RAGSource } from '@/services/ragService';
-import io, { Socket } from 'socket.io-client';
 import { useTabBar } from '@/contexts/TabBarContext';
+import { eventBus } from '@/utils/eventBus';
+import { SOCKET_EVENTS } from '@/services/globalSocketService';
 import {API_ENDPOINTS} from '@/config/api'
 import { ChatSession, ChatMessage as ChatMessageType, WorkspaceChatSession, Note } from '@/types';
 import { ChatSessionStorage } from '@/utils/chatStorage';
@@ -122,7 +123,6 @@ export default function ChatInterface({
   const [showSummaryDropdown, setShowSummaryDropdown] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'summary' | 'quiz'>('chat');
   const scrollViewRef = useRef<ScrollView>(null);
-  const socketRef = useRef<Socket | null>(null);
 
   // New state for chat session management
   const [currentChatSession, setCurrentChatSession] = useState<ChatSession | null>(null);
@@ -1190,33 +1190,28 @@ export default function ChatInterface({
     scrollViewRef.current?.scrollToEnd({ animated: true });
     setShowScrollToBottom(false);
   }, []);
-  // Socket.IO connection for summary notifications
+  // Listen for summary notifications from global socket service
   useEffect(() => {
-  
-
-    const handleSummaryNotification = async (notification: any) => {
-      console.log('📨 Received summary notification via Socket.IO:', notification);
-
-      // Check if this summary is for one of our files using current state
-      setIsSummaryLoading(false); // Always stop loading when any summary arrives
+    const handleSummaryReceived = (data: any) => {
+      console.log('📨 ChatInterface: Received summary from global socket service:', data);
+      
+      const { fileId, summary } = data;
+      
+      // Stop loading state when any summary arrives
+      setIsSummaryLoading(false);
 
       // ==================== SINGLE FILE MODE SUMMARY HANDLING ====================
       if (selectedFile) {
-        // Store summary for specific file using backend file ID
+        // Update summaries state
         setSummaries(prev => ({
           ...prev,
-          [notification.fileId]: notification.summary
+          [fileId]: summary
         }));
 
-        // Save summary to localStorage immediately for single file mode
-        if (selectedFile.id === notification.fileId) {
-          try {
-            await ChatSessionStorage.updateSessionSummary(selectedFile.id, notification.summary);
-            setSummary(notification.summary);
-            console.log('✅ Single file summary saved to localStorage for file:', selectedFile.id);
-          } catch (error) {
-            console.error('❌ Failed to save single file summary to localStorage:', error);
-          }
+        // Update current summary if this is for the selected file
+        if (selectedFile.id === fileId) {
+          setSummary(summary);
+          console.log('✅ ChatInterface: Updated summary for selected file:', selectedFile.id);
         }
       }
       // ==================== WORKSPACE MODE SUMMARY HANDLING ====================
@@ -1224,91 +1219,58 @@ export default function ChatInterface({
         // Update workspace file summaries state
         setWorkspaceFileSummaries(prev => ({
           ...prev,
-          [notification.fileId]: notification.summary
+          [fileId]: summary
         }));
 
         // Update global summaries state for UI consistency
         setSummaries(prev => ({
           ...prev,
-          [notification.fileId]: notification.summary
+          [fileId]: summary
         }));
 
-        // Save summary to workspace localStorage
-        try {
-          await ChatSessionStorage.updateWorkspaceFileSummary(
-            selectedWorkspace.id, 
-            notification.fileId, 
-            notification.summary
-          );
-          console.log('✅ Workspace file summary saved to localStorage for workspace:', selectedWorkspace.id, 'file:', notification.fileId);
-
-          // Update UI state if this is the currently selected summary file
-          setSelectedSummaryFile(currentSelected => {
-            const currentFiles = selectedWorkspace.files;
-            
-            // If no file is selected yet, select the file that just got a summary
-            if (!currentSelected) {
-              const fileWithNewSummary = currentFiles.find(f => f.id === notification.fileId);
-              if (fileWithNewSummary) {
-                setSummary(notification.summary);
-                console.log('✅ Auto-selected file with new summary:', fileWithNewSummary.name);
-                return fileWithNewSummary;
-              }
+        // Update UI state if this is the currently selected summary file
+        setSelectedSummaryFile(currentSelected => {
+          const currentFiles = selectedWorkspace.files;
+          
+          // If no file is selected yet, select the file that just got a summary
+          if (!currentSelected) {
+            const fileWithNewSummary = currentFiles.find(f => f.id === fileId);
+            if (fileWithNewSummary) {
+              setSummary(summary);
+              console.log('✅ ChatInterface: Auto-selected file with new summary:', fileWithNewSummary.name);
+              return fileWithNewSummary;
             }
-            // If the currently selected file got a new summary, update the summary display
-            else if (currentSelected.id === notification.fileId) {
-              setSummary(notification.summary);
-              console.log('✅ Updated summary for currently selected file:', currentSelected.name);
-            }
-            
-            return currentSelected;
-          });
-        } catch (error) {
-          console.error('❌ Failed to save workspace file summary to localStorage:', error);
-        }
+          }
+          // If the currently selected file got a new summary, update the summary display
+          else if (currentSelected.id === fileId) {
+            setSummary(summary);
+            console.log('✅ ChatInterface: Updated summary for currently selected file:', currentSelected.name);
+          }
+          
+          return currentSelected;
+        });
       }
 
-      console.log('✅ Summary processed for file:', notification.fileId);
+      console.log('✅ ChatInterface: Summary UI updated for file:', fileId);
     };
 
-    // Connect to Socket.IO
-    const socketUrl = API_ENDPOINTS.base;
-    console.log('🔌 Connecting to Socket.IO:', socketUrl);
+    const handleSummaryError = (data: any) => {
+      console.error('❌ ChatInterface: Summary error received:', data);
+      setIsSummaryLoading(false);
+    };
 
-    socketRef.current = io(socketUrl, {
-      transports: ['polling', 'websocket'],
-      autoConnect: true,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 2000,
-      forceNew: true,
-      upgrade: true,
-      rememberUpgrade: false,
-      timeout: 20000
-    });
+    // Subscribe to global socket events
+    console.log('🔌 ChatInterface: Subscribing to global socket events');
+    const unsubscribeSummary = eventBus.subscribe(SOCKET_EVENTS.SUMMARY_RECEIVED, handleSummaryReceived);
+    const unsubscribeError = eventBus.subscribe(SOCKET_EVENTS.SUMMARY_ERROR, handleSummaryError);
 
-    socketRef.current.on('connect', () => {
-      console.log('✅ Socket.IO connected for summary notifications');
-    });
-
-    socketRef.current.on('disconnect', (reason) => {
-      console.log('🔌 Socket.IO disconnected:', reason);
-    });
-
-    socketRef.current.on('summary_notification', handleSummaryNotification);
-
-    socketRef.current.on('connect_error', (error) => {
-      console.error('❌ Socket.IO connection error:', error);
-    });
-
-    // Cleanup on unmount
+    // Cleanup event listeners on unmount
     return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
+      console.log('🔌 ChatInterface: Unsubscribing from global socket events');
+      unsubscribeSummary();
+      unsubscribeError();
     };
-  }, []); // Only connect once - don't include files as dependency to avoid reconnections
+  }, [selectedFile, selectedWorkspace]); // Re-subscribe when file/workspace changes
 
   // Clear summary when files change - summaries are now automatically generated via WebSocket
   
