@@ -48,7 +48,10 @@ type IconSymbolName =
   | 'envelope.fill'
   | 'envelope.open'
   | 'share'
-  | 'square.and.arrow.up';
+  | 'square.and.arrow.up'
+  | 'copy'
+  | 'copy.outline'
+  | 'clipboard';
 
 /**
  * Add your SF Symbols to Ionicons mappings here.
@@ -98,6 +101,9 @@ const MAPPING: IconMapping = {
   'checklist': 'list',
   'share': 'share-outline',
   'square.and.arrow.up': 'share-outline',
+  'copy': 'copy',
+  'copy.outline': 'copy-outline',
+  'clipboard': 'clipboard-outline',
 } as const;
 
 /**

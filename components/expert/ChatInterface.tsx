@@ -1343,7 +1343,7 @@ export default function ChatInterface({
                         style={styles.actionButton}
                         onPress={() => handleCopyAnswer(msg.ai)}
                       >
-                        <IconSymbol size={16} name="doc.text" color="#ffffff" />
+                        <IconSymbol size={16} name="copy.outline" color="#ffffff" />
                         <Text style={styles.actionButtonText}>Copy</Text>
                       </TouchableOpacity>
 
