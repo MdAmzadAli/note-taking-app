@@ -1343,8 +1343,8 @@ export default function ChatInterface({
                         style={styles.actionButton}
                         onPress={() => handleCopyAnswer(msg.ai)}
                       >
-                        <IconSymbol size={16} name="copy.outline" color="#ffffff" />
-                        <Text style={styles.actionButtonText}>Copy</Text>
+                        <IconSymbol size={16} name="doc.text" color="#ffffff" />
+                        {/* <Text style={styles.actionButtonText}>Copy</Text> */}
                       </TouchableOpacity>
 
                       <TouchableOpacity 
@@ -1352,7 +1352,7 @@ export default function ChatInterface({
                         onPress={() => handleShareAnswer(msg.ai)}
                       >
                         <IconSymbol size={16} name="square.and.arrow.up" color="#ffffff" />
-                        <Text style={styles.actionButtonText}>Share</Text>
+                        {/* <Text style={styles.actionButtonText}>Share</Text> */}
                       </TouchableOpacity>
 
                       <TouchableOpacity 
@@ -1360,7 +1360,7 @@ export default function ChatInterface({
                         onPress={() => handleTakeNote(msg.ai)}
                       >
                         <IconSymbol size={16} name="note.text" color="#ffffff" />
-                        <Text style={styles.actionButtonText}>Take note</Text>
+                        {/* <Text style={styles.actionButtonText}>Take note</Text> */}
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -2774,7 +2774,7 @@ const styles = StyleSheet.create({
     // paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#333333',
-    maxWidth:'60%',
+    maxWidth:'30%',
     // backgroundColor:"#ffffff",
   },
   actionButton: {
