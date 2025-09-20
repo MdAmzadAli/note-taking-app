@@ -15,6 +15,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { initializeNotificationSystem } from '@/utils/notifications';
+import { globalSocketService } from '@/services/globalSocketService';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -37,6 +38,10 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
       // Initialize notification system
       initializeNotificationSystem();
+      
+      // Initialize global socket service for persistent summary notifications
+      console.log('🚀 App: Initializing global socket service');
+      globalSocketService.initialize();
     }
   }, [loaded]);
 
