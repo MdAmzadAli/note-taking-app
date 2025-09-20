@@ -143,6 +143,7 @@ export default function ChatInterface({
   const [loadedMessageCount, setLoadedMessageCount] = useState<number>(10); // Number of messages currently displayed
   const [hasMoreMessages, setHasMoreMessages] = useState<boolean>(false); // Whether more messages exist
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false); // Loading state for "Load More"
+  const [showLoadingOverlay, setShowLoadingOverlay] = useState<boolean>(false); // Overlay to hide UI during smooth loading
   const [showScrollToBottom, setShowScrollToBottom] = useState<boolean>(false); // Show scroll to bottom button when user scrolls up
   
   // State for preserving scroll position during pagination
@@ -687,32 +688,35 @@ export default function ChatInterface({
     return 'Low';
   };
 
-  // Load more messages with proper scroll position preservation
+  // Load more messages with smooth UI experience (no visible shifts)
   const handleLoadMoreMessages = useCallback(() => {
-    if (isLoadingMore || !hasMoreMessages) return;
+    if (isLoadingMore || !hasMoreMessages || showLoadingOverlay) return;
     
+    // Show overlay immediately to hide UI changes
+    setShowLoadingOverlay(true);
     setIsLoadingMore(true);
     
     // Store current scroll metrics before loading
     const currentScrollY = scrollMetricsRef.current.scrollY;
     const currentContentHeight = scrollMetricsRef.current.contentHeight;
     
-    // Load new messages
-    const newLoadedCount = Math.min(loadedMessageCount + 10, allChatMessages.length);
-    const startIndex = Math.max(0, allChatMessages.length - newLoadedCount);
-    const updatedDisplayMessages = allChatMessages.slice(startIndex);
-    
-    setDisplayChatMessages(updatedDisplayMessages);
-    setLoadedMessageCount(newLoadedCount);
-    setHasMoreMessages(newLoadedCount < allChatMessages.length);
-    
-    // The scroll position will be automatically adjusted in handleContentSizeChange
+    // Small delay to ensure overlay is rendered before making changes
     setTimeout(() => {
-      setIsLoadingMore(false);
-      console.log(`📄 Loaded ${newLoadedCount} of ${allChatMessages.length} messages - Position preserved`);
-    }, 100);
+      // Load new messages
+      const newLoadedCount = Math.min(loadedMessageCount + 10, allChatMessages.length);
+      const startIndex = Math.max(0, allChatMessages.length - newLoadedCount);
+      const updatedDisplayMessages = allChatMessages.slice(startIndex);
+      
+      setDisplayChatMessages(updatedDisplayMessages);
+      setLoadedMessageCount(newLoadedCount);
+      setHasMoreMessages(newLoadedCount < allChatMessages.length);
+      
+      // The scroll position will be adjusted in handleContentSizeChange
+      // Overlay will be hidden after positioning is complete
+      console.log(`📄 Loading ${newLoadedCount} of ${allChatMessages.length} messages with smooth overlay...`);
+    }, 50);
     
-  }, [isLoadingMore, hasMoreMessages, loadedMessageCount, allChatMessages]);
+  }, [isLoadingMore, hasMoreMessages, loadedMessageCount, allChatMessages, showLoadingOverlay]);
 
   // Helper function to clean AI response text by removing formatting and context references
   const cleanAIResponseText = (text: string): string => {
@@ -1138,13 +1142,26 @@ export default function ChatInterface({
             animated: false
           });
         }
+        
+        // Hide overlay and loading state after scroll positioning is complete
+        setTimeout(() => {
+          setShowLoadingOverlay(false);
+          setIsLoadingMore(false);
+          console.log('✅ Smooth loading complete - UI revealed after positioning');
+        }, 100); // Additional delay to ensure scroll is fully complete
       }, 10);
+    } else if (showLoadingOverlay && !isLoadingMore) {
+      // Fallback: hide overlay if no scroll adjustment was needed
+      setTimeout(() => {
+        setShowLoadingOverlay(false);
+        console.log('✅ Smooth loading complete - No scroll adjustment needed');
+      }, 100);
     }
     
     scrollMetricsRef.current.contentHeight = contentHeight;
     scrollMetricsRef.current.oldMessageCount = displayMessages.length;
     setCurrentContentHeight(contentHeight);
-  }, [displayMessages.length, isLoadingMore]);
+  }, [displayMessages.length, isLoadingMore, showLoadingOverlay]);
 
   // Manual scroll to bottom function
   const scrollToBottom = useCallback(() => {
@@ -1636,6 +1653,16 @@ export default function ChatInterface({
                   </View>
                 ))}
               </ScrollView>
+
+              {/* Smooth Loading Overlay - Covers entire chat area during load more */}
+              {showLoadingOverlay && (
+                <View style={styles.smoothLoadingOverlay}>
+                  <View style={styles.smoothLoadingContent}>
+                    <ActivityIndicator size="large" color="#00FF7F" />
+                    <Text style={styles.smoothLoadingText}>Loading messages...</Text>
+                  </View>
+                </View>
+              )}
 
               {/* Scroll to Latest Button */}
               {showScrollToBottom && (
@@ -3283,6 +3310,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#FFFFFF',
     marginLeft: 4,
+    fontWeight: '500',
+  },
+  // Smooth loading overlay styles
+  smoothLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(26, 26, 26, 0.95)', // Semi-transparent dark background
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  smoothLoadingContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  smoothLoadingText: {
+    fontSize: 16,
+    color: '#FFFFFF',
     fontWeight: '500',
   },
 });
