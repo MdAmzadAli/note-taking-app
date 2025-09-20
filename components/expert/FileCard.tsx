@@ -28,6 +28,70 @@ interface FileCardProps {
 }
 
 export default function FileCard({ file, onPreview, onChat, isBackendConnected }: FileCardProps) {
+  // Get time display with proper local timezone handling
+  const getTimeDisplay = (uploadDate: string) => {
+    try {
+      let uploadedDate: Date;
+
+      // Handle different date formats
+      if (uploadDate.includes('/') && !uploadDate.includes('T')) {
+        // Format like "1/9/2025" where 1=day, 9=month, 2025=year (D/M/YYYY format)
+        const parts = uploadDate.split('/');
+        if (parts.length === 3) {
+          const day = parseInt(parts[0]);     // First number is day
+          const month = parseInt(parts[1]) - 1; // Second number is month (0-based in JavaScript)
+          const year = parseInt(parts[2]);
+
+          // Create date in local timezone to avoid UTC conversion
+          uploadedDate = new Date(year, month, day);
+        } else {
+          return 'Invalid date format';
+        }
+      } else {
+        // ISO format or other standard formats - parse and extract date parts to avoid timezone issues
+        const tempDate = new Date(uploadDate);
+        if (!isNaN(tempDate.getTime())) {
+          // Extract the date parts and create a new local date to avoid timezone conversion
+          uploadedDate = new Date(tempDate.getFullYear(), tempDate.getMonth(), tempDate.getDate());
+        } else {
+          return 'Invalid date';
+        }
+      }
+
+      // Ensure valid date
+      if (isNaN(uploadedDate.getTime())) {
+        console.error('❌ Invalid date detected:', uploadDate);
+        return 'Invalid date';
+      }
+
+      // Get current date (without time for comparison)
+      const now = new Date();
+      const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const uploadedDateOnly = new Date(uploadedDate.getFullYear(), uploadedDate.getMonth(), uploadedDate.getDate());
+
+      const diffInMs = nowDate.getTime() - uploadedDateOnly.getTime();
+      const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+      // Display relative time
+      if (diffInDays === 0) {
+        return 'Today';
+      } else if (diffInDays === 1) {
+        return 'Yesterday';
+      } else if (diffInDays <= 7) {
+        return `${diffInDays} days ago`;
+      } else {
+        return uploadedDate.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: uploadedDate.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error formatting date:', error);
+      return 'Unknown date';
+    }
+  };
+
   const getFileIcon = (mimeType?: string, fileName?: string) => {
     if (!mimeType && !fileName) return '📄';
 
@@ -104,7 +168,7 @@ export default function FileCard({ file, onPreview, onChat, isBackendConnected }
       <View style={styles.fileInfo}>
         <Text style={styles.fileName} numberOfLines={2}>{file.name}</Text>
         <Text style={styles.fileDate}>
-          Uploaded: {file.uploadDate}
+          Uploaded: {getTimeDisplay(file.uploadDate)}
           {file.size && ` • ${(file.size / 1024).toFixed(1)}KB`}
         </Text>
         {!isBackendConnected && (
