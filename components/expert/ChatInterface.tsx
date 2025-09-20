@@ -545,6 +545,14 @@ export default function ChatInterface({
     setFileToDelete(null);
   };
 
+  // Helper function to convert relevance score to readable format
+  const getRelevanceLevel = (score: number): string => {
+    const percentage = score > 1 ? score : score * 100; // Handle both 0-1 and 0-100 ranges
+    if (percentage > 50) return 'High';
+    if (percentage >= 30) return 'Medium';
+    return 'Low';
+  };
+
   // Helper function to clean AI response text by removing formatting and context references
   const cleanAIResponseText = (text: string): string => {
     if (!text) return '';
@@ -1651,7 +1659,7 @@ export default function ChatInterface({
                       {(source.pageNumber || source.lineRange) && ')'}
                     </Text>
                     <Text style={styles.sourceScore}>
-                      {Math.round(source.relevanceScore * 100)}% match
+                      {getRelevanceLevel(source.relevanceScore)} relevance
                     </Text>
                   </View>
                   {(source.startLine && source.endLine) && (
@@ -1760,7 +1768,7 @@ export default function ChatInterface({
                         <Text style={styles.contextLineInfo}>{context.lineRange}</Text>
                       )} */}
                       <Text style={styles.contextRelevance}>
-                        Relevance: {context.confidencePercentage || Math.round(context.relevanceScore * 100)}%
+                        Relevance: {getRelevanceLevel(context.relevanceScore)}
                       </Text>
                     </View>
                     
