@@ -4,7 +4,7 @@ const getApiBaseUrl = () => {
     // In Replit web environment, use the backend port forwarding
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
-// sjdisjdjsijd
+// sjdisjdjsijdsnds
     // Check if we're in Expo tunnel environment (mobile/Expo Go)
     if (hostname.includes('.exp.direct')) {
       const baseUrl = 'https://b83d5070-6ccd-49d1-9105-89f8381d5d50-00-2mvb0jvhffi13.riker.replit.dev:8000';
