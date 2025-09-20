@@ -24,6 +24,7 @@ import { ragService } from '../../services/ragService';
 // Import chat session storage
 import { ChatSessionStorage } from '../../utils/chatStorage';
 import { ChatMessage as ChatMessageType } from '../../types';
+import { useTabBar } from '../../contexts/TabBarContext';
 
 // Define API_BASE_URL if it's not already defined elsewhere
 const API_BASE_URL = 'http://localhost:5000'; // Example URL, replace with your actual backend URL
@@ -60,6 +61,9 @@ interface ChatMessage {
 
 
 export default function ExpertTab() {
+  // Get tab bar context for safety measures
+  const { showTabBar } = useTabBar();
+  
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [preserveMenuState, setPreserveMenuState] = useState(false);
   const [isUploadModalVisible, setIsUploadModalVisible] = useState(false);
@@ -85,6 +89,14 @@ export default function ExpertTab() {
     checkBackendConnection();
     loadData();
   }, []);
+
+  // Safety measure: Ensure tab bar is shown when chat is hidden
+  useEffect(() => {
+    if (!isChatVisible) {
+      console.log('🎯 ExpertTab: Chat is hidden - Ensuring tab bar is visible');
+      showTabBar();
+    }
+  }, [isChatVisible, showTabBar]);
 
   const checkBackendConnection = async () => {
     try {

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { 
   View, 
   Text, 
@@ -225,6 +226,21 @@ export default function ChatInterface({
     
     initializeCleanup();
   }, []); // Run only once on mount
+
+  // Navigation focus/blur listener to handle swipe gestures
+  useFocusEffect(
+    useCallback(() => {
+      // Called when screen comes into focus
+      console.log('🎯 ChatInterface: Screen gained focus');
+      hideTabBar();
+      
+      return () => {
+        // Called when screen loses focus (including swipe gestures)
+        console.log('🎯 ChatInterface: Screen lost focus - Showing tab bar (swipe gesture detected)');
+        showTabBar();
+      };
+    }, [hideTabBar, showTabBar])
+  );
 
   // Load chat session when component mounts or file changes
   useEffect(() => {
