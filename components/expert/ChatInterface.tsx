@@ -143,7 +143,7 @@ export default function ChatInterface({
   const [loadedMessageCount, setLoadedMessageCount] = useState<number>(10); // Number of messages currently displayed
   const [hasMoreMessages, setHasMoreMessages] = useState<boolean>(false); // Whether more messages exist
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false); // Loading state for "Load More"
-  const [isLoadingPreviousMessages, setIsLoadingPreviousMessages] = useState<boolean>(false); // Flag to disable auto-scroll during pagination
+  const [showScrollToBottom, setShowScrollToBottom] = useState<boolean>(false); // Show scroll to bottom button when user scrolls up
   
   // State for action buttons (Copy, Share, Take note)
   const [categories, setCategories] = useState<Category[]>([]);
@@ -626,7 +626,6 @@ export default function ChatInterface({
     if (isLoadingMore || !hasMoreMessages) return;
     
     setIsLoadingMore(true);
-    setIsLoadingPreviousMessages(true); // Disable auto-scroll during pagination
     
     // Simulate a small delay for better UX
     setTimeout(() => {
@@ -638,11 +637,6 @@ export default function ChatInterface({
       setLoadedMessageCount(newLoadedCount);
       setHasMoreMessages(newLoadedCount < allChatMessages.length);
       setIsLoadingMore(false);
-      
-      // Re-enable auto-scroll after a short delay to allow UI to settle
-      setTimeout(() => {
-        setIsLoadingPreviousMessages(false);
-      }, 100);
       
       console.log(`📄 Loaded ${newLoadedCount} of ${allChatMessages.length} messages`);
     }, 300);
@@ -1023,13 +1017,29 @@ export default function ChatInterface({
   // Use unified display messages state
   const displayMessages = selectedFile ? displayChatMessages : chatMessages;
 
-  useEffect(() => {
-    if (displayMessages.length > 0 && !isLoadingPreviousMessages) {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+  // Handle scroll events to show/hide scroll-to-bottom button
+  const handleScroll = useCallback((event: any) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const scrollPosition = contentOffset.y;
+    const contentHeight = contentSize.height;
+    const containerHeight = layoutMeasurement.height;
+    
+    // Check if user is near the bottom (within 100px)
+    const isNearBottom = scrollPosition + containerHeight >= contentHeight - 100;
+    
+    // Show button when user scrolls up from bottom and there are messages
+    if (!isNearBottom && displayMessages.length > 0 && displayMessages[displayMessages.length - 1]?.ai) {
+      setShowScrollToBottom(true);
+    } else {
+      setShowScrollToBottom(false);
     }
-  }, [displayMessages, isLoadingPreviousMessages]);
+  }, [displayMessages]);
+
+  // Manual scroll to bottom function
+  const scrollToBottom = useCallback(() => {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+    setShowScrollToBottom(false);
+  }, []);
   // Socket.IO connection for summary notifications
   useEffect(() => {
   
@@ -1406,6 +1416,8 @@ export default function ChatInterface({
                 style={styles.pdfChatMessagesContainer}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.pdfChatMessagesContent}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
               >
                 {/* Chat Data Loading */}
                 {isChatDataLoading && (
@@ -1512,6 +1524,17 @@ export default function ChatInterface({
                   </View>
                 ))}
               </ScrollView>
+
+              {/* Scroll to Latest Button */}
+              {showScrollToBottom && (
+                <TouchableOpacity 
+                  style={styles.scrollToBottomButton}
+                  onPress={scrollToBottom}
+                >
+                  <IconSymbol size={16} name="chevron.down" color="#ffffff" />
+                  <Text style={styles.scrollToBottomText}>Scroll to latest</Text>
+                </TouchableOpacity>
+              )}
             </>
           )}
 
@@ -3125,5 +3148,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#000',
     fontWeight: '600',
+  },
+  scrollToBottomButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 16,
+    backgroundColor: '#333333',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#555555',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  scrollToBottomText: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    marginLeft: 4,
+    fontWeight: '500',
   },
 });
