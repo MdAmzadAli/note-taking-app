@@ -1273,32 +1273,7 @@ export default function ChatInterface({
                           <>
                             {renderFormattedText(msg.ai, msg.sources)}
                             
-                            {/* Action Buttons - Copy, Share, Take note */}
-                            <View style={styles.actionButtonsContainer}>
-                              <TouchableOpacity 
-                                style={styles.actionButton}
-                                onPress={() => handleCopyAnswer(msg.ai)}
-                              >
-                                <IconSymbol size={16} name="doc.text" color="#007AFF" />
-                                <Text style={styles.actionButtonText}>Copy</Text>
-                              </TouchableOpacity>
-                              
-                              <TouchableOpacity 
-                                style={styles.actionButton}
-                                onPress={() => handleShareAnswer(msg.ai)}
-                              >
-                                <IconSymbol size={16} name="square.and.arrow.up" color="#007AFF" />
-                                <Text style={styles.actionButtonText}>Share</Text>
-                              </TouchableOpacity>
-                              
-                              <TouchableOpacity 
-                                style={styles.actionButton}
-                                onPress={() => handleTakeNote(msg.ai)}
-                              >
-                                <IconSymbol size={16} name="note.text" color="#007AFF" />
-                                <Text style={styles.actionButtonText}>Take note</Text>
-                              </TouchableOpacity>
-                            </View>
+                      
                             
                             {/* {msg.sources && msg.sources.length > 0 && (
                               <TouchableOpacity 
@@ -1314,6 +1289,32 @@ export default function ChatInterface({
                           </>
                         )}
                       </View>
+                    </View>
+                    {/* Action Buttons - Copy, Share, Take note */}
+                    <View style={styles.actionButtonsContainer}>
+                      <TouchableOpacity 
+                        style={styles.actionButton}
+                        onPress={() => handleCopyAnswer(msg.ai)}
+                      >
+                        <IconSymbol size={16} name="doc.text" color="#ffffff" />
+                        <Text style={styles.actionButtonText}>Copy</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity 
+                        style={styles.actionButton}
+                        onPress={() => handleShareAnswer(msg.ai)}
+                      >
+                        <IconSymbol size={16} name="square.and.arrow.up" color="#ffffff" />
+                        <Text style={styles.actionButtonText}>Share</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity 
+                        style={styles.actionButton}
+                        onPress={() => handleTakeNote(msg.ai)}
+                      >
+                        <IconSymbol size={16} name="note.text" color="#ffffff" />
+                        <Text style={styles.actionButtonText}>Take note</Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
                 ))}
@@ -2722,25 +2723,27 @@ const styles = StyleSheet.create({
   actionButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginTop: 10,
-    paddingTop: 10,
+    marginTop: 3,
+    // paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#333333',
+    maxWidth:'60%',
+    // backgroundColor:"#ffffff",
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+    paddingHorizontal: 4,
+    // backgroundColor: '#333333',
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: 'rgba(0, 122, 255, 0.3)',
+    borderColor: '#555555',
   },
   actionButtonText: {
-    marginLeft: 6,
-    fontSize: 12,
-    color: '#007AFF',
+    marginLeft: 2,
+    fontSize: 10,
+    color: '#ffffff',
     fontWeight: '500',
   },
   
