@@ -175,44 +175,6 @@ export default function ChatInterface({
     };
   }, [hideTabBar, showTabBar]);
 
-  // Additional safety net - ensure tab bar is shown when app state changes
-  useEffect(() => {
-    const handleAppStateChange = (nextAppState: string) => {
-      console.log('🎯 ChatInterface: App state changed to:', nextAppState);
-      if (nextAppState === 'background' || nextAppState === 'inactive') {
-        console.log('🎯 ChatInterface: App going to background - Showing tab bar');
-        showTabBar();
-      }
-    };
-
-    // Use React Native AppState for mobile platforms
-    if (Platform.OS !== 'web') {
-      const subscription = AppState.addEventListener('change', handleAppStateChange);
-      
-      return () => {
-        subscription?.remove();
-        showTabBar(); // Extra safety call
-      };
-    } 
-    // For web platforms, use proper feature detection
-    else if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-      const handleBeforeUnload = () => {
-        console.log('🎯 ChatInterface: Before unload - Showing tab bar');
-        showTabBar();
-      };
-
-      window.addEventListener('beforeunload', handleBeforeUnload);
-      
-      return () => {
-        window.removeEventListener('beforeunload', handleBeforeUnload);
-        showTabBar(); // Extra safety call
-      };
-    }
-
-    return () => {
-      showTabBar(); // Fallback cleanup
-    };
-  }, [showTabBar]);
 
   // Initialize automatic cleanup on component mount
   useEffect(() => {
