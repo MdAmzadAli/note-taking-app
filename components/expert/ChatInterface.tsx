@@ -11,7 +11,9 @@ import {
   KeyboardAvoidingView,
   Modal,
   ActivityIndicator,
-  Alert
+  Alert,
+  Clipboard,
+  Share
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import FilePreviewModal from './FilePreviewModal';
@@ -21,8 +23,9 @@ import { ragService, RAGSource } from '@/services/ragService';
 import io, { Socket } from 'socket.io-client';
 import { useTabBar } from '@/contexts/TabBarContext';
 import {API_ENDPOINTS} from '@/config/api'
-import { ChatSession, ChatMessage as ChatMessageType, WorkspaceChatSession } from '@/types';
+import { ChatSession, ChatMessage as ChatMessageType, WorkspaceChatSession, Note } from '@/types';
 import { ChatSessionStorage } from '@/utils/chatStorage';
+import { saveNote, getCategories } from '@/utils/storage';
 interface SingleFile {
   id: string;
   name: string;
@@ -44,6 +47,12 @@ interface Workspace {
   name: string;
   files: SingleFile[];
   createdDate: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  createdAt: string;
 }
 
 interface ChatMessage {
@@ -127,6 +136,12 @@ export default function ChatInterface({
   
   // Unified state for displaying messages - starts with localStorage, gets updated with ongoing messages
   const [displayChatMessages, setDisplayChatMessages] = useState<ChatMessage[]>([]);
+  
+  // State for action buttons (Copy, Share, Take note)
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [showNoteCreationModal, setShowNoteCreationModal] = useState(false);
+  const [noteContentToSave, setNoteContentToSave] = useState('');
+  const [selectedCategoryForNote, setSelectedCategoryForNote] = useState<string | undefined>(undefined);
   
   // Get tab bar context to hide bottom navigation
   const { hideTabBar, showTabBar } = useTabBar();
@@ -225,6 +240,19 @@ export default function ChatInterface({
 
     loadChatSession();
   }, [selectedFile, selectedWorkspace]);
+
+  // Load categories for note creation
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const categoriesData = await getCategories();
+        setCategories(categoriesData);
+      } catch (error) {
+        console.error('Error loading categories:', error);
+      }
+    };
+    loadCategories();
+  }, []);
 
   // Update display messages when workspace chatMessages prop changes
   // useEffect(() => {
@@ -508,6 +536,75 @@ export default function ChatInterface({
   const cancelDelete = () => {
     setShowDeleteConfirmation(false);
     setFileToDelete(null);
+  };
+
+  // Action button handlers for Copy, Share, and Take note
+  const handleCopyAnswer = async (aiResponse: string) => {
+    try {
+      await Clipboard.setString(aiResponse);
+      Alert.alert('Copied!', 'AI answer has been copied to clipboard.');
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+      Alert.alert('Error', 'Failed to copy to clipboard.');
+    }
+  };
+
+  const handleShareAnswer = async (aiResponse: string) => {
+    try {
+      const result = await Share.share({
+        message: aiResponse,
+        title: 'AI Answer'
+      });
+      if (result.action === Share.sharedAction) {
+        console.log('Answer shared successfully');
+      }
+    } catch (error) {
+      console.error('Error sharing answer:', error);
+      Alert.alert('Error', 'Failed to share answer.');
+    }
+  };
+
+  const handleTakeNote = (aiResponse: string) => {
+    setNoteContentToSave(aiResponse);
+    setSelectedCategoryForNote(undefined); // Default to no category
+    setShowNoteCreationModal(true);
+  };
+
+  const handleCreateNoteFromAnswer = async () => {
+    try {
+      const note: Note = {
+        id: `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        title: noteContentToSave.length > 50 
+          ? noteContentToSave.substring(0, 50) + '...' 
+          : noteContentToSave,
+        content: noteContentToSave,
+        fields: {},
+        writingStyle: 'mind_dump',
+        theme: '#1C1C1C',
+        isPinned: false,
+        categoryId: selectedCategoryForNote,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        images: [],
+        audios: [],
+        tickBoxGroups: [],
+        editorBlocks: [{
+          id: `block_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          type: 'text',
+          content: noteContentToSave,
+          createdAt: new Date().toISOString()
+        }]
+      };
+
+      await saveNote(note);
+      setShowNoteCreationModal(false);
+      setNoteContentToSave('');
+      setSelectedCategoryForNote(undefined);
+      Alert.alert('Success!', 'Note created successfully.');
+    } catch (error) {
+      console.error('Error creating note:', error);
+      Alert.alert('Error', 'Failed to create note.');
+    }
   };
 
   // Check RAG health on mount (no indexing - that's done during upload)
@@ -1175,6 +1272,34 @@ export default function ChatInterface({
                         ) : (
                           <>
                             {renderFormattedText(msg.ai, msg.sources)}
+                            
+                            {/* Action Buttons - Copy, Share, Take note */}
+                            <View style={styles.actionButtonsContainer}>
+                              <TouchableOpacity 
+                                style={styles.actionButton}
+                                onPress={() => handleCopyAnswer(msg.ai)}
+                              >
+                                <IconSymbol size={16} name="doc.text" color="#007AFF" />
+                                <Text style={styles.actionButtonText}>Copy</Text>
+                              </TouchableOpacity>
+                              
+                              <TouchableOpacity 
+                                style={styles.actionButton}
+                                onPress={() => handleShareAnswer(msg.ai)}
+                              >
+                                <IconSymbol size={16} name="square.and.arrow.up" color="#007AFF" />
+                                <Text style={styles.actionButtonText}>Share</Text>
+                              </TouchableOpacity>
+                              
+                              <TouchableOpacity 
+                                style={styles.actionButton}
+                                onPress={() => handleTakeNote(msg.ai)}
+                              >
+                                <IconSymbol size={16} name="note.text" color="#007AFF" />
+                                <Text style={styles.actionButtonText}>Take note</Text>
+                              </TouchableOpacity>
+                            </View>
+                            
                             {/* {msg.sources && msg.sources.length > 0 && (
                               <TouchableOpacity 
                                 style={styles.pdfSourceButton}
@@ -1280,7 +1405,7 @@ export default function ChatInterface({
           {activeTab === 'quiz' && (
             <View style={styles.quizTabContainer}>
               <View style={styles.comingSoonContainer}>
-                <IconSymbol size={48} name="questionmark.circle" color="#8B5CF6" />
+                <IconSymbol size={48} name="questionmark" color="#8B5CF6" />
                 <Text style={styles.comingSoonTitle}>Quiz Feature Coming Soon</Text>
                 <Text style={styles.comingSoonText}>
                   Interactive quizzes based on your documents will be available in a future update.
@@ -1580,6 +1705,89 @@ export default function ChatInterface({
                 ))}
               </ScrollView>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Note Creation Modal */}
+      <Modal
+        visible={showNoteCreationModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowNoteCreationModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.noteCreationModal}>
+            <View style={styles.noteCreationHeader}>
+              <Text style={styles.noteCreationTitle}>Create Note</Text>
+              <TouchableOpacity 
+                style={styles.noteCreationCloseButton}
+                onPress={() => setShowNoteCreationModal(false)}
+              >
+                <IconSymbol size={20} name="xmark" color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.noteCreationContent} showsVerticalScrollIndicator={false}>
+              <Text style={styles.notePreviewLabel}>Content Preview:</Text>
+              <View style={styles.notePreviewContainer}>
+                <Text style={styles.notePreviewText} numberOfLines={5}>
+                  {noteContentToSave}
+                </Text>
+              </View>
+              
+              <Text style={styles.categoryLabel}>Category (Optional):</Text>
+              <View style={styles.categoryContainer}>
+                <TouchableOpacity 
+                  style={[
+                    styles.categoryOption, 
+                    selectedCategoryForNote === undefined && styles.categoryOptionSelected
+                  ]}
+                  onPress={() => setSelectedCategoryForNote(undefined)}
+                >
+                  <Text style={[
+                    styles.categoryOptionText,
+                    selectedCategoryForNote === undefined && styles.categoryOptionTextSelected
+                  ]}>
+                    No Category
+                  </Text>
+                </TouchableOpacity>
+                
+                {categories.map((category) => (
+                  <TouchableOpacity 
+                    key={category.id}
+                    style={[
+                      styles.categoryOption, 
+                      selectedCategoryForNote === category.id && styles.categoryOptionSelected
+                    ]}
+                    onPress={() => setSelectedCategoryForNote(category.id)}
+                  >
+                    <Text style={[
+                      styles.categoryOptionText,
+                      selectedCategoryForNote === category.id && styles.categoryOptionTextSelected
+                    ]}>
+                      {category.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+            
+            <View style={styles.noteCreationButtons}>
+              <TouchableOpacity 
+                style={styles.noteCreationCancelButton}
+                onPress={() => setShowNoteCreationModal(false)}
+              >
+                <Text style={styles.noteCreationCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.noteCreationSaveButton}
+                onPress={handleCreateNoteFromAnswer}
+              >
+                <Text style={styles.noteCreationSaveText}>Create Note</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -2508,5 +2716,152 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#FFFFFF',
     lineHeight: 20,
+  },
+  
+  // Action buttons styles
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#333333',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 122, 255, 0.3)',
+  },
+  actionButtonText: {
+    marginLeft: 6,
+    fontSize: 12,
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  
+  // Note creation modal styles
+  noteCreationModal: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 16,
+    margin: 20,
+    marginTop: 100,
+    maxHeight: '80%',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  noteCreationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  noteCreationTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  noteCreationCloseButton: {
+    padding: 5,
+  },
+  noteCreationContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  notePreviewLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  notePreviewContainer: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+    maxHeight: 120,
+  },
+  notePreviewText: {
+    fontSize: 14,
+    color: '#CCCCCC',
+    lineHeight: 20,
+  },
+  categoryLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 12,
+  },
+  categoryContainer: {
+    gap: 8,
+  },
+  categoryOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  categoryOptionSelected: {
+    backgroundColor: 'rgba(0, 122, 255, 0.2)',
+    borderColor: '#007AFF',
+  },
+  categoryOptionText: {
+    fontSize: 14,
+    color: '#CCCCCC',
+    fontWeight: '500',
+  },
+  categoryOptionTextSelected: {
+    color: '#007AFF',
+  },
+  noteCreationButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#333333',
+  },
+  noteCreationCancelButton: {
+    flex: 1,
+    marginRight: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  noteCreationCancelText: {
+    fontSize: 14,
+    color: '#CCCCCC',
+    fontWeight: '500',
+  },
+  noteCreationSaveButton: {
+    flex: 1,
+    marginLeft: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  noteCreationSaveText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
 });
