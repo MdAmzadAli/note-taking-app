@@ -145,6 +145,10 @@ export default function ChatInterface({
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false); // Loading state for "Load More"
   const [showScrollToBottom, setShowScrollToBottom] = useState<boolean>(false); // Show scroll to bottom button when user scrolls up
   
+  // State for preserving scroll position during pagination
+  const [currentScrollPosition, setCurrentScrollPosition] = useState<number>(0);
+  const [currentContentHeight, setCurrentContentHeight] = useState<number>(0);
+  
   // State for action buttons (Copy, Share, Take note)
   const [categories, setCategories] = useState<Category[]>([]);
   const [showNoteCreationModal, setShowNoteCreationModal] = useState(false);
@@ -621,11 +625,15 @@ export default function ChatInterface({
     return 'Low';
   };
 
-  // Load more messages (10 more pairs)
+  // Load more messages (10 more pairs) with scroll position preservation
   const handleLoadMoreMessages = useCallback(() => {
     if (isLoadingMore || !hasMoreMessages) return;
     
     setIsLoadingMore(true);
+    
+    // Store current scroll position and content height before loading
+    const oldScrollPosition = currentScrollPosition;
+    const oldContentHeight = currentContentHeight;
     
     // Simulate a small delay for better UX
     setTimeout(() => {
@@ -638,9 +646,25 @@ export default function ChatInterface({
       setHasMoreMessages(newLoadedCount < allChatMessages.length);
       setIsLoadingMore(false);
       
-      console.log(`📄 Loaded ${newLoadedCount} of ${allChatMessages.length} messages`);
+      // Preserve scroll position after new content is rendered
+      setTimeout(() => {
+        const newContentHeight = currentContentHeight;
+        const heightDifference = newContentHeight - oldContentHeight;
+        const adjustedScrollPosition = oldScrollPosition + heightDifference;
+        
+        // Scroll to the adjusted position to preserve user's view
+        if (heightDifference > 0 && scrollViewRef.current) {
+          scrollViewRef.current.scrollTo({
+            y: adjustedScrollPosition,
+            animated: false // No animation for seamless experience
+          });
+        }
+        
+        console.log(`📄 Loaded ${newLoadedCount} of ${allChatMessages.length} messages - Position preserved`);
+      }, 50); // Small delay to ensure content is rendered
+      
     }, 300);
-  }, [isLoadingMore, hasMoreMessages, loadedMessageCount, allChatMessages]);
+  }, [isLoadingMore, hasMoreMessages, loadedMessageCount, allChatMessages, currentScrollPosition, currentContentHeight]);
 
   // Helper function to clean AI response text by removing formatting and context references
   const cleanAIResponseText = (text: string): string => {
@@ -1017,12 +1041,15 @@ export default function ChatInterface({
   // Use unified display messages state
   const displayMessages = selectedFile ? displayChatMessages : chatMessages;
 
-  // Handle scroll events to show/hide scroll-to-bottom button
+  // Handle scroll events to show/hide scroll-to-bottom button and track position
   const handleScroll = useCallback((event: any) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     const scrollPosition = contentOffset.y;
     const contentHeight = contentSize.height;
     const containerHeight = layoutMeasurement.height;
+    
+    // Update current scroll position for pagination
+    setCurrentScrollPosition(scrollPosition);
     
     // Check if user is near the bottom (within 100px)
     const isNearBottom = scrollPosition + containerHeight >= contentHeight - 100;
@@ -1034,6 +1061,11 @@ export default function ChatInterface({
       setShowScrollToBottom(false);
     }
   }, [displayMessages]);
+
+  // Handle content size changes to track height for pagination
+  const handleContentSizeChange = useCallback((contentWidth: number, contentHeight: number) => {
+    setCurrentContentHeight(contentHeight);
+  }, []);
 
   // Manual scroll to bottom function
   const scrollToBottom = useCallback(() => {
@@ -1417,6 +1449,7 @@ export default function ChatInterface({
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.pdfChatMessagesContent}
                 onScroll={handleScroll}
+                onContentSizeChange={handleContentSizeChange}
                 scrollEventThrottle={16}
               >
                 {/* Chat Data Loading */}
