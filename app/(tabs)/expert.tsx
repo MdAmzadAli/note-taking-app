@@ -6,6 +6,31 @@ import {
 import AppLayout from '@/app/AppLayout';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Utility function to convert UTC timestamp to local date string without timezone issues
+const formatUploadDate = (utcTimestamp: string): string => {
+  try {
+    // Parse the UTC timestamp and extract date parts to avoid timezone conversion
+    const utcDate = new Date(utcTimestamp);
+    if (isNaN(utcDate.getTime())) {
+      return new Date().toLocaleDateString('en-GB'); // Fallback to current date in DD/MM/YYYY format
+    }
+    
+    // Extract UTC date parts and create a local date (no timezone conversion)
+    const year = utcDate.getUTCFullYear();
+    const month = utcDate.getUTCMonth();
+    const day = utcDate.getUTCDate();
+    
+    // Create new date in local timezone using UTC date components
+    const localDate = new Date(year, month, day);
+    
+    // Format as DD/MM/YYYY to match the expected format
+    return localDate.toLocaleDateString('en-GB');
+  } catch (error) {
+    console.error('❌ Error formatting upload date:', error);
+    return new Date().toLocaleDateString('en-GB'); // Fallback to current date
+  }
+};
 import fileService, { FileUploadResponse } from '../../services/fileService';
 
 // Import expert components
@@ -170,7 +195,7 @@ export default function ExpertTab() {
       const newFile: SingleFile = {
         id: uploadedFile.id,
         name: uploadedFile.originalName,
-        uploadDate: new Date(uploadedFile.uploadDate).toLocaleDateString(),
+        uploadDate: formatUploadDate(uploadedFile.uploadDate),
         mimetype: uploadedFile.mimetype,
         size: uploadedFile.size,
         isUploaded: true,
@@ -220,7 +245,7 @@ export default function ExpertTab() {
         const processedFile: SingleFile = {
           id: backendFile.id, // Use the ACTUAL file ID from backend, not a fake one
           name: backendFile.originalName || fileItem.file?.name || 'uploaded_file.pdf',
-          uploadDate: new Date(backendFile.uploadDate).toLocaleDateString(),
+          uploadDate: formatUploadDate(backendFile.uploadDate),
           mimetype: backendFile.mimetype || 'application/pdf',
           size: backendFile.size || 0,
           isUploaded: true,
@@ -351,7 +376,7 @@ export default function ExpertTab() {
             const singleFile: SingleFile = {
               id: uploadedFile.id,
               name: uploadedFile.originalName,
-              uploadDate: new Date(uploadedFile.uploadDate).toLocaleDateString(),
+              uploadDate: formatUploadDate(uploadedFile.uploadDate),
               mimetype: uploadedFile.mimetype,
               size: uploadedFile.size,
               isUploaded: true,
@@ -374,7 +399,7 @@ export default function ExpertTab() {
           const localFile: SingleFile = {
             id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
             name: fileInfo.type === 'device' ? fileInfo.file?.name || 'unknown' : fileInfo.source,
-            uploadDate: new Date().toLocaleDateString(),
+            uploadDate: new Date().toLocaleDateString('en-GB'),
             mimetype: fileInfo.type === 'device' ? fileInfo.file?.mimeType || 'application/pdf' : 'text/html',
             size: 0,
             isUploaded: false,
@@ -750,7 +775,7 @@ export default function ExpertTab() {
         const processedFile: SingleFile = {
           id: backendFile.id, // Use the ACTUAL file ID from backend
           name: backendFile.originalName || fileItem.file?.name || 'uploaded_file.pdf',
-          uploadDate: new Date(backendFile.uploadDate).toLocaleDateString(),
+          uploadDate: formatUploadDate(backendFile.uploadDate),
           mimetype: backendFile.mimetype || 'application/pdf',
           size: backendFile.size || 0,
           isUploaded: true,
