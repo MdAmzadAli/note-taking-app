@@ -143,6 +143,7 @@ export default function ChatInterface({
   const [loadedMessageCount, setLoadedMessageCount] = useState<number>(10); // Number of messages currently displayed
   const [hasMoreMessages, setHasMoreMessages] = useState<boolean>(false); // Whether more messages exist
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false); // Loading state for "Load More"
+  const [isLoadingPreviousMessages, setIsLoadingPreviousMessages] = useState<boolean>(false); // Flag to disable auto-scroll during pagination
   
   // State for action buttons (Copy, Share, Take note)
   const [categories, setCategories] = useState<Category[]>([]);
@@ -625,6 +626,7 @@ export default function ChatInterface({
     if (isLoadingMore || !hasMoreMessages) return;
     
     setIsLoadingMore(true);
+    setIsLoadingPreviousMessages(true); // Disable auto-scroll during pagination
     
     // Simulate a small delay for better UX
     setTimeout(() => {
@@ -636,6 +638,11 @@ export default function ChatInterface({
       setLoadedMessageCount(newLoadedCount);
       setHasMoreMessages(newLoadedCount < allChatMessages.length);
       setIsLoadingMore(false);
+      
+      // Re-enable auto-scroll after a short delay to allow UI to settle
+      setTimeout(() => {
+        setIsLoadingPreviousMessages(false);
+      }, 100);
       
       console.log(`📄 Loaded ${newLoadedCount} of ${allChatMessages.length} messages`);
     }, 300);
@@ -1017,12 +1024,12 @@ export default function ChatInterface({
   const displayMessages = selectedFile ? displayChatMessages : chatMessages;
 
   useEffect(() => {
-    if (displayMessages.length > 0) {
+    if (displayMessages.length > 0 && !isLoadingPreviousMessages) {
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
-  }, [displayMessages]);
+  }, [displayMessages, isLoadingPreviousMessages]);
   // Socket.IO connection for summary notifications
   useEffect(() => {
   
