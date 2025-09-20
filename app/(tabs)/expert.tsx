@@ -7,24 +7,23 @@ import AppLayout from '@/app/AppLayout';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Utility function to convert UTC timestamp to local date string without timezone issues
+// Utility function to convert UTC timestamp to local date string with proper timezone handling
 const formatUploadDate = (utcTimestamp: string): string => {
   try {
-    // Parse the UTC timestamp and extract date parts to avoid timezone conversion
-    const utcDate = new Date(utcTimestamp);
-    if (isNaN(utcDate.getTime())) {
+    // Ensure the timestamp is treated as UTC by appending 'Z' if not present
+    let normalizedTimestamp = utcTimestamp;
+    if (!utcTimestamp.includes('Z') && !utcTimestamp.includes('+') && !utcTimestamp.includes('-', 10)) {
+      // Backend timestamps come without timezone info, treat as UTC
+      normalizedTimestamp = utcTimestamp + 'Z';
+    }
+    
+    // Parse the UTC timestamp - JavaScript will convert to local timezone
+    const localDate = new Date(normalizedTimestamp);
+    if (isNaN(localDate.getTime())) {
       return new Date().toLocaleDateString('en-GB'); // Fallback to current date in DD/MM/YYYY format
     }
     
-    // Extract UTC date parts and create a local date (no timezone conversion)
-    const year = utcDate.getUTCFullYear();
-    const month = utcDate.getUTCMonth();
-    const day = utcDate.getUTCDate();
-    
-    // Create new date in local timezone using UTC date components
-    const localDate = new Date(year, month, day);
-    
-    // Format as DD/MM/YYYY to match the expected format
+    // Format as DD/MM/YYYY in the user's local timezone
     return localDate.toLocaleDateString('en-GB');
   } catch (error) {
     console.error('❌ Error formatting upload date:', error);

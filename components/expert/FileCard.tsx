@@ -35,51 +35,45 @@ export default function FileCard({ file, onPreview, onChat, isBackendConnected }
 
       // Handle different date formats
       if (uploadDate.includes('/') && !uploadDate.includes('T')) {
-        // Format like "1/9/2025" where 1=day, 9=month, 2025=year (D/M/YYYY format)
+        // Format like "21/09/2025" (DD/MM/YYYY format from formatUploadDate)
         const parts = uploadDate.split('/');
         if (parts.length === 3) {
           const day = parseInt(parts[0]);     // First number is day
           const month = parseInt(parts[1]) - 1; // Second number is month (0-based in JavaScript)
           const year = parseInt(parts[2]);
 
-          // Create date in local timezone to avoid UTC conversion
+          // Create date in local timezone
           uploadedDate = new Date(year, month, day);
         } else {
           return 'Invalid date format';
         }
       } else {
-        // ISO format or other standard formats - parse and extract date parts to avoid timezone issues
-        const tempDate = new Date(uploadDate);
-        if (!isNaN(tempDate.getTime())) {
-          // Extract the date parts and create a new local date to avoid timezone conversion
-          uploadedDate = new Date(tempDate.getFullYear(), tempDate.getMonth(), tempDate.getDate());
-        } else {
+        // ISO format - let JavaScript handle timezone conversion to local time
+        uploadedDate = new Date(uploadDate);
+        if (isNaN(uploadedDate.getTime())) {
           return 'Invalid date';
         }
       }
 
-      // Ensure valid date
-      if (isNaN(uploadedDate.getTime())) {
-        console.error('❌ Invalid date detected:', uploadDate);
-        return 'Invalid date';
-      }
-
-      // Get current date (without time for comparison)
+      // Get current date and uploaded date in local timezone for comparison
       const now = new Date();
-      const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const currentDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const uploadedDateOnly = new Date(uploadedDate.getFullYear(), uploadedDate.getMonth(), uploadedDate.getDate());
 
-      const diffInMs = nowDate.getTime() - uploadedDateOnly.getTime();
+      const diffInMs = currentDateOnly.getTime() - uploadedDateOnly.getTime();
       const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
 
-      // Display relative time
+      // Display relative time based on local timezone comparison
       if (diffInDays === 0) {
         return 'Today';
       } else if (diffInDays === 1) {
         return 'Yesterday';
-      } else if (diffInDays <= 7) {
+      } else if (diffInDays > 0 && diffInDays <= 7) {
         return `${diffInDays} days ago`;
+      } else if (diffInDays < 0 && diffInDays >= -1) {
+        return 'Tomorrow'; // Edge case for future dates
       } else {
+        // For dates more than a week ago or in the future
         return uploadedDate.toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
