@@ -164,12 +164,36 @@ export default function ChatInterface({
 
   // Hide tab bar when ChatInterface is opened, show when unmounted
   useEffect(() => {
+    console.log('🎯 ChatInterface: Hiding tab bar');
     hideTabBar();
     
     return () => {
+      console.log('🎯 ChatInterface: Cleanup - Showing tab bar');
       showTabBar();
     };
   }, [hideTabBar, showTabBar]);
+
+  // Additional safety net - ensure tab bar is shown when component loses focus
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      console.log('🎯 ChatInterface: Before unload - Showing tab bar');
+      showTabBar();
+    };
+
+    // Add event listener for navigation/focus changes
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      
+      return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+        showTabBar(); // Extra safety call
+      };
+    }
+
+    return () => {
+      showTabBar(); // Fallback cleanup
+    };
+  }, [showTabBar]);
 
   // Initialize automatic cleanup on component mount
   useEffect(() => {
@@ -308,6 +332,13 @@ export default function ChatInterface({
     
 
     // Handle RAG messages with internal state management
+  // Enhanced onBack handler with explicit tab bar restoration
+  const handleBack = useCallback(() => {
+    console.log('🎯 ChatInterface: Back button pressed - Ensuring tab bar is shown');
+    showTabBar(); // Explicitly show tab bar before navigating back
+    onBack();
+  }, [onBack, showTabBar]);
+
   const handleInternalRAGMessage = useCallback(async (message: string) => {
     if (!message.trim()) return;
 
@@ -1258,7 +1289,7 @@ export default function ChatInterface({
       >
         {/* Custom Header */}
         <View style={styles.pdfChatHeader}>
-          <TouchableOpacity onPress={onBack}>
+          <TouchableOpacity onPress={handleBack}>
             <IconSymbol size={24} name="chevron.left" color="#FFFFFF" />
           </TouchableOpacity>
           <Text style={styles.pdfChatHeaderTitle} numberOfLines={1}>

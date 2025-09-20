@@ -15,6 +15,11 @@ function TabLayoutContent() {
   const insets = useSafeAreaInsets();
   const { isTabBarVisible } = useTabBar();
 
+  // Debug tab bar visibility changes
+  React.useEffect(() => {
+    console.log('🎯 TabLayout: Tab bar visibility changed to:', isTabBarVisible);
+  }, [isTabBarVisible]);
+
   return (
     <Tabs
       screenOptions={{
