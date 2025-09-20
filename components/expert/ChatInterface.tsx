@@ -1343,7 +1343,7 @@ export default function ChatInterface({
                         style={styles.actionButton}
                         onPress={() => handleCopyAnswer(msg.ai)}
                       >
-                        <IconSymbol size={16} name="doc.text" color="#ffffff" />
+                        <IconSymbol size={16} name="copy.outline" color="#ffffff" />
                         {/* <Text style={styles.actionButtonText}>Copy</Text> */}
                       </TouchableOpacity>
 
@@ -2780,12 +2780,9 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 4,
     paddingHorizontal: 4,
-    // backgroundColor: '#333333',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#555555',
+
   },
   actionButtonText: {
     marginLeft: 2,
