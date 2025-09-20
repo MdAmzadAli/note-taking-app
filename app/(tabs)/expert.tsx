@@ -90,13 +90,6 @@ export default function ExpertTab() {
     loadData();
   }, []);
 
-  // Safety measure: Ensure tab bar is shown when chat is hidden
-  useEffect(() => {
-    if (!isChatVisible) {
-      console.log('🎯 ExpertTab: Chat is hidden - Ensuring tab bar is visible');
-      showTabBar();
-    }
-  }, [isChatVisible, showTabBar]);
 
   const checkBackendConnection = async () => {
     try {
