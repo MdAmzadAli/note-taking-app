@@ -422,8 +422,12 @@ export default function ChatInterface({
       });
       
       // Update loaded count and hasMore state
-      setLoadedMessageCount(prev => prev + 1);
-      setHasMoreMessages(false); // New message is always at the end, no more to load
+      setLoadedMessageCount(prev => {
+        const newCount = prev + 1;
+        // Recalculate hasMoreMessages based on whether there are more messages than currently loaded
+        setHasMoreMessages(allChatMessages.length > newCount);
+        return newCount;
+      });
 
       // Save to localStorage for single file mode
       if (selectedFile) {
@@ -527,8 +531,12 @@ export default function ChatInterface({
       });
       
       // Update loaded count and hasMore state
-      setLoadedMessageCount(prev => prev + 1);
-      setHasMoreMessages(false); // New message is always at the end, no more to load
+      setLoadedMessageCount(prev => {
+        const newCount = prev + 1;
+        // Recalculate hasMoreMessages based on whether there are more messages than currently loaded
+        setHasMoreMessages(allChatMessages.length > newCount);
+        return newCount;
+      });
 
       // Save to localStorage for workspace mode
       try {
