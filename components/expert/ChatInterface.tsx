@@ -625,46 +625,32 @@ export default function ChatInterface({
     return 'Low';
   };
 
-  // Load more messages (10 more pairs) with scroll position preservation
+  // Load more messages with proper scroll position preservation
   const handleLoadMoreMessages = useCallback(() => {
     if (isLoadingMore || !hasMoreMessages) return;
     
     setIsLoadingMore(true);
     
-    // Store current scroll position and content height before loading
-    const oldScrollPosition = currentScrollPosition;
-    const oldContentHeight = currentContentHeight;
+    // Store current scroll metrics before loading
+    const currentScrollY = scrollMetricsRef.current.scrollY;
+    const currentContentHeight = scrollMetricsRef.current.contentHeight;
     
-    // Simulate a small delay for better UX
+    // Load new messages
+    const newLoadedCount = Math.min(loadedMessageCount + 10, allChatMessages.length);
+    const startIndex = Math.max(0, allChatMessages.length - newLoadedCount);
+    const updatedDisplayMessages = allChatMessages.slice(startIndex);
+    
+    setDisplayChatMessages(updatedDisplayMessages);
+    setLoadedMessageCount(newLoadedCount);
+    setHasMoreMessages(newLoadedCount < allChatMessages.length);
+    
+    // The scroll position will be automatically adjusted in handleContentSizeChange
     setTimeout(() => {
-      const newLoadedCount = Math.min(loadedMessageCount + 10, allChatMessages.length);
-      const startIndex = Math.max(0, allChatMessages.length - newLoadedCount);
-      const updatedDisplayMessages = allChatMessages.slice(startIndex);
-      
-      setDisplayChatMessages(updatedDisplayMessages);
-      setLoadedMessageCount(newLoadedCount);
-      setHasMoreMessages(newLoadedCount < allChatMessages.length);
       setIsLoadingMore(false);
-      
-      // Preserve scroll position after new content is rendered
-      setTimeout(() => {
-        const newContentHeight = currentContentHeight;
-        const heightDifference = newContentHeight - oldContentHeight;
-        const adjustedScrollPosition = oldScrollPosition + heightDifference;
-        
-        // Scroll to the adjusted position to preserve user's view
-        if (heightDifference > 0 && scrollViewRef.current) {
-          scrollViewRef.current.scrollTo({
-            y: adjustedScrollPosition,
-            animated: false // No animation for seamless experience
-          });
-        }
-        
-        console.log(`📄 Loaded ${newLoadedCount} of ${allChatMessages.length} messages - Position preserved`);
-      }, 50); // Small delay to ensure content is rendered
-      
-    }, 300);
-  }, [isLoadingMore, hasMoreMessages, loadedMessageCount, allChatMessages, currentScrollPosition, currentContentHeight]);
+      console.log(`📄 Loaded ${newLoadedCount} of ${allChatMessages.length} messages - Position preserved`);
+    }, 100);
+    
+  }, [isLoadingMore, hasMoreMessages, loadedMessageCount, allChatMessages]);
 
   // Helper function to clean AI response text by removing formatting and context references
   const cleanAIResponseText = (text: string): string => {
@@ -1041,12 +1027,23 @@ export default function ChatInterface({
   // Use unified display messages state
   const displayMessages = selectedFile ? displayChatMessages : chatMessages;
 
+  // Store scroll metrics for position preservation
+  const scrollMetricsRef = useRef({ 
+    scrollY: 0, 
+    contentHeight: 0, 
+    oldMessageCount: 0 
+  });
+
   // Handle scroll events to show/hide scroll-to-bottom button and track position
   const handleScroll = useCallback((event: any) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     const scrollPosition = contentOffset.y;
     const contentHeight = contentSize.height;
     const containerHeight = layoutMeasurement.height;
+    
+    // Update scroll metrics
+    scrollMetricsRef.current.scrollY = scrollPosition;
+    scrollMetricsRef.current.contentHeight = contentHeight;
     
     // Update current scroll position for pagination
     setCurrentScrollPosition(scrollPosition);
@@ -1064,8 +1061,28 @@ export default function ChatInterface({
 
   // Handle content size changes to track height for pagination
   const handleContentSizeChange = useCallback((contentWidth: number, contentHeight: number) => {
+    const oldHeight = scrollMetricsRef.current.contentHeight;
+    const heightDifference = contentHeight - oldHeight;
+    
+    // If content height increased due to loading more messages, preserve scroll position
+    if (heightDifference > 0 && scrollMetricsRef.current.oldMessageCount < displayMessages.length && isLoadingMore) {
+      const currentScroll = scrollMetricsRef.current.scrollY;
+      const adjustedScroll = currentScroll + heightDifference;
+      
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          scrollViewRef.current.scrollTo({
+            y: adjustedScroll,
+            animated: false
+          });
+        }
+      }, 10);
+    }
+    
+    scrollMetricsRef.current.contentHeight = contentHeight;
+    scrollMetricsRef.current.oldMessageCount = displayMessages.length;
     setCurrentContentHeight(contentHeight);
-  }, []);
+  }, [displayMessages.length, isLoadingMore]);
 
   // Manual scroll to bottom function
   const scrollToBottom = useCallback(() => {
