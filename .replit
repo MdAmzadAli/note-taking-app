@@ -33,6 +33,10 @@ externalPort = 3003
 localPort = 41069
 externalPort = 3002
 
+[[ports]]
+localPort = 45519
+externalPort = 4200
+
 [workflows]
 runButton = "Project"
 
@@ -149,7 +153,8 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npx expo start --tunnel"
+args = "expo start --web --port 5000"
+waitForPort = 5000
 
 [deployment]
 run = ["bash", "-c", "cd backend_python && python start.py & npx expo start --web --port 5000"]
