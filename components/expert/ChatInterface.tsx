@@ -160,6 +160,19 @@ export default function ChatInterface({
     };
   }, [hideTabBar, showTabBar]);
 
+  // Initialize automatic cleanup on component mount
+  useEffect(() => {
+    const initializeCleanup = async () => {
+      try {
+        await ChatSessionStorage.initializeAutomaticCleanup();
+      } catch (error) {
+        console.error('❌ Error initializing automatic cleanup:', error);
+      }
+    };
+    
+    initializeCleanup();
+  }, []); // Run only once on mount
+
   // Load chat session when component mounts or file changes
   useEffect(() => {
     const loadChatSession = async () => {

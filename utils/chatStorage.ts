@@ -377,4 +377,135 @@ export class ChatSessionStorage {
       console.error('Error clearing workspace sessions:', error);
     }
   }
+
+  // ==================== AUTOMATIC CLEANUP METHODS ====================
+
+  // Clean up messages older than specified days (default: 30 days)
+  static async cleanupOldMessages(daysOld: number = 30): Promise<void> {
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+      const cutoffTimestamp = cutoffDate.getTime();
+
+      console.log(`🧹 Starting cleanup of messages older than ${daysOld} days (before ${cutoffDate.toISOString()})`);
+
+      // Clean up single file chat sessions
+      await this.cleanupSingleFileSessions(cutoffTimestamp);
+      
+      // Clean up workspace chat sessions
+      await this.cleanupWorkspaceSessions(cutoffTimestamp);
+
+      console.log('✅ Automatic cleanup completed');
+    } catch (error) {
+      console.error('❌ Error during automatic cleanup:', error);
+    }
+  }
+
+  // Clean up old messages from single file sessions
+  private static async cleanupSingleFileSessions(cutoffTimestamp: number): Promise<void> {
+    try {
+      const sessions = await this.getAllSessions();
+      let totalMessagesRemoved = 0;
+      let sessionsModified = 0;
+
+      for (const session of sessions) {
+        const originalMessageCount = session.chats.length;
+        
+        // Filter out messages older than cutoff date
+        session.chats = session.chats.filter(chat => {
+          // Check if chat has a timestamp (might be missing in older messages)
+          const chatTimestamp = chat.timestamp ? new Date(chat.timestamp).getTime() : 0;
+          return chatTimestamp > cutoffTimestamp;
+        });
+
+        const messagesRemoved = originalMessageCount - session.chats.length;
+        
+        if (messagesRemoved > 0) {
+          session.updatedAt = new Date().toISOString();
+          await this.saveChatSession(session);
+          totalMessagesRemoved += messagesRemoved;
+          sessionsModified++;
+          console.log(`🧹 Removed ${messagesRemoved} old messages from file session: ${session.single_file_id}`);
+        }
+      }
+
+      if (totalMessagesRemoved > 0) {
+        console.log(`✅ Single file cleanup: ${totalMessagesRemoved} messages removed from ${sessionsModified} sessions`);
+      } else {
+        console.log('ℹ️ No old messages found in single file sessions');
+      }
+    } catch (error) {
+      console.error('❌ Error cleaning up single file sessions:', error);
+    }
+  }
+
+  // Clean up old messages from workspace sessions
+  private static async cleanupWorkspaceSessions(cutoffTimestamp: number): Promise<void> {
+    try {
+      const sessions = await this.getAllWorkspaceSessions();
+      let totalMessagesRemoved = 0;
+      let sessionsModified = 0;
+
+      for (const session of sessions) {
+        const originalMessageCount = session.chats.length;
+        
+        // Filter out messages older than cutoff date
+        session.chats = session.chats.filter(chat => {
+          // Check if chat has a timestamp (might be missing in older messages)
+          const chatTimestamp = chat.timestamp ? new Date(chat.timestamp).getTime() : 0;
+          return chatTimestamp > cutoffTimestamp;
+        });
+
+        const messagesRemoved = originalMessageCount - session.chats.length;
+        
+        if (messagesRemoved > 0) {
+          session.updatedAt = new Date().toISOString();
+          await this.saveWorkspaceChatSession(session);
+          totalMessagesRemoved += messagesRemoved;
+          sessionsModified++;
+          console.log(`🧹 Removed ${messagesRemoved} old messages from workspace session: ${session.workspace_id}`);
+        }
+      }
+
+      if (totalMessagesRemoved > 0) {
+        console.log(`✅ Workspace cleanup: ${totalMessagesRemoved} messages removed from ${sessionsModified} sessions`);
+      } else {
+        console.log('ℹ️ No old messages found in workspace sessions');
+      }
+    } catch (error) {
+      console.error('❌ Error cleaning up workspace sessions:', error);
+    }
+  }
+
+  // Initialize automatic cleanup (call this on app start or periodically)
+  static async initializeAutomaticCleanup(): Promise<void> {
+    try {
+      // Check if cleanup has been run recently
+      const lastCleanupKey = 'last_chat_cleanup';
+      const lastCleanupData = await AsyncStorage.getItem(lastCleanupKey);
+      
+      const now = new Date();
+      let shouldCleanup = true;
+
+      if (lastCleanupData) {
+        const lastCleanup = new Date(lastCleanupData);
+        const daysSinceLastCleanup = Math.floor((now.getTime() - lastCleanup.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Only cleanup if it's been more than 7 days since last cleanup
+        if (daysSinceLastCleanup < 7) {
+          shouldCleanup = false;
+          console.log(`ℹ️ Skipping cleanup - last run ${daysSinceLastCleanup} days ago`);
+        }
+      }
+
+      if (shouldCleanup) {
+        console.log('🧹 Running automatic chat message cleanup...');
+        await this.cleanupOldMessages(30);
+        await AsyncStorage.setItem(lastCleanupKey, now.toISOString());
+        console.log('✅ Automatic cleanup completed and timestamp saved');
+      }
+    } catch (error) {
+      console.error('❌ Error initializing automatic cleanup:', error);
+    }
+  }
 }
