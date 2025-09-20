@@ -1037,8 +1037,10 @@ export default function ChatInterface({
 
   // Manual scroll to bottom function
   const scrollToBottom = useCallback(() => {
-    scrollViewRef.current?.scrollToEnd({ animated: true });
+    // Hide button immediately before scrolling
     setShowScrollToBottom(false);
+    // Then scroll to bottom
+    scrollViewRef.current?.scrollToEnd({ animated: true });
   }, []);
   // Socket.IO connection for summary notifications
   useEffect(() => {
@@ -1418,6 +1420,10 @@ export default function ChatInterface({
                 contentContainerStyle={styles.pdfChatMessagesContent}
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
+                maintainVisibleContentPosition={{
+                  minIndexForVisible: 0,
+                  autoscrollToTopThreshold: 10,
+                }}
               >
                 {/* Chat Data Loading */}
                 {isChatDataLoading && (
