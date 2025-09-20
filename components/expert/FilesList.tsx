@@ -379,7 +379,7 @@ export default function FilesList({
                   style={styles.dropdownItem}
                   onPress={() => handleStartEdit(item)}
                 >
-                  <IconSymbol size={16} name="pencil" color="#FFFFFF" />
+                  <IconSymbol size={14} name="pencil" color="#FFFFFF" />
                   <Text style={styles.dropdownText}>Rename</Text>
                 </TouchableOpacity>
                 <View style={styles.dropdownSeparator} />
@@ -387,7 +387,7 @@ export default function FilesList({
                   style={styles.dropdownItem}
                   onPress={() => handleDeleteFromDropdown(item)}
                 >
-                  <IconSymbol size={16} name="trash" color="#FF3B30" />
+                  <IconSymbol size={14} name="trash" color="#FF3B30" />
                   <Text style={[styles.dropdownText, styles.deleteDropdownText]}>Delete</Text>
                 </TouchableOpacity>
               </View>
@@ -569,7 +569,7 @@ const styles = StyleSheet.create({
   singleSection: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 8,
     borderLeftWidth: 4,
     justifyContent: 'center',
   },
@@ -578,7 +578,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: 40,
-    paddingVertical: 16,
+    paddingVertical: 10,
     zIndex: 1000,
   },
   menuButton: {
@@ -595,10 +595,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#48484A',
     minWidth: 120,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    // shadowColor: '#000',
+    // shadowOffset: { width: 0, height: 2 },
+    // shadowOpacity: 0.3,
+    // shadowRadius: 4,
     elevation: 10,
     zIndex: 9999,
   },
@@ -606,7 +606,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 7,
   },
   dropdownSeparator: {
     height: 1,
@@ -614,7 +614,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   dropdownText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#FFFFFF',
     marginLeft: 8,
     fontFamily: 'Inter',
@@ -659,7 +659,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   fileName: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '500',
     color: '#FFFFFF',
     fontFamily: 'Inter',
@@ -670,7 +670,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fileType: {
-    fontSize: 13,
+    fontSize: 10,
     fontWeight: '500',
     color: '#8E8E93',
     fontFamily: 'Inter',
@@ -681,7 +681,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
   },
   fileDate: {
-    fontSize: 13,
+    fontSize: 10,
     color: '#8E8E93',
     fontFamily: 'Inter',
   },

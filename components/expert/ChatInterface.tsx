@@ -1154,7 +1154,7 @@ export default function ChatInterface({
           >
             <View style={styles.pdfFileInfoLeft}>
               <View style={styles.pdfFileIconContainer}>
-                <IconSymbol size={20} name="doc.text" color="#FFFFFF" />
+                <IconSymbol size={15} name="doc.text" color="#FFFFFF" />
               </View>
               <View style={styles.pdfFileDetails}>
                 <Text style={styles.pdfFileName} numberOfLines={1}>
@@ -1182,7 +1182,7 @@ export default function ChatInterface({
             >
               <View style={styles.pdfFileInfoLeft}>
                 <View style={styles.pdfFileIconContainer}>
-                  <IconSymbol size={20} name="folder" color="#FFFFFF" />
+                  <IconSymbol size={15} name="folder" color="#FFFFFF" />
                 </View>
                 <View style={styles.pdfFileDetails}>
                   <Text style={styles.pdfFileName} numberOfLines={1}>
@@ -1244,7 +1244,7 @@ export default function ChatInterface({
                               style={styles.fileOption}
                               onPress={() => handleFileRename(file.id)}
                             >
-                               <IconSymbol size={16} name="pencil" color="#FFFFFF" />
+                               <IconSymbol size={12} name="pencil" color="#FFFFFF" />
                               <Text style={styles.fileOptionText}>Rename</Text>
                             </TouchableOpacity>
                             
@@ -1254,7 +1254,7 @@ export default function ChatInterface({
                               style={styles.fileDeleteOption}
                               onPress={() => handleFileDelete(file.id)}
                             >
-                              <IconSymbol size={16} name="trash" color="#FF4444" />
+                              <IconSymbol size={12} name="trash" color="#FF4444" />
                               <Text style={styles.fileDeleteOptionText}>Delete</Text>
                             </TouchableOpacity>
                           </View>
@@ -1867,7 +1867,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
     paddingTop: Platform.OS === 'ios' ? 60 : 45,
     // backgroundColor: '#000000',
   },
@@ -1885,10 +1885,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderWidth:1,
     borderColor:'#555555',
-    paddingVertical: 8,
+    paddingVertical: 3,
     marginHorizontal: 16,
     borderRadius: 10,
-    marginBottom: 16,
+    marginBottom: 10,
   },
   pdfChatTab: {
     flex: 1,
@@ -1905,7 +1905,7 @@ const styles = StyleSheet.create({
     borderColor:'#555555',
   },
   pdfChatTabText: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#999999',
     fontWeight: '500',
   },
@@ -1920,8 +1920,8 @@ const styles = StyleSheet.create({
     borderWidth:1,
     borderColor:'#555555',
     marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 12,
+    marginBottom: 6,
+    padding: 8,
     borderRadius: 12,
   },
   pdfFileInfoLeft: {
@@ -1930,8 +1930,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pdfFileIconContainer: {
-    width: 32,
-    height: 32,
+    width: 28,
+    height: 28,
     backgroundColor: '#333333',
     borderRadius: 6,
     alignItems: 'center',
@@ -1942,17 +1942,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pdfFileName: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: '#FFFFFF',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   pdfFileStatus: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   pdfFileType: {
-    fontSize: 12,
+    fontSize: 8,
     color: '#999999',
     marginRight: 8,
   },
@@ -1961,11 +1961,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#00FF7F',
     paddingHorizontal: 6,
-    paddingVertical: 2,
+    // paddingVertical: 2,
     borderRadius: 10,
   },
   pdfIndexedText: {
-    fontSize: 6,
+    fontSize: 5,
     color: '#000000',
     fontWeight: '600',
     marginLeft: 2,
@@ -2124,7 +2124,7 @@ const styles = StyleSheet.create({
   },
   workspaceFilesContainer: {
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 8,
     // backgroundColor: '#2a2a2a',
     borderWidth:1,
     borderColor:'#555555',
@@ -2168,13 +2168,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   workspaceFileName: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '500',
     color: '#FFFFFF',
     marginBottom: 2,
   },
   workspaceFileSize: {
-    fontSize: 10,
+    fontSize: 8,
     color: '#d3d3d3',
   },
   fileOptionsContainer: {
@@ -2182,7 +2182,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   fileOptionsButton: {
-    padding: 8,
+    padding: 4,
     borderRadius: 6,
     backgroundColor: '#2A2A2A',
   },
@@ -2220,7 +2220,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   fileOptionText: {
-    fontSize: 14,
+    fontSize: 10,
     color: '#FFFFFF',
     fontWeight: '500',
   },
@@ -2233,11 +2233,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical:10,
     gap: 8,
   },
   fileDeleteOptionText: {
-    fontSize: 14,
+    fontSize: 10,
     color: '#FF4444',
     fontWeight: '500',
   },
@@ -2245,7 +2245,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 8,
     paddingHorizontal: 16,
     backgroundColor: '#333333',
   },
@@ -2499,7 +2499,7 @@ const styles = StyleSheet.create({
     borderColor:"#555555",
     borderRadius: 6,
     marginBottom: 8,
-    maxHeight: 120,
+    // maxHeight: 120,
   },
   summaryDropdownOption: {
     flexDirection: 'row',
@@ -2807,7 +2807,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1A1A',
     borderRadius: 16,
     margin: 20,
-    marginTop: 100,
+    marginTop: 50,
+    minWidth:'95%',
+    // minHeight:700,
+    borderWidth:1,
+    borderColor:'#555555',
     maxHeight: '80%',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
@@ -2868,7 +2872,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#444444',
     marginBottom: 20,
-    minHeight: 120,
+    minHeight: 220,
   },
   categoryLabel: {
     fontSize: 14,
@@ -2890,7 +2894,7 @@ const styles = StyleSheet.create({
   categoryPickerItem: {
     color: '#FFFFFF',
     backgroundColor: '#2A2A2A',
-    fontSize: 14,
+    // fontSize: 10,
   },
   categoryContainer: {
     gap: 8,
@@ -2944,13 +2948,13 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#00FF7F',
     borderRadius: 8,
     alignItems: 'center',
   },
   noteCreationSaveText: {
     fontSize: 14,
-    color: '#FFFFFF',
+    color: '#000',
     fontWeight: '600',
   },
 });

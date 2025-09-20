@@ -197,7 +197,7 @@ export default function UploadModal({
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <>
-                    <IconSymbol size={16} name="arrow.up.circle" color="#000000" />
+                    <IconSymbol size={16} name="arrow.up.circle" color="#ffffff" />
                     <Text style={styles.uploadButtonText}>
                       {getButtonText()}
                     </Text>
@@ -211,7 +211,7 @@ export default function UploadModal({
                 onPress={() => setShowDropdown(!showDropdown)}
                 disabled={isLoading}
               >
-                <IconSymbol size={12} name="chevron.down" color="#000000" />
+                <IconSymbol size={12} name="chevron.down" color="#ffffff" />
               </TouchableOpacity>
             </View>
 
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#8B5CF6',
+    shadowColor: '#d3d3d3',
     shadowOffset: {
       width: 0,
       height: 4,
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   uploadButton: {
-    backgroundColor: '#00FF7F',
+    backgroundColor: '#1a1a1a',
     // color:'#000000',
     paddingVertical: 12,
     paddingHorizontal: 20,
@@ -391,16 +391,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   uploadButtonText: {
-    color: '#000000',
+    color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
     fontFamily: 'Inter',
   },
   dropdownArrow: {
-    backgroundColor: '#00FF7F',
+    backgroundColor: '#1a1a1a',
     paddingVertical: 12,
     paddingHorizontal: 12,
-    borderLeftWidth: 1,
+    borderLeftWidth: 0.5,
     borderLeftColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
