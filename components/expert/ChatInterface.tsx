@@ -559,9 +559,9 @@ export default function ChatInterface({
         .replace(/^\*\*(.*)\*\*$/, '$1'); // Remove **heading** patterns
       
       // Clean bullet points - remove bullet markers but keep the text
-      cleanedLine = cleanedLine
-        .replace(/^[\s]*[-•*]\s+/, '') // Remove -, •, * bullet markers
-        .replace(/^\d+\.\s+/, ''); // Remove numbered list markers
+      // cleanedLine = cleanedLine
+      //   .replace(/^[\s]*[-•*]\s+/, '') // Remove -, •, * bullet markers
+      //   .replace(/^\d+\.\s+/, ''); // Remove numbered list markers
       
       // Clean inline formatting patterns
       cleanedLine = cleanedLine
