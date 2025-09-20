@@ -538,10 +538,55 @@ export default function ChatInterface({
     setFileToDelete(null);
   };
 
+  // Helper function to clean AI response text by removing formatting and context references
+  const cleanAIResponseText = (text: string): string => {
+    if (!text) return '';
+    
+    // Split text into lines for processing
+    const lines = text.split('\n');
+    const cleanedLines: string[] = [];
+    
+    for (const line of lines) {
+      // Skip empty lines
+      if (line.trim() === '') {
+        cleanedLines.push('');
+        continue;
+      }
+      
+      // Clean headings - remove ### or **text** patterns
+      let cleanedLine = line
+        .replace(/^#{1,3}\s+/, '') // Remove ### heading markers
+        .replace(/^\*\*(.*)\*\*$/, '$1'); // Remove **heading** patterns
+      
+      // Clean bullet points - remove bullet markers but keep the text
+      cleanedLine = cleanedLine
+        .replace(/^[\s]*[-•*]\s+/, '') // Remove -, •, * bullet markers
+        .replace(/^\d+\.\s+/, ''); // Remove numbered list markers
+      
+      // Clean inline formatting patterns
+      cleanedLine = cleanedLine
+        .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold** -> bold
+        .replace(/\*(.*?)\*/g, '$1') // Remove *italic* -> italic
+        .replace(/`(.*?)`/g, '$1') // Remove `code` -> code
+        .replace(/\[Context\s+[\d,\s]+\]/gi, ''); // Remove [Context 1] or [Context 1,2,3] references
+      
+      // Clean up any extra whitespace
+      cleanedLine = cleanedLine.trim();
+      
+      if (cleanedLine) {
+        cleanedLines.push(cleanedLine);
+      }
+    }
+    
+    // Join lines and clean up multiple consecutive line breaks
+    return cleanedLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  };
+
   // Action button handlers for Copy, Share, and Take note
   const handleCopyAnswer = async (aiResponse: string) => {
     try {
-      await Clipboard.setString(aiResponse);
+      const cleanedText = cleanAIResponseText(aiResponse);
+      await Clipboard.setString(cleanedText);
       Alert.alert('Copied!', 'AI answer has been copied to clipboard.');
     } catch (error) {
       console.error('Error copying to clipboard:', error);
@@ -551,8 +596,9 @@ export default function ChatInterface({
 
   const handleShareAnswer = async (aiResponse: string) => {
     try {
+      const cleanedText = cleanAIResponseText(aiResponse);
       const result = await Share.share({
-        message: aiResponse,
+        message: cleanedText,
         title: 'AI Answer'
       });
       if (result.action === Share.sharedAction) {
@@ -565,7 +611,8 @@ export default function ChatInterface({
   };
 
   const handleTakeNote = (aiResponse: string) => {
-    setNoteContentToSave(aiResponse);
+    const cleanedText = cleanAIResponseText(aiResponse);
+    setNoteContentToSave(cleanedText);
     setSelectedCategoryForNote(undefined); // Default to no category
     setShowNoteCreationModal(true);
   };
