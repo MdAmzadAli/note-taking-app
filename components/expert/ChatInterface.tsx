@@ -15,6 +15,7 @@ import {
   Clipboard,
   Share
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import FilePreviewModal from './FilePreviewModal';
 import UploadModal from './UploadModal';
@@ -141,6 +142,7 @@ export default function ChatInterface({
   const [categories, setCategories] = useState<Category[]>([]);
   const [showNoteCreationModal, setShowNoteCreationModal] = useState(false);
   const [noteContentToSave, setNoteContentToSave] = useState('');
+  const [noteTitleToSave, setNoteTitleToSave] = useState('');
   const [selectedCategoryForNote, setSelectedCategoryForNote] = useState<string | undefined>(undefined);
   
   // Get tab bar context to hide bottom navigation
@@ -613,17 +615,22 @@ export default function ChatInterface({
   const handleTakeNote = (aiResponse: string) => {
     const cleanedText = cleanAIResponseText(aiResponse);
     setNoteContentToSave(cleanedText);
+    setNoteTitleToSave(''); // Empty title - will be auto-filled if not provided
     setSelectedCategoryForNote(undefined); // Default to no category
     setShowNoteCreationModal(true);
   };
 
   const handleCreateNoteFromAnswer = async () => {
     try {
+      // Auto-fill title if not provided
+      const finalTitle = noteTitleToSave.trim() || 
+        (noteContentToSave.length > 50 
+          ? noteContentToSave.substring(0, 50) + '...' 
+          : noteContentToSave);
+
       const note: Note = {
         id: `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        title: noteContentToSave.length > 50 
-          ? noteContentToSave.substring(0, 50) + '...' 
-          : noteContentToSave,
+        title: finalTitle,
         content: noteContentToSave,
         fields: {},
         writingStyle: 'mind_dump',
@@ -646,6 +653,7 @@ export default function ChatInterface({
       await saveNote(note);
       setShowNoteCreationModal(false);
       setNoteContentToSave('');
+      setNoteTitleToSave('');
       setSelectedCategoryForNote(undefined);
       Alert.alert('Success!', 'Note created successfully.');
     } catch (error) {
@@ -1777,47 +1785,50 @@ export default function ChatInterface({
             </View>
             
             <ScrollView style={styles.noteCreationContent} showsVerticalScrollIndicator={false}>
-              <Text style={styles.notePreviewLabel}>Content Preview:</Text>
-              <View style={styles.notePreviewContainer}>
-                <Text style={styles.notePreviewText} numberOfLines={5}>
-                  {noteContentToSave}
-                </Text>
-              </View>
+              {/* Title Field (Optional) */}
+              <Text style={styles.noteTitleLabel}>Title (Optional):</Text>
+              <TextInput
+                style={styles.noteTitleInput}
+                value={noteTitleToSave}
+                onChangeText={setNoteTitleToSave}
+                placeholder="Enter note title (auto-filled if empty)"
+                placeholderTextColor="#888888"
+                multiline={false}
+              />
               
+              {/* Content Field (Editable) */}
+              <Text style={styles.noteContentLabel}>Content:</Text>
+              <TextInput
+                style={styles.noteContentInput}
+                value={noteContentToSave}
+                onChangeText={setNoteContentToSave}
+                placeholder="Enter note content..."
+                placeholderTextColor="#888888"
+                multiline={true}
+                numberOfLines={6}
+                textAlignVertical="top"
+              />
+              
+              {/* Category Dropdown */}
               <Text style={styles.categoryLabel}>Category (Optional):</Text>
-              <View style={styles.categoryContainer}>
-                <TouchableOpacity 
-                  style={[
-                    styles.categoryOption, 
-                    selectedCategoryForNote === undefined && styles.categoryOptionSelected
-                  ]}
-                  onPress={() => setSelectedCategoryForNote(undefined)}
+              <View style={styles.categoryDropdownContainer}>
+                <Picker
+                  selectedValue={selectedCategoryForNote || 'none'}
+                  style={styles.categoryPicker}
+                  itemStyle={styles.categoryPickerItem}
+                  onValueChange={(itemValue) => 
+                    setSelectedCategoryForNote(itemValue === 'none' ? undefined : itemValue)
+                  }
                 >
-                  <Text style={[
-                    styles.categoryOptionText,
-                    selectedCategoryForNote === undefined && styles.categoryOptionTextSelected
-                  ]}>
-                    No Category
-                  </Text>
-                </TouchableOpacity>
-                
-                {categories.map((category) => (
-                  <TouchableOpacity 
-                    key={category.id}
-                    style={[
-                      styles.categoryOption, 
-                      selectedCategoryForNote === category.id && styles.categoryOptionSelected
-                    ]}
-                    onPress={() => setSelectedCategoryForNote(category.id)}
-                  >
-                    <Text style={[
-                      styles.categoryOptionText,
-                      selectedCategoryForNote === category.id && styles.categoryOptionTextSelected
-                    ]}>
-                      {category.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                  <Picker.Item label="No Category" value="none" />
+                  {categories.map((category) => (
+                    <Picker.Item 
+                      key={category.id} 
+                      label={category.name} 
+                      value={category.id} 
+                    />
+                  ))}
+                </Picker>
               </View>
             </ScrollView>
             
@@ -2826,29 +2837,60 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
   },
-  notePreviewLabel: {
+  noteTitleLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
     marginBottom: 8,
   },
-  notePreviewContainer: {
+  noteTitleInput: {
     backgroundColor: '#2A2A2A',
     borderRadius: 8,
     padding: 12,
-    marginBottom: 20,
-    maxHeight: 120,
-  },
-  notePreviewText: {
     fontSize: 14,
-    color: '#CCCCCC',
-    lineHeight: 20,
+    color: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#444444',
+    marginBottom: 20,
+  },
+  noteContentLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  noteContentInput: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#444444',
+    marginBottom: 20,
+    minHeight: 120,
   },
   categoryLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
     marginBottom: 12,
+  },
+  categoryDropdownContainer: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#444444',
+    marginBottom: 20,
+  },
+  categoryPicker: {
+    color: '#FFFFFF',
+    backgroundColor: 'transparent',
+  },
+  categoryPickerItem: {
+    color: '#FFFFFF',
+    backgroundColor: '#2A2A2A',
+    fontSize: 14,
   },
   categoryContainer: {
     gap: 8,
