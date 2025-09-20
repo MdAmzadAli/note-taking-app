@@ -138,6 +138,12 @@ export default function ChatInterface({
   // Unified state for displaying messages - starts with localStorage, gets updated with ongoing messages
   const [displayChatMessages, setDisplayChatMessages] = useState<ChatMessage[]>([]);
   
+  // Pagination state for chat messages
+  const [allChatMessages, setAllChatMessages] = useState<ChatMessage[]>([]); // Store all messages
+  const [loadedMessageCount, setLoadedMessageCount] = useState<number>(10); // Number of messages currently displayed
+  const [hasMoreMessages, setHasMoreMessages] = useState<boolean>(false); // Whether more messages exist
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false); // Loading state for "Load More"
+  
   // State for action buttons (Copy, Share, Take note)
   const [categories, setCategories] = useState<Category[]>([]);
   const [showNoteCreationModal, setShowNoteCreationModal] = useState(false);
@@ -184,14 +190,21 @@ export default function ChatInterface({
           setCurrentChatSession(session);
           setLocalChatMessages(session.chats);
           
-          // Initialize display messages with localStorage messages
-          const displayMessages = session.chats.map(msg => ({
+          // Store all messages and implement pagination
+          const allMessages = session.chats.map(msg => ({
             user: msg.user,
             ai: msg.ai,
             sources: msg.sources,
             isLoading: false
           }));
+          setAllChatMessages(allMessages);
+          
+          // Show only last 10 messages initially
+          const initialMessageCount = Math.min(10, allMessages.length);
+          const displayMessages = allMessages.slice(-initialMessageCount);
           setDisplayChatMessages(displayMessages);
+          setLoadedMessageCount(initialMessageCount);
+          setHasMoreMessages(allMessages.length > initialMessageCount);
           
           // Load stored summary if available
           if (session.summary) {
@@ -224,15 +237,22 @@ export default function ChatInterface({
           
           setCurrentWorkspaceChatSession(workspaceSession);
           
-          // Initialize workspace display messages with localStorage messages
-          const workspaceDisplayMessages = workspaceSession.chats.map(msg => ({
+          // Store all workspace messages and implement pagination
+          const allWorkspaceMessages = workspaceSession.chats.map(msg => ({
             user: msg.user,
             ai: msg.ai,
             sources: msg.sources,
             isLoading: false
           }));
-          setWorkspaceDisplayChatMessages(workspaceDisplayMessages);
+          setAllChatMessages(allWorkspaceMessages);
+          setWorkspaceDisplayChatMessages(allWorkspaceMessages);
+          
+          // Show only last 10 messages initially
+          const initialMessageCount = Math.min(10, allWorkspaceMessages.length);
+          const workspaceDisplayMessages = allWorkspaceMessages.slice(-initialMessageCount);
           setDisplayChatMessages(workspaceDisplayMessages);
+          setLoadedMessageCount(initialMessageCount);
+          setHasMoreMessages(allWorkspaceMessages.length > initialMessageCount);
           
           // Load workspace file summaries
           setWorkspaceFileSummaries(workspaceSession.file_summaries);
@@ -294,6 +314,7 @@ export default function ChatInterface({
     };
     
     setDisplayChatMessages(prev => [...prev, loadingMessage]);
+    setAllChatMessages(prev => [...prev, loadingMessage]);
     setCurrentMessage('');
 
     try {
@@ -328,12 +349,28 @@ export default function ChatInterface({
         setFollowUpQuestions(questions);
       }
 
-      // Update display messages
+      // Update display messages and allChatMessages
       setDisplayChatMessages(prev =>
         prev.map((msg, index) =>
           index === prev.length - 1 ? finalMessage : msg
         )
       );
+      
+      // Update allChatMessages with the new message
+      setAllChatMessages(prev => {
+        const updated = [...prev];
+        if (updated.length === 0 || updated[updated.length - 1].user !== message) {
+          updated.push(finalMessage);
+        } else {
+          // Replace the loading message with the final message
+          updated[updated.length - 1] = finalMessage;
+        }
+        return updated;
+      });
+      
+      // Update loaded count and hasMore state
+      setLoadedMessageCount(prev => prev + 1);
+      setHasMoreMessages(false); // New message is always at the end, no more to load
 
       // Save to localStorage for single file mode
       if (selectedFile) {
@@ -384,6 +421,7 @@ export default function ChatInterface({
     
     setWorkspaceDisplayChatMessages(prev => [...prev, loadingMessage]);
     setDisplayChatMessages(prev => [...prev, loadingMessage]);
+    setAllChatMessages(prev => [...prev, loadingMessage]);
     setCurrentMessage('');
 
     try {
@@ -422,6 +460,22 @@ export default function ChatInterface({
           index === prev.length - 1 ? finalMessage : msg
         )
       );
+      
+      // Update allChatMessages with the new message
+      setAllChatMessages(prev => {
+        const updated = [...prev];
+        if (updated.length === 0 || updated[updated.length - 1].user !== message) {
+          updated.push(finalMessage);
+        } else {
+          // Replace the loading message with the final message
+          updated[updated.length - 1] = finalMessage;
+        }
+        return updated;
+      });
+      
+      // Update loaded count and hasMore state
+      setLoadedMessageCount(prev => prev + 1);
+      setHasMoreMessages(false); // New message is always at the end, no more to load
 
       // Save to localStorage for workspace mode
       try {
@@ -565,6 +619,27 @@ export default function ChatInterface({
     if (percentage >= 30) return 'Medium';
     return 'Low';
   };
+
+  // Load more messages (10 more pairs)
+  const handleLoadMoreMessages = useCallback(() => {
+    if (isLoadingMore || !hasMoreMessages) return;
+    
+    setIsLoadingMore(true);
+    
+    // Simulate a small delay for better UX
+    setTimeout(() => {
+      const newLoadedCount = Math.min(loadedMessageCount + 10, allChatMessages.length);
+      const startIndex = Math.max(0, allChatMessages.length - newLoadedCount);
+      const updatedDisplayMessages = allChatMessages.slice(startIndex);
+      
+      setDisplayChatMessages(updatedDisplayMessages);
+      setLoadedMessageCount(newLoadedCount);
+      setHasMoreMessages(newLoadedCount < allChatMessages.length);
+      setIsLoadingMore(false);
+      
+      console.log(`📄 Loaded ${newLoadedCount} of ${allChatMessages.length} messages`);
+    }, 300);
+  }, [isLoadingMore, hasMoreMessages, loadedMessageCount, allChatMessages]);
 
   // Helper function to clean AI response text by removing formatting and context references
   const cleanAIResponseText = (text: string): string => {
@@ -1333,6 +1408,26 @@ export default function ChatInterface({
                   </View>
                 )}
 
+                {/* Load More Button */}
+                {!isChatDataLoading && hasMoreMessages && displayChatMessages.length > 0 && (
+                  <View style={styles.loadMoreContainer}>
+                    <TouchableOpacity 
+                      style={styles.loadMoreButton}
+                      onPress={handleLoadMoreMessages}
+                      disabled={isLoadingMore}
+                    >
+                      {isLoadingMore ? (
+                        <ActivityIndicator size="small" color="#ffffff" />
+                      ) : (
+                        <IconSymbol size={16} name="arrow.up" color="#ffffff" />
+                      )}
+                      <Text style={styles.loadMoreText}>
+                        {isLoadingMore ? 'Loading...' : `Load 10 more messages`}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
                 {/* Welcome Message */}
                 {!isChatDataLoading && displayChatMessages.length === 0 && (
                   <View style={styles.pdfWelcomeMessage}>
@@ -2047,6 +2142,26 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     textAlign: 'center',
     marginTop: 12,
+  },
+  loadMoreContainer: {
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  loadMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#0056CC',
+  },
+  loadMoreText: {
+    fontSize: 14,
+    color: '#ffffff',
+    fontWeight: '500',
+    marginLeft: 8,
   },
   pdfMessageGroup: {
     marginBottom: 20,
