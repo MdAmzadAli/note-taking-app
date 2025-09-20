@@ -4,7 +4,6 @@ import {
   Text, 
   TouchableOpacity, 
   StyleSheet, 
- 
   Platform, 
   TextInput, 
   ScrollView,
@@ -13,7 +12,8 @@ import {
   ActivityIndicator,
   Alert,
   Clipboard,
-  Share
+  Share,
+  AppState
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -173,15 +173,32 @@ export default function ChatInterface({
     };
   }, [hideTabBar, showTabBar]);
 
-  // Additional safety net - ensure tab bar is shown when component loses focus
+  // Additional safety net - ensure tab bar is shown when app state changes
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      console.log('🎯 ChatInterface: Before unload - Showing tab bar');
-      showTabBar();
+    const handleAppStateChange = (nextAppState: string) => {
+      console.log('🎯 ChatInterface: App state changed to:', nextAppState);
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        console.log('🎯 ChatInterface: App going to background - Showing tab bar');
+        showTabBar();
+      }
     };
 
-    // Add event listener for navigation/focus changes
-    if (typeof window !== 'undefined') {
+    // Use React Native AppState for mobile platforms
+    if (Platform.OS !== 'web') {
+      const subscription = AppState.addEventListener('change', handleAppStateChange);
+      
+      return () => {
+        subscription?.remove();
+        showTabBar(); // Extra safety call
+      };
+    } 
+    // For web platforms, use proper feature detection
+    else if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      const handleBeforeUnload = () => {
+        console.log('🎯 ChatInterface: Before unload - Showing tab bar');
+        showTabBar();
+      };
+
       window.addEventListener('beforeunload', handleBeforeUnload);
       
       return () => {
