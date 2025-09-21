@@ -363,11 +363,15 @@ export default function NoteEditorScreen({
     const { height } = event.nativeEvent.contentSize;
     const currentMinHeight = textInputHeights[blockId] || 50;
 
-    // Increase height if content is approaching current minHeight
-    if (height >= currentMinHeight - 15) {
+    // Calculate the required height with buffer for future typing
+    const requiredHeight = Math.max(height + 40, 50); // 40px buffer for typing
+
+    // Only update if we need more space than current minHeight
+    if (requiredHeight > currentMinHeight) {
+      console.log(`Adjusting height for block ${blockId} from ${currentMinHeight} to ${requiredHeight}`);
       setTextInputHeights(prev => ({
         ...prev,
-        [blockId]: currentMinHeight + 50
+        [blockId]: requiredHeight
       }));
     }
   };
@@ -379,7 +383,7 @@ export default function NoteEditorScreen({
       selectedFontStyle ? { fontFamily: selectedFontStyle } : {},
       { 
         minHeight: isFirstInput ? Math.max(baseHeight, 200) : baseHeight,
-        maxHeight: 600 // Prevent excessive growth
+        
       }
     ];
   };
