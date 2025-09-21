@@ -2298,6 +2298,7 @@ const styles = StyleSheet.create({
   pdfUserMessageText: {
     fontSize: 14,
     color: '#FFFFFF',
+    fontFamily: 'Lora_400Regular',
   },
   pdfAiMessageContainer: {
     alignItems: 'flex-start',
@@ -2318,6 +2319,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#FFFFFF',
     lineHeight: 22,
+    fontFamily: 'Lora_400Regular',
   },
   pdfSourceButton: {
     flexDirection: 'row',
