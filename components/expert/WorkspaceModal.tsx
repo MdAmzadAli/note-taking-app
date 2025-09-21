@@ -186,7 +186,7 @@ export default function WorkspaceModal({
         <Text style={styles.modalTitle}>Add Files</Text>
         <Text style={styles.stepIndicator}>Step 2 of 2</Text>
         <Text style={styles.modalSubtitle}>
-          Add up to 5 files for your workspace ({files.length}/5)
+          Add up to 4 files for your workspace ({files.length}/4)
         </Text>
       </View>
 
@@ -222,7 +222,7 @@ export default function WorkspaceModal({
           ))}
         </ScrollView>
 
-        {files.length < 5 && (
+        {files.length < 4 && (
           <View style={styles.addFileSection}>
             <TouchableOpacity
               style={styles.addFileButton}
@@ -296,7 +296,7 @@ export default function WorkspaceModal({
         isBackendConnected={isBackendConnected}
         isLoading={isLoading}
         mode="workspace"
-        maxFiles={5}
+        maxFiles={4}
         currentFileCount={files.length}
       />
     </Modal>
