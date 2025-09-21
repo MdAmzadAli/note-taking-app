@@ -1460,9 +1460,9 @@ export default function ChatInterface({
                 <TouchableOpacity 
                   style={[
                     styles.addFileButton, 
-                    { opacity: (selectedWorkspace.files.length >= 5 || isLoading) ? 0.5 : 1 }
+                    { opacity: (selectedWorkspace.files.length >= 4 || isLoading) ? 0.5 : 1 }
                   ]}
-                  disabled={selectedWorkspace.files.length >= 5 || isLoading}
+                  disabled={selectedWorkspace.files.length >= 4 || isLoading}
                   onPress={() => setShowUploadModal(true)}
                 >
                   {isLoading ? (
@@ -1471,7 +1471,7 @@ export default function ChatInterface({
                     <IconSymbol size={16} name="plus" color="#ffffff" />
                   )}
                   <Text style={styles.addFileText}>
-                    {isLoading ? 'Adding...' : `Add File (${selectedWorkspace.files.length}/5)`}
+                    {isLoading ? 'Adding...' : `Add File (${selectedWorkspace.files.length}/4)`}
                   </Text>
                 </TouchableOpacity>
               </View>
