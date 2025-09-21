@@ -24,7 +24,7 @@ export default function FileOptionsModal({
   isVisible,
   onClose,
   onFilesAdded,
-  maxFiles = 5,
+  maxFiles = 4,
   currentFileCount = 0
 }: FileOptionsModalProps) {
   const [activeUrlInput, setActiveUrlInput] = useState<'url' | 'webpage' | null>(null);

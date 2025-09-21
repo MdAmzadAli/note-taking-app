@@ -22,7 +22,7 @@ export default function UploadModal({
   isBackendConnected,
   isLoading,
   mode = 'singleFile',
-  maxFiles = 5,
+  maxFiles = 4,
   currentFileCount = 0
 }: UploadModalProps) {
   const [showDropdown, setShowDropdown] = useState(false);
