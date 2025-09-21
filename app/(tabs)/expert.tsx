@@ -53,6 +53,9 @@ import { useTabBar } from '../../contexts/TabBarContext';
 // Define API_BASE_URL if it's not already defined elsewhere
 const API_BASE_URL = 'http://localhost:5000'; // Example URL, replace with your actual backend URL
 
+// Workspace Configuration - Change this value to control the maximum number of files allowed in workspace mode
+export const WORKSPACE_MAX_FILES = 4;
+
 interface SingleFile {
   id: string;
   name: string;

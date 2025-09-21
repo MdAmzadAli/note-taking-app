@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, TextInput } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { WORKSPACE_MAX_FILES } from '@/app/(tabs)/expert';
 
 interface UploadModalProps {
   isVisible: boolean;
@@ -22,7 +23,7 @@ export default function UploadModal({
   isBackendConnected,
   isLoading,
   mode = 'singleFile',
-  maxFiles = 4,
+  maxFiles = WORKSPACE_MAX_FILES,
   currentFileCount = 0
 }: UploadModalProps) {
   const [showDropdown, setShowDropdown] = useState(false);

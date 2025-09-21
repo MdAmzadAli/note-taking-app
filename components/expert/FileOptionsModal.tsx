@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, Alert, Keyboard, Platform } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import * as DocumentPicker from 'expo-document-picker';
+import { WORKSPACE_MAX_FILES } from '@/app/(tabs)/expert';
 
 interface FileItem {
   id: string;
@@ -24,7 +25,7 @@ export default function FileOptionsModal({
   isVisible,
   onClose,
   onFilesAdded,
-  maxFiles = 4,
+  maxFiles = WORKSPACE_MAX_FILES,
   currentFileCount = 0
 }: FileOptionsModalProps) {
   const [activeUrlInput, setActiveUrlInput] = useState<'url' | 'webpage' | null>(null);

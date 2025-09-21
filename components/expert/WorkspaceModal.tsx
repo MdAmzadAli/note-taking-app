@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, ActivityIndicator, ScrollView, Alert, KeyboardAvoidingView, Platform, Dimensions, Keyboard } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import UploadModal from './UploadModal';
+import { WORKSPACE_MAX_FILES } from '@/app/(tabs)/expert';
 
 interface WorkspaceModalProps {
   isVisible: boolean;
@@ -186,7 +187,7 @@ export default function WorkspaceModal({
         <Text style={styles.modalTitle}>Add Files</Text>
         <Text style={styles.stepIndicator}>Step 2 of 2</Text>
         <Text style={styles.modalSubtitle}>
-          Add up to 4 files for your workspace ({files.length}/4)
+          {`Add up to ${WORKSPACE_MAX_FILES} files for your workspace (${files.length}/${WORKSPACE_MAX_FILES})`}
         </Text>
       </View>
 
@@ -222,7 +223,7 @@ export default function WorkspaceModal({
           ))}
         </ScrollView>
 
-        {files.length < 4 && (
+        {files.length < WORKSPACE_MAX_FILES && (
           <View style={styles.addFileSection}>
             <TouchableOpacity
               style={styles.addFileButton}
@@ -296,7 +297,7 @@ export default function WorkspaceModal({
         isBackendConnected={isBackendConnected}
         isLoading={isLoading}
         mode="workspace"
-        maxFiles={4}
+        maxFiles={WORKSPACE_MAX_FILES}
         currentFileCount={files.length}
       />
     </Modal>

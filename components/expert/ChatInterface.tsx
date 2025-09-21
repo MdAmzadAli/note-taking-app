@@ -29,6 +29,7 @@ import {API_ENDPOINTS} from '@/config/api'
 import { ChatSession, ChatMessage as ChatMessageType, WorkspaceChatSession, Note } from '@/types';
 import { ChatSessionStorage } from '@/utils/chatStorage';
 import { saveNote, getCategories } from '@/utils/storage';
+import { WORKSPACE_MAX_FILES } from '@/app/(tabs)/expert';
 interface SingleFile {
   id: string;
   name: string;
@@ -1460,9 +1461,9 @@ export default function ChatInterface({
                 <TouchableOpacity 
                   style={[
                     styles.addFileButton, 
-                    { opacity: (selectedWorkspace.files.length >= 4 || isLoading) ? 0.5 : 1 }
+                    { opacity: (selectedWorkspace.files.length >= WORKSPACE_MAX_FILES || isLoading) ? 0.5 : 1 }
                   ]}
-                  disabled={selectedWorkspace.files.length >= 4 || isLoading}
+                  disabled={selectedWorkspace.files.length >= WORKSPACE_MAX_FILES || isLoading}
                   onPress={() => setShowUploadModal(true)}
                 >
                   {isLoading ? (
@@ -1471,7 +1472,7 @@ export default function ChatInterface({
                     <IconSymbol size={16} name="plus" color="#ffffff" />
                   )}
                   <Text style={styles.addFileText}>
-                    {isLoading ? 'Adding...' : `Add File (${selectedWorkspace.files.length}/4)`}
+                    {isLoading ? 'Adding...' : `Add File (${selectedWorkspace.files.length}/${WORKSPACE_MAX_FILES})`}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1935,7 +1936,7 @@ export default function ChatInterface({
         isBackendConnected={true}
         isLoading={isLoading || false}
         mode="chatInterface"
-        maxFiles={4}
+        maxFiles={WORKSPACE_MAX_FILES}
         currentFileCount={selectedWorkspace?.files?.length || 0}
       />
 
