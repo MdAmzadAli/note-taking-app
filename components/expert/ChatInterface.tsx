@@ -1935,7 +1935,7 @@ export default function ChatInterface({
         isBackendConnected={true}
         isLoading={isLoading || false}
         mode="chatInterface"
-        maxFiles={5}
+        maxFiles={4}
         currentFileCount={selectedWorkspace?.files?.length || 0}
       />
 
