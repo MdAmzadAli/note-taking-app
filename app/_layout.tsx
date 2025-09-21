@@ -6,6 +6,10 @@ import { GreatVibes_400Regular } from '@expo-google-fonts/great-vibes';
 import { CedarvilleCursive_400Regular } from '@expo-google-fonts/cedarville-cursive';
 import { Satisfy_400Regular } from '@expo-google-fonts/satisfy';
 import { Caveat_400Regular } from '@expo-google-fonts/caveat';
+import { Lora_400Regular } from '@expo-google-fonts/lora';
+import { SourceCodePro_400Regular } from '@expo-google-fonts/source-code-pro';
+import { Inter_400Regular } from '@expo-google-fonts/inter';
+import { LibreBaskerville_400Regular } from '@expo-google-fonts/libre-baskerville';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -31,6 +35,10 @@ export default function RootLayout() {
     CedarvilleCursive_400Regular,
     Satisfy_400Regular,
     Caveat_400Regular,
+    Lora_400Regular,
+    SourceCodePro_400Regular,
+    Inter_400Regular,
+    LibreBaskerville_400Regular,
   });
 
   useEffect(() => {

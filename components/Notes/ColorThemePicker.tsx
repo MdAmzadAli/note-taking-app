@@ -34,6 +34,11 @@ const fontStyles: Array<{ name: string; value: string | undefined }> = [
   { name: 'Pacifico', value: 'Pacifico_400Regular' },
   { name: 'Great Vibes', value: 'GreatVibes_400Regular' },
   { name: 'Caveat', value: 'Caveat_400Regular' },
+  { name: 'Satisfy', value: 'Satisfy_400Regular' },
+  { name: 'Lora', value: 'Lora_400Regular' },
+  { name: 'Source Code Pro', value: 'SourceCodePro_400Regular' },
+  { name: 'Inter', value: 'Inter_400Regular' },
+  { name: 'Libre Baskerville', value: 'LibreBaskerville_400Regular' },
 ];
 
 const noteThemes: ThemeOption[] = [
