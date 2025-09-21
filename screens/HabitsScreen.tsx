@@ -629,7 +629,7 @@ const styles = StyleSheet.create({
   // sjdsdn
   emptySubtitle: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#d3d3d3',
     textAlign: 'center',
     paddingHorizontal: 32,
   },

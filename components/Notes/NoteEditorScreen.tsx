@@ -1302,7 +1302,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dateTimeText: {
-    color: '#888888',
+    color: '#d3d3d3',
     fontSize: 12,
     lineHeight: 16,
     fontFamily: 'Inter',

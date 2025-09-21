@@ -1337,7 +1337,7 @@ export default function TasksScreen() {
                   <Text style={styles.emptyText}>
                     {searchQuery.trim()
                       ? 'No upcoming tasks found for your search.'
-                      : "No upcoming tasks. Tap 'New Task' to create your first task."
+                      : "No upcoming tasks. Tap + to create your first task."
                     }
                   </Text>
                 </View>
@@ -1786,7 +1786,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#FFFFFF',
+    color: '#d3d3d3',
     textAlign: 'center',
     fontFamily: 'Inter',
     lineHeight: 25.6,

@@ -513,27 +513,11 @@ export default function FilesList({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1C1C1E',
+    // backgroundColor: '#1C1C1E',
     paddingHorizontal: 16,
     paddingTop: 16,
   },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2C2C2E',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    // paddingVertical: 12,
-    marginBottom: 24,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#FFFFFF',
-    marginLeft: 12,
-    fontFamily: 'Inter',
-    // outlineStyle: 'none', // Removed for React Native compatibility
-  },
+
   clearButton: {
     marginLeft: 8,
     padding: 4,
