@@ -4,7 +4,7 @@ import asyncio
 from typing import List, Dict, Any, Optional
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
-from qdrant_client.http.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
+from qdrant_client.http.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue, ScalarQuantization
 import uuid
 from pathlib import Path
 from dotenv import load_dotenv
@@ -19,7 +19,7 @@ POINT_NS = '2d3c0d3e-1e1a-4f6a-9e84-1b8de377e9c9'
 class VectorDatabaseService:
     def __init__(self):
         self.client = None
-        self.collection_name = 'documents'  # Match JavaScript collection name
+        self.collection_name = 'Ragdocs'  # New collection name with int8 optimization
         self.is_initialized_flag = False
 
     async def initialize(self):
@@ -67,6 +67,9 @@ class VectorDatabaseService:
                     self.client.create_collection,
                     collection_name=self.collection_name,
                     vectors_config=VectorParams(size=768, distance=Distance.COSINE),
+                    quantization_config=ScalarQuantization(
+                        scalar=dict(type="int8", always_ram=True)
+                    ),
                     optimizers_config={
                         "default_segment_number": 2
                     },
