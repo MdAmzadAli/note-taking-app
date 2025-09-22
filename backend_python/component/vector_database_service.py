@@ -19,7 +19,7 @@ POINT_NS = '2d3c0d3e-1e1a-4f6a-9e84-1b8de377e9c9'
 class VectorDatabaseService:
     def __init__(self):
         self.client = None
-        self.collection_name = 'Ragdocs'  # New collection name with int8 optimization
+        self.collection_name = 'Ragdocuments'  # New collection name with int8 optimization
         self.is_initialized_flag = False
 
     async def initialize(self):
@@ -452,3 +452,7 @@ class VectorDatabaseService:
         except Exception as error:
             print(f'❌ Failed to count chunks: {error}')
             return 0
+
+
+# service = VectorDatabaseService()
+# print(f"✅✅✅✅✅Current collection: {service.collection_name}")
