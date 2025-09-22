@@ -68,7 +68,7 @@ class VectorDatabaseService:
                     collection_name=self.collection_name,
                     vectors_config=VectorParams(size=768, distance=Distance.COSINE),
                     quantization_config=ScalarQuantization(
-                        scalar=ScalarQuantizationConfig(type=ScalarType.INT8, always_ram=True)
+                        scalar=ScalarQuantizationConfig(type=ScalarType.INT8)
                     ),
                     optimizers_config={
                         "default_segment_number": 2
