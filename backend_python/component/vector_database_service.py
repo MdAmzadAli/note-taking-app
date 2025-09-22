@@ -4,7 +4,7 @@ import asyncio
 from typing import List, Dict, Any, Optional
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
-from qdrant_client.http.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue, ScalarQuantization
+from qdrant_client.http.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue, ScalarQuantization, ScalarQuantizationConfig
 import uuid
 from pathlib import Path
 from dotenv import load_dotenv
@@ -68,7 +68,7 @@ class VectorDatabaseService:
                     collection_name=self.collection_name,
                     vectors_config=VectorParams(size=768, distance=Distance.COSINE),
                     quantization_config=ScalarQuantization(
-                        scalar=dict(type="int8", always_ram=True)
+                        scalar=ScalarQuantizationConfig(type="int8", always_ram=True)
                     ),
                     optimizers_config={
                         "default_segment_number": 2
