@@ -297,87 +297,7 @@ class VectorDatabaseService:
             print(f'❌ VectorDB: Error type: {type(error).__name__}')
             raise error
 
-    async def check_document_exists(self, file_id: str) -> bool:
-        """Check if document exists (matching JavaScript)"""
-        if not self.is_initialized_flag:
-            return False
-        
-        try:
-            existing_points = await asyncio.to_thread(
-                self.client.scroll,
-                collection_name=self.collection_name,
-                scroll_filter=Filter(
-                    must=[FieldCondition(key="fileId", match=MatchValue(value=file_id))]
-                ),
-                limit=1
-            )
-            
-            return existing_points[0] and len(existing_points[0]) > 0
-            
-        except Exception as error:
-            print(f'⚠️ Could not check for existing documents: {error}')
-            return False
-
-    async def get_document_chunk_count(self, file_id: str) -> int:
-        """Get chunk count for document (matching JavaScript)"""
-        if not self.is_initialized_flag:
-            return 0
-        
-        try:
-            all_points = await asyncio.to_thread(
-                self.client.scroll,
-                collection_name=self.collection_name,
-                scroll_filter=Filter(
-                    must=[FieldCondition(key="fileId", match=MatchValue(value=file_id))]
-                ),
-                limit=10000
-            )
-            
-            return len(all_points[0]) if all_points[0] else 0
-            
-        except Exception as error:
-            print(f'⚠️ Could not get document chunk count: {error}')
-            return 0
-
-    async def get_document_workspace_info(self, file_id: str) -> Dict[str, Any]:
-        """Get document workspace information (matching JavaScript)"""
-        if not self.is_initialized_flag:
-            return {'workspaceIds': [], 'totalChunks': 0}
-        
-        try:
-            all_points = await asyncio.to_thread(
-                self.client.scroll,
-                collection_name=self.collection_name,
-                scroll_filter=Filter(
-                    must=[FieldCondition(key="fileId", match=MatchValue(value=file_id))]
-                ),
-                limit=100
-            )
-            
-            if not all_points[0]:
-                return {'workspaceIds': [], 'totalChunks': 0}
-
-            points = all_points[0]
-            workspace_ids = list(set(point.payload.get('workspaceId') for point in points))
-            sample_chunks = [
-                {
-                    'chunkIndex': point.payload.get('chunkIndex'),
-                    'workspaceId': point.payload.get('workspaceId'),
-                    'fileName': point.payload.get('fileName')
-                }
-                for point in points[:3]
-            ]
-
-            return {
-                'workspaceIds': workspace_ids,
-                'totalChunks': len(points),
-                'sampleChunks': sample_chunks
-            }
-            
-        except Exception as error:
-            print(f'⚠️ Could not get document workspace info: {error}')
-            return {'workspaceIds': [], 'totalChunks': 0, 'error': str(error)}
-
+  
     async def health_check(self) -> Dict[str, Any]:
         """Health check (matching JavaScript)"""
         try:
@@ -395,64 +315,8 @@ class VectorDatabaseService:
             print(f'⚠️ VectorDB: State mismatch - flag={self.is_initialized_flag}, actual={actual_state}')
         return actual_state
 
-    # Legacy methods for backward compatibility
-    async def store_chunks(self, chunks: List[Dict[str, Any]]) -> List[str]:
-        """Legacy method - use store_document_chunks instead"""
-        print('⚠️ Warning: store_chunks is deprecated, use store_document_chunks instead')
-        if not chunks:
-            return []
-        
-        # Extract minimal info for legacy support
-        file_id = chunks[0].get('metadata', {}).get('fileId', 'unknown')
-        file_name = chunks[0].get('metadata', {}).get('fileName', 'unknown')
-        workspace_id = chunks[0].get('metadata', {}).get('workspaceId')
-        
-        # Generate dummy embeddings if not provided
-        embeddings = [[0.0] * 768 for _ in chunks]
-        
-        result = await self.store_document_chunks(file_id, file_name, chunks, embeddings, workspace_id)
-        return [str(uuid.uuid4()) for _ in range(result.get('chunksCount', 0))]
 
-    async def remove_chunks_by_file_id(self, file_id: str):
-        """Legacy method - use remove_document instead"""
-        print('⚠️ Warning: remove_chunks_by_file_id is deprecated, use remove_document instead')
-        await self.remove_document(file_id)
-
-    async def get_chunk_count(self, file_id: Optional[str] = None, workspace_id: Optional[str] = None) -> int:
-        """Legacy method with workspace support"""
-        if not self.is_initialized_flag:
-            return 0
-        
-        try:
-            filter_conditions = []
-            
-            if file_id:
-                filter_conditions.append(
-                    FieldCondition(key="fileId", match=MatchValue(value=file_id))
-                )
-            
-            if workspace_id:
-                filter_conditions.append(
-                    FieldCondition(key="workspaceId", match=MatchValue(value=workspace_id))
-                )
-            
-            query_filter = None
-            if filter_conditions:
-                query_filter = Filter(must=filter_conditions)
-            
-            # Count points
-            result = await asyncio.to_thread(
-                self.client.count,
-                collection_name=self.collection_name,
-                count_filter=query_filter
-            )
-            
-            return result.count
-            
-        except Exception as error:
-            print(f'❌ Failed to count chunks: {error}')
-            return 0
-
+  
 
 # service = VectorDatabaseService()
 # print(f"✅✅✅✅✅Current collection: {service.collection_name}")
