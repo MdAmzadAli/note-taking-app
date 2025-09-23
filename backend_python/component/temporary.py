@@ -9,15 +9,8 @@ from typing import List, Dict, Any, Tuple, Optional
 import statistics
 import hdbscan
 from collections import deque, defaultdict
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 import math
-try:
-    import nltk
-    from nltk.tokenize import sent_tokenize
-    _NLTK_READY = True
-except Exception:
-    _NLTK_READY = False
+
 
 # ---------- FIXED Config dataclasses ----------
 

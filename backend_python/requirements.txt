@@ -13,15 +13,12 @@ numpy==2.0.2
 pandas==2.2.3
 aiohttp==3.10.11
 beautifulsoup4==4.12.3
-camelot-py[cv]==0.10.1
-opencv-python
 PyPDF2==2.12.1
 numpy
 regex
 hdbscan
 scikit-learn
 nltk
-matplotlib
 brotli
 python-socketio
 aiohttp==3.10.11
