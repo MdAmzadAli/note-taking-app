@@ -8,6 +8,7 @@ from qdrant_client.http.models import Distance, VectorParams, PointStruct, Filte
 import uuid
 from pathlib import Path
 from dotenv import load_dotenv
+from sql_db.db_methods.database_manager import DatabaseManager
 
 # Load environment variables with explicit path
 env_path = Path(__file__).parent.parent / '.env'
@@ -21,6 +22,7 @@ class VectorDatabaseService:
         self.client = None
         self.collection_name = 'Ragdocuments'  # New collection name with int8 optimization
         self.is_initialized_flag = False
+        self.db_manager = DatabaseManager()
 
     async def initialize(self):
         print('🔧 VectorDatabaseService: Starting initialization...')
@@ -117,7 +119,7 @@ class VectorDatabaseService:
     async def store_document_chunks(self, file_id: str, file_name: str, chunks: List[Dict[str, Any]], 
                                    embeddings: List[List[float]], workspace_id: Optional[str] = None, 
                                    cloudinary_data: Optional[Dict] = None) -> Dict[str, Any]:
-        """Store document chunks with document-specific logic (matching JavaScript)"""
+        """Store document chunks with minimal Qdrant payload and full text in SQL database"""
         if not self.is_initialized_flag:
             raise Exception('VectorDatabaseService not initialized')
         
@@ -126,56 +128,39 @@ class VectorDatabaseService:
         
         try:
             print(f'🏢 VectorDB: Storing chunks for {file_name} with workspaceId: {workspace_id or "null"}')
+            
+            # Prepare data for both vector and SQL storage
             points = []
+            contexts_data = []
             
             for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+                context_number = i + 1  # 1-based indexing for SQL
                 page_number = chunk.get('metadata', {}).get('pageNumber', 1)
                 page_url = None
+                thumbnail_url = None
+                
                 if cloudinary_data:
                     page_urls = cloudinary_data.get('pageUrls', [])
                     if page_urls and page_number <= len(page_urls):
                         page_url = page_urls[page_number - 1]
                     else:
                         page_url = cloudinary_data.get('secureUrl')
+                    thumbnail_url = cloudinary_data.get('thumbnailUrl')
 
-                # Create point payload matching JavaScript structure
+                # Minimal Qdrant payload - only essential search fields
                 point_payload = {
-                    'text': chunk['text'],
                     'fileId': file_id,
-                    'fileName': file_name,
-                    'chunkIndex': i,
                     'workspaceId': workspace_id,
-                    'totalChunks': len(chunks),
-                    'pageNumber': page_number,
-                    'startLine': chunk.get('metadata', {}).get('startLine'),
-                    'endLine': chunk.get('metadata', {}).get('endLine'),
-                    'linesUsed': chunk.get('metadata', {}).get('linesUsed'),
-                    'totalLinesOnPage': chunk.get('metadata', {}).get('totalLinesOnPage'),
-                    'totalPages': chunk.get('metadata', {}).get('totalPages'),
-                    'pageUrl': page_url,
-                    'cloudinaryUrl': cloudinary_data.get('secureUrl') if cloudinary_data else None,
+                    'contextNumber': context_number,
                     'embeddingType': 'RETRIEVAL_DOCUMENT'
                 }
                 
-                # For webpage content, add source URL information
-                content_type = chunk.get('metadata', {}).get('content_type')
-                if content_type == 'webpage':
-                    point_payload['sourceUrl'] = chunk.get('metadata', {}).get('initial_url')
-                    point_payload['contentType'] = 'webpage'
-                    point_payload['pagesProcessed'] = chunk.get('metadata', {}).get('pages_processed', 1)
-
-                # Add additional metadata
-                metadata = chunk.get('metadata', {})
-                for key, value in metadata.items():
-                    if key not in point_payload and value is not None:
-                        point_payload[key] = value
-
-                # Remove None values
+                # Remove None values from Qdrant payload
                 point_payload = {k: v for k, v in point_payload.items() if v is not None}
 
                 # Log workspaceId for first few chunks for debugging
                 if i < 3:
-                    print(f'🔍 VectorDB: Chunk {i} payload workspaceId: {point_payload.get("workspaceId") or "null"}')
+                    print(f'🔍 VectorDB: Chunk {i} minimal payload workspaceId: {point_payload.get("workspaceId") or "null"}')
 
                 # Generate UUID v5 for consistent IDs (matching JavaScript)
                 point_id = str(uuid.uuid5(uuid.UUID(POINT_NS), f'{file_id}:{i}'))
@@ -186,14 +171,78 @@ class VectorDatabaseService:
                     payload=point_payload
                 )
                 points.append(point)
+                
+                # Prepare comprehensive data for SQL storage
+                metadata = chunk.get('metadata', {})
+                context_data = {
+                    'text': chunk['text'],
+                    'metadata': {
+                        'chunkIndex': i,
+                        'pageNumber': page_number,
+                        'startLine': metadata.get('startLine'),
+                        'endLine': metadata.get('endLine'),
+                        'linesUsed': metadata.get('linesUsed'),
+                        'totalLinesOnPage': metadata.get('totalLinesOnPage'),
+                        'totalPages': metadata.get('totalPages'),
+                        'pageUrl': page_url,
+                        'thumbnailUrl': thumbnail_url,
+                        'cloudinaryUrl': cloudinary_data.get('secureUrl') if cloudinary_data else None,
+                        'sourceUrl': metadata.get('initial_url') if metadata.get('content_type') == 'webpage' else None,
+                        'contentType': metadata.get('content_type'),
+                        'pagesProcessed': metadata.get('pages_processed'),
+                        'tokens_est': metadata.get('tokens_est'),
+                        'total_chars': metadata.get('total_chars'),
+                        'fileName': file_name,
+                        'workspaceId': workspace_id
+                    }
+                }
+                contexts_data.append(context_data)
             
-            # Store points
+            # Store in Qdrant with minimal payload
             await asyncio.to_thread(
                 self.client.upsert,
                 collection_name=self.collection_name,
                 points=points,
                 wait=True
             )
+            print(f'✅ VectorDB: Stored {len(points)} vectors in Qdrant with minimal payload')
+            
+            # Store comprehensive text data in SQL database
+            try:
+                with DatabaseManager() as db:
+                    # Ensure workspace exists
+                    workspace = db.workspace_repo.get_workspace(workspace_id)
+                    if not workspace:
+                        # Create workspace if it doesn't exist
+                        workspace = db.workspace_repo.create_workspace(
+                            workspace_id, 
+                            f"Workspace {workspace_id}", 
+                            {"auto_created": True}
+                        )
+                        print(f'📝 SQL: Created workspace {workspace_id}')
+                    
+                    # Ensure file exists  
+                    file_record = db.file_repo.get_file(file_id)
+                    if not file_record:
+                        # Create file record
+                        file_data = {
+                            'file_type': 'pdf' if page_number else 'text',
+                            'content_type': chunks[0].get('metadata', {}).get('content_type', 'pdf'),
+                            'cloudinary_url': cloudinary_data.get('secureUrl') if cloudinary_data else None,
+                            'page_urls': cloudinary_data.get('pageUrls', []) if cloudinary_data else [],
+                            'total_pages': chunks[0].get('metadata', {}).get('totalPages'),
+                            'metadata': {'cloudinary_data': cloudinary_data} if cloudinary_data else {}
+                        }
+                        file_record = db.file_repo.create_file(file_id, workspace_id, file_name, file_data)
+                        print(f'📝 SQL: Created file record {file_id}')
+                    
+                    # Store contexts in bulk
+                    stored_count = db.context_repo.store_contexts_bulk(file_id, contexts_data)
+                    print(f'✅ SQL: Stored {stored_count} contexts in database')
+                    
+            except Exception as sql_error:
+                print(f'⚠️ SQL storage failed: {sql_error}')
+                # Continue anyway as vector search can still work
             
             print(f'✅ Successfully stored {len(points)} chunks for {file_name}')
             return {'chunksCount': len(points), 'success': True}
@@ -204,7 +253,7 @@ class VectorDatabaseService:
 
     async def search_similar_chunks(self, query_embedding: List[float], filter_param: Optional[Dict] = None, 
                                    limit: int = 5) -> List[Dict[str, Any]]:
-        """Search similar chunks with optional filter (matching JavaScript)"""
+        """Search similar chunks and retrieve full text from SQL database"""
         if not self.is_initialized_flag:
             raise Exception('VectorDatabaseService not initialized')
         
@@ -223,20 +272,93 @@ class VectorDatabaseService:
 
             print(f'🔍 VectorDB: Query embedding length: {len(query_embedding)}')
 
-            # Perform search
-            search_result = await asyncio.to_thread(
+            # Perform vector search
+            vector_results = await asyncio.to_thread(
                 self.client.search,
                 collection_name=self.collection_name,
                 **search_params
             )
             
-            print(f'📊 VectorDB: Search returned {len(search_result)} results')
+            print(f'📊 VectorDB: Vector search returned {len(vector_results)} results')
             
-            if search_result:
-                top_result = search_result[0]
-                print(f'📝 VectorDB: Top result score: {top_result.score}, fileId: {top_result.payload.get("fileId")}, workspaceId: {top_result.payload.get("workspaceId")}')
+            if not vector_results:
+                return []
             
-            return search_result
+            # Extract file_id and context_number pairs for SQL retrieval
+            context_requests = []
+            for result in vector_results:
+                payload = result.payload
+                file_id = payload.get('fileId')
+                context_number = payload.get('contextNumber')
+                workspace_id = payload.get('workspaceId')
+                
+                if file_id and context_number:
+                    context_requests.append({
+                        'fileId': file_id,
+                        'workspaceId': workspace_id,
+                        'contextNumber': context_number,
+                        'score': result.score
+                    })
+            
+            if not context_requests:
+                print(f'⚠️ No valid context requests found from vector results')
+                return []
+            
+            # Retrieve text data from SQL database using RAG repository
+            try:
+                with DatabaseManager() as db:
+                    full_contexts = db.rag_repo.retrieve_contexts_for_rag(context_requests)
+                    print(f'📝 SQL: Retrieved {len(full_contexts)} contexts from database')
+                    
+                    # Combine vector scores with SQL text data
+                    enriched_results = []
+                    context_lookup = {(ctx['fileId'], ctx['contextNumber']): ctx for ctx in full_contexts}
+                    
+                    for req in context_requests:
+                        file_id = req['fileId']
+                        context_number = req['contextNumber']
+                        score = req['score']
+                        
+                        context_data = context_lookup.get((file_id, context_number))
+                        if context_data:
+                            # Create result in format expected by search_service.py
+                            enriched_result = type('SearchResult', (), {
+                                'score': score,
+                                'payload': {
+                                    'text': context_data['text'],
+                                    'fileId': file_id,
+                                    'workspaceId': req['workspaceId'],
+                                    'chunkIndex': context_data['metadata'].get('chunkIndex'),
+                                    'fileName': context_data['metadata'].get('fileName'),
+                                    'pageNumber': context_data['metadata'].get('pageNumber'),
+                                    'startLine': context_data['metadata'].get('startLine'),
+                                    'endLine': context_data['metadata'].get('endLine'),
+                                    'linesUsed': context_data['metadata'].get('linesUsed'),
+                                    'totalLinesOnPage': context_data['metadata'].get('totalLinesOnPage'),
+                                    'totalPages': context_data['metadata'].get('totalPages'),
+                                    'pageUrl': context_data['metadata'].get('pageUrl'),
+                                    'cloudinaryUrl': context_data['metadata'].get('cloudinaryUrl'),
+                                    'thumbnailUrl': context_data['metadata'].get('thumbnailUrl'),
+                                    'embeddingType': 'RETRIEVAL_DOCUMENT'
+                                }
+                            })()
+                            enriched_results.append(enriched_result)
+                        else:
+                            print(f'⚠️ No text data found for file {file_id}, context {context_number}')
+                    
+                    print(f'✅ Enriched {len(enriched_results)} results with text data')
+                    
+                    if enriched_results:
+                        top_result = enriched_results[0]
+                        print(f'📝 VectorDB: Top enriched result score: {top_result.score}, fileId: {top_result.payload.get("fileId")}, workspaceId: {top_result.payload.get("workspaceId")}')
+                    
+                    return enriched_results
+                    
+            except Exception as sql_error:
+                print(f'⚠️ SQL retrieval failed: {sql_error}')
+                # Fallback to vector results only (with minimal data)
+                print(f'🔄 Falling back to vector-only results')
+                return vector_results
             
         except Exception as error:
             print(f'❌ Vector search failed: {error}')
@@ -244,7 +366,7 @@ class VectorDatabaseService:
             raise error
 
     async def remove_document(self, file_id: str):
-        """Remove document by file ID (matching JavaScript)"""
+        """Remove document by file ID from both vector and SQL databases"""
         print(f'🗑️ VectorDB: Starting document removal for {file_id}')
         print(f'🔍 VectorDB: Current state - initialized_flag={self.is_initialized_flag}, client_exists={self.client is not None}')
         
@@ -255,6 +377,7 @@ class VectorDatabaseService:
             raise Exception(error_msg)
         
         try:
+            # Remove from Qdrant vector database
             print(f'🔄 VectorDB: Executing deletion for file_id={file_id} from collection={self.collection_name}')
             await asyncio.to_thread(
                 self.client.delete,
@@ -263,7 +386,20 @@ class VectorDatabaseService:
                     must=[FieldCondition(key="fileId", match=MatchValue(value=file_id))]
                 )
             )
-            print(f'✅ VectorDB: Successfully removed document {file_id} from index')
+            print(f'✅ VectorDB: Successfully removed document {file_id} from vector index')
+            
+            # Remove from SQL database
+            try:
+                with DatabaseManager() as db:
+                    # Delete contexts and file record
+                    deleted_contexts = db.context_repo.delete_file_contexts(file_id)
+                    deleted_file = db.file_repo.delete_file(file_id)
+                    
+                    print(f'✅ SQL: Removed {deleted_contexts} contexts and file record for {file_id}')
+                    
+            except Exception as sql_error:
+                print(f'⚠️ SQL deletion failed for {file_id}: {sql_error}')
+                # Continue anyway as vector deletion succeeded
             
         except Exception as error:
             print(f'❌ VectorDB: Failed to remove document {file_id}: {error}')
@@ -271,7 +407,7 @@ class VectorDatabaseService:
             raise error
 
     async def remove_workspace_metadata(self, workspace_id: str):
-        """Remove all documents in a workspace by workspace ID"""
+        """Remove all documents in a workspace by workspace ID from both vector and SQL databases"""
         print(f'🗑️ VectorDB: Starting workspace metadata removal for {workspace_id}')
         print(f'🔍 VectorDB: Current state - initialized_flag={self.is_initialized_flag}, client_exists={self.client is not None}')
         
@@ -282,6 +418,7 @@ class VectorDatabaseService:
             raise Exception(error_msg)
         
         try:
+            # Remove from Qdrant vector database
             print(f'🔄 VectorDB: Executing workspace deletion for workspace_id={workspace_id} from collection={self.collection_name}')
             await asyncio.to_thread(
                 self.client.delete,
@@ -290,7 +427,33 @@ class VectorDatabaseService:
                     must=[FieldCondition(key="workspaceId", match=MatchValue(value=workspace_id))]
                 )
             )
-            print(f'✅ VectorDB: Successfully removed all documents for workspace {workspace_id} from index')
+            print(f'✅ VectorDB: Successfully removed all documents for workspace {workspace_id} from vector index')
+            
+            # Remove from SQL database
+            try:
+                with DatabaseManager() as db:
+                    # Get all files in workspace first
+                    files = db.file_repo.get_files_by_workspace(workspace_id)
+                    deleted_files_count = 0
+                    deleted_contexts_count = 0
+                    
+                    # Delete each file and its contexts
+                    for file_record in files:
+                        contexts_deleted = db.context_repo.delete_file_contexts(file_record.id)
+                        file_deleted = db.file_repo.delete_file(file_record.id)
+                        
+                        if file_deleted:
+                            deleted_files_count += 1
+                            deleted_contexts_count += contexts_deleted
+                    
+                    # Delete workspace itself
+                    workspace_deleted = db.workspace_repo.delete_workspace(workspace_id)
+                    
+                    print(f'✅ SQL: Removed workspace {workspace_id}, {deleted_files_count} files, {deleted_contexts_count} contexts')
+                    
+            except Exception as sql_error:
+                print(f'⚠️ SQL deletion failed for workspace {workspace_id}: {sql_error}')
+                # Continue anyway as vector deletion succeeded
             
         except Exception as error:
             print(f'❌ VectorDB: Failed to remove workspace {workspace_id}: {error}')
