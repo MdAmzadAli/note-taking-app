@@ -22,3 +22,5 @@ nltk
 brotli
 python-socketio
 aiohttp==3.10.11
+psycopg2-binary
+SQLAlchemy
