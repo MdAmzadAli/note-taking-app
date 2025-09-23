@@ -50,7 +50,7 @@ class File(Base):
     # Primary key
     id = Column(String(255), primary_key=True)
     
-    # Foreign key to workspace
+    # Foreign key to workspace with CASCADE delete
     workspace_id = Column(String(255), ForeignKey('workspaces.id', ondelete='CASCADE'), nullable=False)
     
     # File information
@@ -115,7 +115,7 @@ class Context(Base):
     """
     __tablename__ = 'contexts'
     
-    # Composite primary key for maximum efficiency
+    # Composite primary key for maximum efficiency with CASCADE delete
     file_id = Column(String(255), ForeignKey('files.id', ondelete='CASCADE'), primary_key=True)
     context_number = Column(Integer, primary_key=True)
     
@@ -183,9 +183,9 @@ class WorkspaceFileContext(Base):
     """
     __tablename__ = 'workspace_file_contexts'
     
-    # Composite key covering all common query patterns
-    workspace_id = Column(String(255), primary_key=True)
-    file_id = Column(String(255), primary_key=True)
+    # Composite key with CASCADE constraints for automatic cleanup
+    workspace_id = Column(String(255), ForeignKey('workspaces.id', ondelete='CASCADE'), primary_key=True)
+    file_id = Column(String(255), ForeignKey('files.id', ondelete='CASCADE'), primary_key=True)
     context_number = Column(Integer, primary_key=True)
     
     # Denormalized frequently accessed fields

@@ -82,9 +82,8 @@ class FileRepository(BaseRepository):
             ).update({File.total_chunks: chunk_count})
     
     def delete_file(self, file_id: str) -> bool:
-        """Soft delete file and all its contexts"""
+        """Soft delete file - CASCADE handles contexts automatically"""
         with self.transaction():
-            # Soft delete the file
             file_record = self.session.query(File).filter(
                 File.id == file_id
             ).first()
@@ -92,18 +91,14 @@ class FileRepository(BaseRepository):
             if not file_record:
                 return False
             
+            # Soft delete the file - contexts cascade automatically
             file_record.is_deleted = True
             file_record.deleted_at = func.now()
-            
-            # Delete denormalized records
-            self.session.query(WorkspaceFileContext).filter(
-                WorkspaceFileContext.file_id == file_id
-            ).delete()
             
             return True
     
     def hard_delete_file(self, file_id: str) -> bool:
-        """Permanently delete file and all related data"""
+        """Permanently delete file - CASCADE handles all related data automatically"""
         with self.transaction():
             deleted_count = self.session.query(File).filter(
                 File.id == file_id

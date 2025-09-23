@@ -388,14 +388,13 @@ class VectorDatabaseService:
             )
             print(f'✅ VectorDB: Successfully removed document {file_id} from vector index')
             
-            # Remove from SQL database
+            # Remove from SQL database - CASCADE handles contexts automatically
             try:
                 with DatabaseManager() as db:
-                    # Delete contexts and file record
-                    deleted_contexts = db.context_repo.delete_file_contexts(file_id)
+                    # Delete file record - CASCADE handles contexts automatically
                     deleted_file = db.file_repo.delete_file(file_id)
                     
-                    print(f'✅ SQL: Removed {deleted_contexts} contexts and file record for {file_id}')
+                    print(f'✅ SQL: Removed file record for {file_id} (contexts cascaded automatically)')
                     
             except Exception as sql_error:
                 print(f'⚠️ SQL deletion failed for {file_id}: {sql_error}')
@@ -429,27 +428,13 @@ class VectorDatabaseService:
             )
             print(f'✅ VectorDB: Successfully removed all documents for workspace {workspace_id} from vector index')
             
-            # Remove from SQL database
+            # Remove from SQL database - CASCADE handles files and contexts automatically
             try:
                 with DatabaseManager() as db:
-                    # Get all files in workspace first
-                    files = db.file_repo.get_files_by_workspace(workspace_id)
-                    deleted_files_count = 0
-                    deleted_contexts_count = 0
-                    
-                    # Delete each file and its contexts
-                    for file_record in files:
-                        contexts_deleted = db.context_repo.delete_file_contexts(file_record.id)
-                        file_deleted = db.file_repo.delete_file(file_record.id)
-                        
-                        if file_deleted:
-                            deleted_files_count += 1
-                            deleted_contexts_count += contexts_deleted
-                    
-                    # Delete workspace itself
+                    # Delete workspace - CASCADE handles files and contexts automatically
                     workspace_deleted = db.workspace_repo.delete_workspace(workspace_id)
                     
-                    print(f'✅ SQL: Removed workspace {workspace_id}, {deleted_files_count} files, {deleted_contexts_count} contexts')
+                    print(f'✅ SQL: Removed workspace {workspace_id} (files and contexts cascaded automatically)')
                     
             except Exception as sql_error:
                 print(f'⚠️ SQL deletion failed for workspace {workspace_id}: {sql_error}')

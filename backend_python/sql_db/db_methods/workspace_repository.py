@@ -53,11 +53,9 @@ class WorkspaceRepository(BaseRepository):
     
     def delete_workspace(self, workspace_id: str) -> bool:
         """
-        Soft delete workspace and cascade to all files and contexts
-        Uses optimized bulk delete operations
+        Soft delete workspace - CASCADE will handle files and contexts automatically
         """
         with self.transaction():
-            # First, soft delete the workspace
             workspace = self.session.query(Workspace).filter(
                 Workspace.id == workspace_id
             ).first()
@@ -65,10 +63,11 @@ class WorkspaceRepository(BaseRepository):
             if not workspace:
                 return False
             
+            # Soft delete the workspace - files and contexts cascade automatically
             workspace.is_deleted = True
             workspace.deleted_at = func.now()
             
-            # Bulk soft delete all files in workspace
+            # Bulk soft delete all files in workspace (preserves soft delete pattern)
             self.session.query(File).filter(
                 File.workspace_id == workspace_id
             ).update({
@@ -76,17 +75,11 @@ class WorkspaceRepository(BaseRepository):
                 File.deleted_at: func.now()
             })
             
-            # Delete denormalized records
-            self.session.query(WorkspaceFileContext).filter(
-                WorkspaceFileContext.workspace_id == workspace_id
-            ).delete()
-            
             return True
     
     def hard_delete_workspace(self, workspace_id: str) -> bool:
         """
-        Permanently delete workspace and all related data
-        CASCADE will handle file and context deletion
+        Permanently delete workspace - CASCADE handles all related data automatically
         """
         with self.transaction():
             deleted_count = self.session.query(Workspace).filter(

@@ -199,14 +199,10 @@ class ContextRepository(BaseRepository):
         }
     
     def delete_file_contexts(self, file_id: str) -> int:
-        """Delete all contexts for a file"""
+        """Delete all contexts for a file - CASCADE handles this automatically when file is deleted"""
+        # This method is kept for explicit context deletion if needed
+        # But normally CASCADE will handle this when file is deleted
         with self.transaction():
-            # Delete from denormalized table
-            self.session.query(WorkspaceFileContext).filter(
-                WorkspaceFileContext.file_id == file_id
-            ).delete()
-            
-            # Delete main contexts
             deleted_count = self.session.query(Context).filter(
                 Context.file_id == file_id
             ).delete()
