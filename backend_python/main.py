@@ -1162,7 +1162,14 @@ async def upload_workspace(
 
                 print(f"✅ RAG indexing completed for item {item_metadata['id']}: {index_result.get('chunksCount', 0)} chunks")
                 indexed_count += 1
-                await file_service.delete_local_file_only(item_metadata['id'])
+
+                # Only delete local files for non-webpage items (webpages don't have local files)
+                if item_metadata['sourceType'] != 'webpage':
+                    print(f"🧹 Deleting local file for {item_metadata['sourceType']} item: {item_metadata['id']}")
+                    await file_service.delete_local_file_only(item_metadata['id'])
+                else:
+                    print(f"🌐 Skipping local file deletion for webpage item: {item_metadata['id']} (no local file to delete)")
+
                 # Start background summary generation (non-blocking)
                 asyncio.create_task(generate_file_summary_background(
                     item_metadata['id'],
