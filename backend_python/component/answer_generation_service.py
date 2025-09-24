@@ -54,28 +54,68 @@ class AnswerGenerationService:
         if not self.embedding_service.chat_client:
             raise Exception("Google GenAI Chat client not initialized")
 
-        # Analyze document context for complexity assessment
-        document_types = list(set(chunk['metadata']['fileName'] for chunk in relevant_chunks))
-        has_table_content = any(chunk['metadata'].get('hasTableContent', False) for chunk in relevant_chunks)
-        has_json_tables = any(chunk['metadata'].get('has_json_tables', False) for chunk in relevant_chunks)
-        has_financial_data = any(chunk['metadata'].get('hasFinancialData', False) for chunk in relevant_chunks)
-        has_structured_tables = any(chunk.get('structured_tables') for chunk in relevant_chunks)
+        # Analyze document context for complexity assessment - with safe None handling
+        document_types = []
+        for chunk in relevant_chunks:
+            metadata = chunk.get('metadata', {})
+            if metadata:
+                file_name = metadata.get('fileName')
+                if file_name:
+                    document_types.append(file_name)
         
-        # Count table chunks and analyze numerical content
-        table_chunks = [chunk for chunk in relevant_chunks if chunk['metadata'].get('hasTableContent', False)]
+        # Remove duplicates and handle empty list
+        document_types = list(set(document_types))
+        if not document_types:
+            document_types = ['Unknown Document']
+        
+        has_table_content = any(
+            chunk.get('metadata', {}).get('hasTableContent', False) 
+            for chunk in relevant_chunks
+        )
+        has_json_tables = any(
+            chunk.get('metadata', {}).get('has_json_tables', False) 
+            for chunk in relevant_chunks
+        )
+        has_financial_data = any(
+            chunk.get('metadata', {}).get('hasFinancialData', False) 
+            for chunk in relevant_chunks
+        )
+        has_structured_tables = any(
+            chunk.get('structured_tables', False) 
+            for chunk in relevant_chunks
+        )
+        
+        # Count table chunks and analyze numerical content - with safe handling
+        table_chunks = []
+        for chunk in relevant_chunks:
+            metadata = chunk.get('metadata', {})
+            if metadata and metadata.get('hasTableContent', False):
+                table_chunks.append(chunk)
+        
         table_count = len(table_chunks)
         
-        # Analyze table metadata for complexity indicators
+        # Analyze table metadata for complexity indicators - with safe handling
         table_headers = []
         table_currencies = []
         for chunk in table_chunks:
-            numeric_metadata = chunk['metadata'].get('numeric_metadata', {})
-            if numeric_metadata:
-                table_headers.extend(numeric_metadata.get('table_context_headings', []))
-                table_currencies.extend(numeric_metadata.get('currencies', []))
+            metadata = chunk.get('metadata', {})
+            if metadata:
+                numeric_metadata = metadata.get('numeric_metadata', {})
+                if numeric_metadata and isinstance(numeric_metadata, dict):
+                    headers = numeric_metadata.get('table_context_headings', [])
+                    currencies = numeric_metadata.get('currencies', [])
+                    if headers and isinstance(headers, list):
+                        table_headers.extend(headers)
+                    if currencies and isinstance(currencies, list):
+                        table_currencies.extend(currencies)
 
         mode_info = "Single file mode" if is_single_file_mode else "Workspace mode" if is_workspace_mode else "Standard mode"
-        context_info = f"Mode: {mode_info}. Documents: {', '.join(document_types)}. Tables: {table_count} chunks, JSON tables: {has_json_tables}, Structured tables: {has_structured_tables}. Financial data: {has_financial_data}. Table contexts: {table_headers[:3]}."
+        
+        # Safe string building - ensure all components are strings
+        doc_names = ', '.join(str(doc) for doc in document_types if doc is not None)
+        table_headers_str = ', '.join(str(h) for h in table_headers[:3] if h is not None) if table_headers else 'none'
+        
+        context_info = f"Mode: {mode_info}. Documents: {doc_names}. Tables: {table_count} chunks, JSON tables: {has_json_tables}, Structured tables: {has_structured_tables}. Financial data: {has_financial_data}. Table contexts: {table_headers_str}."
 
         complexity_router_prompt = f"""You are an expert query complexity analyzer. Analyze the user query and document context to determine the reasoning complexity level required to answer this query effectively.
 
@@ -490,49 +530,95 @@ Return ONLY this JSON format:
 
     def _build_context_for_query(self, relevant_chunks: List[Dict]) -> str:
         """Build context string for queries with enhanced metadata"""
+        if not relevant_chunks:
+            return "No context available"
+        
         context_parts = []
         for index, chunk in enumerate(relevant_chunks):
-            # Safely handle score
-            score = chunk.get('score', 0)
-            confidence = f"{score * 100:.1f}"
-            location_info = ''
+            try:
+                # Ensure chunk is a dictionary
+                if not isinstance(chunk, dict):
+                    print(f'⚠️ Warning: chunk {index} is not a dictionary: {type(chunk)}')
+                    continue
+                
+                # Safely handle score - ensure it's never None
+                score = chunk.get('score', 0)
+                if score is None:
+                    score = 0
+                confidence = f"{float(score) * 100:.1f}" if score is not None else "0.0"
+                
+                # Safely get metadata - ensure it's never None
+                metadata = chunk.get('metadata', {})
+                if not isinstance(metadata, dict):
+                    metadata = {}
 
-            # Safely get metadata
-            metadata = chunk.get('metadata', {})
-            if not metadata:
-                metadata = {}
-
-            # Build location info only if page/line data exists
-            page_number = metadata.get('pageNumber')
-            if page_number is not None:
-                location_info = f"Page {page_number}"
-                start_line = metadata.get('startLine')
-                end_line = metadata.get('endLine')
-                if start_line is not None and end_line is not None:
-                    location_info += f", Lines {start_line}-{end_line}"
-            else:
+                # Build location info only if page/line data exists
                 location_info = 'Content'
+                page_number = metadata.get('pageNumber')
+                if page_number is not None and str(page_number).isdigit():
+                    location_info = f"Page {page_number}"
+                    start_line = metadata.get('startLine')
+                    end_line = metadata.get('endLine')
+                    if start_line is not None and end_line is not None:
+                        try:
+                            location_info += f", Lines {start_line}-{end_line}"
+                        except (TypeError, ValueError):
+                            # If line numbers aren't valid, just use page
+                            pass
 
-            # Highlight special content types
-            content_tags = []
-            if metadata.get('hasTableContent', False):
-                content_tags.append('TABLE')
-            if metadata.get('hasFinancialData', False):
-                content_tags.append('FINANCIAL')
-            if chunk.get('structured_tables'):
-                content_tags.append('STRUCTURED')
-            
-            tag_info = f" [{','.join(content_tags)}]" if content_tags else ""
-            
-            # Handle None values safely - ensure all components are strings
-            file_name = metadata.get('fileName') or 'Document'
-            chunk_text = chunk.get('text') or 'No content available'
-            
-            # Ensure all string components are properly handled
-            context_part = f"[Context {index + 1} - {file_name} - {location_info}{tag_info} - Relevance: {confidence}%]: {chunk_text}"
-            context_parts.append(context_part)
+                # Highlight special content types - with safe checking
+                content_tags = []
+                try:
+                    if metadata.get('hasTableContent', False):
+                        content_tags.append('TABLE')
+                    if metadata.get('hasFinancialData', False):
+                        content_tags.append('FINANCIAL')
+                    if chunk.get('structured_tables', False):
+                        content_tags.append('STRUCTURED')
+                except (TypeError, AttributeError):
+                    # If metadata access fails, continue without tags
+                    pass
+                
+                tag_info = f" [{','.join(content_tags)}]" if content_tags else ""
+                
+                # Handle None values safely - ensure all components are strings
+                file_name = metadata.get('fileName')
+                if not file_name or file_name is None:
+                    file_name = 'Document'
+                
+                chunk_text = chunk.get('text')
+                if not chunk_text or chunk_text is None:
+                    chunk_text = 'No content available'
+                
+                # Final safety check - convert everything to string explicitly
+                file_name = str(file_name)
+                chunk_text = str(chunk_text)
+                location_info = str(location_info)
+                tag_info = str(tag_info)
+                confidence = str(confidence)
+                
+                # Ensure all string components are properly handled
+                context_part = f"[Context {index + 1} - {file_name} - {location_info}{tag_info} - Relevance: {confidence}%]: {chunk_text}"
+                context_parts.append(context_part)
+                
+            except Exception as context_error:
+                print(f'⚠️ Error building context for chunk {index}: {context_error}')
+                # Add a fallback context entry
+                fallback_text = chunk.get('text', 'Error retrieving content') if isinstance(chunk, dict) else 'Invalid chunk data'
+                context_parts.append(f"[Context {index + 1} - Document - Content - Relevance: 0.0%]: {fallback_text}")
 
-        return '\n\n'.join(context_parts)
+        # Final safety check for the join operation
+        if not context_parts:
+            return "No valid context could be built"
+        
+        try:
+            return '\n\n'.join(context_parts)
+        except TypeError as join_error:
+            print(f'⚠️ Error joining context parts: {join_error}')
+            print(f'⚠️ Context parts types: {[type(part) for part in context_parts]}')
+            # Convert all parts to strings explicitly
+            safe_context_parts = [str(part) for part in context_parts if part is not None]
+            return '\n\n'.join(safe_context_parts)
 
     def _process_response_and_build_result(self, full_response: str, relevant_chunks: List[Dict], 
                                           complexity_result: Dict[str, Any], model_name: str, mode_info: str) -> Dict[str, Any]:
