@@ -363,6 +363,8 @@ export default function ChatInterface({
                 startSummaryTimeout(file.id, true); // Workspace mode
               });
             } else {
+              // All files have timed out - don't show loading
+              console.log(`⚠️ All files have previously timed out - not showing loading indicator`);
               setIsSummaryLoading(false);
             }
           }
@@ -1834,6 +1836,9 @@ export default function ChatInterface({
                     const hasSummary = !!summaries[file.id];
                     const hasTimedOut = summaryTimedOut[file.id];
                     const isRetrying = summaryRetrying[file.id];
+                    // Also check persistent timeout state
+                    const persistentState = persistentSummaryStates[file.id];
+                    const hasPersistedTimeout = persistentState?.hasTimedOut || false;
                     
                     return (
                       <View key={file.id} style={styles.summaryDropdownOption}>
@@ -1863,7 +1868,7 @@ export default function ChatInterface({
                         <View style={styles.summaryDropdownStatus}>
                           {hasSummary ? (
                             <IconSymbol size={12} name="checkmark" color="#10B981" />
-                          ) : hasTimedOut && !isRetrying ? (
+                          ) : (hasTimedOut || hasPersistedTimeout) && !isRetrying ? (
                             <TouchableOpacity 
                               style={styles.smallRetryButton}
                               onPress={() => handleSummaryRetry(file.id)}
@@ -1893,7 +1898,7 @@ export default function ChatInterface({
                 <View style={styles.summaryLoading}>
                   <ActivityIndicator size="small" color="#00FF7F" />
                   <Text style={styles.summaryLoadingText}>
-                    {files.length > 1 ? 'Generating summaries...' : 'Generating summary...'}
+                    {selectedWorkspace ? 'Generating summaries...' : (files.length > 1 ? 'Generating summaries...' : 'Generating summary...')}
                   </Text>
                 </View>
               ) : summary ? (
@@ -1975,10 +1980,16 @@ export default function ChatInterface({
                         <View style={styles.summaryWaitingContainer}>
                           <ActivityIndicator size="small" color="#00FF7F" />
                           <Text style={styles.summaryWaitingText}>
-                            Generating summary for "{selectedSummaryFile?.name}"...
+                            {selectedWorkspace ? 
+                              `Generating summaries for workspace files...` : 
+                              `Generating summary for "${selectedSummaryFile?.name}"...`
+                            }
                           </Text>
                           <Text style={styles.summaryWaitingSubtext}>
-                            Summary will appear here once ready
+                            {selectedWorkspace ? 
+                              'Summaries will appear here once ready' : 
+                              'Summary will appear here once ready'
+                            }
                           </Text>
                         </View>
                       );
