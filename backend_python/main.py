@@ -10,6 +10,7 @@ import requests
 import aiohttp
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -79,7 +80,30 @@ except ImportError as e:
 
 print("🔧 All imports completed")
 
-app = FastAPI(title="Document Management API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup code (before yield)
+    print("🚀 FastAPI application starting up...")
+    # Ensure RAG service is initialized if not already done or if startup is called again
+    if 'rag_service' in globals() and rag_service and not rag_service.is_initialized:
+        print("🔄 Initializing RAG service on startup...")
+        try:
+            await rag_service.initialize()
+            if rag_service.is_initialized:
+                print("✅ RAG service initialized successfully on startup.")
+            else:
+                print("⚠️ RAG service initialization might have issues.")
+        except Exception as e:
+            print(f"❌ Error during RAG service initialization on startup: {e}")
+    else:
+        print("🔧 RAG service already initialized or not available.")
+    
+    yield
+    
+    # Shutdown code (after yield)
+    print("🛑 FastAPI application shutting down...")
+
+app = FastAPI(title="Document Management API", lifespan=lifespan)
 
 # Configuration - Use port 8000 for backend to avoid conflicts
 PORT = int(os.getenv("PORT", 8000))
@@ -1714,23 +1738,7 @@ async def general_exception_handler(request: Request, exc: Exception):
         }
     )
 
-# Startup event to ensure RAG is initialized
-@app.on_event("startup")
-async def startup_event():
-    print("🚀 FastAPI application starting up...")
-    # Ensure RAG service is initialized if not already done or if startup is called again
-    if 'rag_service' in globals() and rag_service and not rag_service.is_initialized:
-        print("🔄 Initializing RAG service on startup...")
-        try:
-            await rag_service.initialize()
-            if rag_service.is_initialized:
-                print("✅ RAG service initialized successfully on startup.")
-            else:
-                print("⚠️ RAG service initialization might have issues.")
-        except Exception as e:
-            print(f"❌ Error during RAG service initialization on startup: {e}")
-    else:
-        print(" RAG service already initialized or not available.")
+# Startup/shutdown events now handled by the lifespan function above
 
 # Server startup logic
 async def start_server():
