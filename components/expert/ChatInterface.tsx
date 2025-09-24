@@ -124,6 +124,12 @@ export default function ChatInterface({
   const [showSummaryDropdown, setShowSummaryDropdown] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'summary' | 'quiz'>('chat');
   const scrollViewRef = useRef<ScrollView>(null);
+  
+  // Summary timeout and retry state
+  const [summaryTimeouts, setSummaryTimeouts] = useState<{[fileId: string]: NodeJS.Timeout}>({});
+  const [summaryTimedOut, setSummaryTimedOut] = useState<{[fileId: string]: boolean}>({});
+  const [summaryRetrying, setSummaryRetrying] = useState<{[fileId: string]: boolean}>({});
+  const [retryAttempts, setRetryAttempts] = useState<{[fileId: string]: number}>({});
 
   // New state for chat session management
   const [currentChatSession, setCurrentChatSession] = useState<ChatSession | null>(null);
@@ -240,6 +246,11 @@ export default function ChatInterface({
               [selectedFile.id]: session.summary
             }));
             console.log('✅ Loaded stored summary for file:', selectedFile.id);
+          } else {
+            // No summary exists, start timeout monitoring for automatic summary
+            console.log('📋 No existing summary found, starting timeout monitoring for:', selectedFile.id);
+            setIsSummaryLoading(true);
+            startSummaryTimeout(selectedFile.id, false); // Single file mode
           }
           
           console.log('✅ Chat session loaded with', session.chats.length, 'messages');
@@ -290,6 +301,16 @@ export default function ChatInterface({
             setSelectedSummaryFile(filesWithSummaries[0]);
             setSummary(workspaceSession.file_summaries[filesWithSummaries[0].id]);
           }
+
+          // Start timeout monitoring for files without summaries in workspace
+          const filesWithoutSummaries = selectedWorkspace.files.filter(f => !workspaceSession.file_summaries[f.id]);
+          if (filesWithoutSummaries.length > 0) {
+            console.log(`📋 Starting timeout monitoring for ${filesWithoutSummaries.length} files without summaries in workspace`);
+            setIsSummaryLoading(true);
+            filesWithoutSummaries.forEach(file => {
+              startSummaryTimeout(file.id, true); // Workspace mode
+            });
+          }
           
           console.log('✅ Workspace chat session loaded with', workspaceSession.chats.length, 'messages and', Object.keys(workspaceSession.file_summaries).length, 'file summaries');
         } catch (error) {
@@ -329,6 +350,97 @@ export default function ChatInterface({
     
 
     // Handle RAG messages with internal state management
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      // Clear all summary timeouts on unmount
+      Object.values(summaryTimeouts).forEach(timeout => {
+        if (timeout) clearTimeout(timeout);
+      });
+    };
+  }, [summaryTimeouts]);
+
+  // Summary timeout management functions
+  const startSummaryTimeout = useCallback((fileId: string, isWorkspace: boolean = false) => {
+    // Clear existing timeout if any
+    if (summaryTimeouts[fileId]) {
+      clearTimeout(summaryTimeouts[fileId]);
+    }
+
+    // Set timeout duration based on mode
+    const timeoutDuration = isWorkspace ? 20000 : 5000; // 20s for workspace, 5s for single file
+    
+    console.log(`⏰ Starting summary timeout for ${fileId}: ${timeoutDuration}ms (${isWorkspace ? 'workspace' : 'single file'} mode)`);
+
+    const timeout = setTimeout(() => {
+      console.log(`⌛ Summary timeout occurred for file: ${fileId}`);
+      setSummaryTimedOut(prev => ({ ...prev, [fileId]: true }));
+      setIsSummaryLoading(false);
+      
+      // Remove from timeouts tracking
+      setSummaryTimeouts(prev => {
+        const updated = { ...prev };
+        delete updated[fileId];
+        return updated;
+      });
+    }, timeoutDuration);
+
+    setSummaryTimeouts(prev => ({ ...prev, [fileId]: timeout }));
+  }, [summaryTimeouts]);
+
+  const clearSummaryTimeout = useCallback((fileId: string) => {
+    if (summaryTimeouts[fileId]) {
+      clearTimeout(summaryTimeouts[fileId]);
+      setSummaryTimeouts(prev => {
+        const updated = { ...prev };
+        delete updated[fileId];
+        return updated;
+      });
+      console.log(`✅ Cleared summary timeout for file: ${fileId}`);
+    }
+  }, [summaryTimeouts]);
+
+  const resetSummaryRetryState = useCallback((fileId: string) => {
+    setSummaryTimedOut(prev => ({ ...prev, [fileId]: false }));
+    setSummaryRetrying(prev => ({ ...prev, [fileId]: false }));
+    setRetryAttempts(prev => ({ ...prev, [fileId]: 0 }));
+  }, []);
+
+  const handleSummaryRetry = useCallback(async (fileId: string) => {
+    console.log(`🔄 Retrying summary generation for file: ${fileId}`);
+    
+    // Increment retry attempts
+    setRetryAttempts(prev => ({ ...prev, [fileId]: (prev[fileId] || 0) + 1 }));
+    
+    // Set retrying state
+    setSummaryRetrying(prev => ({ ...prev, [fileId]: true }));
+    setSummaryTimedOut(prev => ({ ...prev, [fileId]: false }));
+    setIsSummaryLoading(true);
+
+    try {
+      // Determine if this is workspace mode
+      const isWorkspace = !!selectedWorkspace;
+      const workspaceId = selectedWorkspace?.id;
+
+      // Request summary generation using ragService
+      const response = await ragService.requestSummary(fileId, workspaceId);
+      
+      if (response.success) {
+        console.log(`✅ Summary retry request successful for file: ${fileId}`);
+        
+        // Start timeout for this retry
+        startSummaryTimeout(fileId, isWorkspace);
+      } else {
+        throw new Error(response.error || 'Failed to request summary');
+      }
+    } catch (error) {
+      console.error(`❌ Summary retry failed for file: ${fileId}`, error);
+      setIsSummaryLoading(false);
+      setSummaryRetrying(prev => ({ ...prev, [fileId]: false }));
+      setSummaryTimedOut(prev => ({ ...prev, [fileId]: true }));
+    }
+  }, [selectedWorkspace, startSummaryTimeout]);
+
   // Enhanced onBack handler with explicit tab bar restoration
   const handleBack = useCallback(() => {
     console.log('🎯 ChatInterface: Back button pressed - Ensuring tab bar is shown');
@@ -1160,6 +1272,10 @@ export default function ChatInterface({
       
       const { fileId, summary } = data;
       
+      // Clear timeout and reset retry state for this file
+      clearSummaryTimeout(fileId);
+      resetSummaryRetryState(fileId);
+      
       // Stop loading state when any summary arrives
       setIsSummaryLoading(false);
 
@@ -1684,23 +1800,53 @@ export default function ChatInterface({
                     {renderFormattedText(cleanContextReferences(summary))}
                   </View>
                 </ScrollView>
-              ) : files.length > 0 ? (
-                <View style={styles.summaryWaitingContainer}>
-                  <ActivityIndicator size="small" color="#00FF7F" />
-                  <Text style={styles.summaryWaitingText}>
-                    {files.length > 1 ? 'Summaries are being generated automatically...' : 'Summary is being generated automatically...'}
-                  </Text>
-                  <Text style={styles.summaryWaitingSubtext}>
-                    Summaries will appear here once ready
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.summaryWaitingContainer}>
-                  <Text style={styles.summaryText}>
-                    Upload documents to see their summary here.
-                  </Text>
-                </View>
-              )}
+              ) : (() => {
+                // Check if current file has timed out
+                const currentFileId = selectedFile?.id || selectedSummaryFile?.id;
+                const hasTimedOut = currentFileId && summaryTimedOut[currentFileId];
+                const isRetrying = currentFileId && summaryRetrying[currentFileId];
+                const attempts = currentFileId ? retryAttempts[currentFileId] || 0 : 0;
+                
+                if (hasTimedOut && !isRetrying) {
+                  return (
+                    <View style={styles.summaryWaitingContainer}>
+                      <Text style={styles.summaryErrorText}>
+                        Summary generation timed out
+                      </Text>
+                      <Text style={styles.summaryErrorSubtext}>
+                        {attempts > 0 ? `Retry attempt ${attempts} failed` : 'The summary took longer than expected to generate'}
+                      </Text>
+                      <TouchableOpacity 
+                        style={styles.retryButton}
+                        onPress={() => currentFileId && handleSummaryRetry(currentFileId)}
+                      >
+                        <IconSymbol size={16} name="arrow.clockwise" color="#ffffff" />
+                        <Text style={styles.retryButtonText}>Retry</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                } else if (files.length > 0) {
+                  return (
+                    <View style={styles.summaryWaitingContainer}>
+                      <ActivityIndicator size="small" color="#00FF7F" />
+                      <Text style={styles.summaryWaitingText}>
+                        {files.length > 1 ? 'Summaries are being generated automatically...' : 'Summary is being generated automatically...'}
+                      </Text>
+                      <Text style={styles.summaryWaitingSubtext}>
+                        Summaries will appear here once ready
+                      </Text>
+                    </View>
+                  );
+                } else {
+                  return (
+                    <View style={styles.summaryWaitingContainer}>
+                      <Text style={styles.summaryText}>
+                        Upload documents to see their summary here.
+                      </Text>
+                    </View>
+                  );
+                }
+              })()}
             </View>
           )}
 
@@ -2850,6 +2996,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     textAlign: 'center',
+  },
+  summaryErrorText: {
+    fontSize: 16,
+    color: '#FF6B6B',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  summaryErrorSubtext: {
+    fontSize: 12,
+    color: '#8B5A5A',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#00FF7F',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    color: '#000000',
+    fontWeight: '600',
   },
   summaryFormattedContainer: {
     paddingVertical: 8,

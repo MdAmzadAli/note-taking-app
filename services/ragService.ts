@@ -217,6 +217,37 @@ class RAGService {
       };
     }
   }
+
+  async requestSummary(fileId: string, workspaceId?: string): Promise<{
+    success: boolean;
+    message?: string;
+    fileId?: string;
+    error?: string;
+  }> {
+    console.log(`📋 RAG: Requesting summary generation for file: ${fileId}`);
+    console.log(`📁 Workspace ID: ${workspaceId || 'None'}`);
+    
+    try {
+      const requestData = { workspaceId };
+      console.log(`📦 Summary request payload:`, JSON.stringify(requestData, null, 2));
+      
+      const response = await this.makeRequest(`/rag/summary/${fileId}`, {
+        method: 'POST',
+        body: JSON.stringify(requestData)
+      });
+
+      console.log(`✅ Summary generation request successful for file: ${fileId}`);
+      console.log(`📊 Summary response:`, JSON.stringify(response, null, 2));
+      return response;
+    } catch (error) {
+      console.error(`❌ Failed to request summary for file ${fileId}`);
+      console.error(`❌ Error details:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to request summary'
+      };
+    }
+  }
 }
 
 export const ragService = new RAGService();
