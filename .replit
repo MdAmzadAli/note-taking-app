@@ -10,6 +10,14 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
+localPort = 8000
+externalPort = 8000
+
+[[ports]]
+localPort = 8081
+externalPort = 8081
+
+[[ports]]
 localPort = 8082
 externalPort = 3000
 
@@ -20,10 +28,6 @@ externalPort = 3001
 [[ports]]
 localPort = 35015
 externalPort = 3003
-
-[[ports]]
-localPort = 35783
-externalPort = 4200
 
 [[ports]]
 localPort = 41069
@@ -145,8 +149,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npx expo start --web --port 5000"
-waitForPort = 5000
+args = "npx expo start --tunnel"
 
 [deployment]
 run = ["bash", "-c", "cd backend_python && python start.py & npx expo start --web --port 5000 --host 0.0.0.0"]
