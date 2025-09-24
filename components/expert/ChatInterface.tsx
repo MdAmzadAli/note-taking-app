@@ -1765,25 +1765,62 @@ export default function ChatInterface({
               {/* Dropdown options for workspace mode */}
               {showSummaryDropdown && files.length > 1 && (
                 <View style={styles.summaryDropdownOptions}>
-                  {files.map((file) => (
-                    <TouchableOpacity
-                      key={file.id}
-                      style={styles.summaryDropdownOption}
-                      onPress={() => {
-                        setSelectedSummaryFile(file);
-                        setSummary(summaries[file.id] || '');
-                        setShowSummaryDropdown(false);
-                      }}
-                    >
-                      <IconSymbol size={12} name="doc.text" color="#00FF7F" />
-                      <Text style={styles.summaryDropdownOptionText} numberOfLines={1}>
-                        {file.name}
-                      </Text>
-                      {summaries[file.id] && (
-                        <IconSymbol size={10} name="checkmark" color="#10B981" />
-                      )}
-                    </TouchableOpacity>
-                  ))}
+                  {files.map((file) => {
+                    const hasSummary = !!summaries[file.id];
+                    const hasTimedOut = summaryTimedOut[file.id];
+                    const isRetrying = summaryRetrying[file.id];
+                    
+                    return (
+                      <View key={file.id} style={styles.summaryDropdownOption}>
+                        <TouchableOpacity
+                          style={styles.summaryDropdownFileInfo}
+                          onPress={() => {
+                            if (hasSummary) {
+                              setSelectedSummaryFile(file);
+                              setSummary(summaries[file.id] || '');
+                              setShowSummaryDropdown(false);
+                            }
+                          }}
+                          disabled={!hasSummary}
+                        >
+                          <IconSymbol size={12} name="doc.text" color="#00FF7F" />
+                          <Text 
+                            style={[
+                              styles.summaryDropdownOptionText,
+                              !hasSummary && styles.summaryDropdownOptionTextDisabled
+                            ]} 
+                            numberOfLines={1}
+                          >
+                            {file.name}
+                          </Text>
+                        </TouchableOpacity>
+                        
+                        <View style={styles.summaryDropdownStatus}>
+                          {hasSummary ? (
+                            <IconSymbol size={12} name="checkmark" color="#10B981" />
+                          ) : hasTimedOut && !isRetrying ? (
+                            <TouchableOpacity 
+                              style={styles.smallRetryButton}
+                              onPress={() => handleSummaryRetry(file.id)}
+                            >
+                              <IconSymbol size={10} name="arrow.clockwise" color="#ffffff" />
+                              <Text style={styles.smallRetryButtonText}>Retry</Text>
+                            </TouchableOpacity>
+                          ) : isRetrying ? (
+                            <View style={styles.retryingIndicator}>
+                              <ActivityIndicator size="small" color="#00FF7F" />
+                              <Text style={styles.retryingText}>Retrying...</Text>
+                            </View>
+                          ) : (
+                            <View style={styles.loadingIndicator}>
+                              <ActivityIndicator size="small" color="#6B7280" />
+                              <Text style={styles.loadingText}>Loading...</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    );
+                  })}
                 </View>
               )}
 
@@ -1801,42 +1838,112 @@ export default function ChatInterface({
                   </View>
                 </ScrollView>
               ) : (() => {
-                // Check if current file has timed out
-                const currentFileId = selectedFile?.id || selectedSummaryFile?.id;
-                const hasTimedOut = currentFileId && summaryTimedOut[currentFileId];
-                const isRetrying = currentFileId && summaryRetrying[currentFileId];
-                const attempts = currentFileId ? retryAttempts[currentFileId] || 0 : 0;
-                
-                if (hasTimedOut && !isRetrying) {
-                  return (
-                    <View style={styles.summaryWaitingContainer}>
-                      <Text style={styles.summaryErrorText}>
-                        Summary generation timed out
-                      </Text>
-                      <Text style={styles.summaryErrorSubtext}>
-                        {attempts > 0 ? `Retry attempt ${attempts} failed` : 'The summary took longer than expected to generate'}
-                      </Text>
-                      <TouchableOpacity 
-                        style={styles.retryButton}
-                        onPress={() => currentFileId && handleSummaryRetry(currentFileId)}
-                      >
-                        <IconSymbol size={16} name="arrow.clockwise" color="#ffffff" />
-                        <Text style={styles.retryButtonText}>Retry</Text>
-                      </TouchableOpacity>
-                    </View>
-                  );
-                } else if (files.length > 0) {
-                  return (
-                    <View style={styles.summaryWaitingContainer}>
-                      <ActivityIndicator size="small" color="#00FF7F" />
-                      <Text style={styles.summaryWaitingText}>
-                        {files.length > 1 ? 'Summaries are being generated automatically...' : 'Summary is being generated automatically...'}
-                      </Text>
-                      <Text style={styles.summaryWaitingSubtext}>
-                        Summaries will appear here once ready
-                      </Text>
-                    </View>
-                  );
+                // Handle different modes: single file vs workspace
+                if (selectedFile) {
+                  // Single file mode
+                  const hasTimedOut = summaryTimedOut[selectedFile.id];
+                  const isRetrying = summaryRetrying[selectedFile.id];
+                  const attempts = retryAttempts[selectedFile.id] || 0;
+                  
+                  if (hasTimedOut && !isRetrying) {
+                    return (
+                      <View style={styles.summaryWaitingContainer}>
+                        <Text style={styles.summaryErrorText}>
+                          Summary generation timed out
+                        </Text>
+                        <Text style={styles.summaryErrorSubtext}>
+                          {attempts > 0 ? `Retry attempt ${attempts} failed` : 'The summary took longer than expected to generate'}
+                        </Text>
+                        <TouchableOpacity 
+                          style={styles.retryButton}
+                          onPress={() => handleSummaryRetry(selectedFile.id)}
+                        >
+                          <IconSymbol size={16} name="arrow.clockwise" color="#ffffff" />
+                          <Text style={styles.retryButtonText}>Retry</Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  } else {
+                    return (
+                      <View style={styles.summaryWaitingContainer}>
+                        <ActivityIndicator size="small" color="#00FF7F" />
+                        <Text style={styles.summaryWaitingText}>
+                          Summary is being generated automatically...
+                        </Text>
+                        <Text style={styles.summaryWaitingSubtext}>
+                          Summary will appear here once ready
+                        </Text>
+                      </View>
+                    );
+                  }
+                } else if (selectedWorkspace && files.length > 0) {
+                  // Workspace mode
+                  const filesWithSummaries = files.filter(f => summaries[f.id]);
+                  const currentFileId = selectedSummaryFile?.id;
+                  
+                  if (currentFileId) {
+                    // A file is selected, check its status
+                    const hasTimedOut = summaryTimedOut[currentFileId];
+                    const isRetrying = summaryRetrying[currentFileId];
+                    const attempts = retryAttempts[currentFileId] || 0;
+                    
+                    if (hasTimedOut && !isRetrying) {
+                      return (
+                        <View style={styles.summaryWaitingContainer}>
+                          <Text style={styles.summaryErrorText}>
+                            Summary generation timed out for "{selectedSummaryFile?.name}"
+                          </Text>
+                          <Text style={styles.summaryErrorSubtext}>
+                            {attempts > 0 ? `Retry attempt ${attempts} failed` : 'The summary took longer than expected to generate'}
+                          </Text>
+                          <TouchableOpacity 
+                            style={styles.retryButton}
+                            onPress={() => handleSummaryRetry(currentFileId)}
+                          >
+                            <IconSymbol size={16} name="arrow.clockwise" color="#ffffff" />
+                            <Text style={styles.retryButtonText}>Retry</Text>
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    } else {
+                      return (
+                        <View style={styles.summaryWaitingContainer}>
+                          <ActivityIndicator size="small" color="#00FF7F" />
+                          <Text style={styles.summaryWaitingText}>
+                            Generating summary for "{selectedSummaryFile?.name}"...
+                          </Text>
+                          <Text style={styles.summaryWaitingSubtext}>
+                            Summary will appear here once ready
+                          </Text>
+                        </View>
+                      );
+                    }
+                  } else if (filesWithSummaries.length > 0) {
+                    // Some files have summaries but none selected, show instruction
+                    return (
+                      <View style={styles.summaryWaitingContainer}>
+                        <Text style={styles.summaryText}>
+                          {filesWithSummaries.length} of {files.length} summaries ready
+                        </Text>
+                        <Text style={styles.summaryWaitingSubtext}>
+                          Select a file from the dropdown above to view its summary
+                        </Text>
+                      </View>
+                    );
+                  } else {
+                    // No summaries yet, show loading for all
+                    return (
+                      <View style={styles.summaryWaitingContainer}>
+                        <ActivityIndicator size="small" color="#00FF7F" />
+                        <Text style={styles.summaryWaitingText}>
+                          Generating summaries for {files.length} files...
+                        </Text>
+                        <Text style={styles.summaryWaitingSubtext}>
+                          Summaries will appear here once ready. Use the dropdown to select specific files.
+                        </Text>
+                      </View>
+                    );
+                  }
                 } else {
                   return (
                     <View style={styles.summaryWaitingContainer}>
@@ -2934,6 +3041,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
+    justifyContent: 'space-between',
+  },
+  summaryDropdownFileInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 6,
   },
   summaryDropdownOptionText: {
     fontSize: 12,
@@ -2941,6 +3055,48 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 6,
     marginRight: 4,
+  },
+  summaryDropdownOptionTextDisabled: {
+    color: '#6B7280',
+  },
+  summaryDropdownStatus: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 60,
+  },
+  smallRetryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+    gap: 3,
+  },
+  smallRetryButtonText: {
+    fontSize: 9,
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  retryingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  retryingText: {
+    fontSize: 9,
+    color: '#00FF7F',
+    fontWeight: '500',
+  },
+  loadingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  loadingText: {
+    fontSize: 9,
+    color: '#6B7280',
+    fontWeight: '500',
   },
   summaryText: {
     fontSize: 16,
