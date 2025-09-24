@@ -1166,7 +1166,7 @@ async def upload_workspace(
                 # Only delete local files for non-webpage items (webpages don't have local files)
                 if item_metadata['sourceType'] != 'webpage':
                     print(f"🧹 Deleting local file for {item_metadata['sourceType']} item: {item_metadata['id']}")
-                    await file_service.delete_local_file_only(item_metadata['id'])
+                    await file_service.delete_local_file_only(item_metadataa['id'])
                 else:
                     print(f"🌐 Skipping local file deletion for webpage item: {item_metadata['id']} (no local file to delete)")
 
