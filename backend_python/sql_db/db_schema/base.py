@@ -16,6 +16,7 @@ Base = declarative_base()
 # Database URL from environment
 DATABASE_URL = os.getenv('DATABASE_URL')
 
+
 # Create engine with connection pooling
 engine = create_engine(
     DATABASE_URL,
