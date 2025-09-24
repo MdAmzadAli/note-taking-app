@@ -51,7 +51,8 @@ type IconSymbolName =
   | 'square.and.arrow.up'
   | 'copy'
   | 'copy.outline'
-  | 'clipboard';
+  | 'clipboard'
+  | 'refresh';
 
 /**
  * Add your SF Symbols to Ionicons mappings here.
@@ -104,6 +105,7 @@ const MAPPING: IconMapping = {
   'copy': 'copy',
   'copy.outline': 'copy-outline',
   'clipboard': 'clipboard-outline',
+  'refresh': 'refresh',
 } as const;
 
 /**

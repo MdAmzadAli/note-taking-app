@@ -1873,7 +1873,7 @@ export default function ChatInterface({
                               style={styles.smallRetryButton}
                               onPress={() => handleSummaryRetry(file.id)}
                             >
-                              <IconSymbol size={10} name="arrow.clockwise" color="#ffffff" />
+                              <IconSymbol size={10} name="refresh" color="#ffffff" />
                               <Text style={styles.smallRetryButtonText}>Retry</Text>
                             </TouchableOpacity>
                           ) : isRetrying ? (
@@ -1928,7 +1928,7 @@ export default function ChatInterface({
                           style={styles.retryButton}
                           onPress={() => handleSummaryRetry(selectedFile.id)}
                         >
-                          <IconSymbol size={16} name="arrow.clockwise" color="#ffffff" />
+                          <IconSymbol size={16} name="arrow.up.circle" color="#000000" />
                           <Text style={styles.retryButtonText}>Retry</Text>
                         </TouchableOpacity>
                       </View>
@@ -1970,7 +1970,7 @@ export default function ChatInterface({
                             style={styles.retryButton}
                             onPress={() => handleSummaryRetry(currentFileId)}
                           >
-                            <IconSymbol size={16} name="arrow.clockwise" color="#ffffff" />
+                            <IconSymbol size={16} name="refresh" color="#ffffff" />
                             <Text style={styles.retryButtonText}>Retry</Text>
                           </TouchableOpacity>
                         </View>
