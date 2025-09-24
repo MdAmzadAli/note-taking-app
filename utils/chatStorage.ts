@@ -3,6 +3,7 @@ import { ChatSession, ChatMessage, WorkspaceChatSession } from '@/types';
 
 const CHAT_SESSIONS_KEY = 'expert_chat_sessions';
 const WORKSPACE_CHAT_SESSIONS_KEY = 'expert_workspace_chat_sessions';
+const SUMMARY_ATTEMPT_STATES_KEY = 'expert_summary_attempt_states';
 
 // Storage utilities for chat sessions
 export class ChatSessionStorage {
@@ -507,5 +508,80 @@ export class ChatSessionStorage {
     } catch (error) {
       console.error('❌ Error initializing automatic cleanup:', error);
     }
+  }
+
+  // Summary Attempt State Management
+  static async getSummaryAttemptState(fileId: string): Promise<{
+    hasAttempted: boolean;
+    hasTimedOut: boolean;
+    retryCount: number;
+  }> {
+    try {
+      const statesData = await AsyncStorage.getItem(SUMMARY_ATTEMPT_STATES_KEY);
+      if (!statesData) {
+        return { hasAttempted: false, hasTimedOut: false, retryCount: 0 };
+      }
+      
+      const states = JSON.parse(statesData);
+      return states[fileId] || { hasAttempted: false, hasTimedOut: false, retryCount: 0 };
+    } catch (error) {
+      console.error('Error loading summary attempt state:', error);
+      return { hasAttempted: false, hasTimedOut: false, retryCount: 0 };
+    }
+  }
+
+  static async setSummaryAttemptState(fileId: string, state: {
+    hasAttempted: boolean;
+    hasTimedOut: boolean;
+    retryCount: number;
+  }): Promise<void> {
+    try {
+      const statesData = await AsyncStorage.getItem(SUMMARY_ATTEMPT_STATES_KEY);
+      const states = statesData ? JSON.parse(statesData) : {};
+      
+      states[fileId] = {
+        ...state,
+        updatedAt: new Date().toISOString()
+      };
+      
+      await AsyncStorage.setItem(SUMMARY_ATTEMPT_STATES_KEY, JSON.stringify(states));
+    } catch (error) {
+      console.error('Error saving summary attempt state:', error);
+    }
+  }
+
+  static async markSummaryAttempted(fileId: string): Promise<void> {
+    const currentState = await this.getSummaryAttemptState(fileId);
+    await this.setSummaryAttemptState(fileId, {
+      hasAttempted: true,
+      hasTimedOut: false,
+      retryCount: currentState.retryCount
+    });
+  }
+
+  static async markSummaryTimedOut(fileId: string): Promise<void> {
+    const currentState = await this.getSummaryAttemptState(fileId);
+    await this.setSummaryAttemptState(fileId, {
+      hasAttempted: true,
+      hasTimedOut: true,
+      retryCount: currentState.retryCount
+    });
+  }
+
+  static async incrementRetryCount(fileId: string): Promise<void> {
+    const currentState = await this.getSummaryAttemptState(fileId);
+    await this.setSummaryAttemptState(fileId, {
+      hasAttempted: true,
+      hasTimedOut: false,
+      retryCount: currentState.retryCount + 1
+    });
+  }
+
+  static async resetSummaryAttemptState(fileId: string): Promise<void> {
+    await this.setSummaryAttemptState(fileId, {
+      hasAttempted: false,
+      hasTimedOut: false,
+      retryCount: 0
+    });
   }
 }

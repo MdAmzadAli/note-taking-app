@@ -126,10 +126,17 @@ export default function ChatInterface({
   const scrollViewRef = useRef<ScrollView>(null);
   
   // Summary timeout and retry state
-  const [summaryTimeouts, setSummaryTimeouts] = useState<{[fileId: string]: NodeJS.Timeout}>({});
+  const [summaryTimeouts, setSummaryTimeouts] = useState<{[fileId: string]: ReturnType<typeof setTimeout>}>({});
   const [summaryTimedOut, setSummaryTimedOut] = useState<{[fileId: string]: boolean}>({});
   const [summaryRetrying, setSummaryRetrying] = useState<{[fileId: string]: boolean}>({});
   const [retryAttempts, setRetryAttempts] = useState<{[fileId: string]: number}>({});
+  
+  // Persistent summary attempt states
+  const [persistentSummaryStates, setPersistentSummaryStates] = useState<{[fileId: string]: {
+    hasAttempted: boolean;
+    hasTimedOut: boolean;
+    retryCount: number;
+  }}>({});
 
   // New state for chat session management
   const [currentChatSession, setCurrentChatSession] = useState<ChatSession | null>(null);
@@ -170,6 +177,15 @@ export default function ChatInterface({
   
   // Get tab bar context to hide bottom navigation
   const { hideTabBar, showTabBar } = useTabBar();
+
+  // Helper function to load persistent summary states
+  const loadPersistentSummaryStates = useCallback(async (fileIds: string[]) => {
+    const states: {[fileId: string]: {hasAttempted: boolean; hasTimedOut: boolean; retryCount: number}} = {};
+    for (const fileId of fileIds) {
+      states[fileId] = await ChatSessionStorage.getSummaryAttemptState(fileId);
+    }
+    setPersistentSummaryStates(states);
+  }, []);
 
   // Hide tab bar when ChatInterface is opened, show when unmounted
   useEffect(() => {
@@ -238,6 +254,10 @@ export default function ChatInterface({
           setLoadedMessageCount(initialMessageCount);
           setHasMoreMessages(allMessages.length > initialMessageCount);
           
+          // Load persistent summary attempt state
+          await loadPersistentSummaryStates([selectedFile.id]);
+          const attemptState = await ChatSessionStorage.getSummaryAttemptState(selectedFile.id);
+          
           // Load stored summary if available
           if (session.summary) {
             setSummary(session.summary);
@@ -245,10 +265,19 @@ export default function ChatInterface({
               ...prev,
               [selectedFile.id]: session.summary
             }));
+            // Reset attempt state on successful summary
+            await ChatSessionStorage.resetSummaryAttemptState(selectedFile.id);
             console.log('✅ Loaded stored summary for file:', selectedFile.id);
+          } else if (attemptState.hasTimedOut) {
+            // Previous attempt timed out - only show retry button, don't auto-retry
+            console.log('⚠️ Previous summary generation timed out for file:', selectedFile.id, '- showing retry option only');
+            setSummaryTimedOut(prev => ({ ...prev, [selectedFile.id]: true }));
+            setRetryAttempts(prev => ({ ...prev, [selectedFile.id]: attemptState.retryCount }));
+            setIsSummaryLoading(false);
           } else {
-            // No summary exists, start timeout monitoring for automatic summary
+            // No summary exists and hasn't timed out before - start timeout monitoring
             console.log('📋 No existing summary found, starting timeout monitoring for:', selectedFile.id);
+            await ChatSessionStorage.markSummaryAttempted(selectedFile.id);
             setIsSummaryLoading(true);
             startSummaryTimeout(selectedFile.id, false); // Single file mode
           }
@@ -302,14 +331,40 @@ export default function ChatInterface({
             setSummary(workspaceSession.file_summaries[filesWithSummaries[0].id]);
           }
 
+          // Load persistent summary attempt states for all files
+          const allFileIds = selectedWorkspace.files.map(f => f.id);
+          await loadPersistentSummaryStates(allFileIds);
+          
           // Start timeout monitoring for files without summaries in workspace
           const filesWithoutSummaries = selectedWorkspace.files.filter(f => !workspaceSession.file_summaries[f.id]);
           if (filesWithoutSummaries.length > 0) {
-            console.log(`📋 Starting timeout monitoring for ${filesWithoutSummaries.length} files without summaries in workspace`);
-            setIsSummaryLoading(true);
-            filesWithoutSummaries.forEach(file => {
-              startSummaryTimeout(file.id, true); // Workspace mode
-            });
+            console.log(`📋 Checking ${filesWithoutSummaries.length} files without summaries in workspace`);
+            
+            // Check which files haven't timed out before
+            const filesToRetry = [];
+            for (const file of filesWithoutSummaries) {
+              const attemptState = await ChatSessionStorage.getSummaryAttemptState(file.id);
+              if (attemptState.hasTimedOut) {
+                // Mark as timed out in component state - don't auto-retry
+                setSummaryTimedOut(prev => ({ ...prev, [file.id]: true }));
+                setRetryAttempts(prev => ({ ...prev, [file.id]: attemptState.retryCount }));
+                console.log(`⚠️ File ${file.id} previously timed out - showing retry option only`);
+              } else {
+                // This file hasn't timed out before - mark as attempted and start monitoring
+                await ChatSessionStorage.markSummaryAttempted(file.id);
+                filesToRetry.push(file);
+              }
+            }
+            
+            if (filesToRetry.length > 0) {
+              console.log(`📋 Starting timeout monitoring for ${filesToRetry.length} new files in workspace`);
+              setIsSummaryLoading(true);
+              filesToRetry.forEach(file => {
+                startSummaryTimeout(file.id, true); // Workspace mode
+              });
+            } else {
+              setIsSummaryLoading(false);
+            }
           }
           
           console.log('✅ Workspace chat session loaded with', workspaceSession.chats.length, 'messages and', Object.keys(workspaceSession.file_summaries).length, 'file summaries');
@@ -372,8 +427,12 @@ export default function ChatInterface({
     
     console.log(`⏰ Starting summary timeout for ${fileId}: ${timeoutDuration}ms (${isWorkspace ? 'workspace' : 'single file'} mode)`);
 
-    const timeout = setTimeout(() => {
+    const timeout = setTimeout(async () => {
       console.log(`⌛ Summary timeout occurred for file: ${fileId}`);
+      
+      // Mark as timed out in persistent storage
+      await ChatSessionStorage.markSummaryTimedOut(fileId);
+      
       setSummaryTimedOut(prev => ({ ...prev, [fileId]: true }));
       setIsSummaryLoading(false);
       
@@ -409,7 +468,10 @@ export default function ChatInterface({
   const handleSummaryRetry = useCallback(async (fileId: string) => {
     console.log(`🔄 Retrying summary generation for file: ${fileId}`);
     
-    // Increment retry attempts
+    // Increment retry attempts in persistent storage
+    await ChatSessionStorage.incrementRetryCount(fileId);
+    
+    // Increment retry attempts in component state
     setRetryAttempts(prev => ({ ...prev, [fileId]: (prev[fileId] || 0) + 1 }));
     
     // Set retrying state
@@ -1267,7 +1329,7 @@ export default function ChatInterface({
   }, []);
   // Listen for summary notifications from global socket service
   useEffect(() => {
-    const handleSummaryReceived = (data: any) => {
+    const handleSummaryReceived = async (data: any) => {
       console.log('📨 ChatInterface: Received summary from global socket service:', data);
       
       const { fileId, summary } = data;
@@ -1275,6 +1337,9 @@ export default function ChatInterface({
       // Clear timeout and reset retry state for this file
       clearSummaryTimeout(fileId);
       resetSummaryRetryState(fileId);
+      
+      // Reset persistent attempt state on successful summary
+      await ChatSessionStorage.resetSummaryAttemptState(fileId);
       
       // Stop loading state when any summary arrives
       setIsSummaryLoading(false);

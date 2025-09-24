@@ -132,13 +132,12 @@ args = "Frontend"
 name = "Backend"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd backend_python && python start.py"
-waitForPort = 8000
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend_python && python main.py"
 
 [[workflows.workflow]]
 name = "Frontend"
@@ -149,7 +148,8 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npx expo start --tunnel"
+args = "npx expo start --port 5000"
+waitForPort = 5000
 
 [deployment]
 run = ["bash", "-c", "cd backend_python && python start.py & npx expo start --web --port 5000 --host 0.0.0.0"]
