@@ -217,7 +217,8 @@ class VectorDatabaseService:
                         workspace = db.workspace_repo.create_workspace(
                             workspace_id, 
                             f"Workspace {workspace_id}", 
-                            {"auto_created": True}
+                            "Auto-created workspace for document storage",  # description as string
+                            {"auto_created": True}  # metadata as dict
                         )
                         print(f'📝 SQL: Created workspace {workspace_id}')
                     
