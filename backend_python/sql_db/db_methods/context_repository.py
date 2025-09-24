@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func, delete, select, text
 from sqlalchemy.dialects.postgresql import insert
 from typing import List, Dict, Any, Optional, Tuple
-from ..db_schema.models import File, Context, WorkspaceFileContext
+from ..db_schema.models import File, Context
 from .base_repository import BaseRepository
 import logging
 

@@ -2,7 +2,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func, delete
 from typing import List, Dict, Any, Optional
-from ..db_schema.models import Workspace, File, Context, WorkspaceFileContext
+from ..db_schema.models import Workspace, File, Context
 from .base_repository import BaseRepository
 import logging
 
@@ -14,15 +14,12 @@ class WorkspaceRepository(BaseRepository):
     Optimized for single file vs workspace mode queries
     """
     
-    def create_workspace(self, workspace_id: str, name: str, description: str = None, 
+    def create_workspace(self, workspace_id: str, name: str = None, description: str = None, 
                         metadata: Dict[str, Any] = None) -> Workspace:
-        """Create a new workspace"""
+        """Create a new workspace (minimal schema - only id)"""
         with self.transaction():
             workspace = Workspace(
-                id=workspace_id,
-                name=name,
-                description=description,
-                metadata_json=metadata or {}
+                id=workspace_id
             )
             self.session.add(workspace)
             return workspace
@@ -30,10 +27,7 @@ class WorkspaceRepository(BaseRepository):
     def get_workspace(self, workspace_id: str) -> Optional[Workspace]:
         """Get workspace by ID"""
         return self.session.query(Workspace).filter(
-            and_(
-                Workspace.id == workspace_id,
-                Workspace.is_deleted == False
-            )
+            Workspace.id == workspace_id
         ).first()
     
     def get_workspace_with_files(self, workspace_id: str) -> Optional[Workspace]:

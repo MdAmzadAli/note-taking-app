@@ -2,7 +2,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func, delete, select
 from typing import List, Dict, Any, Optional
-from ..db_schema.models import Workspace, File, Context, WorkspaceFileContext
+from ..db_schema.models import Workspace, File, Context
 from .base_repository import BaseRepository
 import logging
 
