@@ -22,8 +22,6 @@ class Workspace(Base):
     deleted_at = Column(DateTime(timezone=True))
 
     # Metadata
-    name = Column(String(500))  # Added missing name field
-    description = Column(Text)  # Added missing description field
     metadata_json = Column(JSONB, default={}) # Changed to JSONB
 
     # Relationships
@@ -56,8 +54,7 @@ class File(Base):
     workspace_id = Column(String(255), ForeignKey('workspaces.id', ondelete='CASCADE'), nullable=True)
 
     # File information
-    file_name = Column(String(500), nullable=False)  # Added missing file_name field
-    file_size = Column(BIGINT, default=0)  # Added missing file_size field
+    file_name = Column(String(500), nullable=False)
     content_type = Column(String(100))  # 'pdf', 'webpage', 'text', etc.
 
     # URLs and resources
@@ -69,15 +66,14 @@ class File(Base):
 
     # Processing info
     embedding_type = Column(String(100), default='RETRIEVAL_DOCUMENT')
-    
-    # Metadata for file content
-    metadata_json = Column(JSONB, default={})  # Added metadata_json field for files
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    # Relationships - nullable workspace for single file mode
+
+
+    # Relationships
     workspace = relationship("Workspace", back_populates="files")
     contexts = relationship("Context", back_populates="file", cascade="all, delete-orphan")
 
@@ -88,13 +84,12 @@ class File(Base):
         Index('idx_files_file_name', 'file_name'),
         Index('idx_files_content_type', 'content_type'),
 
-        # Composite indexes for efficient retrieval (handle nullable workspace_id)
+        # Composite indexes for efficient retrieval
         Index('idx_files_workspace_deleted', 'workspace_id', 'is_deleted'),
         Index('idx_files_workspace_name_deleted', 'workspace_id', 'file_name', 'is_deleted'),
 
-        # Single file mode optimization (workspace_id can be null)
+        # Single file mode optimization
         Index('idx_files_id_workspace', 'id', 'workspace_id'),
-        Index('idx_files_single_mode', 'id', postgresql_where="workspace_id IS NULL OR workspace_id LIKE 'single_%'"),
 
         # Timestamp and metadata indexes
         Index('idx_files_created_at', 'created_at'),
