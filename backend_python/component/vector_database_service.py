@@ -210,22 +210,30 @@ class VectorDatabaseService:
             # Store comprehensive text data in SQL database
             try:
                 with DatabaseManager() as db:
-                    # Ensure workspace exists
-                    workspace = db.workspace_repo.get_workspace(workspace_id)
-                    if not workspace:
-                        # Create workspace if it doesn't exist
-                        workspace = db.workspace_repo.create_workspace(
-                            workspace_id, 
-                            f"Workspace {workspace_id}", 
-                            "Auto-created workspace for document storage",  # description as string
-                            {"auto_created": True}  # metadata as dict
-                        )
-                        print(f'📝 SQL: Created workspace {workspace_id}')
+                    # Handle workspace creation based on mode
+                    is_single_file_mode = workspace_id and workspace_id.startswith('single_')
+                    
+                    if not is_single_file_mode and workspace_id:
+                        # Only ensure workspace exists for workspace mode (not single file mode)
+                        workspace = db.workspace_repo.get_workspace(workspace_id)
+                        if not workspace:
+                            # Create workspace if it doesn't exist
+                            workspace = db.workspace_repo.create_workspace(
+                                workspace_id, 
+                                f"Workspace {workspace_id}", 
+                                "Auto-created workspace for document storage",  # description as string
+                                {"auto_created": True}  # metadata as dict
+                            )
+                            print(f'📝 SQL: Created workspace {workspace_id}')
+                    elif is_single_file_mode:
+                        print(f'📝 SQL: Single file mode detected for {workspace_id}, skipping workspace creation')
+                    else:
+                        print(f'📝 SQL: No workspace_id provided, treating as single file mode')
                     
                     # Ensure file exists  
                     file_record = db.file_repo.get_file(file_id)
                     if not file_record:
-                        # Create file record
+                        # Create file record - workspace_id can be None for single file mode
                         file_data = {
                             'file_type': 'pdf' if page_number else 'text',
                             'content_type': chunks[0].get('metadata', {}).get('content_type', 'pdf'),
@@ -234,8 +242,10 @@ class VectorDatabaseService:
                             'total_pages': chunks[0].get('metadata', {}).get('totalPages'),
                             'metadata': {'cloudinary_data': cloudinary_data} if cloudinary_data else {}
                         }
-                        file_record = db.file_repo.create_file(file_id, workspace_id, file_name, file_data)
-                        print(f'📝 SQL: Created file record {file_id}')
+                        # Pass workspace_id as-is (can be None for single file mode)
+                        effective_workspace_id = workspace_id if not is_single_file_mode else None
+                        file_record = db.file_repo.create_file(file_id, effective_workspace_id, file_name, file_data)
+                        print(f'📝 SQL: Created file record {file_id} with workspace_id: {effective_workspace_id or "null (single file mode)"}')
                     
                     # Store contexts in bulk
                     stored_count = db.context_repo.store_contexts_bulk(file_id, contexts_data)
@@ -389,13 +399,20 @@ class VectorDatabaseService:
             )
             print(f'✅ VectorDB: Successfully removed document {file_id} from vector index')
             
-            # Remove from SQL database - CASCADE handles contexts automatically
+            # Remove from SQL database - handles both workspace and single file modes
             try:
                 with DatabaseManager() as db:
+                    # Check if file exists and get its workspace_id for logging
+                    file_record = db.file_repo.get_file(file_id)
+                    if file_record:
+                        workspace_id = file_record.workspace_id
+                        is_single_file_mode = workspace_id is None or (workspace_id and workspace_id.startswith('single_'))
+                        print(f'🔍 SQL: File {file_id} found with workspace_id: {workspace_id or "null"} (single_file_mode: {is_single_file_mode})')
+                    
                     # HARD delete file record - CASCADE handles contexts automatically
                     deleted_file = db.file_repo.hard_delete_file(file_id)
                     
-                    print(f'✅ SQL: HARD deleted file record for {file_id} (contexts cascaded automatically)')
+                    print(f'✅ SQL: HARD deleted file record for {file_id} (contexts cascaded automatically, workspace handling preserved)')
                     
             except Exception as sql_error:
                 print(f'⚠️ SQL deletion failed for {file_id}: {sql_error}')
