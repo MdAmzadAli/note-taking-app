@@ -28,6 +28,22 @@ This is a React Native Expo note-taking app with features including:
 
 ## Recent Changes (September 2025)
 
+### Expert Chat Summary Timeout & Retry System
+**Date**: September 24, 2025
+**Changes Made**:
+1. **Enhanced workspace mode summary handling**:
+   - File: `components/expert/ChatInterface.tsx`
+   - Workspace dropdown now shows individual file status (summary ready, loading, timed out)
+   - Added individual retry buttons for specific files that failed in workspace mode
+   - Enhanced main summary display to handle partial summary states properly
+   - Shows count of ready summaries vs total files in workspace mode
+
+2. **Timeout and retry functionality**:
+   - Implemented 5-second timeout for single file mode, 20-second timeout for workspace mode
+   - Added retry buttons that appear when summaries timeout with proper error messaging
+   - Individual file retry capability in workspace mode for specific failed files
+   - File: `services/ragService.ts` - Added requestSummary function for manual retry
+
 ### Deleted Notes UI Improvements
 **Date**: September 14, 2025
 **Changes Made**:
