@@ -13,12 +13,9 @@ load_dotenv(dotenv_path=env_path, override=True)
 # Create base class for all models
 Base = declarative_base()
 
-# Database URL from environment - prioritize .env file over system env
+# Database URL from environment
 DATABASE_URL = os.getenv('DATABASE_URL')
-
-# Debug: Print which database we're connecting to (first 50 chars for security)
 print(f"🔗 Connecting to database: {DATABASE_URL[:50]}..." if DATABASE_URL else "❌ No DATABASE_URL found")
-
 
 # Create engine with connection pooling
 engine = create_engine(
