@@ -889,18 +889,57 @@ async def delete_file(file_id: str):
 
 # Delete workspace and all its files
 @app.delete("/workspace/{workspace_id}")
-async def delete_workspace(workspace_id,request:Request):
- workspace = await request.json()
- print(f"Deleting workspace: {workspace}")
- try:
-  
-  for file in workspace["files"]:
-     print(f"Deleting file: {file}")
-     await delete_file(str(file["id"]))
-  return {"success": True, "message": "Workspace deleted successfully"}
- except Exception as error:
-  print(f"❌ Failed to delete workspace: {error}")
-  raise HTTPException(status_code=500, detail=f"Failed to delete workspace: {str(error)}")
+async def delete_workspace(workspace_id: str, request: Request):
+    workspace = await request.json()
+    print(f"🗑️ Deleting workspace: {workspace_id}")
+    print(f"🗑️ Workspace data: {workspace}")
+    
+    try:
+        # First attempt: Use vector database workspace deletion (efficient bulk deletion)
+        try:
+            if rag_service and rag_service.is_ready_for_deletion():
+                print(f"🗑️ Attempting bulk workspace deletion via vector database for: {workspace_id}")
+                await rag_service.vector_database_service.remove_workspace_metadata(workspace_id)
+                print(f"✅ Bulk workspace deletion successful for: {workspace_id}")
+                return {"success": True, "message": "Workspace deleted successfully via bulk deletion"}
+            else:
+                print(f"⚠️ RAG service not ready for deletion, falling back to individual file deletion")
+                raise Exception("RAG service not ready for bulk deletion")
+        
+        except Exception as bulk_error:
+            print(f"⚠️ Bulk workspace deletion failed: {bulk_error}")
+            print(f"🔄 Falling back to individual file deletion for workspace: {workspace_id}")
+            
+            # Fallback: Delete files one by one
+            deleted_files = []
+            failed_files = []
+            
+            for file in workspace.get("files", []):
+                try:
+                    file_id = str(file["id"])
+                    print(f"🗑️ Deleting individual file: {file_id}")
+                    await delete_file(file_id)
+                    deleted_files.append(file_id)
+                    print(f"✅ Successfully deleted file: {file_id}")
+                except Exception as file_error:
+                    print(f"❌ Failed to delete file {file_id}: {file_error}")
+                    failed_files.append({"id": file_id, "error": str(file_error)})
+            
+            if failed_files:
+                print(f"⚠️ Workspace deletion completed with some failures: {len(failed_files)} files failed")
+                return {
+                    "success": True, 
+                    "message": f"Workspace partially deleted: {len(deleted_files)} files deleted, {len(failed_files)} files failed",
+                    "deleted_files": deleted_files,
+                    "failed_files": failed_files
+                }
+            else:
+                print(f"✅ All files deleted successfully via individual deletion for workspace: {workspace_id}")
+                return {"success": True, "message": "Workspace deleted successfully via individual file deletion"}
+    
+    except Exception as error:
+        print(f"❌ Complete workspace deletion failed for {workspace_id}: {error}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete workspace: {str(error)}")
 
 # Workspace mixed file and URL upload endpoint
 @app.post("/upload/workspace")
