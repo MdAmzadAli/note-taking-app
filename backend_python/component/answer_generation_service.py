@@ -14,8 +14,8 @@ class AnswerGenerationService:
             print(f'🤖 Starting new 2-step LLM flow for: "{query}"')
 
             # Determine if this is single file mode or workspace mode
-            is_single_file_mode = workspace_id is None
-            is_workspace_mode = workspace_id is not None and file_ids and len(file_ids) > 1
+            is_single_file_mode = workspace_id and workspace_id.startswith("single_")
+            is_workspace_mode = workspace_id and not workspace_id.startswith("single_") and file_ids and len(file_ids) > 1
 
             print(f'📊 Mode Detection: Single={is_single_file_mode}, Workspace={is_workspace_mode}, WorkspaceId={workspace_id}')
 
@@ -515,7 +515,7 @@ Return ONLY this JSON format:
             tag_info = f" [{','.join(content_tags)}]" if content_tags else ""
             
             # Handle None values safely
-            file_name = chunk['metadata'].get('fileName') or 'Unknown File'
+            file_name = chunk['metadata'].get('fileName') or 'Document'
             context_parts.append(f"[Context {index + 1} - {file_name} - {location_info}{tag_info} - Relevance: {confidence}%]: {chunk['text']}")
 
         return '\n\n'.join(context_parts)

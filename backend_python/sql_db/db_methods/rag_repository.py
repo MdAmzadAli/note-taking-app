@@ -51,7 +51,7 @@ class RAGRepository(BaseRepository):
                 continue
             
             # Determine if this is workspace mode (multiple files) or single file mode
-            if workspace_id is None:
+            if workspace_id and workspace_id.startswith('single_'):
                 # Single file mode
                 if file_id not in single_file_results:
                     single_file_results[file_id] = []

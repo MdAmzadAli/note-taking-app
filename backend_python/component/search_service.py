@@ -22,8 +22,8 @@ class SearchService:
             print(f'📊 Chunk limit: {limit}')
 
             # Mode detection for better logging
-            is_single_file_mode = workspace_id is None
-            is_workspace_mode = workspace_id is not None and file_ids and len(file_ids) > 1
+            is_single_file_mode = workspace_id and workspace_id.startswith("single_")
+            is_workspace_mode = workspace_id and not workspace_id.startswith("single_") and file_ids and len(file_ids) > 1
             mode_info = "Single file mode" if is_single_file_mode else "Workspace mode" if is_workspace_mode else "Standard mode"
             print(f'🎯 Detected mode: {mode_info}')
 
