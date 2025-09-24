@@ -13,10 +13,6 @@ class Workspace(Base):
     # Primary key
     id = Column(String(255), primary_key=True)
 
-    # Basic info
-    name = Column(String(500), nullable=False)
-    description = Column(Text)
-
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -26,6 +22,8 @@ class Workspace(Base):
     deleted_at = Column(DateTime(timezone=True))
 
     # Metadata
+    name = Column(String(500))  # Added missing name field
+    description = Column(Text)  # Added missing description field
     metadata_json = Column(JSONB, default={}) # Changed to JSONB
 
     # Relationships
@@ -49,41 +47,37 @@ class File(Base):
 
     # Primary key
     id = Column(String(255), primary_key=True)
-
-    # Foreign key to workspace with CASCADE delete
-    workspace_id = Column(String(255), ForeignKey('workspaces.id', ondelete='CASCADE'), nullable=False)
+    
+    # Soft delete
+    is_deleted = Column(Boolean, default=False, nullable=False)
+    deleted_at = Column(DateTime(timezone=True))
+    
+    # Foreign key to workspace with CASCADE delete - nullable for single file mode
+    workspace_id = Column(String(255), ForeignKey('workspaces.id', ondelete='CASCADE'), nullable=True)
 
     # File information
-    file_name = Column(String(1000), nullable=False)
-    original_name = Column(String(1000))
-    file_type = Column(String(100))
-    file_size = Column(BIGINT)
+    file_name = Column(String(500), nullable=False)  # Added missing file_name field
+    file_size = Column(BIGINT, default=0)  # Added missing file_size field
     content_type = Column(String(100))  # 'pdf', 'webpage', 'text', etc.
 
     # URLs and resources
     source_url = Column(Text)  # For webpage content
-    cloudinary_url = Column(Text)
-    page_urls = Column(JSONB, default=[]) # Changed to JSONB
+    # Changed to JSONB
 
     # Statistics
-    total_pages = Column(Integer)
     total_chunks = Column(Integer, default=0)
 
     # Processing info
     embedding_type = Column(String(100), default='RETRIEVAL_DOCUMENT')
+    
+    # Metadata for file content
+    metadata_json = Column(JSONB, default={})  # Added metadata_json field for files
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    # Soft delete
-    is_deleted = Column(Boolean, default=False, nullable=False)
-    deleted_at = Column(DateTime(timezone=True))
-
-    # Metadata
-    metadata_json = Column(JSONB, default={}) # Changed to JSONB
-
-    # Relationships
+    # Relationships - nullable workspace for single file mode
     workspace = relationship("Workspace", back_populates="files")
     contexts = relationship("Context", back_populates="file", cascade="all, delete-orphan")
 
@@ -94,12 +88,13 @@ class File(Base):
         Index('idx_files_file_name', 'file_name'),
         Index('idx_files_content_type', 'content_type'),
 
-        # Composite indexes for efficient retrieval
+        # Composite indexes for efficient retrieval (handle nullable workspace_id)
         Index('idx_files_workspace_deleted', 'workspace_id', 'is_deleted'),
         Index('idx_files_workspace_name_deleted', 'workspace_id', 'file_name', 'is_deleted'),
 
-        # Single file mode optimization
+        # Single file mode optimization (workspace_id can be null)
         Index('idx_files_id_workspace', 'id', 'workspace_id'),
+        Index('idx_files_single_mode', 'id', postgresql_where="workspace_id IS NULL OR workspace_id LIKE 'single_%'"),
 
         # Timestamp and metadata indexes
         Index('idx_files_created_at', 'created_at'),
@@ -126,26 +121,14 @@ class Context(Base):
     chunk_index = Column(Integer)  # Original chunk index from processing
     page_number = Column(Integer)
 
-    # Line information (for PDFs)
-    start_line = Column(Integer)
-    end_line = Column(Integer)
-    lines_used = Column(Integer)
-    total_lines_on_page = Column(Integer)
 
-    # Processing statistics
-    tokens_estimated = Column(Integer)
     total_chars = Column(Integer)
 
-    # Page resources
-    page_url = Column(Text)
-    thumbnail_url = Column(Text)
+
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-
-    # Additional metadata
-    metadata_json = Column(JSONB, default={}) # Changed to JSONB
 
     # Relationships
     file = relationship("File", back_populates="contexts")
@@ -189,7 +172,6 @@ class WorkspaceFileContext(Base):
     context_number = Column(Integer, primary_key=True)
 
     # Denormalized frequently accessed fields
-    file_name = Column(String(1000), nullable=False)
     text_content = Column(Text, nullable=False)
     page_number = Column(Integer)
     chunk_index = Column(Integer)
