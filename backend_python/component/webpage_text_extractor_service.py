@@ -10,7 +10,7 @@ import random
 
 class WebpageTextExtractorService:
     def __init__(self):
-        self.max_content_length = 10 * 1024 * 1024  # 10MB limit
+        self.max_content_length = 5 * 1024 * 1024  # 5MB limit
         self.timeout = 30  # 30 seconds
         self._last_html_content = ''  # Store raw HTML for URL extraction
         
