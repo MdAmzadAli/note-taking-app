@@ -893,6 +893,7 @@ async def delete_workspace(workspace_id,request:Request):
  workspace = await request.json()
  print(f"Deleting workspace: {workspace}")
  try:
+  
   for file in workspace["files"]:
      print(f"Deleting file: {file}")
      await delete_file(str(file["id"]))
