@@ -76,43 +76,29 @@ class RAGRepository(BaseRepository):
                     'contextNumber': context.context_number,
                     'text': context.text_content,
                     'metadata': {
-                        'chunkIndex': context.chunk_index,
-                        'pageNumber': context.page_number,
-                        'startLine': context.start_line,
-                        'endLine': context.end_line,
-                        'linesUsed': context.lines_used,
-                        'totalLinesOnPage': context.total_lines_on_page,
-                        'tokensEstimated': context.tokens_estimated,
-                        'totalChars': context.total_chars,
-                        'pageUrl': context.page_url,
-                        'thumbnailUrl': context.thumbnail_url,
-                        **context.metadata_json
+                        'chunkIndex': context.context_number - 1,  # Convert back to 0-based index
+                        'pageNumber': context.page_number
                     }
                 })
         
-        # Handle workspace mode (optimized workspace queries)
+        # Handle workspace mode (optimized multi-file queries)
         for workspace_id, file_contexts in workspace_mode_results.items():
-            # Flatten all context numbers for this workspace
-            all_context_numbers = []
-            file_ids = list(file_contexts.keys())
+            # Create file-context pairs for multi-file query
+            file_context_pairs = []
+            for file_id, context_numbers in file_contexts.items():
+                file_context_pairs.append((file_id, context_numbers))
             
-            for context_numbers in file_contexts.values():
-                all_context_numbers.extend(context_numbers)
-            
-            # Use optimized denormalized table query
-            contexts = self.context_repo.get_contexts_workspace_optimized(
-                workspace_id, all_context_numbers, file_ids
-            )
+            # Use multi-file context retrieval
+            contexts = self.context_repo.get_contexts_by_numbers_multi_file(file_context_pairs)
             
             for context in contexts:
                 all_contexts.append({
-                    'fileId': context['file_id'],
-                    'contextNumber': context['context_number'],
-                    'text': context['text_content'],
+                    'fileId': context.file_id,
+                    'contextNumber': context.context_number,
+                    'text': context.text_content,
                     'metadata': {
-                        'fileName': context['file_name'],
-                        'chunkIndex': context['chunk_index'],
-                        'pageNumber': context['page_number'],
+                        'chunkIndex': context.context_number - 1,  # Convert back to 0-based index
+                        'pageNumber': context.page_number,
                         'workspaceId': workspace_id
                     }
                 })
@@ -136,9 +122,8 @@ class RAGRepository(BaseRepository):
                 'text': context.text_content,
                 'isTarget': context.context_number == context_number,
                 'metadata': {
-                    'chunkIndex': context.chunk_index,
-                    'pageNumber': context.page_number,
-                    'tokensEstimated': context.tokens_estimated
+                    'chunkIndex': context.context_number - 1,  # Convert back to 0-based index
+                    'pageNumber': context.page_number
                 }
             }
             for context in contexts
@@ -166,9 +151,8 @@ class RAGRepository(BaseRepository):
                 'text': context.text_content,
                 'isOriginal': context.context_number in context_numbers,
                 'metadata': {
-                    'chunkIndex': context.chunk_index,
-                    'pageNumber': context.page_number,
-                    'tokensEstimated': context.tokens_estimated
+                    'chunkIndex': context.context_number - 1,  # Convert back to 0-based index
+                    'pageNumber': context.page_number
                 }
             }
             for context in contexts
@@ -182,12 +166,12 @@ class RAGRepository(BaseRepository):
             return self.context_repo.get_context_stats(file_id)
         
         elif workspace_id:
-            # Workspace stats
+            # Workspace stats using normalized tables
             stats = self.session.query(
-                func.count(WorkspaceFileContext.context_number).label('total_contexts'),
-                func.count(func.distinct(WorkspaceFileContext.file_id)).label('total_files')
-            ).filter(
-                WorkspaceFileContext.workspace_id == workspace_id
+                func.count(Context.context_number).label('total_contexts'),
+                func.count(func.distinct(Context.file_id)).label('total_files')
+            ).join(File).filter(
+                File.workspace_id == workspace_id
             ).first()
             
             return {

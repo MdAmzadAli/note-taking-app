@@ -83,32 +83,31 @@ class ContextRepository(BaseRepository):
                                         context_numbers: List[int],
                                         file_ids: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
-        Ultra-optimized method for workspace mode using denormalized table
+        Optimized method for workspace mode using normalized tables with join
         Returns contexts with file information
         """
-        query = self.session.query(WorkspaceFileContext).filter(
+        query = self.session.query(Context, File.content_type).join(File).filter(
             and_(
-                WorkspaceFileContext.workspace_id == workspace_id,
-                WorkspaceFileContext.context_number.in_(context_numbers)
+                File.workspace_id == workspace_id,
+                Context.context_number.in_(context_numbers)
             )
         )
         
         if file_ids:
-            query = query.filter(WorkspaceFileContext.file_id.in_(file_ids))
+            query = query.filter(Context.file_id.in_(file_ids))
         
         results = query.order_by(
-            WorkspaceFileContext.file_id, 
-            WorkspaceFileContext.context_number
+            Context.file_id, 
+            Context.context_number
         ).all()
         
         return [
             {
-                'file_id': r.file_id,
-                'context_number': r.context_number,
-                'file_name': r.file_name,
-                'text_content': r.text_content,
-                'page_number': r.page_number,
-                'chunk_index': r.chunk_index
+                'file_id': r.Context.file_id,
+                'context_number': r.Context.context_number,
+                'text_content': r.Context.text_content,
+                'page_number': r.Context.page_number,
+                'chunk_index': r.Context.context_number - 1  # Convert to 0-based index
             }
             for r in results
         ]
@@ -152,15 +151,11 @@ class ContextRepository(BaseRepository):
         """Get context statistics for a file"""
         stats = self.session.query(
             func.count(Context.context_number).label('total_contexts'),
-            func.avg(Context.tokens_estimated).label('avg_tokens'),
-            func.avg(Context.total_chars).label('avg_chars'),
             func.max(Context.page_number).label('max_page')
         ).filter(Context.file_id == file_id).first()
         
         return {
             'total_contexts': stats.total_contexts or 0,
-            'avg_tokens': float(stats.avg_tokens or 0),
-            'avg_chars': float(stats.avg_chars or 0),
             'max_page': stats.max_page or 0
         }
     
@@ -175,30 +170,8 @@ class ContextRepository(BaseRepository):
             
             return deleted_count
     
-    def refresh_denormalized_data(self, workspace_id: str):
-        """Refresh denormalized table for a workspace (maintenance operation)"""
-        with self.transaction():
-            # Delete existing denormalized data
-            self.session.query(WorkspaceFileContext).filter(
-                WorkspaceFileContext.workspace_id == workspace_id
-            ).delete()
-            
-            # Rebuild from normalized tables
-            rebuild_query = text("""
-                INSERT INTO workspace_file_contexts 
-                (workspace_id, file_id, context_number, file_name, text_content, page_number, chunk_index)
-                SELECT 
-                    f.workspace_id,
-                    c.file_id,
-                    c.context_number,
-                    f.file_name,
-                    c.text_content,
-                    c.page_number,
-                    c.chunk_index
-                FROM contexts c
-                JOIN files f ON c.file_id = f.id
-                WHERE f.workspace_id = :workspace_id 
-                  AND f.is_deleted = false
-            """)
-            
-            self.session.execute(rebuild_query, {'workspace_id': workspace_id})
+    def refresh_workspace_cache(self, workspace_id: str):
+        """Placeholder for future workspace cache operations (currently not needed)"""
+        # This method is kept for future denormalization if needed
+        # For now, we use normalized queries which are sufficient
+        pass

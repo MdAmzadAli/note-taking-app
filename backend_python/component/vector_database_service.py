@@ -333,7 +333,7 @@ class VectorDatabaseService:
                                     'text': context_data['text'],
                                     'fileId': file_id,
                                     'workspaceId': req['workspaceId'],
-                                    'chunkIndex': context_data['metadata'].get('chunkIndex'),
+                                    'chunkIndex': context_data['metadata'].get('chunkIndex', context_number - 1),
                                     'fileName': context_data['metadata'].get('fileName'),
                                     'pageNumber': context_data['metadata'].get('pageNumber'),
                                     'startLine': context_data['metadata'].get('startLine'),
