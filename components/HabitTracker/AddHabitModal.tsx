@@ -602,30 +602,43 @@ export default function AddHabitModal({ visible, onClose, onSave, habitType, edi
           <View style={styles.field}>
             <View style={styles.reminderHeader}>
               <Text style={[styles.label, { color: textColor }]}>Reminder</Text>
-              <TouchableOpacity
-                style={[styles.toggleSwitch, { backgroundColor: reminderEnabled ? '#00FF7F' : '#333' }]}
-                onPress={() => {
-                  const newEnabled = !reminderEnabled;
-                  setReminderEnabled(newEnabled);
-                  if (!newEnabled) {
-                    setReminderTime(null);
-                  }
-                }}
-              >
-                <View style={[styles.toggleThumb, { transform: [{ translateX: reminderEnabled ? 20 : 2 }] }]} />
-              </TouchableOpacity>
+              <View style={styles.comingSoonContainer}>
+                <Text style={[styles.comingSoonText, { color: subtleTextColor }]}>Coming soon</Text>
+              </View>
+              {/* Keep existing toggle code but make it non-functional and hidden */}
+              <View style={{ opacity: 0, position: 'absolute' }}>
+                <TouchableOpacity
+                  style={[styles.toggleSwitch, { backgroundColor: false ? '#00FF7F' : '#333' }]}
+                  onPress={() => {
+                    // Disabled - coming soon
+                    // const newEnabled = !reminderEnabled;
+                    // setReminderEnabled(newEnabled);
+                    // if (!newEnabled) {
+                    //   setReminderTime(null);
+                    // }
+                  }}
+                >
+                  <View style={[styles.toggleThumb, { transform: [{ translateX: false ? 20 : 2 }] }]} />
+                </TouchableOpacity>
+              </View>
             </View>
-            {reminderEnabled && (
-              <TouchableOpacity
-                style={[styles.dropdownButton, { borderBottomColor: borderColor }]}
-                onPress={() => setShowReminderPicker(true)}
-              >
-                <Text style={[styles.dropdownText, { color: textColor }]}>
-                  {reminderTime ? reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Set time'}
-                </Text>
-                <Text style={[styles.dropdownArrow, { color: subtleTextColor }]}>▼</Text>
-              </TouchableOpacity>
-            )}
+            {/* Keep existing time picker code but make it non-functional and hidden */}
+            <View style={{ opacity: 0, position: 'absolute' }}>
+              {false && (
+                <TouchableOpacity
+                  style={[styles.dropdownButton, { borderBottomColor: borderColor }]}
+                  onPress={() => {
+                    // Disabled - coming soon
+                    // setShowReminderPicker(true)
+                  }}
+                >
+                  <Text style={[styles.dropdownText, { color: textColor }]}>
+                    {reminderTime ? reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Set time'}
+                  </Text>
+                  <Text style={[styles.dropdownArrow, { color: subtleTextColor }]}>▼</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
         </ScrollView>
@@ -1299,5 +1312,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  comingSoonContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  comingSoonText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    fontWeight: '500',
   },
 });
