@@ -1,0 +1,63 @@
+python quick_sync.py
+🔗 Connecting to database: postgresql://postgres.hoqlkvcbosorggmixuid:noteTak...
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/sqlalchemy/sql/schema.py", line 4335, in _col_expressions
+    parent.c[col] if isinstance(col, str) else col
+    ~~~~~~~~^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/sqlalchemy/sql/base.py", line 1642, in __getitem__
+    return self._index[key][1]
+           ~~~~~~~~~~~^^^^^
+KeyError: 'name'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/workspace/backend_python/quick_sync.py", line 4, in <module>
+    from sql_db.db_methods.database_manager import DatabaseManager
+  File "/home/runner/workspace/backend_python/sql_db/db_methods/database_manager.py", line 4, in <module>
+    from .workspace_repository import WorkspaceRepository
+  File "/home/runner/workspace/backend_python/sql_db/db_methods/workspace_repository.py", line 5, in <module>
+    from ..db_schema.models import Workspace, File, Context, WorkspaceFileContext
+  File "/home/runner/workspace/backend_python/sql_db/db_schema/models.py", line 7, in <module>
+    class Workspace(Base):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/sqlalchemy/orm/decl_api.py", line 198, in __init__
+    _as_declarative(reg, cls, dict_)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 245, in _as_declarative
+    return _MapperConfig.setup_mapping(registry, cls, dict_, None, {})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 326, in setup_mapping
+    return _ClassScanMapperConfig(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 577, in __init__
+    self._setup_table(table)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/sqlalchemy/orm/decl_base.py", line 1762, in _setup_table
+    table_cls(
+  File "<string>", line 2, in __new__
+  File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/sqlalchemy/util/deprecations.py", line 281, in warned
+    return fn(*args, **kwargs)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/sqlalchemy/sql/schema.py", line 429, in __new__
+    return cls._new(*args, **kw)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/sqlalchemy/sql/schema.py", line 483, in _new
+    with util.safe_reraise():
+         ^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/sqlalchemy/sql/schema.py", line 479, in _new
+    table.__init__(name, metadata, *args, _no_init=False, **kw)  # type: ignore[misc] # noqa: E501
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/sqlalchemy/sql/schema.py", line 873, in __init__
+    self._init_items(
+  File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/sqlalchemy/sql/schema.py", line 233, in _init_items
+    spwd(self, **kw)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/sqlalchemy/sql/base.py", line 1347, in _set_parent_with_dispatch
+    self._set_parent(parent, **kw)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/sqlalchemy/sql/schema.py", line 5299, in _set_parent
+    ColumnCollectionMixin._set_parent(self, table)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/sqlalchemy/sql/schema.py", line 4348, in _set_parent
+    for col in self._col_expressions(parent):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/sqlalchemy/sql/schema.py", line 4339, in _col_expressions
+    raise exc.ConstraintColumnNotFoundError(
+sqlalchemy.exc.ConstraintColumnNotFoundError: Can't create Index on table 'workspaces': no column named 'name' is present.

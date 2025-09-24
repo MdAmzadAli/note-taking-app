@@ -21,8 +21,7 @@ class Workspace(Base):
     is_deleted = Column(Boolean, default=False, nullable=False)
     deleted_at = Column(DateTime(timezone=True))
 
-    # Metadata
-    metadata_json = Column(JSONB, default={}) # Changed to JSONB
+    
 
     # Relationships
     files = relationship("File", back_populates="workspace", cascade="all, delete-orphan")
