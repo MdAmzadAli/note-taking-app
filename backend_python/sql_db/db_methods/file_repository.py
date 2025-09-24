@@ -14,24 +14,13 @@ class FileRepository(BaseRepository):
     Optimized for both single file and workspace mode queries
     """
     
-    def create_file(self, file_id: str, workspace_id: str, file_name: str, 
-                   file_data: Dict[str, Any]) -> File:
-        """Create a new file record"""
+    def create_file(self, file_id: str, workspace_id: Optional[str], content_type: str) -> File:
+        """Create a new file record with minimal schema"""
         with self.transaction():
             file_record = File(
                 id=file_id,
-                workspace_id=workspace_id,
-                file_name=file_name,
-                original_name=file_data.get('original_name'),
-                file_type=file_data.get('file_type'),
-                file_size=file_data.get('file_size'),
-                content_type=file_data.get('content_type'),
-                source_url=file_data.get('source_url'),
-                cloudinary_url=file_data.get('cloudinary_url'),
-                page_urls=file_data.get('page_urls', []),
-                total_pages=file_data.get('total_pages'),
-                embedding_type=file_data.get('embedding_type', 'RETRIEVAL_DOCUMENT'),
-                metadata_json=file_data.get('metadata', {})
+                workspace_id=workspace_id,  # Can be None for single file mode
+                content_type=content_type
             )
             self.session.add(file_record)
             return file_record
@@ -39,10 +28,7 @@ class FileRepository(BaseRepository):
     def get_file(self, file_id: str) -> Optional[File]:
         """Get file by ID"""
         return self.session.query(File).filter(
-            and_(
-                File.id == file_id,
-                File.is_deleted == False
-            )
+            File.id == file_id
         ).first()
     
     def get_file_with_workspace(self, file_id: str) -> Optional[File]:

@@ -17,61 +17,27 @@ class ContextRepository(BaseRepository):
     
     def store_contexts_bulk(self, file_id: str, contexts_data: List[Dict[str, Any]]) -> int:
         """
-        Bulk store contexts for a file with optimal performance
+        Bulk store contexts for a file with minimal schema and optimal performance
         Returns the number of contexts stored
         """
         with self.transaction():
-            # Prepare context records
+            # Prepare minimal context records for bulk insert
             context_records = []
-            denormalized_records = []
-            
-            # Get file and workspace info for denormalization
-            file_record = self.session.query(File).filter(File.id == file_id).first()
-            if not file_record:
-                raise ValueError(f"File {file_id} not found")
             
             for i, context_data in enumerate(contexts_data):
                 context_number = i + 1  # 1-based indexing
                 
-                # Main context record
+                # Minimal context record - only essential fields
                 context_record = {
                     'file_id': file_id,
                     'context_number': context_number,
                     'text_content': context_data.get('text', ''),
-                    'chunk_index': context_data.get('metadata', {}).get('chunkIndex', i),
-                    'page_number': context_data.get('metadata', {}).get('pageNumber'),
-                    'start_line': context_data.get('metadata', {}).get('startLine'),
-                    'end_line': context_data.get('metadata', {}).get('endLine'),
-                    'lines_used': context_data.get('metadata', {}).get('linesUsed'),
-                    'total_lines_on_page': context_data.get('metadata', {}).get('totalLinesOnPage'),
-                    'tokens_estimated': context_data.get('metadata', {}).get('tokens_est'),
-                    'total_chars': context_data.get('metadata', {}).get('total_chars'),
-                    'page_url': context_data.get('metadata', {}).get('pageUrl'),
-                    'thumbnail_url': context_data.get('metadata', {}).get('thumbnailUrl'),
-                    'metadata_json': context_data.get('metadata', {})
+                    'page_number': context_data.get('metadata', {}).get('pageNumber')
                 }
                 context_records.append(context_record)
-                
-                # Denormalized record for fast queries
-                denormalized_record = {
-                    'workspace_id': file_record.workspace_id,
-                    'file_id': file_id,
-                    'context_number': context_number,
-                    'file_name': file_record.file_name,
-                    'text_content': context_data.get('text', ''),
-                    'page_number': context_data.get('metadata', {}).get('pageNumber'),
-                    'chunk_index': context_data.get('metadata', {}).get('chunkIndex', i)
-                }
-                denormalized_records.append(denormalized_record)
             
-            # Bulk insert contexts
+            # Efficient bulk insert with minimal schema
             self.session.bulk_insert_mappings(Context, context_records)
-            
-            # Bulk insert denormalized records
-            self.session.bulk_insert_mappings(WorkspaceFileContext, denormalized_records)
-            
-            # Update file's total chunks count
-            file_record.total_chunks = len(context_records)
             
             return len(context_records)
     

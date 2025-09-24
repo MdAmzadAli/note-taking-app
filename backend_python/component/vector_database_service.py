@@ -233,18 +233,12 @@ class VectorDatabaseService:
                     # Ensure file exists  
                     file_record = db.file_repo.get_file(file_id)
                     if not file_record:
-                        # Create file record - workspace_id can be None for single file mode
-                        file_data = {
-                            'file_type': 'pdf' if page_number else 'text',
-                            'content_type': chunks[0].get('metadata', {}).get('content_type', 'pdf'),
-                            'cloudinary_url': cloudinary_data.get('secureUrl') if cloudinary_data else None,
-                            'page_urls': cloudinary_data.get('pageUrls', []) if cloudinary_data else [],
-                            'total_pages': chunks[0].get('metadata', {}).get('totalPages'),
-                            'metadata': {'cloudinary_data': cloudinary_data} if cloudinary_data else {}
-                        }
+                        # Create file record with minimal schema - only essential fields
+                        content_type = chunks[0].get('metadata', {}).get('content_type', 'pdf')
+                        
                         # Pass workspace_id as-is (can be None for single file mode)
                         effective_workspace_id = workspace_id if not is_single_file_mode else None
-                        file_record = db.file_repo.create_file(file_id, effective_workspace_id, file_name, file_data)
+                        file_record = db.file_repo.create_file(file_id, effective_workspace_id, content_type)
                         print(f'📝 SQL: Created file record {file_id} with workspace_id: {effective_workspace_id or "null (single file mode)"}')
                     
                     # Store contexts in bulk
