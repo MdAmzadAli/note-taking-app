@@ -392,10 +392,10 @@ class VectorDatabaseService:
             # Remove from SQL database - CASCADE handles contexts automatically
             try:
                 with DatabaseManager() as db:
-                    # Delete file record - CASCADE handles contexts automatically
-                    deleted_file = db.file_repo.delete_file(file_id)
+                    # HARD delete file record - CASCADE handles contexts automatically
+                    deleted_file = db.file_repo.hard_delete_file(file_id)
                     
-                    print(f'✅ SQL: Removed file record for {file_id} (contexts cascaded automatically)')
+                    print(f'✅ SQL: HARD deleted file record for {file_id} (contexts cascaded automatically)')
                     
             except Exception as sql_error:
                 print(f'⚠️ SQL deletion failed for {file_id}: {sql_error}')
@@ -432,10 +432,10 @@ class VectorDatabaseService:
             # Remove from SQL database - CASCADE handles files and contexts automatically
             try:
                 with DatabaseManager() as db:
-                    # Delete workspace - CASCADE handles files and contexts automatically
-                    workspace_deleted = db.workspace_repo.delete_workspace(workspace_id)
+                    # HARD delete workspace - CASCADE handles files and contexts automatically
+                    workspace_deleted = db.workspace_repo.hard_delete_workspace(workspace_id)
                     
-                    print(f'✅ SQL: Removed workspace {workspace_id} (files and contexts cascaded automatically)')
+                    print(f'✅ SQL: HARD deleted workspace {workspace_id} (files and contexts cascaded automatically)')
                     
             except Exception as sql_error:
                 print(f'⚠️ SQL deletion failed for workspace {workspace_id}: {sql_error}')
