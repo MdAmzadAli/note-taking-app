@@ -1928,7 +1928,7 @@ export default function ChatInterface({
                           style={styles.retryButton}
                           onPress={() => handleSummaryRetry(selectedFile.id)}
                         >
-                          <IconSymbol size={16} name="arrow.up.circle" color="#000000" />
+                          <IconSymbol size={16} name="refresh" color="#000000" />
                           <Text style={styles.retryButtonText}>Retry</Text>
                         </TouchableOpacity>
                       </View>
