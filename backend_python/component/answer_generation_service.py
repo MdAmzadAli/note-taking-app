@@ -492,31 +492,45 @@ Return ONLY this JSON format:
         """Build context string for queries with enhanced metadata"""
         context_parts = []
         for index, chunk in enumerate(relevant_chunks):
-            confidence = f"{chunk['score'] * 100:.1f}"
+            # Safely handle score
+            score = chunk.get('score', 0)
+            confidence = f"{score * 100:.1f}"
             location_info = ''
 
+            # Safely get metadata
+            metadata = chunk.get('metadata', {})
+            if not metadata:
+                metadata = {}
+
             # Build location info only if page/line data exists
-            if chunk['metadata'].get('pageNumber') is not None:
-                location_info = f"Page {chunk['metadata']['pageNumber']}"
-                if chunk['metadata'].get('startLine') is not None:
-                    location_info += f", Lines {chunk['metadata']['startLine']}-{chunk['metadata']['endLine']}"
+            page_number = metadata.get('pageNumber')
+            if page_number is not None:
+                location_info = f"Page {page_number}"
+                start_line = metadata.get('startLine')
+                end_line = metadata.get('endLine')
+                if start_line is not None and end_line is not None:
+                    location_info += f", Lines {start_line}-{end_line}"
             else:
                 location_info = 'Content'
 
             # Highlight special content types
             content_tags = []
-            if chunk['metadata'].get('hasTableContent', False):
+            if metadata.get('hasTableContent', False):
                 content_tags.append('TABLE')
-            if chunk['metadata'].get('hasFinancialData', False):
+            if metadata.get('hasFinancialData', False):
                 content_tags.append('FINANCIAL')
             if chunk.get('structured_tables'):
                 content_tags.append('STRUCTURED')
             
             tag_info = f" [{','.join(content_tags)}]" if content_tags else ""
             
-            # Handle None values safely
-            file_name = chunk['metadata'].get('fileName') or 'Document'
-            context_parts.append(f"[Context {index + 1} - {file_name} - {location_info}{tag_info} - Relevance: {confidence}%]: {chunk['text']}")
+            # Handle None values safely - ensure all components are strings
+            file_name = metadata.get('fileName') or 'Document'
+            chunk_text = chunk.get('text') or 'No content available'
+            
+            # Ensure all string components are properly handled
+            context_part = f"[Context {index + 1} - {file_name} - {location_info}{tag_info} - Relevance: {confidence}%]: {chunk_text}"
+            context_parts.append(context_part)
 
         return '\n\n'.join(context_parts)
 
