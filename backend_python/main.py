@@ -296,6 +296,13 @@ class RAGQueryRequest(BaseModel):
     fileIds: Optional[List[str]] = None
     workspaceId: Optional[str] = None
 
+class FeedbackRequest(BaseModel):
+    feedbackType: str  # 'Bug', 'Feature Request', 'General Feedback', 'Other'
+    feedback: str  # Description
+    platformType: str  # 'Android' or 'IOS'
+    userName: Optional[str] = None
+    email: Optional[str] = None
+
 class TranscriptionResponse(BaseModel):
     success: bool
     transcript: Optional[str] = None
@@ -1736,6 +1743,85 @@ async def start_server():
     print(f"🛡️ Environment: {os.getenv('NODE_ENV', 'development')}")
     print(f"🔧 RAG Service initialized: {'Yes' if 'rag_service' in globals() and rag_service and rag_service.is_initialized else 'No'}")
     print("🎯 All APIs and services status logged above")
+
+
+# Feedback submission endpoint
+@app.post("/feedback")
+async def submit_feedback(request: FeedbackRequest):
+    """Submit feedback to Airtable"""
+    try:
+        print(f"📝 Feedback submission received: {request.feedbackType} from {request.platformType}")
+        
+        # Get Airtable configuration from environment variables
+        airtable_base_id = os.getenv('AIRTABLE_BASE_ID')
+        airtable_table_name = os.getenv('AIRTABLE_TABLE_NAME', 'Feedback')  # Default table name
+        airtable_api_key = os.getenv('AIRTABLE_API_KEY')
+        
+        if not airtable_base_id or not airtable_api_key:
+            print("❌ Airtable configuration missing")
+            raise HTTPException(
+                status_code=500,
+                detail="Airtable configuration not available"
+            )
+        
+        # Prepare Airtable record
+        airtable_record = {
+            "fields": {
+                "Beta Version": "0.0",
+                "Feedback Type": request.feedbackType,
+                "Status": "New",
+                "Feedback": request.feedback,
+                "Platform Type": request.platformType
+            }
+        }
+        
+        # Add optional fields if available
+        if request.userName:
+            airtable_record["fields"]["User Name"] = request.userName
+        if request.email:
+            airtable_record["fields"]["Email"] = request.email
+        
+        # Send to Airtable (non-blocking)
+        airtable_url = f"https://api.airtable.com/v0/{airtable_base_id}/{airtable_table_name}"
+        headers = {
+            "Authorization": f"Bearer {airtable_api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        # Use asyncio to make non-blocking request
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                airtable_url,
+                json=airtable_record,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
+                if response.status == 200:
+                    response_data = await response.json()
+                    record_id = response_data.get('id')
+                    print(f"✅ Feedback submitted successfully to Airtable: {record_id}")
+                    
+                    return {
+                        "success": True,
+                        "message": "Feedback submitted successfully",
+                        "recordId": record_id
+                    }
+                else:
+                    error_text = await response.text()
+                    print(f"❌ Airtable API error: {response.status} - {error_text}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to submit feedback to Airtable: {error_text}"
+                    )
+                    
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as error:
+        print(f"❌ Feedback submission error: {error}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to submit feedback: {str(error)}"
+        )
 
 
 if __name__ == "__main__":
