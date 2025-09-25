@@ -118,6 +118,13 @@ function TabLayoutContent() {
         }}
       />
       <Tabs.Screen
+        name="feedback"
+        options={{
+          title: 'Feedback',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="message" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="templates"
         options={{
           href: null,

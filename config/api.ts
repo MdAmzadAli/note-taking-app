@@ -43,7 +43,8 @@ export const API_ENDPOINTS = {
   csvPage: (id: string, page: number) => `${API_BASE_URL}/csv/${id}/page/${page}`,
   download: (id: string) => `${API_BASE_URL}/download/${id}`,
   health: `${API_BASE_URL}/health`,
-  ragRemove: (id: string) => `${API_BASE_URL}/rag/index/${id}`
+  ragRemove: (id: string) => `${API_BASE_URL}/rag/index/${id}`,
+  feedback: `${API_BASE_URL}/feedback`
 };
 
 export interface ApiResponse<T = any> {
