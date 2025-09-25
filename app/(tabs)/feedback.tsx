@@ -132,6 +132,11 @@ export default function FeedbackTab() {
             />
           </View>
 
+          <View style={styles.platformInfo}>
+            <Text style={styles.platformText}>
+              Platform: {getPlatformType()}
+            </Text>
+          </View>
 
           <TouchableOpacity
             style={[

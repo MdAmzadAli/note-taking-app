@@ -83,13 +83,6 @@ function TabLayoutContent() {
         }}
       />
       <Tabs.Screen
-        name="reminders"
-        options={{
-          title: 'Reminders',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="bell" color={color} />,
-        }}
-      />
-      <Tabs.Screen
         name="expert"
         options={{
           title: 'Expert',
@@ -104,24 +97,28 @@ function TabLayoutContent() {
         }}
       />
       <Tabs.Screen
+        name="feedback"
+        options={{
+          title: 'Feedback',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="message" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="reminders"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="gear" color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen
         name="search"
         options={{
-          title: 'Search',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="magnifyingglass" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="feedback"
-        options={{
-          title: 'Feedback',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="message" color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen
