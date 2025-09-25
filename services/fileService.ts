@@ -115,85 +115,6 @@ class FileService {
     }
   }
 
-  async uploadWorkspaceFiles(files: Array<{ uri: string; name: string; type?: string }>, workspaceId: string): Promise<FileUploadResponse[]> {
-    try {
-      console.log('📤 Starting batch workspace file upload...');
-      console.log('🏢 Workspace ID:', workspaceId);
-      console.log('📄 Number of files:', files.length);
-
-      const formData = new FormData();
-      formData.append('workspaceId', workspaceId);
-
-      // Add all files to the same FormData
-      files.forEach((file, index) => {
-        console.log(`📱 Adding file ${index + 1}: ${file.name}`);
-        const mobileFile = {
-          uri: file.uri,
-          name: file.name,
-          type: file.type || 'application/pdf'
-        };
-        formData.append('files', mobileFile as any);
-      });
-
-      console.log('🔄 Sending batch upload request to:', API_ENDPOINTS.uploadWorkspace);
-      console.log('formData is :',Object.fromEntries(formData));
-      const response = await fetch(API_ENDPOINTS.uploadWorkspace, {
-        method: 'POST',
-        body: formData,
-      });
-
-      console.log('📨 Batch upload response received');
-      console.log('📨 Response status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Batch upload failed with status:', response.status);
-        console.error('❌ Error response:', errorText);
-        throw new Error(`Batch upload failed: ${response.status} - ${errorText}`);
-      }
-
-      const result = await response.json();
-      console.log('📨 Backend response structure:', result);
-
-      // Backend returns: { success, mode, workspaceId, filesProcessed, filesIndexed, totalItems, errors }
-      if (result.success && result.filesProcessed > 0) {
-        const uploadedFiles: FileUploadResponse[] = [];
-        
-        // Use actual file details from backend response if available
-        if (result.files && result.files.length > 0) {
-          // Backend provided actual file details with real IDs
-          result.files.forEach((backendFile: any) => {
-            uploadedFiles.push({
-              id: backendFile.id,
-              originalName: backendFile.originalName || backendFile.name,
-              mimetype: backendFile.mimetype || 'application/pdf',
-              size: backendFile.size || 0,
-              uploadDate: backendFile.uploadDate || new Date().toISOString()
-            });
-          });
-        } else {
-          // This fallback should not happen as backend now always returns file details
-          // But if it does, we need to log this issue for debugging
-          console.error('❌ Backend did not return file details, this is unexpected');
-          console.error('❌ Backend response:', JSON.stringify(result, null, 2));
-          
-          // Don't create fake entries with workspace IDs - this causes deletion issues
-          throw new Error('Backend did not return proper file details after upload');
-        }
-        
-        console.log('✅ Batch files uploaded successfully:', uploadedFiles.length, 'files');
-        return uploadedFiles;
-      } else {
-        throw new Error(`Upload failed: ${result.errors ? JSON.stringify(result.errors) : 'Unknown error'}`);
-      }
-    } catch (error) {
-      console.error('❌ Batch file upload error occurred');
-      console.error('❌ Error type:', error.constructor.name);
-      console.error('❌ Error message:', error.message);
-      console.error('❌ Error stack:', error.stack);
-      throw error;
-    }
-  }
 
   async uploadFile(file: File | { uri: string; name: string; type?: string; workspaceId?: string }, filename?: string): Promise<FileUploadResponse> {
     try {
@@ -310,32 +231,7 @@ class FileService {
     }
   }
 
-  async getFileMetadata(id: string): Promise<FileMetadata> {
-    try {
-      console.log('🔍 Fetching metadata for file ID:', id);
-      const response = await fetch(API_ENDPOINTS.metadata(id));
-
-      console.log('📨 Metadata response received for ID:', id);
-      console.log('📨 Metadata response status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Failed to get file metadata for ID:', id, 'Status:', response.status, 'Response:', errorText);
-        throw new Error(`Failed to get file metadata: ${response.status} - ${errorText}`);
-      }
-
-      const metadata: FileMetadata = await response.json();
-      console.log('✅ Successfully fetched metadata for ID:', id);
-      console.log('✅ Metadata:', JSON.stringify(metadata, null, 2));
-      return metadata;
-    } catch (error) {
-      console.error('❌ Error fetching metadata for ID:', id);
-      console.error('❌ Error type:', error.constructor.name);
-      console.error('❌ Error message:', error.message);
-      console.error('❌ Error stack:', error.stack);
-      throw error;
-    }
-  }
+  
 
   getPreviewUrl(fileId: string): string {
     const url = API_ENDPOINTS.preview(fileId);
@@ -355,39 +251,9 @@ class FileService {
     return url;
   }
 
-  getPdfPageUrl(id: string, page: number): string {
-    const url = API_ENDPOINTS.pdfPage(id, page);
-    console.log('🔗 Generated PDF page URL for ID', id, 'page', page, ':', url);
-    return url;
-  }
 
-  async getCsvPage(id: string, page: number, limit: number = 20) {
-    try {
-      console.log('🔍 Fetching CSV data for file ID:', id, 'page:', page, 'limit:', limit);
-      const response = await fetch(`${API_ENDPOINTS.csvPage(id, page)}?limit=${limit}`);
 
-      console.log('📨 CSV data response received for ID:', id);
-      console.log('📨 CSV data response status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Failed to get CSV data for ID:', id, 'Status:', response.status, 'Response:', errorText);
-        throw new Error(`Failed to get CSV data: ${response.status} - ${errorText}`);
-      }
-
-      const csvData = await response.json();
-      console.log('✅ Successfully fetched CSV data for ID:', id, 'page:', page);
-      console.log('✅ CSV data preview:', JSON.stringify(csvData).substring(0, 200) + '...'); // Log preview
-      return csvData;
-    } catch (error) {
-      console.error('❌ Error fetching CSV data for ID:', id, 'page:', page);
-      console.error('❌ Error type:', error.constructor.name);
-      console.error('❌ Error message:', error.message);
-      console.error('❌ Error stack:', error.stack);
-      throw error;
-    }
-  }
-
+  
   async deleteFile(fileId: string): Promise<boolean> {
     try {
       console.log('🗑️ Starting complete file deletion for:', fileId);

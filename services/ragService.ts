@@ -148,22 +148,7 @@ class RAGService {
     }
   }
 
-  async removeDocument(fileId: string): Promise<{ success: boolean; message: string }> {
-    try {
-      console.log(`🗑️ Removing document from index: ${fileId}`);
-      
-      const response = await this.makeRequest(`/rag/index/${fileId}`, {
-        method: 'DELETE'
-      });
-
-      console.log(`✅ Document removed from index: ${fileId}`);
-      return response;
-    } catch (error) {
-      console.error(`❌ Failed to remove document ${fileId}:`, error);
-      throw error;
-    }
-  }
-
+  
   async queryDocuments(
     query: string, 
     fileIds?: string[], 

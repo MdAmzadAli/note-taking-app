@@ -852,25 +852,6 @@ async def transcribe_audio(audio_file: UploadFile = File(...)) -> TranscriptionJ
             print(f"⚠️ Final cleanup failed: {cleanup_error}")
 
 # List all files
-@app.get("/files")
-async def list_files():
-    try:
-        print("📋 Listing all files...")
-        if not file_service:
-            raise HTTPException(status_code=500, detail="File service not available")
-        files = await file_service.list_files()
-
-        response = {
-            "success": True,
-            "files": files,
-            "count": len(files)
-        }
-
-        print(f"✅ Found {len(files)} files")
-        return response
-    except Exception as error:
-        print(f"❌ Failed to list files: {error}")
-        raise HTTPException(status_code=500, detail=f"Failed to list files: {str(error)}")
 
 # Delete file
 @app.delete("/file/{file_id}")
@@ -1436,55 +1417,7 @@ async def download_file(file_id: str):
         print(f"❌ Download error: {error}")
         raise HTTPException(status_code=500, detail=f"Download failed: {str(error)}")
 
-# CSV pagination endpoint
-@app.get("/csv/{file_id}/page/{page_number}")
-async def get_csv_page(file_id: str, page_number: int, limit: int = 20):
-    try:
-        if page_number < 1:
-            raise HTTPException(status_code=400, detail="Invalid page number")
 
-        file_info = await file_service.get_file_metadata(file_id)
-        if not file_info or not csv_service.is_csv_type(file_info["mimetype"]):
-            raise HTTPException(status_code=404, detail="CSV file not found")
-
-        csv_data = await csv_service.get_paginated_data(file_info["path"], page_number, limit)
-
-        return {
-            "data": csv_data["rows"],
-            "pagination": {
-                "page": page_number,
-                "limit": limit,
-                "totalRows": csv_data["totalRows"],
-                "totalPages": (csv_data["totalRows"] + limit - 1) // limit,
-                "hasNext": page_number * limit < csv_data["totalRows"],
-                "hasPrev": page_number > 1
-            }
-        }
-    except HTTPException as http_exc:
-        # Re-raise HTTP exceptions to be handled by FastAPI's exception handler
-        raise http_exc
-    except Exception as error:
-        print(f"❌ CSV pagination error: {error}")
-        raise HTTPException(status_code=500, detail=f"CSV pagination failed: {str(error)}")
-
-# File metadata endpoint
-@app.get("/metadata/{file_id}")
-async def get_metadata(file_id: str):
-    try:
-        file_info = await file_service.get_file_metadata(file_id)
-
-        if not file_info:
-            raise HTTPException(status_code=404, detail="File not found")
-
-        # Don't expose internal paths
-        public_metadata = {k: v for k, v in file_info.items() if k != "path"}
-        return public_metadata
-    except HTTPException as http_exc:
-        # Re-raise HTTP exceptions to be handled by FastAPI's exception handler
-        raise http_exc
-    except Exception as error:
-        print(f"❌ Metadata error: {error}")
-        raise HTTPException(status_code=500, detail=f"Metadata retrieval failed: {str(error)}")
 
 # RAG endpoints
 @app.post("/rag/index/{file_id}")
@@ -1562,30 +1495,6 @@ async def rag_index(file_id: str, request: RAGIndexRequest):
             }
         )
 
-@app.delete("/rag/index/{file_id}")
-async def rag_remove(file_id: str):
-    try:
-        print(f"🗑️ RAG: Removing document from index: {file_id}")
-        await rag_service.remove_document(file_id)
-
-        print(f"✅ RAG: Document removed from index: {file_id}")
-        return {
-            "success": True,
-            "message": "Document removed from index"
-        }
-
-    except HTTPException as http_exc:
-        # Re-raise HTTP exceptions to be handled by FastAPI's exception handler
-        raise http_exc
-    except Exception as error:
-        print(f"❌ RAG removal error: {error}")
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": "Failed to remove document from index",
-                "details": str(error)
-            }
-        )
 
 @app.post("/rag/query")
 async def rag_query(request: RAGQueryRequest):
