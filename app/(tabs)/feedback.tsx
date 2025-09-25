@@ -63,7 +63,7 @@ export default function FeedbackTab() {
 
       if (response.ok && result.success) {
         Alert.alert(
-          'Thank You!', 
+          'Thank You A Lot!', 
           'Your feedback has been submitted successfully.',
           [
             {
@@ -110,7 +110,7 @@ export default function FeedbackTab() {
                     key={type}
                     label={type}
                     value={type}
-                    color={Platform.OS === 'ios' ? '#FFFFFF' : '#000000'}
+                    color={'#FFFFFF'}
                   />
                 ))}
               </Picker>
@@ -132,11 +132,6 @@ export default function FeedbackTab() {
             />
           </View>
 
-          <View style={styles.platformInfo}>
-            <Text style={styles.platformText}>
-              Platform: {getPlatformType()}
-            </Text>
-          </View>
 
           <TouchableOpacity
             style={[
@@ -161,7 +156,7 @@ export default function FeedbackTab() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    // backgroundColor: '#1a1a1a',
   },
   header: {
     paddingHorizontal: 20,
@@ -198,10 +193,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   pickerContainer: {
-    backgroundColor: '#374151',
+    backgroundColor: '#333333',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#4B5563',
+    borderColor: '#555555',
     overflow: 'hidden',
   },
   picker: {
@@ -209,10 +204,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   textArea: {
-    backgroundColor: '#374151',
+    backgroundColor: '#333333',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#4B5563',
+    borderColor: '#555555',
     padding: 16,
     fontSize: 16,
     color: '#FFFFFF',
@@ -231,7 +226,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
   submitButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#00FFA7',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -240,8 +235,8 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: '#000',
     fontFamily: 'Inter',
   },
   disabledButton: {
