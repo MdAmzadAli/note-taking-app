@@ -97,42 +97,13 @@ function TabLayoutContent() {
         }}
       />
       <Tabs.Screen
-        name="feedback"
-        options={{
-          title: 'Feedback',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="message" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="reminders"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
         name="settings"
         options={{
-          href: null,
+          title: 'Setting',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="gear" color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="search"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="templates"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          href: null,
-        }}
-      />
+
     </Tabs>
   );
 }
