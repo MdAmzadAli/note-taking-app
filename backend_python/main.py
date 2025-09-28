@@ -380,6 +380,16 @@ async def update_user_transcription_usage_background(user_uuid: str, duration_se
                 result = usage_repo.initialize_usage_if_not_exists(user_uuid, duration_seconds)
                 print(f"✅ [Checkpoint 2] Usage table initialized for user {user_uuid}")
                 
+                # Send initial usage data to frontend via Socket.IO
+                if sio:
+                    await sio.emit('transcription_usage_updated', {
+                        'user_uuid': user_uuid,
+                        'current_usage': result['transcription_used'],
+                        'limit': result['transcription_limit'],
+                        'percentage': round((result['transcription_used'] / result['transcription_limit']) * 100, 1)
+                    })
+                    print(f"📊 [Checkpoint 2] Initial usage data sent to frontend for user {user_uuid}: {result['transcription_used']}/{result['transcription_limit']} ({round((result['transcription_used'] / result['transcription_limit']) * 100, 1)}%)")
+                
             else:
                 # User has existing usage table, check if adding current duration exceeds limit
                 current_used = usage_data['transcription_used']
