@@ -26,6 +26,16 @@ class BetaUserRepository(BaseRepository):
             self.session.add(beta_user)
             return beta_user
     
+    def create_beta_user_with_uuid(self, user_uuid: str, email: Optional[str] = None) -> User:
+        """Create a new beta user with specific UUID and optional email"""
+        with self.transaction():
+            beta_user = User(
+                id=user_uuid,
+                email=email.lower().strip() if email else None
+            )
+            self.session.add(beta_user)
+            return beta_user
+    
     def get_beta_user_by_email(self, email: str) -> Optional[User]:
         """Get beta user by email"""
         return self.session.query(User).filter(

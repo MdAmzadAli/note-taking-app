@@ -23,6 +23,7 @@ import { initializeNotificationSystem } from '@/utils/notifications';
 import { globalSocketService } from '@/services/globalSocketService';
 import BetaSignupModal from '@/components/BetaSignupModal';
 import { getUserUuid, getBetaUserData, storeBetaUserData } from '@/utils/storage';
+import { API_ENDPOINTS } from '@/config/api';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -86,6 +87,33 @@ export default function RootLayout() {
 
   const handleBetaSignupClose = async () => {
     try {
+      // Send UUID to backend even when user skips signup
+      const userUuid = await getUserUuid();
+      
+      try {
+        const response = await fetch(`${API_ENDPOINTS.base}/beta-user/signup`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user_uuid: userUuid,
+          }),
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+          console.log('✅ User profile created with UUID only:', userUuid);
+          // Store the user ID for future reference
+          await storeBetaUserData('', userUuid);
+        } else {
+          console.log('⚠️ Failed to create user profile:', result.error);
+        }
+      } catch (error) {
+        console.error('❌ Error creating user profile:', error);
+      }
+      
       // Mark that user has seen the beta signup modal
       await AsyncStorage.setItem('betaSignupShown', 'true');
       setShowBetaSignup(false);

@@ -323,7 +323,8 @@ class FeedbackRequest(BaseModel):
     email: Optional[str] = None
 
 class BetaUserSignupRequest(BaseModel):
-    email: str
+    email: Optional[str] = None
+    user_uuid: str
 
 class BetaUserUpdateRequest(BaseModel):
     user_id: str
@@ -1860,40 +1861,82 @@ async def submit_feedback(request: FeedbackRequest):
 # Beta User endpoints
 @app.post("/beta-user/signup")
 async def beta_user_signup(request: BetaUserSignupRequest):
-    """Sign up a beta user with email"""
+    """Sign up a beta user with UUID and optional email"""
     try:
-        print(f"📧 Beta user signup request received: {request.email}")
+        print(f"📧 Beta user signup request received - UUID: {request.user_uuid}, Email: {request.email}")
         
-        # Validate email format
-        email = request.email.strip().lower()
-        if not email or '@' not in email:
+        # Validate UUID is provided
+        if not request.user_uuid or not request.user_uuid.strip():
             raise HTTPException(
                 status_code=400,
-                detail="Valid email address is required"
+                detail="User UUID is required"
             )
+        
+        # Validate email format if provided
+        email = None
+        if request.email:
+            email = request.email.strip().lower()
+            if '@' not in email:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Valid email address is required when email is provided"
+                )
         
         # Get database session
         session = next(get_db_session())
         beta_user_repo = BetaUserRepository(session)
         
         try:
-            # Check if email already exists
-            if beta_user_repo.email_exists(email):
+            # Check if user with this UUID already exists
+            existing_user = beta_user_repo.get_beta_user_by_id(request.user_uuid)
+            if existing_user:
+                # User exists, update email if provided and different
+                if email and existing_user.email != email:
+                    # Check if email is already used by another user
+                    if beta_user_repo.email_exists(email):
+                        print(f"⚠️ Email already exists for different user: {email}")
+                        return BetaUserResponse(
+                            success=False,
+                            error="Email already registered by another user"
+                        )
+                    
+                    # Update email
+                    updated_user = beta_user_repo.update_beta_user_email(request.user_uuid, email)
+                    print(f"✅ Beta user email updated: {updated_user.id}")
+                    
+                    return BetaUserResponse(
+                        success=True,
+                        user_id=updated_user.id,
+                        email=updated_user.email,
+                        message="Email updated successfully"
+                    )
+                else:
+                    # User exists, no email change needed
+                    print(f"✅ Beta user already exists: {existing_user.id}")
+                    return BetaUserResponse(
+                        success=True,
+                        user_id=existing_user.id,
+                        email=existing_user.email,
+                        message="User profile already exists"
+                    )
+            
+            # Check if email already exists (for new user creation)
+            if email and beta_user_repo.email_exists(email):
                 print(f"⚠️ Email already exists: {email}")
                 return BetaUserResponse(
                     success=False,
                     error="Email already registered for beta access"
                 )
             
-            # Create new beta user
-            beta_user = beta_user_repo.create_beta_user(email)
+            # Create new beta user with UUID and optional email
+            beta_user = beta_user_repo.create_beta_user_with_uuid(request.user_uuid, email)
             print(f"✅ Beta user created successfully: {beta_user.id}")
             
             return BetaUserResponse(
                 success=True,
                 user_id=beta_user.id,
                 email=beta_user.email,
-                message="Successfully signed up for beta access"
+                message="Successfully created user profile"
             )
             
         except Exception as e:
