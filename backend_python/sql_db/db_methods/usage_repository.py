@@ -91,6 +91,7 @@ class UsageRepository(BaseRepository):
             
             return {
                 'transcription_used': new_usage.transcription_used,
+                'transcription_limit': new_usage.transcription_limit,
                 'transcription_reset_date': new_usage.transcription_reset_date,
                 'created': True
             }

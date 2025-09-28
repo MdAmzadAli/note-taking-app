@@ -469,6 +469,53 @@ async def health_check():
         "timestamp": datetime.now().isoformat()
     }
 
+# Usage endpoint
+@app.get("/usage/transcription/{user_uuid}")
+async def get_transcription_usage(user_uuid: str):
+    """Get transcription usage data for a user"""
+    try:
+        print(f'📊 Usage request for user: {user_uuid}')
+        
+        session = next(get_db_session())
+        usage_repo = UsageRepository(session)
+        
+        try:
+            usage_data = usage_repo.get_transcription_usage(user_uuid)
+            
+            if not usage_data:
+                # Return default usage data if no record exists
+                return {
+                    "success": True,
+                    "transcription_used": 0,
+                    "transcription_limit": 60,
+                    "percentage": 0.0
+                }
+            
+            percentage = (usage_data['transcription_used'] / usage_data['transcription_limit']) * 100
+            
+            return {
+                "success": True,
+                "transcription_used": usage_data['transcription_used'],
+                "transcription_limit": usage_data['transcription_limit'],
+                "percentage": round(percentage, 1)
+            }
+            
+        except Exception as e:
+            print(f"❌ Error getting usage data: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "transcription_used": 0,
+                "transcription_limit": 60,
+                "percentage": 0.0
+            }
+        finally:
+            session.close()
+            
+    except Exception as e:
+        print(f"❌ Usage endpoint error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get usage data")
+
 # Async transcription background processing
 async def process_transcription_job(job_id: str, audio_file_path: Path, user_uuid: str, duration_seconds: int):
     """
