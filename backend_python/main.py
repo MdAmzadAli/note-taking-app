@@ -84,6 +84,7 @@ print("🔧 All imports completed")
 try:
     from sql_db.db_schema.base import get_db_session, create_all_tables
     from sql_db.db_methods.beta_user_repository import BetaUserRepository
+    from sql_db.db_methods.usage_repository import UsageRepository
     print("✅ Database components imported successfully")
 except ImportError as e:
     print(f"❌ Failed to import database components: {e}")
@@ -359,6 +360,61 @@ class TranscriptionJobStatus(BaseModel):
 transcription_jobs: Dict[str, Dict[str, Any]] = {}
 job_lock = asyncio.Lock()
 
+async def update_user_transcription_usage_background(user_uuid: str, duration_minutes: int, job_id: str):
+    """
+    SECOND CHECKPOINT: Background task to update user transcription usage after completion
+    """
+    try:
+        print(f"📊 [Checkpoint 2] Processing usage update for user {user_uuid}, duration: {duration_minutes} minutes")
+        
+        session = next(get_db_session())
+        usage_repo = UsageRepository(session)
+        
+        try:
+            # Check if user has existing usage data
+            usage_data = usage_repo.get_transcription_usage(user_uuid)
+            
+            if not usage_data:
+                # User doesn't have usage table, initialize with current transcription duration
+                print(f"🆕 [Checkpoint 2] Initializing usage table for user {user_uuid} with {duration_minutes} minutes")
+                result = usage_repo.initialize_usage_if_not_exists(user_uuid, duration_minutes)
+                print(f"✅ [Checkpoint 2] Usage table initialized for user {user_uuid}")
+                
+            else:
+                # User has existing usage table, check if adding current duration exceeds limit
+                current_used = usage_data['transcription_used']
+                limit = usage_data['transcription_limit']
+                new_total = current_used + duration_minutes
+                
+                print(f"📊 [Checkpoint 2] Current usage: {current_used}, Adding: {duration_minutes}, New total: {new_total}, Limit: {limit}")
+                
+                # Update usage regardless of whether limit is exceeded
+                result = usage_repo.update_transcription_used(user_uuid, duration_minutes)
+                print(f"✅ [Checkpoint 2] Usage updated for user {user_uuid}: {result['transcription_used']}/{result['transcription_limit']}")
+                
+                # Check if limit is exceeded after the update and send flag if needed
+                if new_total >= limit:
+                    print(f"⚠️ [Checkpoint 2] User {user_uuid} has exceeded limit after this transcription")
+                    # Send flag to frontend via Socket.IO
+                    if sio:
+                        await sio.emit('transcription_limit_exceeded', {
+                            'job_id': job_id,
+                            'user_uuid': user_uuid,
+                            'current_usage': new_total,
+                            'limit': limit,
+                            'message': 'Transcription limit exceeded. Further transcriptions may be restricted.'
+                        })
+                        print(f"🚨 [Checkpoint 2] Limit exceeded notification sent to frontend for user {user_uuid}")
+                
+        except Exception as usage_update_error:
+            print(f"❌ [Checkpoint 2] Error updating usage for user {user_uuid}: {usage_update_error}")
+            
+        finally:
+            session.close()
+            
+    except Exception as background_error:
+        print(f"❌ [Checkpoint 2] Background usage update failed for user {user_uuid}: {background_error}")
+
 # Middleware for logging
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -394,7 +450,7 @@ async def health_check():
     }
 
 # Async transcription background processing
-async def process_transcription_job(job_id: str, audio_file_path: Path):
+async def process_transcription_job(job_id: str, audio_file_path: Path, user_uuid: str, duration_minutes: int):
     """
     Process transcription in background with real-time progress updates
     """
@@ -627,6 +683,10 @@ async def process_transcription_job(job_id: str, audio_file_path: Path):
                             transcription_jobs[job_id]['transcript'] = transcript_text
                             transcription_jobs[job_id]['updated_at'] = datetime.now().isoformat()
                         
+                        # SECOND CHECKPOINT: Background usage update after transcription completion
+                        print(f"🔍 [Checkpoint 2] Starting background usage update for user: {user_uuid}")
+                        asyncio.create_task(update_user_transcription_usage_background(user_uuid, duration_minutes, job_id))
+                        
                         # Final completion event with transcript
                         if sio:
                             await sio.emit('transcription_completed', {
@@ -685,9 +745,50 @@ async def transcribe_audio_async(
         # Parse audio duration
         try:
             duration_seconds = int(audio_duration)
+            duration_minutes = duration_seconds // 60  # Convert to minutes for usage tracking
         except ValueError:
             duration_seconds = 0
+            duration_minutes = 0
             print(f"⚠️ [Job] Invalid audio duration format: {audio_duration}, defaulting to 0")
+        
+        # FIRST CHECKPOINT: Check user transcription usage before starting transcription
+        print(f"🔍 [Checkpoint 1] Checking transcription usage for user: {user_uuid}")
+        session = next(get_db_session())
+        usage_repo = UsageRepository(session)
+        
+        try:
+            # Fetch user's current transcription usage data
+            usage_data = usage_repo.get_transcription_usage(user_uuid)
+            
+            if usage_data:
+                # User has usage table, check if current usage exceeds limit
+                current_used = usage_data['transcription_used']
+                limit = usage_data['transcription_limit']
+                
+                print(f"📊 [Checkpoint 1] User usage: {current_used}/{limit} minutes")
+                
+                if current_used >= limit:
+                    # Usage limit already exceeded, return immediately
+                    print(f"❌ [Checkpoint 1] User {user_uuid} has exceeded transcription limit ({current_used}/{limit} minutes)")
+                    session.close()
+                    return TranscriptionJobResponse(
+                        success=False,
+                        error="Transcription limit exceeded. Please upgrade your plan or wait for limit reset."
+                    )
+                else:
+                    # Usage within limit, allow transcription to proceed
+                    print(f"✅ [Checkpoint 1] User {user_uuid} within limit, proceeding with transcription")
+            else:
+                # No usage table found, let transcription proceed
+                print(f"ℹ️ [Checkpoint 1] No usage data found for user {user_uuid}, allowing transcription to proceed")
+                
+        except Exception as usage_check_error:
+            print(f"⚠️ [Checkpoint 1] Error checking usage for user {user_uuid}: {usage_check_error}")
+            # Allow transcription to proceed on usage check error
+            
+        finally:
+            session.close()
+        
         # Get AssemblyAI API key from server environment
         api_key = os.getenv("ASSEMBLYAI_API_KEY")
         if not api_key:
@@ -722,8 +823,8 @@ async def transcribe_audio_async(
         async with job_lock:
             transcription_jobs[job_id] = job_entry
         
-        # Start background processing (non-blocking)
-        asyncio.create_task(process_transcription_job(job_id, temp_audio_path))
+        # Start background processing (non-blocking) with user data for usage tracking
+        asyncio.create_task(process_transcription_job(job_id, temp_audio_path, user_uuid, duration_minutes))
         
         print(f"🚀 [Job {job_id}] Transcription job queued for background processing")
         
