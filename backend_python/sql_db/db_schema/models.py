@@ -1,5 +1,6 @@
-from sqlalchemy import Column, String, Integer, Text, ForeignKey, Index
+from sqlalchemy import Column, String, Integer, Text, ForeignKey, Index, DateTime
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from .base import Base
 
 class Workspace(Base):
@@ -62,4 +63,26 @@ class Context(Base):
     __table_args__ = (
         Index('idx_contexts_file_context', 'file_id', 'context_number'),
         Index('idx_contexts_file_page', 'file_id', 'page_number'),
+    )
+
+
+class BetaUser(Base):
+    """
+    Beta user profiles for early access signup
+    """
+    __tablename__ = 'beta_users'
+
+    # Primary key
+    id = Column(String(255), primary_key=True)
+    
+    # Email field for beta signup
+    email = Column(String(255), nullable=False, unique=True)
+    
+    # Timestamp for when they signed up
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Essential indexes
+    __table_args__ = (
+        Index('idx_beta_users_email', 'email'),
+        Index('idx_beta_users_created_at', 'created_at'),
     )
