@@ -80,10 +80,29 @@ except ImportError as e:
 
 print("🔧 All imports completed")
 
+# Database imports for beta user functionality
+try:
+    from sql_db.db_schema.base import get_db_session, create_all_tables
+    from sql_db.db_methods.beta_user_repository import BetaUserRepository
+    print("✅ Database components imported successfully")
+except ImportError as e:
+    print(f"❌ Failed to import database components: {e}")
+
+print("🔧 All imports including database completed")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup code (before yield)
     print("🚀 FastAPI application starting up...")
+    
+    # Create database tables
+    try:
+        print("🔧 Creating database tables...")
+        create_all_tables()
+        print("✅ Database tables created successfully")
+    except Exception as e:
+        print(f"❌ Error creating database tables: {e}")
+    
     # Ensure RAG service is initialized if not already done or if startup is called again
     if 'rag_service' in globals() and rag_service and not rag_service.is_initialized:
         print("🔄 Initializing RAG service on startup...")
@@ -302,6 +321,20 @@ class FeedbackRequest(BaseModel):
     platformType: str  # 'Android' or 'IOS'
     userName: Optional[str] = None
     email: Optional[str] = None
+
+class BetaUserSignupRequest(BaseModel):
+    email: str
+
+class BetaUserUpdateRequest(BaseModel):
+    user_id: str
+    email: str
+
+class BetaUserResponse(BaseModel):
+    success: bool
+    user_id: Optional[str] = None
+    email: Optional[str] = None
+    message: Optional[str] = None
+    error: Optional[str] = None
 
 class TranscriptionResponse(BaseModel):
     success: bool
@@ -1821,6 +1854,159 @@ async def submit_feedback(request: FeedbackRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to submit feedback: {str(error)}"
+        )
+
+
+# Beta User endpoints
+@app.post("/beta-user/signup")
+async def beta_user_signup(request: BetaUserSignupRequest):
+    """Sign up a beta user with email"""
+    try:
+        print(f"📧 Beta user signup request received: {request.email}")
+        
+        # Validate email format
+        email = request.email.strip().lower()
+        if not email or '@' not in email:
+            raise HTTPException(
+                status_code=400,
+                detail="Valid email address is required"
+            )
+        
+        # Get database session
+        session = next(get_db_session())
+        beta_user_repo = BetaUserRepository(session)
+        
+        try:
+            # Check if email already exists
+            if beta_user_repo.email_exists(email):
+                print(f"⚠️ Email already exists: {email}")
+                return BetaUserResponse(
+                    success=False,
+                    error="Email already registered for beta access"
+                )
+            
+            # Create new beta user
+            beta_user = beta_user_repo.create_beta_user(email)
+            print(f"✅ Beta user created successfully: {beta_user.id}")
+            
+            return BetaUserResponse(
+                success=True,
+                user_id=beta_user.id,
+                email=beta_user.email,
+                message="Successfully signed up for beta access"
+            )
+            
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
+            
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as error:
+        print(f"❌ Beta user signup error: {error}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to sign up beta user: {str(error)}"
+        )
+
+
+@app.get("/beta-user/{email}")
+async def get_beta_user_by_email(email: str):
+    """Get beta user by email"""
+    try:
+        print(f"📧 Get beta user request: {email}")
+        
+        # Get database session
+        session = next(get_db_session())
+        beta_user_repo = BetaUserRepository(session)
+        
+        try:
+            beta_user = beta_user_repo.get_beta_user_by_email(email)
+            
+            if not beta_user:
+                return BetaUserResponse(
+                    success=False,
+                    error="Beta user not found"
+                )
+            
+            return BetaUserResponse(
+                success=True,
+                user_id=beta_user.id,
+                email=beta_user.email,
+                message="Beta user found"
+            )
+            
+        finally:
+            session.close()
+            
+    except Exception as error:
+        print(f"❌ Get beta user error: {error}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get beta user: {str(error)}"
+        )
+
+
+@app.put("/beta-user/update")
+async def update_beta_user_email(request: BetaUserUpdateRequest):
+    """Update beta user email"""
+    try:
+        print(f"📧 Update beta user email request: {request.user_id} -> {request.email}")
+        
+        # Validate email format
+        email = request.email.strip().lower()
+        if not email or '@' not in email:
+            raise HTTPException(
+                status_code=400,
+                detail="Valid email address is required"
+            )
+        
+        # Get database session
+        session = next(get_db_session())
+        beta_user_repo = BetaUserRepository(session)
+        
+        try:
+            # Check if new email already exists (for different user)
+            existing_user = beta_user_repo.get_beta_user_by_email(email)
+            if existing_user and existing_user.id != request.user_id:
+                return BetaUserResponse(
+                    success=False,
+                    error="Email already registered by another user"
+                )
+            
+            # Update email
+            updated_user = beta_user_repo.update_beta_user_email(request.user_id, email)
+            
+            if not updated_user:
+                return BetaUserResponse(
+                    success=False,
+                    error="Beta user not found"
+                )
+            
+            print(f"✅ Beta user email updated successfully: {updated_user.id}")
+            
+            return BetaUserResponse(
+                success=True,
+                user_id=updated_user.id,
+                email=updated_user.email,
+                message="Email updated successfully"
+            )
+            
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
+            
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as error:
+        print(f"❌ Update beta user error: {error}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update beta user: {str(error)}"
         )
 
 
