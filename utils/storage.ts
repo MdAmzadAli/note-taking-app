@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Note, Task, Reminder, CustomTemplate, TemplateEntry, UserSettings, Habit } from '@/types';
+import { v4 as uuidv4 } from 'uuid';
 
 interface Template {
   id: string;
@@ -28,6 +29,8 @@ const KEYS = {
   TASKS: 'tasks',
   USER_SETTINGS: 'userSettings',
   CATEGORIES: 'categories',
+  USER_UUID: 'userUuid',
+  BETA_USER_DATA: 'betaUserData',
 };
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -651,3 +654,64 @@ export const getCategoryById = async (categoryId: string): Promise<Category | nu
 // Remove duplicate UserSettings interface - using the one from types/index.ts
 export const updateNote = saveNote; // Alias for backward compatibility
 export { mockSpeechToText } from './speech';
+
+// User UUID Management
+interface BetaUserData {
+  userId: string;
+  email?: string;
+  signupDate?: string;
+}
+
+export const generateUserUuid = (): string => {
+  return uuidv4();
+};
+
+export const getUserUuid = async (): Promise<string> => {
+  try {
+    let userUuid = await AsyncStorage.getItem(KEYS.USER_UUID);
+    if (!userUuid) {
+      userUuid = generateUserUuid();
+      await AsyncStorage.setItem(KEYS.USER_UUID, userUuid);
+      console.log('[UUID] Generated new user UUID:', userUuid);
+    }
+    return userUuid;
+  } catch (error) {
+    console.error('Error getting user UUID:', error);
+    // Fallback: generate new UUID if storage fails
+    return generateUserUuid();
+  }
+};
+
+export const storeBetaUserData = async (email: string, userId: string): Promise<void> => {
+  try {
+    const betaUserData: BetaUserData = {
+      userId,
+      email,
+      signupDate: new Date().toISOString(),
+    };
+    await AsyncStorage.setItem(KEYS.BETA_USER_DATA, JSON.stringify(betaUserData));
+    console.log('[BETA_USER] Stored beta user data for:', email);
+  } catch (error) {
+    console.error('Error storing beta user data:', error);
+    throw error;
+  }
+};
+
+export const getBetaUserData = async (): Promise<BetaUserData | null> => {
+  try {
+    const data = await AsyncStorage.getItem(KEYS.BETA_USER_DATA);
+    return data ? JSON.parse(data) : null;
+  } catch (error) {
+    console.error('Error getting beta user data:', error);
+    return null;
+  }
+};
+
+export const clearBetaUserData = async (): Promise<void> => {
+  try {
+    await AsyncStorage.removeItem(KEYS.BETA_USER_DATA);
+    console.log('[BETA_USER] Cleared beta user data');
+  } catch (error) {
+    console.error('Error clearing beta user data:', error);
+  }
+};

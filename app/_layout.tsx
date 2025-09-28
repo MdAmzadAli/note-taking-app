@@ -22,11 +22,13 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { initializeNotificationSystem } from '@/utils/notifications';
 import { globalSocketService } from '@/services/globalSocketService';
 import BetaSignupModal from '@/components/BetaSignupModal';
+import { getUserUuid, getBetaUserData, storeBetaUserData } from '@/utils/storage';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [showBetaSignup, setShowBetaSignup] = useState(false);
   const [appReady, setAppReady] = useState(false);
+  const [userUuid, setUserUuid] = useState<string | null>(null);
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     'Inter-Regular': { uri: 'https://fonts.googleapis.com/css2?family=Inter:wght@400&display=swap' },
@@ -49,9 +51,14 @@ export default function RootLayout() {
     const initializeApp = async () => {
       if (loaded) {
         try {
+          // Generate or retrieve user UUID
+          const uuid = await getUserUuid();
+          setUserUuid(uuid);
+          console.log('🔑 User UUID initialized:', uuid);
+          
           // Check if user has already seen the beta signup modal
           const betaSignupShown = await AsyncStorage.getItem('betaSignupShown');
-          const betaUserData = await AsyncStorage.getItem('betaUserData');
+          const betaUserData = await getBetaUserData();
           
           // Show beta signup modal only if user hasn't seen it and hasn't signed up
           if (!betaSignupShown && !betaUserData) {
@@ -90,11 +97,10 @@ export default function RootLayout() {
 
   const handleBetaSignupComplete = async (email: string, userId: string) => {
     try {
-      // Save beta user data
-      const betaUserData = { email, userId, signupDate: new Date().toISOString() };
-      await AsyncStorage.setItem('betaUserData', JSON.stringify(betaUserData));
+      // Save beta user data using new storage functions
+      await storeBetaUserData(email, userId);
       await AsyncStorage.setItem('betaSignupShown', 'true');
-      console.log('✅ Beta signup completed:', email);
+      console.log('✅ Beta signup completed:', email, 'UUID:', userId);
     } catch (error) {
       console.error('Error saving beta user data:', error);
     }
@@ -120,6 +126,7 @@ export default function RootLayout() {
           visible={showBetaSignup}
           onClose={handleBetaSignupClose}
           onSignupComplete={handleBetaSignupComplete}
+          userUuid={userUuid}
         />
       </ThemeProvider>
     </GestureHandlerRootView>

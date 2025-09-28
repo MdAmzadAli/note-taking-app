@@ -17,12 +17,14 @@ interface BetaSignupModalProps {
   visible: boolean;
   onClose: () => void;
   onSignupComplete?: (email: string, userId: string) => void;
+  userUuid?: string | null;
 }
 
 export default function BetaSignupModal({ 
   visible, 
   onClose, 
-  onSignupComplete 
+  onSignupComplete,
+  userUuid 
 }: BetaSignupModalProps) {
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,6 +57,7 @@ export default function BetaSignupModal({
         },
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
+          user_uuid: userUuid,
         }),
       });
 
@@ -68,7 +71,8 @@ export default function BetaSignupModal({
             {
               text: 'Great!',
               onPress: () => {
-                onSignupComplete?.(result.email, result.user_id);
+                // Pass the user UUID (which should be the same as the one we sent)
+                onSignupComplete?.(result.email, userUuid || result.user_id);
                 setEmail('');
                 onClose();
               },
