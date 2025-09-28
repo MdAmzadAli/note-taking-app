@@ -83,7 +83,6 @@ class UsageRepository(BaseRepository):
                 id=usage_id,
                 user_id=user_uuid,
                 transcription_used=current_transcription_duration,
-                transcription_limit=600,  # Default 10 hours = 600 minutes
                 transcription_reset_date=reset_date
             )
             
@@ -92,7 +91,6 @@ class UsageRepository(BaseRepository):
             
             return {
                 'transcription_used': new_usage.transcription_used,
-                'transcription_limit': new_usage.transcription_limit,
                 'transcription_reset_date': new_usage.transcription_reset_date,
                 'created': True
             }
