@@ -1,3 +1,15 @@
+// Custom crypto polyfill for React Native
+if (typeof global.crypto === 'undefined') {
+  global.crypto = {
+    getRandomValues: (array) => {
+      for (let i = 0; i < array.length; i++) {
+        array[i] = Math.floor(Math.random() * 256);
+      }
+      return array;
+    },
+  };
+}
+
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { DancingScript_400Regular } from '@expo-google-fonts/dancing-script';
