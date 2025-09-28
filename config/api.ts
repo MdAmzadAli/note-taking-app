@@ -7,7 +7,7 @@ const getApiBaseUrl = () => {
 // sjdisjdjsijdsnds
     // Check if we're in Expo tunnel environment (mobile/Expo Go)
     if (hostname.includes('.exp.direct')) {
-      const baseUrl = 'https://61f76305-ea14-48ac-9679-e594b0e393df-00-3mq86dbqq5c87.kirk.replit.dev:8000';
+      const baseUrl = 'https://a47ffd71-7341-4ff4-ba6f-1cdd761cf67f-00-34iqkedg9f76c.worf.replit.dev:8000';
       console.log('🔗 API Base URL (Expo Go - Replit Backend):', baseUrl);
       return baseUrl;
     }
