@@ -57,6 +57,7 @@ export default function AudioTranscriptionModal({
   });
   const [saveRecordingOption, setSaveRecordingOption] = useState(false);
   const [completedStages, setCompletedStages] = useState<Set<string>>(new Set());
+  const [isTranscriptionLimitExceeded, setIsTranscriptionLimitExceeded] = useState(false);
 
   const slideAnim = useRef(new Animated.Value(600)).current;
   const recordingRef = useRef<Audio.Recording | null>(null);
@@ -185,6 +186,21 @@ export default function AudioTranscriptionModal({
         }
       });
 
+      socketRef.current.on('transcription_limit_exceeded', (data) => {
+        console.log('[SOCKET] Transcription limit exceeded:', data);
+        if (data.job_id === currentJobIdRef.current || data.user_uuid) {
+          console.log('[SOCKET] Disabling transcription due to limit exceeded');
+          setIsTranscriptionLimitExceeded(true);
+          setIsTranscribing(false);
+          // Alert user about the limit
+          Alert.alert(
+            'Transcription Limit Exceeded',
+            data.message || 'You have reached your transcription limit. Further transcriptions are restricted.',
+            [{ text: 'OK', onPress: onClose }]
+          );
+        }
+      });
+
       socketRef.current.on('disconnect', () => {
         console.log('[SOCKET] Disconnected from transcription server');
       });
@@ -210,6 +226,7 @@ export default function AudioTranscriptionModal({
       message: 'Preparing to upload...'
     });
     currentJobIdRef.current = null;
+    setIsTranscriptionLimitExceeded(false);
   };
 
   const cleanup = async () => {
@@ -244,6 +261,12 @@ export default function AudioTranscriptionModal({
 
   const startRecording = async () => {
     try {
+      // Check if transcription limit is exceeded
+      if (isTranscriptionLimitExceeded) {
+        Alert.alert('Transcription Disabled', 'Transcription limit exceeded. Feature is disabled.');
+        return;
+      }
+
       // Request permissions
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== 'granted') {
@@ -476,22 +499,26 @@ export default function AudioTranscriptionModal({
           style={[
             styles.recordButton,
             isRecording && styles.recordButtonActive,
+            isTranscriptionLimitExceeded && styles.recordButtonDisabled,
           ]}
-          onPress={isRecording ? stopRecording : startRecording}
-          activeOpacity={0.7}
+          onPress={isTranscriptionLimitExceeded ? undefined : (isRecording ? stopRecording : startRecording)}
+          activeOpacity={isTranscriptionLimitExceeded ? 1 : 0.7}
+          disabled={isTranscriptionLimitExceeded}
         >
           <Ionicons
             name={isRecording ? 'stop' : 'mic'}
             size={32}
-            color="#FFFFFF"
+            color={isTranscriptionLimitExceeded ? "#666666" : "#FFFFFF"}
           />
         </TouchableOpacity>
       </View>
 
       <Text style={styles.instructionText}>
-        {isRecording 
-          ? `Tap stop when finished (max ${maxRecordingMinutes} minutes)` 
-          : 'Tap the microphone to start recording'}
+        {isTranscriptionLimitExceeded 
+          ? 'Transcription limit exceeded. Feature disabled.' 
+          : isRecording 
+            ? `Tap stop when finished (max ${maxRecordingMinutes} minutes)` 
+            : 'Tap the microphone to start recording'}
       </Text>
 
       <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
@@ -885,6 +912,10 @@ const styles = StyleSheet.create({
   },
   recordButtonActive: {
     backgroundColor: '#CC3333',
+  },
+  recordButtonDisabled: {
+    backgroundColor: '#333333',
+    opacity: 0.5,
   },
   instructionText: {
     fontSize: 14,
