@@ -13,16 +13,20 @@ import { LibreBaskerville_400Regular } from '@expo-google-fonts/libre-baskervill
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { initializeNotificationSystem } from '@/utils/notifications';
 import { globalSocketService } from '@/services/globalSocketService';
+import BetaSignupModal from '@/components/BetaSignupModal';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const [showBetaSignup, setShowBetaSignup] = useState(false);
+  const [appReady, setAppReady] = useState(false);
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     'Inter-Regular': { uri: 'https://fonts.googleapis.com/css2?family=Inter:wght@400&display=swap' },
@@ -42,18 +46,61 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-      // Initialize notification system
-      initializeNotificationSystem();
-      
-      // Initialize global socket service for persistent summary notifications
-      console.log('🚀 App: Initializing global socket service');
-      globalSocketService.initialize();
-    }
+    const initializeApp = async () => {
+      if (loaded) {
+        try {
+          // Check if user has already seen the beta signup modal
+          const betaSignupShown = await AsyncStorage.getItem('betaSignupShown');
+          const betaUserData = await AsyncStorage.getItem('betaUserData');
+          
+          // Show beta signup modal only if user hasn't seen it and hasn't signed up
+          if (!betaSignupShown && !betaUserData) {
+            setShowBetaSignup(true);
+          }
+          
+          SplashScreen.hideAsync();
+          // Initialize notification system
+          initializeNotificationSystem();
+          
+          // Initialize global socket service for persistent summary notifications
+          console.log('🚀 App: Initializing global socket service');
+          globalSocketService.initialize();
+          
+          setAppReady(true);
+        } catch (error) {
+          console.error('Error initializing app:', error);
+          setAppReady(true); // Continue even if there's an error
+        }
+      }
+    };
+
+    initializeApp();
   }, [loaded]);
 
-  if (!loaded) {
+  const handleBetaSignupClose = async () => {
+    try {
+      // Mark that user has seen the beta signup modal
+      await AsyncStorage.setItem('betaSignupShown', 'true');
+      setShowBetaSignup(false);
+    } catch (error) {
+      console.error('Error saving beta signup status:', error);
+      setShowBetaSignup(false);
+    }
+  };
+
+  const handleBetaSignupComplete = async (email: string, userId: string) => {
+    try {
+      // Save beta user data
+      const betaUserData = { email, userId, signupDate: new Date().toISOString() };
+      await AsyncStorage.setItem('betaUserData', JSON.stringify(betaUserData));
+      await AsyncStorage.setItem('betaSignupShown', 'true');
+      console.log('✅ Beta signup completed:', email);
+    } catch (error) {
+      console.error('Error saving beta user data:', error);
+    }
+  };
+
+  if (!loaded || !appReady) {
     // Async font loading only occurs in development.
     return null;
   }
@@ -67,6 +114,13 @@ export default function RootLayout() {
           <Stack.Screen name="+not-found" />
         </Stack>
         <StatusBar style="auto" />
+        
+        {/* Beta Signup Modal */}
+        <BetaSignupModal
+          visible={showBetaSignup}
+          onClose={handleBetaSignupClose}
+          onSignupComplete={handleBetaSignupComplete}
+        />
       </ThemeProvider>
     </GestureHandlerRootView>
   );
