@@ -17,6 +17,7 @@ interface NotesHeaderProps {
   onVoiceInput: () => void;
   isListening: boolean;
   showMicButton?: boolean;
+  isTranscriptionDisabled?: boolean;
   selectedCategoryName?: string | null;
   searchType?: 'notes' | 'tasks';
   showDeleteAllMenu?: boolean;
@@ -30,6 +31,7 @@ export default function NotesHeader({
   onVoiceInput, 
   isListening,
   showMicButton = true,
+  isTranscriptionDisabled = false,
   selectedCategoryName = null,
   searchType = 'notes',
   showDeleteAllMenu = false,
@@ -72,11 +74,19 @@ export default function NotesHeader({
       </View>
 
       {showMicButton && (
-        <TouchableOpacity style={styles.micButton} onPress={onVoiceInput}>
+        <TouchableOpacity 
+          style={[
+            styles.micButton,
+            isTranscriptionDisabled && styles.micButtonDisabled
+          ]} 
+          onPress={isTranscriptionDisabled ? undefined : onVoiceInput}
+          disabled={isTranscriptionDisabled}
+          activeOpacity={isTranscriptionDisabled ? 1 : 0.7}
+        >
           <Ionicons 
             name="mic" 
             size={20} 
-            color={isListening ? "#00FF7F" : "#FFFFFF"} 
+            color={isTranscriptionDisabled ? "#666666" : (isListening ? "#00FF7F" : "#FFFFFF")} 
           />
         </TouchableOpacity>
       )}
@@ -177,6 +187,10 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  micButtonDisabled: {
+    backgroundColor: '#1A1A1A',
+    opacity: 0.5,
   },
   menuButton: {
     padding: 8,

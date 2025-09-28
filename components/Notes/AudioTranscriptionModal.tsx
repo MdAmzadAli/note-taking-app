@@ -26,6 +26,7 @@ interface AudioTranscriptionModalProps {
   visible: boolean;
   onClose: () => void;
   onNoteSaved?: (note: Note) => void;
+  onTranscriptionLimitExceeded?: () => void;
   maxRecordingMinutes?: number;
   transcriptionProvider?: 'assemblyai' | 'whisper' | 'google';
 }
@@ -40,6 +41,7 @@ export default function AudioTranscriptionModal({
   visible,
   onClose,
   onNoteSaved,
+  onTranscriptionLimitExceeded,
   maxRecordingMinutes = 20,
   transcriptionProvider = 'assemblyai',
 }: AudioTranscriptionModalProps) {
@@ -192,6 +194,10 @@ export default function AudioTranscriptionModal({
           console.log('[SOCKET] Disabling transcription due to limit exceeded');
           setIsTranscriptionLimitExceeded(true);
           setIsTranscribing(false);
+          // Notify parent component to disable header mic icon
+          if (onTranscriptionLimitExceeded) {
+            onTranscriptionLimitExceeded();
+          }
           // Alert user about the limit
           Alert.alert(
             'Transcription Limit Exceeded',

@@ -104,7 +104,7 @@ class Usage(Base):
     user_id = Column(String(255), ForeignKey('users.id', ondelete='CASCADE'), nullable=False, unique=True)
     
     # Transcription limits and usage (in minutes)
-    transcription_limit = Column(Integer, default=600, nullable=False)  # 10 hours = 600 minutes
+    transcription_limit = Column(Integer, default=60, nullable=False)  # 10 hours = 600 minutes
     transcription_used = Column(Integer, default=0, nullable=False)
     transcription_reset_date = Column(DateTime(timezone=True), nullable=False)
     

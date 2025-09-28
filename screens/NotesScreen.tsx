@@ -119,6 +119,7 @@ export default function NotesScreen() {
   const [menuScrollOffset, setMenuScrollOffset] = useState(0);
   const menuFlatListRef = useRef<FlatList>(null);
   const [showTranscriptionModal, setShowTranscriptionModal] = useState(false);
+  const [isTranscriptionDisabled, setIsTranscriptionDisabled] = useState(false);
 
   useEffect(() => {
     loadNotes();
@@ -562,7 +563,16 @@ export default function NotesScreen() {
 
   // Handle voice input for transcription
   const handleVoiceInput = () => {
+    if (isTranscriptionDisabled) {
+      Alert.alert('Transcription Disabled', 'Transcription limit exceeded. Feature is disabled.');
+      return;
+    }
     setShowTranscriptionModal(true);
+  };
+
+  // Handle when transcription limit is exceeded
+  const handleTranscriptionLimitExceeded = () => {
+    setIsTranscriptionDisabled(true);
   };
 
   // Handle when a note is saved from transcription
@@ -787,6 +797,7 @@ export default function NotesScreen() {
           onMenuPress={() => setIsMenuVisible(true)}
           onVoiceInput={handleVoiceInput}
           isListening={isListening}
+          isTranscriptionDisabled={isTranscriptionDisabled}
           showMicButton={!isCreating && selectedSection !== 'deleted'}
           selectedCategoryName={selectedCategoryId ? categories.find(cat => cat.id === selectedCategoryId)?.name : null}
           searchType="notes"
@@ -875,6 +886,7 @@ export default function NotesScreen() {
         visible={showTranscriptionModal}
         onClose={() => setShowTranscriptionModal(false)}
         onNoteSaved={handleTranscriptionNoteSaved}
+        onTranscriptionLimitExceeded={handleTranscriptionLimitExceeded}
         maxRecordingMinutes={20}
         transcriptionProvider={settings.speechProvider?.includes('assemblyai') ? 'assemblyai' : 'assemblyai'}
       />

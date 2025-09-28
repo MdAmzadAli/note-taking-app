@@ -360,12 +360,12 @@ class TranscriptionJobStatus(BaseModel):
 transcription_jobs: Dict[str, Dict[str, Any]] = {}
 job_lock = asyncio.Lock()
 
-async def update_user_transcription_usage_background(user_uuid: str, duration_minutes: int, job_id: str):
+async def update_user_transcription_usage_background(user_uuid: str, duration_seconds: int, job_id: str):
     """
     SECOND CHECKPOINT: Background task to update user transcription usage after completion
     """
     try:
-        print(f"📊 [Checkpoint 2] Processing usage update for user {user_uuid}, duration: {duration_minutes} minutes")
+        print(f"📊 [Checkpoint 2] Processing usage update for user {user_uuid}, duration: {duration_seconds} minutes")
         
         session = next(get_db_session())
         usage_repo = UsageRepository(session)
@@ -376,20 +376,20 @@ async def update_user_transcription_usage_background(user_uuid: str, duration_mi
             
             if not usage_data:
                 # User doesn't have usage table, initialize with current transcription duration
-                print(f"🆕 [Checkpoint 2] Initializing usage table for user {user_uuid} with {duration_minutes} minutes")
-                result = usage_repo.initialize_usage_if_not_exists(user_uuid, duration_minutes)
+                print(f"🆕 [Checkpoint 2] Initializing usage table for user {user_uuid} with {duration_seconds} minutes")
+                result = usage_repo.initialize_usage_if_not_exists(user_uuid, duration_seconds)
                 print(f"✅ [Checkpoint 2] Usage table initialized for user {user_uuid}")
                 
             else:
                 # User has existing usage table, check if adding current duration exceeds limit
                 current_used = usage_data['transcription_used']
                 limit = usage_data['transcription_limit']
-                new_total = current_used + duration_minutes
+                new_total = current_used + duration_seconds
                 
-                print(f"📊 [Checkpoint 2] Current usage: {current_used}, Adding: {duration_minutes}, New total: {new_total}, Limit: {limit}")
+                print(f"📊 [Checkpoint 2] Current usage: {current_used}, Adding: {duration_seconds}, New total: {new_total}, Limit: {limit}")
                 
                 # Update usage regardless of whether limit is exceeded
-                result = usage_repo.update_transcription_used(user_uuid, duration_minutes)
+                result = usage_repo.update_transcription_used(user_uuid, duration_seconds)
                 print(f"✅ [Checkpoint 2] Usage updated for user {user_uuid}: {result['transcription_used']}/{result['transcription_limit']}")
                 
                 # Check if limit is exceeded after the update and send flag if needed
@@ -450,7 +450,7 @@ async def health_check():
     }
 
 # Async transcription background processing
-async def process_transcription_job(job_id: str, audio_file_path: Path, user_uuid: str, duration_minutes: int):
+async def process_transcription_job(job_id: str, audio_file_path: Path, user_uuid: str, duration_seconds: int):
     """
     Process transcription in background with real-time progress updates
     """
@@ -685,7 +685,7 @@ async def process_transcription_job(job_id: str, audio_file_path: Path, user_uui
                         
                         # SECOND CHECKPOINT: Background usage update after transcription completion
                         print(f"🔍 [Checkpoint 2] Starting background usage update for user: {user_uuid}")
-                        asyncio.create_task(update_user_transcription_usage_background(user_uuid, duration_minutes, job_id))
+                        asyncio.create_task(update_user_transcription_usage_background(user_uuid, duration_seconds, job_id))
                         
                         # Final completion event with transcript
                         if sio:
@@ -745,10 +745,10 @@ async def transcribe_audio_async(
         # Parse audio duration
         try:
             duration_seconds = int(audio_duration)
-            duration_minutes = duration_seconds // 60  # Convert to minutes for usage tracking
+            # duration_seconds = duration_seconds // 60  # Convert to minutes for usage tracking
         except ValueError:
+            # duration_seconds = 0
             duration_seconds = 0
-            duration_minutes = 0
             print(f"⚠️ [Job] Invalid audio duration format: {audio_duration}, defaulting to 0")
         
         # FIRST CHECKPOINT: Check user transcription usage before starting transcription
@@ -824,7 +824,7 @@ async def transcribe_audio_async(
             transcription_jobs[job_id] = job_entry
         
         # Start background processing (non-blocking) with user data for usage tracking
-        asyncio.create_task(process_transcription_job(job_id, temp_audio_path, user_uuid, duration_minutes))
+        asyncio.create_task(process_transcription_job(job_id, temp_audio_path, user_uuid, duration_seconds))
         
         print(f"🚀 [Job {job_id}] Transcription job queued for background processing")
         
