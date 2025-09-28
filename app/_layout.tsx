@@ -85,33 +85,35 @@ export default function RootLayout() {
     initializeApp();
   }, [loaded]);
 
-  const handleBetaSignupClose = async () => {
+  const handleBetaSignupClose = async (signupCompleted: boolean = false) => {
     try {
-      // Send UUID to backend even when user skips signup
-      const userUuid = await getUserUuid();
-      
-      try {
-        const response = await fetch(`${API_ENDPOINTS.base}/beta-user/signup`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            user_uuid: userUuid,
-          }),
-        });
+      // Only send UUID to backend if user skipped signup (didn't complete it)
+      if (!signupCompleted) {
+        const userUuid = await getUserUuid();
         
-        const result = await response.json();
-        
-        if (response.ok && result.success) {
-          console.log('✅ User profile created with UUID only:', userUuid);
-          // Store the user ID for future reference
-          await storeBetaUserData('', userUuid);
-        } else {
-          console.log('⚠️ Failed to create user profile:', result.error);
+        try {
+          const response = await fetch(`${API_ENDPOINTS.base}/beta-user/signup`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              user_uuid: userUuid,
+            }),
+          });
+          
+          const result = await response.json();
+          
+          if (response.ok && result.success) {
+            console.log('✅ User profile created with UUID only:', userUuid);
+            // Store the user ID for future reference
+            await storeBetaUserData('', userUuid);
+          } else {
+            console.log('⚠️ Failed to create user profile:', result.error);
+          }
+        } catch (error) {
+          console.error('❌ Error creating user profile:', error);
         }
-      } catch (error) {
-        console.error('❌ Error creating user profile:', error);
       }
       
       // Mark that user has seen the beta signup modal
@@ -129,6 +131,8 @@ export default function RootLayout() {
       await storeBetaUserData(email, userId);
       await AsyncStorage.setItem('betaSignupShown', 'true');
       console.log('✅ Beta signup completed:', email, 'UUID:', userId);
+      // Close modal with signupCompleted=true to avoid duplicate backend call
+      handleBetaSignupClose(true);
     } catch (error) {
       console.error('Error saving beta user data:', error);
     }

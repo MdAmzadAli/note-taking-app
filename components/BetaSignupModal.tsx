@@ -74,7 +74,7 @@ export default function BetaSignupModal({
                 // Pass the user UUID (which should be the same as the one we sent)
                 onSignupComplete?.(result.email, userUuid || result.user_id);
                 setEmail('');
-                onClose();
+                // Don't call onClose() here - handleBetaSignupComplete will handle it
               },
             },
           ]
@@ -90,7 +90,8 @@ export default function BetaSignupModal({
                 text: 'OK',
                 onPress: () => {
                   setEmail('');
-                  onClose();
+                  // Call onSignupComplete to indicate this was a successful interaction
+                  onSignupComplete?.(email.trim().toLowerCase(), userUuid || 'existing-user');
                 },
               },
             ]
