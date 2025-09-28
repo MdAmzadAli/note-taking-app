@@ -673,14 +673,21 @@ async def process_transcription_job(job_id: str, audio_file_path: Path):
 @app.post("/transcribe/async")
 async def transcribe_audio_async(
     audio_file: UploadFile = File(...),
-    user_uuid: str = Form(...)
+    user_uuid: str = Form(...),
+    audio_duration: str = Form(...)
 ) -> TranscriptionJobResponse:
     """
     Non-blocking transcription endpoint that returns job ID immediately
     """
-    print(f"🎤 [Async] Transcription request received: {audio_file.filename} from user: {user_uuid}")
+    print(f"🎤 [Async] Transcription request received: {audio_file.filename} from user: {user_uuid}, duration: {audio_duration}s")
     
     try:
+        # Parse audio duration
+        try:
+            duration_seconds = int(audio_duration)
+        except ValueError:
+            duration_seconds = 0
+            print(f"⚠️ [Job] Invalid audio duration format: {audio_duration}, defaulting to 0")
         # Get AssemblyAI API key from server environment
         api_key = os.getenv("ASSEMBLYAI_API_KEY")
         if not api_key:

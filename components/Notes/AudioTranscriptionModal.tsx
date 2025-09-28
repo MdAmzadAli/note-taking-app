@@ -345,6 +345,9 @@ export default function AudioTranscriptionModal({
       // Add user UUID from local storage
       const userUuid = await getUserUuid();
       formData.append('user_uuid', userUuid);
+      
+      // Add audio duration in seconds
+      formData.append('audio_duration', recordingDuration.toString());
 
       // Submit transcription job
       const baseUrl = getApiBaseUrl();
