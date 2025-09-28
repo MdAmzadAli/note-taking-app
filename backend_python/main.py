@@ -392,6 +392,16 @@ async def update_user_transcription_usage_background(user_uuid: str, duration_se
                 result = usage_repo.update_transcription_used(user_uuid, duration_seconds)
                 print(f"✅ [Checkpoint 2] Usage updated for user {user_uuid}: {result['transcription_used']}/{result['transcription_limit']}")
                 
+                # Send current usage data to frontend via Socket.IO
+                if sio:
+                    await sio.emit('transcription_usage_updated', {
+                        'user_uuid': user_uuid,
+                        'current_usage': result['transcription_used'],
+                        'limit': result['transcription_limit'],
+                        'percentage': round((result['transcription_used'] / result['transcription_limit']) * 100, 1)
+                    })
+                    print(f"📊 [Checkpoint 2] Usage data sent to frontend for user {user_uuid}: {result['transcription_used']}/{result['transcription_limit']} ({round((result['transcription_used'] / result['transcription_limit']) * 100, 1)}%)")
+                
                 # Check if limit is exceeded after the update and send flag if needed
                 if new_total >= limit:
                     print(f"⚠️ [Checkpoint 2] User {user_uuid} has exceeded limit after this transcription")

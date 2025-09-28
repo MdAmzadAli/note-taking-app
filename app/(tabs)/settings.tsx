@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { Picker } from '@react-native-picker/picker';
 import { API_ENDPOINTS } from '@/config/api';
 import AppLayout from '@/app/AppLayout';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { io, Socket } from 'socket.io-client';
 
 const FEEDBACK_TYPES = [
   'Bug',
@@ -173,8 +174,17 @@ export default function SettingsTab() {
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
   const [betaUserId, setBetaUserId] = useState<string | null>(null);
   const [isLoadingBetaData, setIsLoadingBetaData] = useState(true);
+  
+  // Transcription usage states
+  const [transcriptionUsage, setTranscriptionUsage] = useState({
+    current_usage: 0,
+    limit: 60,
+    percentage: 0
+  });
+  const [isLoadingUsage, setIsLoadingUsage] = useState(true);
+  const socketRef = useRef<Socket | null>(null);
 
-  // Load beta user data on component mount
+  // Load beta user data and setup Socket.IO on component mount
   useEffect(() => {
     const loadBetaUserData = async () => {
       try {
@@ -192,7 +202,72 @@ export default function SettingsTab() {
       }
     };
 
+    const loadTranscriptionUsage = async () => {
+      try {
+        const userUuid = await AsyncStorage.getItem('userUuid');
+        if (userUuid) {
+          const response = await fetch(`${API_ENDPOINTS.base}/usage/transcription/${userUuid}`);
+          if (response.ok) {
+            const usageData = await response.json();
+            if (usageData.success) {
+              const percentage = (usageData.transcription_used / usageData.transcription_limit) * 100;
+              setTranscriptionUsage({
+                current_usage: usageData.transcription_used,
+                limit: usageData.transcription_limit,
+                percentage: Math.round(percentage * 10) / 10
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading transcription usage:', error);
+      } finally {
+        setIsLoadingUsage(false);
+      }
+    };
+
+    const setupSocketConnection = async () => {
+      try {
+        const userUuid = await AsyncStorage.getItem('userUuid');
+        if (userUuid) {
+          const socketUrl = API_ENDPOINTS.base.replace('/api/v1', '');
+          socketRef.current = io(socketUrl, {
+            transports: ['websocket', 'polling'],
+            upgrade: true,
+            timeout: 20000,
+          });
+
+          socketRef.current.on('transcription_usage_updated', (data) => {
+            console.log('[SOCKET] Usage updated:', data);
+            if (data.user_uuid === userUuid) {
+              setTranscriptionUsage({
+                current_usage: data.current_usage,
+                limit: data.limit,
+                percentage: data.percentage
+              });
+            }
+          });
+
+          socketRef.current.on('connect', () => {
+            console.log('[SOCKET] Connected to transcription server for usage updates');
+          });
+        }
+      } catch (error) {
+        console.error('Error setting up socket connection:', error);
+      }
+    };
+
     loadBetaUserData();
+    loadTranscriptionUsage();
+    setupSocketConnection();
+
+    // Cleanup socket connection on unmount
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
   }, []);
 
   const handleEmailEdit = () => {
@@ -387,6 +462,51 @@ export default function SettingsTab() {
                 {betaUserEmail && (
                   <Text style={styles.betaStatusText}>
                     ✅ You're registered for beta access with 40% lifetime discount!
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
+
+          {/* Transcription Usage Section */}
+          <View style={styles.usageSection}>
+            <Text style={styles.sectionTitle}>Usage</Text>
+            <Text style={styles.sectionDescription}>
+              Voice transcription usage limit
+            </Text>
+            
+            {isLoadingUsage ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator color="#00FFA7" size="small" />
+                <Text style={styles.loadingText}>Loading usage...</Text>
+              </View>
+            ) : (
+              <View style={styles.usageContainer}>
+                <Text style={styles.usageLabel}>Transcription Usage</Text>
+                
+                <View style={styles.progressBarContainer}>
+                  <View style={styles.progressBarBackground}>
+                    <View 
+                      style={[
+                        styles.progressBarFill, 
+                        { width: `${Math.min(transcriptionUsage.percentage, 100)}%` }
+                      ]} 
+                    />
+                  </View>
+                </View>
+                
+                <View style={styles.usageTextContainer}>
+                  <Text style={styles.usageText}>
+                    {transcriptionUsage.current_usage}s / {transcriptionUsage.limit}s
+                  </Text>
+                  <Text style={styles.percentageText}>
+                    {transcriptionUsage.percentage}%
+                  </Text>
+                </View>
+                
+                {transcriptionUsage.percentage >= 100 && (
+                  <Text style={styles.limitExceededText}>
+                    ⚠️ Transcription limit exceeded. Further transcriptions are restricted.
                   </Text>
                 )}
               </View>
@@ -680,5 +800,64 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     textAlign: 'center',
     fontWeight: '500',
+  },
+  // Usage Section Styles
+  usageSection: {
+    marginTop: 24,
+    padding: 20,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  usageContainer: {
+    flex: 1,
+  },
+  usageLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    fontFamily: 'Inter',
+    marginBottom: 12,
+  },
+  progressBarContainer: {
+    marginBottom: 8,
+  },
+  progressBarBackground: {
+    width: '100%',
+    height: 8,
+    backgroundColor: '#3A3A3A',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#00ffa7',
+    borderRadius: 4,
+  },
+  usageTextContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  usageText: {
+    fontSize: 14,
+    color: '#CCCCCC',
+    fontFamily: 'Inter',
+  },
+  percentageText: {
+    fontSize: 14,
+    color: '#00ffa7',
+    fontFamily: 'Inter',
+    fontWeight: '600',
+  },
+  limitExceededText: {
+    fontSize: 12,
+    color: '#FF6B6B',
+    fontFamily: 'Inter',
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
 });
