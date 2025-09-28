@@ -20,6 +20,7 @@ import { saveNote } from '@/utils/storage';
 import { TranscriptionService, TranscriptionConfig } from '@/services/transcriptionService';
 import io, { Socket } from 'socket.io-client';
 import { getApiBaseUrl } from '@/config/api';
+import { getUserUuid } from '@/utils/storage';
 
 interface AudioTranscriptionModalProps {
   visible: boolean;
@@ -340,6 +341,10 @@ export default function AudioTranscriptionModal({
       } as any;
 
       formData.append('audio_file', audioFile);
+      
+      // Add user UUID from local storage
+      const userUuid = await getUserUuid();
+      formData.append('user_uuid', userUuid);
 
       // Submit transcription job
       const baseUrl = getApiBaseUrl();

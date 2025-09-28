@@ -671,11 +671,14 @@ async def process_transcription_job(job_id: str, audio_file_path: Path):
 
 # New async transcription endpoints
 @app.post("/transcribe/async")
-async def transcribe_audio_async(audio_file: UploadFile = File(...)) -> TranscriptionJobResponse:
+async def transcribe_audio_async(
+    audio_file: UploadFile = File(...),
+    user_uuid: str = Form(...)
+) -> TranscriptionJobResponse:
     """
     Non-blocking transcription endpoint that returns job ID immediately
     """
-    print(f"🎤 [Async] Transcription request received: {audio_file.filename}")
+    print(f"🎤 [Async] Transcription request received: {audio_file.filename} from user: {user_uuid}")
     
     try:
         # Get AssemblyAI API key from server environment
