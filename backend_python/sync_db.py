@@ -49,7 +49,7 @@ def sync_database_schema():
             """)
             tables = [row[0] for row in result.fetchall()]
             
-            expected_tables = ['workspaces', 'files', 'contexts', 'workspace_file_contexts']
+            expected_tables = ['workspaces', 'files', 'contexts', 'users', 'usage']
             
             logger.info(f"📊 Found {len(tables)} tables in database:")
             for table in tables:
