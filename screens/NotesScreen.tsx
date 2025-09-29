@@ -36,6 +36,7 @@ import { getCategories } from '@/utils/storage';
 import WritingStyleSelector from '@/components/WritingStyleSelector';
 import WritingStyleEditor from '@/components/WritingStyleEditor';
 import { useTabBar } from '@/contexts/TabBarContext';
+import { useTranscriptionUsage } from '@/contexts/TranscriptionUsageContext';
 
 interface ImageAttachment {
   id: string;
@@ -64,6 +65,7 @@ interface SimpleNote {
 export default function NotesScreen() {
   const insets = useSafeAreaInsets();
   const { hideTabBar, showTabBar } = useTabBar();
+  const { isUsageLimitExceeded } = useTranscriptionUsage();
   const [notes, setNotes] = useState<SimpleNote[]>([]);
   const [filteredNotes, setFilteredNotes] = useState<SimpleNote[]>([]);
   const [isCreating, setIsCreating] = useState(false);
@@ -137,6 +139,12 @@ export default function NotesScreen() {
       showTabBar();
     }
   }, [isCreating, hideTabBar, showTabBar]);
+
+  // Monitor transcription usage limit and disable mic when exceeded
+  useEffect(() => {
+    console.log('[NOTES] Transcription usage limit check - isUsageLimitExceeded:', isUsageLimitExceeded);
+    setIsTranscriptionDisabled(isUsageLimitExceeded);
+  }, [isUsageLimitExceeded]);
 
   // Refresh templates when screen gains focus (e.g., returning from Templates tab)
   useFocusEffect(
