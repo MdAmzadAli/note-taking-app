@@ -412,20 +412,6 @@ async def update_user_transcription_usage_background(user_uuid: str, duration_se
                     })
                     print(f"📊 [Checkpoint 2] Usage data sent to frontend for user {user_uuid}: {result['transcription_used']}/{result['transcription_limit']} ({round((result['transcription_used'] / result['transcription_limit']) * 100, 1)}%)")
                 
-                # Check if limit is exceeded after the update and send flag if needed
-                if new_total >= limit:
-                    print(f"⚠️ [Checkpoint 2] User {user_uuid} has exceeded limit after this transcription")
-                    # Send flag to frontend via Socket.IO
-                    if sio:
-                        await sio.emit('transcription_limit_exceeded', {
-                            'job_id': job_id,
-                            'user_uuid': user_uuid,
-                            'current_usage': new_total,
-                            'limit': limit,
-                            'message': 'Transcription limit exceeded. Further transcriptions may be restricted.'
-                        })
-                        print(f"🚨 [Checkpoint 2] Limit exceeded notification sent to frontend for user {user_uuid}")
-                
         except Exception as usage_update_error:
             print(f"❌ [Checkpoint 2] Error updating usage for user {user_uuid}: {usage_update_error}")
             

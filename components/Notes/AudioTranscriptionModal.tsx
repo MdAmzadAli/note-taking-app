@@ -188,24 +188,6 @@ export default function AudioTranscriptionModal({
         }
       });
 
-      socketRef.current.on('transcription_limit_exceeded', (data) => {
-        console.log('[SOCKET] Transcription limit exceeded:', data);
-        if (data.job_id === currentJobIdRef.current || data.user_uuid) {
-          console.log('[SOCKET] Disabling transcription due to limit exceeded');
-          setIsTranscriptionLimitExceeded(true);
-          setIsTranscribing(false);
-          // Notify parent component to disable header mic icon
-          if (onTranscriptionLimitExceeded) {
-            onTranscriptionLimitExceeded();
-          }
-          // Alert user about the limit
-          Alert.alert(
-            'Transcription Limit Exceeded',
-            data.message || 'You have reached your transcription limit. Further transcriptions are restricted.',
-            [{ text: 'OK', onPress: onClose }]
-          );
-        }
-      });
 
       socketRef.current.on('disconnect', () => {
         console.log('[SOCKET] Disconnected from transcription server');
