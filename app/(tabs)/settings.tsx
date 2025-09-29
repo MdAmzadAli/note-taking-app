@@ -504,11 +504,7 @@ export default function SettingsTab() {
                   </Text>
                 </View>
                 
-                {transcriptionUsage.percentage >= 100 && (
-                  <Text style={styles.limitExceededText}>
-                    ⚠️ Transcription limit exceeded. Further transcriptions are restricted.
-                  </Text>
-                )}
+           
               </View>
             )}
           </View>
