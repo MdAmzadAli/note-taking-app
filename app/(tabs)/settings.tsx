@@ -15,7 +15,7 @@ import { Picker } from '@react-native-picker/picker';
 import { API_ENDPOINTS } from '@/config/api';
 import AppLayout from '@/app/AppLayout';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { io, Socket } from 'socket.io-client';
+import { useTranscriptionUsage } from '@/contexts/TranscriptionUsageContext';
 
 const FEEDBACK_TYPES = [
   'Bug',
@@ -175,16 +175,10 @@ export default function SettingsTab() {
   const [betaUserId, setBetaUserId] = useState<string | null>(null);
   const [isLoadingBetaData, setIsLoadingBetaData] = useState(true);
   
-  // Transcription usage states
-  const [transcriptionUsage, setTranscriptionUsage] = useState({
-    current_usage: 0,
-    limit: 60,
-    percentage: 0
-  });
-  const [isLoadingUsage, setIsLoadingUsage] = useState(true);
-  const socketRef = useRef<Socket | null>(null);
+  // Use transcription usage context
+  const { usageData: transcriptionUsage, isLoading: isLoadingUsage } = useTranscriptionUsage();
 
-  // Load beta user data and setup Socket.IO on component mount
+  // Load beta user data on component mount
   useEffect(() => {
     const loadBetaUserData = async () => {
       try {
@@ -202,72 +196,7 @@ export default function SettingsTab() {
       }
     };
 
-    const loadTranscriptionUsage = async () => {
-      try {
-        const userUuid = await AsyncStorage.getItem('userUuid');
-        if (userUuid) {
-          const response = await fetch(`${API_ENDPOINTS.base}/usage/transcription/${userUuid}`);
-          if (response.ok) {
-            const usageData = await response.json();
-            if (usageData.success) {
-              const percentage = (usageData.transcription_used / usageData.transcription_limit) * 100;
-              setTranscriptionUsage({
-                current_usage: usageData.transcription_used,
-                limit: usageData.transcription_limit,
-                percentage: Math.round(percentage * 10) / 10
-              });
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error loading transcription usage:', error);
-      } finally {
-        setIsLoadingUsage(false);
-      }
-    };
-
-    const setupSocketConnection = async () => {
-      try {
-        const userUuid = await AsyncStorage.getItem('userUuid');
-        if (userUuid) {
-          const socketUrl = API_ENDPOINTS.base.replace('/api/v1', '');
-          socketRef.current = io(socketUrl, {
-            transports: ['websocket', 'polling'],
-            upgrade: true,
-            timeout: 20000,
-          });
-
-          socketRef.current.on('transcription_usage_updated', (data) => {
-            console.log('[SOCKET] Usage updated:', data);
-            if (data.user_uuid === userUuid) {
-              setTranscriptionUsage({
-                current_usage: data.current_usage,
-                limit: data.limit,
-                percentage: data.percentage
-              });
-            }
-          });
-
-          socketRef.current.on('connect', () => {
-            console.log('[SOCKET] Connected to transcription server for usage updates');
-          });
-        }
-      } catch (error) {
-        console.error('Error setting up socket connection:', error);
-      }
-    };
-
     loadBetaUserData();
-    loadTranscriptionUsage();
-    setupSocketConnection();
-
-    // Cleanup socket connection on unmount
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
-    };
   }, []);
 
   const handleEmailEdit = () => {
