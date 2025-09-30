@@ -73,6 +73,12 @@ except ImportError as e:
     print(f"❌ Failed to import URLDownloadService: {e}")
 
 try:
+    from component.vector_database_service import set_global_sio
+    print("✅ set_global_sio imported successfully")
+except ImportError as e:
+    print(f"❌ Failed to import set_global_sio: {e}")
+
+try:
     from component.webpage_text_extractor_service import WebpageTextExtractorService
     print("✅ WebpageTextExtractorService imported successfully")
 except ImportError as e:
@@ -233,10 +239,9 @@ socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 print("🔌 Socket.IO ASGI app created successfully")
 print("🔌 Socket.IO will handle routes: /socket.io/*")
 
-# Set Socket.IO instance on vector database service for real-time file usage updates
-if rag_service and hasattr(rag_service, 'vector_db_service'):
-    rag_service.vector_db_service.set_sio(sio)
-    print("✅ Socket.IO instance set on VectorDatabaseService for real-time updates")
+# Set Socket.IO instance globally for vector database service real-time file usage updates
+set_global_sio(sio)
+print("✅ Socket.IO instance set globally for VectorDatabaseService real-time updates")
 
 @sio.event
 async def connect(sid, environ):

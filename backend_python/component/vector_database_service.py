@@ -17,6 +17,15 @@ load_dotenv(dotenv_path=env_path)
 # UUID namespace for consistent point IDs (matching JavaScript)
 POINT_NS = '2d3c0d3e-1e1a-4f6a-9e84-1b8de377e9c9'
 
+# Module-level Socket.IO instance for real-time updates
+_sio_instance = None
+
+def set_global_sio(sio):
+    """Set the global Socket.IO instance for this module"""
+    global _sio_instance
+    _sio_instance = sio
+    print('✅ VectorDatabaseService: Global Socket.IO instance set for real-time updates')
+
 class VectorDatabaseService:
     def __init__(self):
         self.client = None
@@ -73,16 +82,22 @@ class VectorDatabaseService:
                     else:
                         print(f'⚠️ Background: No usage record found for user {user_uuid}, cannot subtract file usage')
                 
-                # Emit real-time update via Socket.IO
-                if self.sio and updated_usage:
+                # Emit real-time update via Socket.IO using global instance
+                global _sio_instance
+                print(f'🔍 Background: Checking Socket.IO emit - _sio_instance is None: {_sio_instance is None}, updated_usage exists: {updated_usage is not None}')
+                if _sio_instance and updated_usage:
                     percentage = (updated_usage['file_size_used'] / updated_usage['file_upload_size_limit']) * 100
-                    await self.sio.emit('file_usage_updated', {
+                    await _sio_instance.emit('file_usage_updated', {
                         'user_uuid': user_uuid,
                         'file_size_used': updated_usage['file_size_used'],
                         'file_upload_size_limit': updated_usage['file_upload_size_limit'],
                         'percentage': round(percentage, 1)
                     })
                     print(f'📊 Background: File usage update sent to frontend for user {user_uuid}: {updated_usage["file_size_used"]}/{updated_usage["file_upload_size_limit"]} ({round(percentage, 1)}%)')
+                elif not _sio_instance:
+                    print(f'⚠️ Background: Cannot emit file usage update - Socket.IO instance not set!')
+                elif not updated_usage:
+                    print(f'⚠️ Background: Cannot emit file usage update - No usage data to send!')
                         
             finally:
                 session.close()
