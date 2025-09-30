@@ -36,7 +36,7 @@ import { globalSocketService } from '@/services/globalSocketService';
 import BetaSignupModal from '@/components/BetaSignupModal';
 import { getUserUuid, getBetaUserData, storeBetaUserData } from '@/utils/storage';
 import { API_ENDPOINTS } from '@/config/api';
-import { TranscriptionUsageProvider } from '@/contexts/TranscriptionUsageContext';
+import { UsageProvider } from '@/contexts/UsageContext';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -159,7 +159,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <TranscriptionUsageProvider>
+        <UsageProvider>
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="labels-edit" options={{ headerShown: false }} />
@@ -174,7 +174,7 @@ export default function RootLayout() {
             onSignupComplete={handleBetaSignupComplete}
             userUuid={userUuid}
           />
-        </TranscriptionUsageProvider>
+        </UsageProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
   );
