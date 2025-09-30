@@ -115,7 +115,7 @@ class Usage(Base):
     transcription_reset_date = Column(DateTime(timezone=True), nullable=False)
     
     # File upload limits and usage (in bytes)
-    file_upload_size_limit = Column(BigInteger, default=73400320, nullable=False)  # 70MB in bytes
+    file_upload_size_limit = Column(BigInteger, default=25000, nullable=False)  # 70MB in bytes
     file_size_used = Column(BigInteger, default=0, nullable=False)
     
     # Timestamp for when usage record was created

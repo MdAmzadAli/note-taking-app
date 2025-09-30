@@ -518,7 +518,7 @@ async def get_file_usage(user_uuid: str):
         
         try:
             usage_data = usage_repo.get_file_upload_usage(user_uuid)
-            
+            print(f'📊 File usage data for user {user_uuid}: {usage_data}')
             if not usage_data:
                 # Return default usage data if no record exists
                 return {
