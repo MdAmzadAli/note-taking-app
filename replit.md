@@ -34,6 +34,8 @@ This is a React Native Expo note-taking app with features including:
 1. **Backend API and WebSocket support**:
    - File: `backend_python/main.py` - Added `/usage/file/{user_uuid}` endpoint for fetching file usage
    - File: `backend_python/component/vector_database_service.py` - Added `file_usage_updated` Socket.IO events when files are uploaded/deleted
+   - Implemented module-level Socket.IO instance (`_sio_instance`) for reliable real-time updates
+   - Added `set_global_sio()` function to set Socket.IO instance at module level
 
 2. **Frontend context extension**:
    - File: `contexts/UsageContext.tsx` - Extended context to manage both transcription and file usage
@@ -53,6 +55,11 @@ This is a React Native Expo note-taking app with features including:
 5. **Updated imports**:
    - File: `app/_layout.tsx` - Updated to use new `UsageProvider`
    - File: `screens/NotesScreen.tsx` - Updated import to use new context
+
+**Bug Fix** (Same day): Fixed real-time update issue where file usage wasn't updating live
+   - Root cause: Socket.IO instance wasn't being properly set on VectorDatabaseService
+   - Solution: Changed from instance-level `self.sio` to module-level `_sio_instance` variable
+   - Now file usage updates immediately via WebSocket when files are uploaded/deleted
 
 ## Recent Changes (September 2025)
 
