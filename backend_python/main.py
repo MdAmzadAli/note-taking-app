@@ -233,6 +233,11 @@ socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 print("🔌 Socket.IO ASGI app created successfully")
 print("🔌 Socket.IO will handle routes: /socket.io/*")
 
+# Set Socket.IO instance on vector database service for real-time file usage updates
+if rag_service and hasattr(rag_service, 'vector_db_service'):
+    rag_service.vector_db_service.set_sio(sio)
+    print("✅ Socket.IO instance set on VectorDatabaseService for real-time updates")
+
 @sio.event
 async def connect(sid, environ):
     print(f"🔌 Socket.IO client connected: {sid}")
@@ -501,6 +506,52 @@ async def get_transcription_usage(user_uuid: str):
     except Exception as e:
         print(f"❌ Usage endpoint error: {e}")
         raise HTTPException(status_code=500, detail="Failed to get usage data")
+
+@app.get("/usage/file/{user_uuid}")
+async def get_file_usage(user_uuid: str):
+    """Get file upload usage data for a user"""
+    try:
+        print(f'📊 File usage request for user: {user_uuid}')
+        
+        session = next(get_db_session())
+        usage_repo = UsageRepository(session)
+        
+        try:
+            usage_data = usage_repo.get_file_upload_usage(user_uuid)
+            
+            if not usage_data:
+                # Return default usage data if no record exists
+                return {
+                    "success": True,
+                    "file_size_used": 0,
+                    "file_upload_size_limit": 52428800,  # 50 MB default
+                    "percentage": 0.0
+                }
+            
+            percentage = (usage_data['file_size_used'] / usage_data['file_upload_size_limit']) * 100
+            
+            return {
+                "success": True,
+                "file_size_used": usage_data['file_size_used'],
+                "file_upload_size_limit": usage_data['file_upload_size_limit'],
+                "percentage": round(percentage, 1)
+            }
+            
+        except Exception as e:
+            print(f"❌ Error getting file usage data: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "file_size_used": 0,
+                "file_upload_size_limit": 52428800,
+                "percentage": 0.0
+            }
+        finally:
+            session.close()
+            
+    except Exception as e:
+        print(f"❌ File usage endpoint error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get file usage data")
 
 # Async transcription background processing
 async def process_transcription_job(job_id: str, audio_file_path: Path, user_uuid: str, duration_seconds: int):

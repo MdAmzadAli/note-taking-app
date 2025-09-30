@@ -23,10 +23,16 @@ class VectorDatabaseService:
         self.collection_name = 'Ragdocuments'  # New collection name with int8 optimization
         self.is_initialized_flag = False
         self.db_manager = DatabaseManager()
+        self.sio = None  # Socket.IO instance for real-time updates
+    
+    def set_sio(self, sio):
+        """Set the Socket.IO instance for real-time updates"""
+        self.sio = sio
+        print('✅ VectorDatabaseService: Socket.IO instance set for real-time updates')
     
     async def _update_file_usage_background(self, user_uuid: str, file_size: int, operation: str = 'add'):
         """
-        Background job to update user file usage
+        Background job to update user file usage and emit real-time updates
         
         Args:
             user_uuid: User UUID
@@ -41,6 +47,7 @@ class VectorDatabaseService:
             usage_repo = UsageRepository(session)
             
             try:
+                updated_usage = None
                 if operation == 'add':
                     # Check if usage record exists
                     file_usage = usage_repo.get_file_upload_usage(user_uuid)
@@ -52,6 +59,7 @@ class VectorDatabaseService:
                     else:
                         # Usage doesn't exist, initialize it
                         initialized_usage = usage_repo.initialize_file_usage_if_not_exists(user_uuid, file_size)
+                        updated_usage = initialized_usage
                         print(f'🔄 Background: Initialized file usage for user {user_uuid}: {initialized_usage["file_size_used"]} bytes used')
                         
                 elif operation == 'subtract':
@@ -64,6 +72,17 @@ class VectorDatabaseService:
                         print(f'🔄 Background: Subtracted file usage for user {user_uuid}: removed {file_size} bytes, total now {updated_usage["file_size_used"]} bytes')
                     else:
                         print(f'⚠️ Background: No usage record found for user {user_uuid}, cannot subtract file usage')
+                
+                # Emit real-time update via Socket.IO
+                if self.sio and updated_usage:
+                    percentage = (updated_usage['file_size_used'] / updated_usage['file_upload_size_limit']) * 100
+                    await self.sio.emit('file_usage_updated', {
+                        'user_uuid': user_uuid,
+                        'file_size_used': updated_usage['file_size_used'],
+                        'file_upload_size_limit': updated_usage['file_upload_size_limit'],
+                        'percentage': round(percentage, 1)
+                    })
+                    print(f'📊 Background: File usage update sent to frontend for user {user_uuid}: {updated_usage["file_size_used"]}/{updated_usage["file_upload_size_limit"]} ({round(percentage, 1)}%)')
                         
             finally:
                 session.close()
