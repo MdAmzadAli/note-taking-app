@@ -108,8 +108,8 @@ export default function FilesList({
     switch (file.source) {
       case 'device': return '#00D4AA'; // Teal for device files
       case 'url':
-      case 'from_url': return '#FF6B6B'; // Red for URL files
-      case 'webpage': return '#B2F2BB'; // Light blue for webpage files
+      case 'from_url': return '#FFD9B3'; // Red for URL files
+      case 'webpage': return '#D8B4F8'; // Light blue for webpage files
       default: return '#00D4AA'; // Default to teal
     }
   };
