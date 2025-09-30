@@ -35,7 +35,7 @@ class File(Base):
     content_type = Column(String(100), nullable=False)
     
     # File size in bytes
-    file_size = Column(BigInteger, default=0, nullable=False)
+    file_size = Column(BigInteger, default=0,nullable=False)
 
     # Relationships
     workspace = relationship("Workspace", back_populates="files")
