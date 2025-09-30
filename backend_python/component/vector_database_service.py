@@ -37,9 +37,10 @@ class VectorDatabaseService:
             from sql_db.db_methods.usage_repository import UsageRepository
             from sql_db.db_schema.base import get_db_session
             
-            with get_db_session() as session:
-                usage_repo = UsageRepository(session)
-                
+            session = next(get_db_session())
+            usage_repo = UsageRepository(session)
+            
+            try:
                 if operation == 'add':
                     # Check if usage record exists
                     file_usage = usage_repo.get_file_upload_usage(user_uuid)
@@ -63,6 +64,9 @@ class VectorDatabaseService:
                         print(f'🔄 Background: Subtracted file usage for user {user_uuid}: removed {file_size} bytes, total now {updated_usage["file_size_used"]} bytes')
                     else:
                         print(f'⚠️ Background: No usage record found for user {user_uuid}, cannot subtract file usage')
+                        
+            finally:
+                session.close()
                         
         except Exception as e:
             print(f'❌ Background: Failed to update file usage for user {user_uuid}: {e}')
