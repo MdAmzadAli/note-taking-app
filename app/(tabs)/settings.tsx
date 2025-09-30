@@ -15,7 +15,7 @@ import { Picker } from '@react-native-picker/picker';
 import { API_ENDPOINTS } from '@/config/api';
 import AppLayout from '@/app/AppLayout';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTranscriptionUsage } from '@/contexts/TranscriptionUsageContext';
+import { useTranscriptionUsage, useFileUsage } from '@/contexts/UsageContext';
 
 const FEEDBACK_TYPES = [
   'Bug',
@@ -23,6 +23,15 @@ const FEEDBACK_TYPES = [
   'General Feedback',
   'Other'
 ];
+
+// Helper function to format bytes to human-readable format
+const formatBytes = (bytes: number): string => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+};
 
 // Feedback Modal Component
 function FeedbackModal({ visible, onClose }) {
@@ -175,8 +184,9 @@ export default function SettingsTab() {
   const [betaUserId, setBetaUserId] = useState<string | null>(null);
   const [isLoadingBetaData, setIsLoadingBetaData] = useState(true);
   
-  // Use transcription usage context
-  const { usageData: transcriptionUsage, isLoading: isLoadingUsage } = useTranscriptionUsage();
+  // Use transcription and file usage contexts
+  const { usageData: transcriptionUsage, isLoading: isLoadingTranscriptionUsage } = useTranscriptionUsage();
+  const { usageData: fileUsage, isLoading: isLoadingFileUsage } = useFileUsage();
 
   // Load beta user data on component mount
   useEffect(() => {
@@ -397,17 +407,18 @@ export default function SettingsTab() {
             )}
           </View>
 
-          {/* Transcription Usage Section */}
+          {/* Usage Section */}
           <View style={styles.usageSection}>
             <Text style={styles.sectionTitle}>Usage</Text>
             <Text style={styles.sectionDescription}>
-              Voice transcription usage limit
+              Track your transcription and file storage usage
             </Text>
             
-            {isLoadingUsage ? (
+            {/* Transcription Usage */}
+            {isLoadingTranscriptionUsage ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator color="#00FFA7" size="small" />
-                <Text style={styles.loadingText}>Loading usage...</Text>
+                <Text style={styles.loadingText}>Loading transcription usage...</Text>
               </View>
             ) : (
               <View style={styles.usageContainer}>
@@ -432,8 +443,50 @@ export default function SettingsTab() {
                     {transcriptionUsage.percentage}%
                   </Text>
                 </View>
+              </View>
+            )}
+            
+            {/* File Usage */}
+            {isLoadingFileUsage ? (
+              <View style={[styles.loadingContainer, { marginTop: 24 }]}>
+                <ActivityIndicator color="#00FFA7" size="small" />
+                <Text style={styles.loadingText}>Loading file usage...</Text>
+              </View>
+            ) : (
+              <View style={[styles.usageContainer, { marginTop: 24 }]}>
+                <Text style={styles.usageLabel}>File Storage Usage</Text>
                 
-           
+                <View style={styles.progressBarContainer}>
+                  <View style={styles.progressBarBackground}>
+                    <View 
+                      style={[
+                        styles.progressBarFill, 
+                        { 
+                          width: `${Math.min(fileUsage.percentage, 100)}%`,
+                          backgroundColor: fileUsage.percentage >= 100 ? '#FF6B6B' : '#00ffa7'
+                        }
+                      ]} 
+                    />
+                  </View>
+                </View>
+                
+                <View style={styles.usageTextContainer}>
+                  <Text style={styles.usageText}>
+                    {formatBytes(fileUsage.file_size_used)} / {formatBytes(fileUsage.file_upload_size_limit)}
+                  </Text>
+                  <Text style={[
+                    styles.percentageText,
+                    { color: fileUsage.percentage >= 100 ? '#FF6B6B' : '#00ffa7' }
+                  ]}>
+                    {fileUsage.percentage}%
+                  </Text>
+                </View>
+                
+                {fileUsage.percentage >= 100 && (
+                  <Text style={styles.limitExceededText}>
+                    ⚠️ Storage limit reached. Remove files to upload more.
+                  </Text>
+                )}
               </View>
             )}
           </View>
