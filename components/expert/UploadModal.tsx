@@ -4,6 +4,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, Tex
 import * as DocumentPicker from 'expo-document-picker';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { WORKSPACE_MAX_FILES } from '@/app/(tabs)/expert';
+import { useFileUsage } from '@/contexts/UsageContext';
 
 interface UploadModalProps {
   isVisible: boolean;
@@ -29,6 +30,9 @@ export default function UploadModal({
   const [showDropdown, setShowDropdown] = useState(false);
   const [uploadMode, setUploadMode] = useState<'phone' | 'url' | 'webpage'>('phone');
   const [urlInput, setUrlInput] = useState('');
+  
+  // Get file usage to check if limit is exceeded
+  const { isUsageLimitExceeded: isFileUsageLimitExceeded } = useFileUsage();
 
   const handleMainButtonPress = () => {
     if (uploadMode === 'phone') {
@@ -143,6 +147,11 @@ export default function UploadModal({
   };
 
   const getStatusText = () => {
+    // Check file usage limit first
+    if (isFileUsageLimitExceeded) {
+      return '⚠️ File storage limit reached. Remove files to upload more.';
+    }
+    
     if (mode === 'singleFile') {
       return isBackendConnected 
         ? 'Select a PDF file to upload and chat with AI'
@@ -190,9 +199,9 @@ export default function UploadModal({
             {/* Upload Button with Dropdown */}
             <View style={styles.uploadButtonContainer}>
               <TouchableOpacity 
-                style={[styles.uploadButton, { opacity: isLoading ? 0.7 : 1 }]} 
+                style={[styles.uploadButton, { opacity: (isLoading || isFileUsageLimitExceeded) ? 0.7 : 1 }]} 
                 onPress={handleMainButtonPress}
-                disabled={isLoading || (uploadMode === 'url' && !urlInput.trim())}
+                disabled={isLoading || (uploadMode === 'url' && !urlInput.trim()) || isFileUsageLimitExceeded}
               >
                 {isLoading ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
@@ -210,7 +219,7 @@ export default function UploadModal({
               <TouchableOpacity 
                 style={styles.dropdownArrow}
                 onPress={() => setShowDropdown(!showDropdown)}
-                disabled={isLoading}
+                disabled={isLoading || isFileUsageLimitExceeded}
               >
                 <IconSymbol size={12} name="chevron.down" color="#ffffff" />
               </TouchableOpacity>
