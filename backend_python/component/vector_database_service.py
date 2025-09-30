@@ -118,7 +118,7 @@ class VectorDatabaseService:
 
     async def store_document_chunks(self, file_id: str, file_name: str, chunks: List[Dict[str, Any]], 
                                    embeddings: List[List[float]], workspace_id: Optional[str] = None, 
-                                   cloudinary_data: Optional[Dict] = None) -> Dict[str, Any]:
+                                   cloudinary_data: Optional[Dict] = None, user_uuid: Optional[str] = None) -> Dict[str, Any]:
         """Store document chunks with minimal Qdrant payload and full text in SQL database"""
         if not self.is_initialized_flag:
             raise Exception('VectorDatabaseService not initialized')
@@ -247,6 +247,27 @@ class VectorDatabaseService:
                     # Store contexts in bulk
                     stored_count = db.context_repo.store_contexts_bulk(file_id, contexts_data)
                     print(f'✅ SQL: Stored {stored_count} contexts in database')
+                    
+                    # Update file usage for the user if user_uuid is provided
+                    if user_uuid:
+                        try:
+                            from sql_db.db_methods.usage_repository import UsageRepository
+                            usage_repo = UsageRepository(db.session)
+                            
+                            # Check if usage record exists
+                            file_usage = usage_repo.get_file_upload_usage(user_uuid)
+                            
+                            if file_usage:
+                                # Usage exists, update it
+                                updated_usage = usage_repo.update_file_upload_usage(user_uuid, total_file_size)
+                                print(f'✅ Updated file usage for user {user_uuid}: added {total_file_size} bytes, total now {updated_usage["file_size_used"]} bytes')
+                            else:
+                                # Usage doesn't exist, initialize it
+                                initialized_usage = usage_repo.initialize_file_usage_if_not_exists(user_uuid, total_file_size)
+                                print(f'✅ Initialized file usage for user {user_uuid}: {initialized_usage["file_size_used"]} bytes used')
+                        except Exception as usage_error:
+                            print(f'⚠️ Failed to update file usage for user {user_uuid}: {usage_error}')
+                            # Continue anyway, don't fail the upload due to usage tracking error
                     
             except Exception as sql_error:
                 print(f'⚠️ SQL storage failed: {sql_error}')
