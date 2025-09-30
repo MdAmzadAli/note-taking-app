@@ -36,7 +36,7 @@ import { getCategories } from '@/utils/storage';
 import WritingStyleSelector from '@/components/WritingStyleSelector';
 import WritingStyleEditor from '@/components/WritingStyleEditor';
 import { useTabBar } from '@/contexts/TabBarContext';
-import { useTranscriptionUsage } from '@/contexts/TranscriptionUsageContext';
+import { useTranscriptionUsage } from '@/contexts/UsageContext';
 
 interface ImageAttachment {
   id: string;
