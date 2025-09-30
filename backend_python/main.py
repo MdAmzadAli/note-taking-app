@@ -1231,8 +1231,10 @@ async def upload_workspace(
         # Check file usage limit before proceeding with upload
         if user_uuid:
             try:
-                with get_db_session() as session:
-                    usage_repo = UsageRepository(session)
+                session = next(get_db_session())
+                usage_repo = UsageRepository(session)
+                
+                try:
                     file_usage = usage_repo.get_file_upload_usage(user_uuid)
                     
                     if file_usage:
@@ -1249,6 +1251,8 @@ async def upload_workspace(
                         print(f"✅ File upload usage check passed: {file_size_used}/{file_upload_size_limit} bytes used")
                     else:
                         print(f"⚠️ No file usage record found for user {user_uuid}, proceeding with upload")
+                finally:
+                    session.close()
             except HTTPException:
                 raise
             except Exception as usage_error:
