@@ -225,7 +225,7 @@ export default function ExpertTab() {
       }
     } catch (error) {
       console.error('❌ Error uploading single file:', error);
-      Alert.alert('Upload Error', `Failed to upload file: ${error.message || 'Unknown error'}`);
+      Alert.alert('Upload Error', `Failed to upload file!`);
     } finally {
       setIsLoading(false);
     }
