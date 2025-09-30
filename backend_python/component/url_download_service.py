@@ -20,6 +20,67 @@ class URLDownloadService:
         except Exception as error:
             print(f'❌ Failed to create upload directory: {error}')
 
+    async def check_pdf_size(self, url: str, max_size_mb: int = 10) -> dict:
+        """
+        Check PDF size via HEAD request before downloading
+        @param url: PDF URL to check
+        @param max_size_mb: Maximum allowed size in MB
+        @returns: Size check result with metadata
+        """
+        print(f'📏 Checking PDF size for: {url}')
+        
+        max_size_bytes = max_size_mb * 1024 * 1024  # Convert MB to bytes
+        
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+                async with session.head(url, allow_redirects=True) as response:
+                    if response.status != 200:
+                        # If HEAD fails, try GET with range to get size
+                        async with session.get(url, headers={'Range': 'bytes=0-0'}, allow_redirects=True) as range_response:
+                            if range_response.status in [206, 200]:
+                                content_range = range_response.headers.get('content-range', '')
+                                if content_range and '/' in content_range:
+                                    try:
+                                        total_size = int(content_range.split('/')[-1])
+                                    except ValueError:
+                                        # Fallback: get content-length from headers
+                                        total_size = int(range_response.headers.get('content-length', 0))
+                                else:
+                                    total_size = int(range_response.headers.get('content-length', 0))
+                            else:
+                                raise Exception(f'Cannot determine file size. HTTP {range_response.status}')
+                    else:
+                        # Use content-length from HEAD response
+                        total_size = int(response.headers.get('content-length', 0))
+                    
+                    # Check content type if available
+                    content_type = response.headers.get('content-type', '')
+                    
+                    size_mb = total_size / (1024 * 1024)
+                    
+                    print(f'📏 PDF size check result: {size_mb:.2f}MB (limit: {max_size_mb}MB)')
+                    
+                    return {
+                        'success': True,
+                        'size_bytes': total_size,
+                        'size_mb': round(size_mb, 2),
+                        'within_limit': total_size <= max_size_bytes,
+                        'content_type': content_type,
+                        'max_size_mb': max_size_mb
+                    }
+                    
+        except Exception as error:
+            print(f'❌ Size check failed: {error}')
+            return {
+                'success': False,
+                'error': str(error),
+                'size_bytes': 0,
+                'size_mb': 0,
+                'within_limit': False,
+                'content_type': '',
+                'max_size_mb': max_size_mb
+            }
+
     async def download_pdf(self, url: str, file_id: str) -> dict:
         """
         Download PDF from URL and save to local file system

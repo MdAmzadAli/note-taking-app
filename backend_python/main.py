@@ -1357,6 +1357,19 @@ async def upload_workspace(
                 processed_file_details = None # Details from file_service.process_file_upload
 
                 if url_info.get("type") in ["from_url", "url"]:
+                    # Check PDF size before downloading (10MB limit)
+                    print(f"📏 Checking PDF size before download: {url}")
+                    size_check = await url_download_service.check_pdf_size(url, max_size_mb=10)
+                    
+                    if not size_check.get("success"):
+                        print(f"⚠️ Could not check PDF size: {size_check.get('error')}, proceeding with download")
+                    elif not size_check.get("within_limit"):
+                        size_mb = size_check.get("size_mb", 0)
+                        raise Exception(f"PDF file too large: {size_mb}MB exceeds 10MB limit. Please use a smaller file.")
+                    else:
+                        size_mb = size_check.get("size_mb", 0)
+                        print(f"✅ PDF size check passed: {size_mb}MB is within 10MB limit")
+                    
                     # Download PDF from URL
                     print(f"📥 Downloading PDF from URL: {url}")
                     download_result = await url_download_service.download_pdf(url, file_id)
