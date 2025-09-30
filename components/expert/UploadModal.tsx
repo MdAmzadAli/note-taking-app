@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, TextInput } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
@@ -30,7 +29,7 @@ export default function UploadModal({
   const [showDropdown, setShowDropdown] = useState(false);
   const [uploadMode, setUploadMode] = useState<'phone' | 'url' | 'webpage'>('phone');
   const [urlInput, setUrlInput] = useState('');
-  
+
   // Get file usage to check if limit is exceeded
   const { isUsageLimitExceeded: isFileUsageLimitExceeded } = useFileUsage();
 
@@ -64,8 +63,37 @@ export default function UploadModal({
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
+        // File size limit: 10MB = 10 * 1024 * 1024 bytes
+        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+        // Check each file size individually before uploading (applies to both single and workspace modes)
+        const oversizedFiles = result.assets.filter(file => {
+          if (!file.size) {
+            console.warn(`File ${file.name} has no size information`);
+            return false; // Skip files without size info
+          }
+          return file.size > MAX_FILE_SIZE;
+        });
+
+        if (oversizedFiles.length > 0) {
+          const oversizedFileNames = oversizedFiles.map(file => {
+            const sizeInMB = file.size ? (file.size / (1024 * 1024)).toFixed(2) : 'unknown';
+            return `${file.name} (${sizeInMB}MB)`;
+          }).join('\n');
+
+          const modeText = mode === 'singleFile' ? 'single file' : 'workspace';
+          alert(`File size limit exceeded!\n\nThe following files are larger than 10MB:\n\n${oversizedFileNames}\n\nPlease select files smaller than 10MB per file for ${modeText} mode.`);
+          return;
+        }
+
+        // Also validate that all files have valid size information
+        const filesWithoutSize = result.assets.filter(file => !file.size);
+        if (filesWithoutSize.length > 0) {
+          console.warn('Some files do not have size information:', filesWithoutSize.map(f => f.name));
+        }
+
         if (mode === 'singleFile') {
-          // Single file mode - original behavior
+          // Single file mode - apply 10MB limit check for single file
           const file = result.assets[0];
           const fileItem = {
             type: 'device',
@@ -82,7 +110,7 @@ export default function UploadModal({
             source: file.name,
             file: file
           }));
-          
+
           // For workspace modes, pass array of files
           onUpload(fileItems);
         }
@@ -151,7 +179,7 @@ export default function UploadModal({
     if (isFileUsageLimitExceeded) {
       return '⚠️ File storage limit reached. Remove files to upload more.';
     }
-    
+
     if (mode === 'singleFile') {
       return isBackendConnected 
         ? 'Select a PDF file to upload and chat with AI'
@@ -214,7 +242,7 @@ export default function UploadModal({
                   </>
                 )}
               </TouchableOpacity>
-              
+
               {/* Dropdown Arrow */}
               <TouchableOpacity 
                 style={styles.dropdownArrow}
@@ -251,9 +279,9 @@ export default function UploadModal({
                   <IconSymbol size={14} name="phone" color="#ffffff" />
                   <Text style={styles.dropdownOptionText}>From phone</Text>
                 </TouchableOpacity>
-                
+
                 <View style={styles.dropdownSeparator} />
-                
+
                 <TouchableOpacity 
                   style={styles.dropdownOption}
                   onPress={() => handleDropdownOptionPress('url')}
@@ -261,9 +289,9 @@ export default function UploadModal({
                   <IconSymbol size={14} name="link" color="#ffffff" />
                   <Text style={styles.dropdownOptionText}>From URL</Text>
                 </TouchableOpacity>
-                
+
                 <View style={styles.dropdownSeparator} />
-                
+
                 <TouchableOpacity 
                   style={styles.dropdownOption}
                   onPress={() => handleDropdownOptionPress('webpage')}
