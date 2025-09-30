@@ -23,6 +23,50 @@ class VectorDatabaseService:
         self.collection_name = 'Ragdocuments'  # New collection name with int8 optimization
         self.is_initialized_flag = False
         self.db_manager = DatabaseManager()
+    
+    async def _update_file_usage_background(self, user_uuid: str, file_size: int, operation: str = 'add'):
+        """
+        Background job to update user file usage
+        
+        Args:
+            user_uuid: User UUID
+            file_size: File size in bytes to add or subtract
+            operation: 'add' or 'subtract'
+        """
+        try:
+            from sql_db.db_methods.usage_repository import UsageRepository
+            from sql_db.db_schema.base import get_db_session
+            
+            with get_db_session() as session:
+                usage_repo = UsageRepository(session)
+                
+                if operation == 'add':
+                    # Check if usage record exists
+                    file_usage = usage_repo.get_file_upload_usage(user_uuid)
+                    
+                    if file_usage:
+                        # Usage exists, update it
+                        updated_usage = usage_repo.update_file_upload_usage(user_uuid, file_size)
+                        print(f'🔄 Background: Updated file usage for user {user_uuid}: added {file_size} bytes, total now {updated_usage["file_size_used"]} bytes')
+                    else:
+                        # Usage doesn't exist, initialize it
+                        initialized_usage = usage_repo.initialize_file_usage_if_not_exists(user_uuid, file_size)
+                        print(f'🔄 Background: Initialized file usage for user {user_uuid}: {initialized_usage["file_size_used"]} bytes used')
+                        
+                elif operation == 'subtract':
+                    # For subtraction, we need to subtract by passing negative value
+                    file_usage = usage_repo.get_file_upload_usage(user_uuid)
+                    
+                    if file_usage:
+                        # Update by subtracting (using negative value)
+                        updated_usage = usage_repo.update_file_upload_usage(user_uuid, -file_size)
+                        print(f'🔄 Background: Subtracted file usage for user {user_uuid}: removed {file_size} bytes, total now {updated_usage["file_size_used"]} bytes')
+                    else:
+                        print(f'⚠️ Background: No usage record found for user {user_uuid}, cannot subtract file usage')
+                        
+        except Exception as e:
+            print(f'❌ Background: Failed to update file usage for user {user_uuid}: {e}')
+            # Don't raise - this is a background job, errors should not affect main flow
 
     async def initialize(self):
         print('🔧 VectorDatabaseService: Starting initialization...')
@@ -248,30 +292,14 @@ class VectorDatabaseService:
                     stored_count = db.context_repo.store_contexts_bulk(file_id, contexts_data)
                     print(f'✅ SQL: Stored {stored_count} contexts in database')
                     
-                    # Update file usage for the user if user_uuid is provided
-                    if user_uuid:
-                        try:
-                            from sql_db.db_methods.usage_repository import UsageRepository
-                            usage_repo = UsageRepository(db.session)
-                            
-                            # Check if usage record exists
-                            file_usage = usage_repo.get_file_upload_usage(user_uuid)
-                            
-                            if file_usage:
-                                # Usage exists, update it
-                                updated_usage = usage_repo.update_file_upload_usage(user_uuid, total_file_size)
-                                print(f'✅ Updated file usage for user {user_uuid}: added {total_file_size} bytes, total now {updated_usage["file_size_used"]} bytes')
-                            else:
-                                # Usage doesn't exist, initialize it
-                                initialized_usage = usage_repo.initialize_file_usage_if_not_exists(user_uuid, total_file_size)
-                                print(f'✅ Initialized file usage for user {user_uuid}: {initialized_usage["file_size_used"]} bytes used')
-                        except Exception as usage_error:
-                            print(f'⚠️ Failed to update file usage for user {user_uuid}: {usage_error}')
-                            # Continue anyway, don't fail the upload due to usage tracking error
-                    
             except Exception as sql_error:
                 print(f'⚠️ SQL storage failed: {sql_error}')
                 # Continue anyway as vector search can still work
+            
+            # Start background job to update file usage (non-blocking)
+            if user_uuid:
+                asyncio.create_task(self._update_file_usage_background(user_uuid, total_file_size, 'add'))
+                print(f'📤 Background job scheduled: Add {total_file_size} bytes to user {user_uuid} file usage')
             
             print(f'✅ Successfully stored {len(points)} chunks for {file_name}')
             return {'chunksCount': len(points), 'success': True}
@@ -394,7 +422,7 @@ class VectorDatabaseService:
             print(f'❌ Search params were: vector_length={len(query_embedding) if query_embedding else None}, limit={limit}, filter={filter_param}')
             raise error
 
-    async def remove_document(self, file_id: str):
+    async def remove_document(self, file_id: str, user_uuid: Optional[str] = None):
         """Remove document by file ID from both vector and SQL databases"""
         print(f'🗑️ VectorDB: Starting document removal for {file_id}')
         print(f'🔍 VectorDB: Current state - initialized_flag={self.is_initialized_flag}, client_exists={self.client is not None}')
@@ -404,6 +432,17 @@ class VectorDatabaseService:
             error_msg = f'VectorDatabaseService not properly initialized. Flag: {self.is_initialized_flag}, Client: {self.client is not None}'
             print(f'❌ VectorDB: {error_msg}')
             raise Exception(error_msg)
+        
+        # Get file size before deletion for usage tracking
+        file_size_to_subtract = 0
+        try:
+            with DatabaseManager() as db:
+                file_record = db.file_repo.get_file(file_id)
+                if file_record:
+                    file_size_to_subtract = file_record.file_size
+                    print(f'📊 VectorDB: File size to subtract: {file_size_to_subtract} bytes')
+        except Exception as e:
+            print(f'⚠️ Could not get file size before deletion: {e}')
         
         try:
             # Remove from Qdrant vector database
@@ -436,12 +475,17 @@ class VectorDatabaseService:
                 print(f'⚠️ SQL deletion failed for {file_id}: {sql_error}')
                 # Continue anyway as vector deletion succeeded
             
+            # Start background job to subtract file usage (non-blocking)
+            if user_uuid and file_size_to_subtract > 0:
+                asyncio.create_task(self._update_file_usage_background(user_uuid, file_size_to_subtract, 'subtract'))
+                print(f'📤 Background job scheduled: Subtract {file_size_to_subtract} bytes from user {user_uuid} file usage')
+            
         except Exception as error:
             print(f'❌ VectorDB: Failed to remove document {file_id}: {error}')
             print(f'❌ VectorDB: Error type: {type(error).__name__}')
             raise error
 
-    async def remove_workspace_metadata(self, workspace_id: str):
+    async def remove_workspace_metadata(self, workspace_id: str, user_uuid: Optional[str] = None):
         """Remove all documents in a workspace by workspace ID from both vector and SQL databases"""
         print(f'🗑️ VectorDB: Starting workspace metadata removal for {workspace_id}')
         print(f'🔍 VectorDB: Current state - initialized_flag={self.is_initialized_flag}, client_exists={self.client is not None}')
@@ -451,6 +495,17 @@ class VectorDatabaseService:
             error_msg = f'VectorDatabaseService not properly initialized. Flag: {self.is_initialized_flag}, Client: {self.client is not None}'
             print(f'❌ VectorDB: {error_msg}')
             raise Exception(error_msg)
+        
+        # Get workspace total size before deletion for usage tracking
+        workspace_total_size = 0
+        try:
+            with DatabaseManager() as db:
+                workspace_record = db.workspace_repo.get_workspace(workspace_id)
+                if workspace_record:
+                    workspace_total_size = workspace_record.total_size
+                    print(f'📊 VectorDB: Workspace total size to subtract: {workspace_total_size} bytes')
+        except Exception as e:
+            print(f'⚠️ Could not get workspace size before deletion: {e}')
         
         try:
             # Remove from Qdrant vector database
@@ -475,6 +530,11 @@ class VectorDatabaseService:
             except Exception as sql_error:
                 print(f'⚠️ SQL deletion failed for workspace {workspace_id}: {sql_error}')
                 # Continue anyway as vector deletion succeeded
+            
+            # Start background job to subtract workspace usage (non-blocking)
+            if user_uuid and workspace_total_size > 0:
+                asyncio.create_task(self._update_file_usage_background(user_uuid, workspace_total_size, 'subtract'))
+                print(f'📤 Background job scheduled: Subtract {workspace_total_size} bytes from user {user_uuid} file usage')
             
         except Exception as error:
             print(f'❌ VectorDB: Failed to remove workspace {workspace_id}: {error}')

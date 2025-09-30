@@ -213,10 +213,10 @@ class RAGService:
         return await self.document_indexing_service.index_document_unified(
             file_id, source, file_name, workspace_id, cloudinary_data, content_type, user_uuid)
 
-    async def remove_document(self, file_id):
+    async def remove_document(self, file_id, user_uuid=None):
         """Remove a document from the RAG index"""
         try:
-            result = await self.document_indexing_service.remove_document(file_id)
+            result = await self.document_indexing_service.remove_document(file_id, user_uuid)
             return result
         except Exception as error:
             print(f"❌ RAG: Failed to remove document {file_id}: {error}")

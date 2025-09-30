@@ -1084,7 +1084,7 @@ async def delete_file(file_id: str, request: Request):
 
                 if rag_service.is_ready_for_deletion():
                     print(f'🗑️ Removing from vector database: {file_id}')
-                    await rag_service.vector_database_service.remove_document(file_id)
+                    await rag_service.vector_database_service.remove_document(file_id, user_uuid)
                     print(f'✅ Removed from vector database: {file_id}')
                 else:
                     print(f'⚠️ RAG service not ready for deletion. Status: {detailed_status}')
@@ -1121,7 +1121,7 @@ async def delete_workspace(workspace_id: str, request: Request):
         try:
             if rag_service and rag_service.is_ready_for_deletion():
                 print(f"🗑️ Attempting bulk workspace deletion via vector database for: {workspace_id}")
-                await rag_service.vector_database_service.remove_workspace_metadata(workspace_id)
+                await rag_service.vector_database_service.remove_workspace_metadata(workspace_id, user_uuid)
                 print(f"✅ Bulk workspace deletion successful for: {workspace_id}")
                 return {"success": True, "message": "Workspace deleted successfully via bulk deletion"}
             else:

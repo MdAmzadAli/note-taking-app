@@ -108,7 +108,7 @@ class DocumentIndexingService:
 
         return all_embeddings
 
-    async def remove_document(self, file_id: str) -> Dict[str, Any]:
+    async def remove_document(self, file_id: str, user_uuid: Optional[str] = None) -> Dict[str, Any]:
         """
         Remove document from index
         """
@@ -122,7 +122,7 @@ class DocumentIndexingService:
                     'message': f'Vector database service not initialized for document {file_id}'
                 }
             
-            await self.vector_database_service.remove_document(file_id)
+            await self.vector_database_service.remove_document(file_id, user_uuid)
             print(f'✅ Removed document {file_id} from index')
             return {
                 'success': True,
