@@ -66,7 +66,7 @@ export default function UploadModal({
         // File size limit: 10MB = 10 * 1024 * 1024 bytes
         const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
-        // Check each file size individually before uploading (applies to both single and workspace modes)
+        // Check each file size individually
         const oversizedFiles = result.assets.filter(file => {
           if (!file.size) {
             console.warn(`File ${file.name} has no size information`);
@@ -75,34 +75,59 @@ export default function UploadModal({
           return file.size > MAX_FILE_SIZE;
         });
 
-        if (oversizedFiles.length > 0) {
+        // For single file mode: reject if the single file is oversized
+        if (mode === 'singleFile' && oversizedFiles.length > 0) {
           const oversizedFileNames = oversizedFiles.map(file => {
             const sizeInMB = file.size ? (file.size / (1024 * 1024)).toFixed(2) : 'unknown';
             return `${file.name} (${sizeInMB}MB)`;
           }).join('\n');
 
-          const modeText = mode === 'singleFile' ? 'single file' : 'workspace';
-          alert(`File size limit exceeded!\n\nThe following files are larger than 10MB:\n\n${oversizedFileNames}\n\nPlease select files smaller than 10MB per file for ${modeText} mode.`);
+          alert(`File size limit exceeded!\n\nThe following file is larger than 10MB:\n\n${oversizedFileNames}\n\nPlease select a file smaller than 10MB.`);
           return;
         }
 
-        // Also validate that all files have valid size information
-        const filesWithoutSize = result.assets.filter(file => !file.size);
+        // For workspace mode: filter out oversized files and show notification
+        let validFiles = result.assets;
+        if (mode !== 'singleFile' && oversizedFiles.length > 0) {
+          validFiles = result.assets.filter(file => {
+            if (!file.size) return true; // Keep files without size info
+            return file.size <= MAX_FILE_SIZE;
+          });
+
+          const oversizedFileNames = oversizedFiles.map(file => {
+            const sizeInMB = file.size ? (file.size / (1024 * 1024)).toFixed(2) : 'unknown';
+            return `${file.name} (${sizeInMB}MB)`;
+          }).join('\n');
+
+          const validFileCount = validFiles.length;
+          const rejectedFileCount = oversizedFiles.length;
+
+          alert(`Some files exceeded the 10MB limit and were filtered out:\n\n${oversizedFileNames}\n\n✅ ${validFileCount} valid files will be uploaded\n❌ ${rejectedFileCount} files rejected`);
+
+          // If no valid files remain, return early
+          if (validFiles.length === 0) {
+            alert('No valid files to upload. All selected files exceeded the 10MB limit.');
+            return;
+          }
+        }
+
+        // Also validate that all valid files have size information
+        const filesWithoutSize = validFiles.filter(file => !file.size);
         if (filesWithoutSize.length > 0) {
           console.warn('Some files do not have size information:', filesWithoutSize.map(f => f.name));
         }
 
         if (mode === 'singleFile') {
-          // Single file mode - apply 10MB limit check for single file
-          const file = result.assets[0];
+          // Single file mode - use the single valid file
+          const file = validFiles[0];
           const fileItem = {
             type: 'device',
             file: file
           };
           onUpload(fileItem);
         } else {
-          // Workspace modes - handle multiple files
-          const filesToAdd = result.assets.slice(0, remainingSlots);
+          // Workspace modes - handle multiple valid files
+          const filesToAdd = validFiles.slice(0, remainingSlots);
           const fileItems = filesToAdd.map((file, index) => ({
             id: (Date.now() + index).toString(),
             name: file.name,
