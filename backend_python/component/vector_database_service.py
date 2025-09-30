@@ -129,6 +129,9 @@ class VectorDatabaseService:
         try:
             print(f'🏢 VectorDB: Storing chunks for {file_name} with workspaceId: {workspace_id or "null"}')
             
+            # Calculate total file size early for usage tracking
+            total_file_size = sum(len(chunk['text'].encode('utf-8')) for chunk in chunks)
+            
             # Prepare data for both vector and SQL storage
             points = []
             contexts_data = []
@@ -235,9 +238,6 @@ class VectorDatabaseService:
                     if not file_record:
                         # Create file record with minimal schema - only essential fields
                         content_type = chunks[0].get('metadata', {}).get('content_type', 'pdf')
-                        
-                        # Calculate total file size from all chunks
-                        total_file_size = sum(len(chunk['text'].encode('utf-8')) for chunk in chunks)
                         
                         # Pass workspace_id as-is (can be None for single file mode)
                         effective_workspace_id = workspace_id if not is_single_file_mode else None
