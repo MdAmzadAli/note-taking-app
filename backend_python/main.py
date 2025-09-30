@@ -1397,7 +1397,8 @@ async def upload_workspace(
                     index_result = await rag_service.index_document(
                         item_metadata['id'],
                         item_metadata['sourceUrl'],  # Pass URL directly
-                        item_metadata
+                        item_metadata,
+                        user_uuid
                     )
                 else:
                     # For other file types, use the file path
@@ -1407,7 +1408,8 @@ async def upload_workspace(
                     index_result = await rag_service.index_document(
                         item_metadata['id'],
                         item_metadata['path'],
-                        item_metadata
+                        item_metadata,
+                        user_uuid
                     )
 
                 print(f"✅ RAG indexing completed for item {item_metadata['id']}: {index_result.get('chunksCount', 0)} chunks")
