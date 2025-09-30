@@ -1172,6 +1172,32 @@ async def upload_workspace(
     files: List[UploadFile] = File(default= [])
 ):
     try:
+        # Check file usage limit before proceeding with upload
+        if user_uuid:
+            try:
+                with get_db_session() as session:
+                    usage_repo = UsageRepository(session)
+                    file_usage = usage_repo.get_file_upload_usage(user_uuid)
+                    
+                    if file_usage:
+                        file_size_used = file_usage['file_size_used']
+                        file_upload_size_limit = file_usage['file_upload_size_limit']
+                        
+                        if file_size_used >= file_upload_size_limit:
+                            print(f"❌ User {user_uuid} has exceeded file upload limit: {file_size_used}/{file_upload_size_limit} bytes")
+                            raise HTTPException(
+                                status_code=403,
+                                detail=f"File upload limit exceeded. You have used {file_size_used} bytes out of {file_upload_size_limit} bytes allowed."
+                            )
+                        
+                        print(f"✅ File upload usage check passed: {file_size_used}/{file_upload_size_limit} bytes used")
+                    else:
+                        print(f"⚠️ No file usage record found for user {user_uuid}, proceeding with upload")
+            except HTTPException:
+                raise
+            except Exception as usage_error:
+                print(f"⚠️ Error checking file usage: {usage_error}. Proceeding with upload.")
+        
         # Generate a default workspace ID if none provided (single file mode)
         effective_workspace_id = workspaceId or f"single_{int(time.time() * 1000)}"
         mode = "workspace" if workspaceId else "single"
