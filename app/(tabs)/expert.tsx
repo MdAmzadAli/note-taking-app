@@ -180,53 +180,7 @@ export default function ExpertTab() {
     setIsMenuVisible(false);
   };
 
-  const handleFileUpload = async (file: any, workspaceId?: string): Promise<SingleFile | null> => {
-    if (!file) return null;
-
-    setIsLoading(true);
-
-    try {
-      const fileToUpload = {
-        uri: file.uri,
-        name: file.name,
-        type: file.mimeType || 'application/octet-stream'
-      };
-
-      const uploadedFile = await fileService.uploadFile(fileToUpload);
-
-      const newFile: SingleFile = {
-        id: uploadedFile.id,
-        name: uploadedFile.originalName,
-        uploadDate: formatUploadDate(uploadedFile.uploadDate),
-        mimetype: uploadedFile.mimetype,
-        size: uploadedFile.size,
-        isUploaded: true,
-        cloudinary: uploadedFile.cloudinary,
-      };
-
-      // Index the document for RAG after successful upload
-      if (workspaceId) {
-        try {
-          console.log(`🔄 Starting RAG indexing for file ${newFile.id} in workspace ${workspaceId}...`);
-          const indexResult = await ragService.indexDocument(uploadedFile.id, workspaceId);
-          console.log('✅ RAG indexing completed:', indexResult);
-        } catch (ragError) {
-          console.warn('⚠️ RAG indexing failed for uploaded file (continuing anyway):', ragError.message);
-          // Don't fail the upload if RAG indexing fails
-        }
-      }
-
-      Alert.alert('Success', 'File uploaded successfully!');
-      return newFile;
-
-    } catch (error) {
-      console.error('❌ File upload process failed:', error.message);
-      Alert.alert('Error', `Failed to upload file: ${error.message}`);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+ 
 
   const handleUploadSingleFile = async (fileItem?: any) => {
     if (!fileItem) return;
@@ -274,69 +228,6 @@ export default function ExpertTab() {
       Alert.alert('Upload Error', `Failed to upload file: ${error.message || 'Unknown error'}`);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleUrlUpload = async (url: string, workspaceId?: string): Promise<SingleFile | null> => {
-    try {
-      const fileId = Date.now().toString();
-
-      if (isBackendConnected) {
-        // Send URL to backend for processing
-        const response = await fetch(`${API_BASE_URL}/api/upload-url`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            url: url,
-            fileId: fileId,
-            workspaceId: workspaceId || null
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Upload failed: ${response.statusText}`);
-        }
-
-        const result = await response.json();
-
-        // Index the document for RAG after successful upload
-        if (workspaceId) {
-          try {
-            console.log(`🔄 Starting RAG indexing for URL file ${fileId} in workspace ${workspaceId}...`);
-            const indexResult = await ragService.indexDocument(fileId, workspaceId); // Assuming indexDocument can handle fileId from URL upload
-            console.log('✅ RAG indexing completed:', indexResult);
-          } catch (ragError) {
-            console.warn('⚠️ RAG indexing failed for URL file (continuing anyway):', ragError.message);
-            // Don't fail the upload if RAG indexing fails
-          }
-        }
-
-        return {
-          id: fileId,
-          name: result.filename || `URL_${fileId}`,
-          uploadDate: new Date().toISOString(),
-          mimetype: 'application/pdf', // Assuming PDF for URL uploads
-          size: result.size || 0,
-          isUploaded: true,
-          cloudinary: result.cloudinary
-        };
-      } else {
-        // Store URL locally for offline mode
-        return {
-          id: fileId,
-          name: `URL_${fileId}`,
-          uploadDate: new Date().toISOString(),
-          mimetype: 'application/pdf',
-          size: 0,
-          isUploaded: false,
-        };
-      }
-    } catch (error) {
-      console.error('Error uploading from URL:', error);
-      Alert.alert('Error', `Failed to upload from URL: ${error.message}`);
-      return null;
     }
   };
 
