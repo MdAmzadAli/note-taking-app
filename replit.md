@@ -28,6 +28,34 @@ This is a React Native Expo note-taking app with features including:
 
 ## Recent Changes (September 2025)
 
+### File Usage Tracking System
+**Date**: September 30, 2025
+**Changes Made**:
+1. **Backend API and WebSocket support**:
+   - File: `backend_python/main.py` - Added `/usage/file/{user_uuid}` endpoint for fetching file usage
+   - File: `backend_python/component/vector_database_service.py` - Added `file_usage_updated` Socket.IO events when files are uploaded/deleted
+
+2. **Frontend context extension**:
+   - File: `contexts/UsageContext.tsx` - Extended context to manage both transcription and file usage
+   - Renamed from `TranscriptionUsageContext.tsx` to `UsageContext.tsx` for unified usage management
+   - Added `useFileUsage()` hook while maintaining backward compatibility with `useTranscriptionUsage()`
+   - Real-time WebSocket updates for both transcription and file usage
+
+3. **Settings tab enhancements**:
+   - File: `app/(tabs)/settings.tsx` - Added file storage usage display below transcription usage
+   - Shows progress bar, percentage, and formatted bytes (MB/GB) for file usage
+   - Warning message when storage limit is reached
+
+4. **Upload button restrictions**:
+   - File: `components/expert/UploadModal.tsx` - Upload button disabled when file storage limit exceeded
+   - Status text shows warning when limit is reached
+
+5. **Updated imports**:
+   - File: `app/_layout.tsx` - Updated to use new `UsageProvider`
+   - File: `screens/NotesScreen.tsx` - Updated import to use new context
+
+## Recent Changes (September 2025)
+
 ### Expert Chat Summary Timeout & Retry System
 **Date**: September 24, 2025
 **Changes Made**:
