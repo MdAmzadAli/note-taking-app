@@ -17,16 +17,19 @@ class DocumentIndexingService:
             chunk_overlap=getattr(chunking_service, 'chunk_overlap', 75)
         )
 
-    async def index_document(self, file_id: str, file_path_or_url: str, metadata: Dict = None) -> Dict:
+    async def index_document(self, file_id: str, file_path_or_url: str, metadata: Dict = None, user_uuid: Optional[str] = None) -> Dict:
         """
         Index document with chunking and vector storage
         @param file_id: Unique file identifier
         @param file_path_or_url: Path to file or URL to process
         @param metadata: Optional metadata
+        @param user_uuid: Optional user UUID for usage tracking
         @returns: Indexing result
         """
         print(f'📚 Starting document indexing for: {file_id}')
         print(f'📂 Input: {file_path_or_url}')
+        if user_uuid:
+            print(f'👤 User UUID: {user_uuid}')
 
         if metadata is None:
             metadata = {}
@@ -71,7 +74,8 @@ class DocumentIndexingService:
                 chunks,
                 embeddings,
                 metadata.get('workspaceId'),
-                cloudinary_for_storage
+                cloudinary_for_storage,
+                user_uuid
             )
 
             print(f'✅ Successfully indexed {result.get("chunksCount")} chunks for {file_id} in workspace: {metadata.get("workspaceId") or "null"}')
@@ -131,7 +135,7 @@ class DocumentIndexingService:
 
     async def index_document_unified(self, file_id: str, source: str, file_name: str, 
                                    workspace_id: Optional[str] = None, cloudinary_data: Optional[Dict] = None, 
-                                   content_type: Optional[str] = None) -> Dict[str, Any]:
+                                   content_type: Optional[str] = None, user_uuid: Optional[str] = None) -> Dict[str, Any]:
         """
         Index a document using the unified chunking service with auto-detection
 
@@ -207,7 +211,8 @@ class DocumentIndexingService:
                 chunks,
                 embeddings,
                 workspace_id,
-                cloudinary_for_storage
+                cloudinary_for_storage,
+                user_uuid
             )
 
             # Add processing statistics
