@@ -236,9 +236,12 @@ class VectorDatabaseService:
                         # Create file record with minimal schema - only essential fields
                         content_type = chunks[0].get('metadata', {}).get('content_type', 'pdf')
                         
+                        # Calculate total file size from all chunks
+                        total_file_size = sum(len(chunk['text'].encode('utf-8')) for chunk in chunks)
+                        
                         # Pass workspace_id as-is (can be None for single file mode)
                         effective_workspace_id = workspace_id if not is_single_file_mode else None
-                        file_record = db.file_repo.create_file(file_id, effective_workspace_id, content_type)
+                        file_record = db.file_repo.create_file(file_id, effective_workspace_id, content_type, total_file_size)
                         print(f'📝 SQL: Created file record {file_id} with workspace_id: {effective_workspace_id or "null (single file mode)"}')
                     
                     # Store contexts in bulk
