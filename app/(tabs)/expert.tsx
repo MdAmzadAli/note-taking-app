@@ -304,8 +304,8 @@ export default function ExpertTab() {
       // Step 4: Update workspace with processed files
       newWorkspace.files = processedFiles;
 
-      // Step 5: Save workspace locally
-      const updatedWorkspaces = [...workspaces, newWorkspace];
+      // Step 5: Save workspace locally (add new workspace at the beginning)
+      const updatedWorkspaces = [newWorkspace, ...workspaces];
       setWorkspaces(updatedWorkspaces);
       await AsyncStorage.setItem('expert_workspaces', JSON.stringify(updatedWorkspaces));
 
