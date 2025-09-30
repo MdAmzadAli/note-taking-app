@@ -1,4 +1,5 @@
 import { API_ENDPOINTS, ApiResponse, FileMetadata } from '../config/api';
+import { getUserUuid } from '../utils/storage';
 
 
 // sdsjdjs
@@ -23,8 +24,13 @@ class FileService {
       console.log('🏢 Workspace ID:', workspaceId);
       console.log('📄 Number of items:', fileItems.length);
 
+      // Get user UUID
+      const userUuid = await getUserUuid();
+      console.log('👤 User UUID:', userUuid);
+
       const formData = new FormData();
       formData.append('workspaceId', workspaceId);
+      formData.append('user_uuid', userUuid);
 
       // Separate device files and URLs
       const deviceFiles: any[] = [];
@@ -140,6 +146,10 @@ class FileService {
       console.log('🗑️ Starting complete file deletion for:', fileId);
       console.log('🗑️ Making single API call for complete deletion from all sources...');
 
+      // Get user UUID
+      const userUuid = await getUserUuid();
+      console.log('👤 User UUID:', userUuid);
+
       // Single call to backend - it handles ALL deletions:
       // - Vector database (Qdrant) removal
       // - Local uploads folder cleanup  
@@ -150,6 +160,7 @@ class FileService {
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ user_uuid: userUuid }),
       });
 
       if (!response.ok) {
@@ -177,6 +188,10 @@ class FileService {
       console.log('🗑️ Starting complete workspace deletion for:', workspace.id);
       console.log('🗑️ Making single API call for complete workspace deletion from all sources...');
 
+      // Get user UUID
+      const userUuid = await getUserUuid();
+      console.log('👤 User UUID:', userUuid);
+
       // Single call to backend - it handles ALL deletions:
       // - All files in the workspace
       // - Vector database (Qdrant) removal for all files and workspace metadata
@@ -188,7 +203,7 @@ class FileService {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(workspace)
+        body: JSON.stringify({ ...workspace, user_uuid: userUuid })
       });
 
       if (!response.ok) {

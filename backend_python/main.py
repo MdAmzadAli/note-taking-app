@@ -1060,11 +1060,19 @@ async def transcribe_audio(audio_file: UploadFile = File(...)) -> TranscriptionJ
 
 # Delete file
 @app.delete("/file/{file_id}")
-async def delete_file(file_id: str):
+async def delete_file(file_id: str, request: Request):
     print(f'🌐 DELETE /file/{file_id} - Content-Type: application/json - Origin: None')
     print(f'🗑️ Deleting file: {file_id}')
 
     try:
+        # Extract user UUID from request body
+        try:
+            request_body = await request.json()
+            user_uuid = request_body.get('user_uuid')
+            print(f'👤 User UUID: {user_uuid}')
+        except Exception as e:
+            print(f'⚠️ Could not extract user UUID: {e}')
+            user_uuid = None
         print(f'🗑️ Starting complete file deletion for: {file_id}')
 
         # Remove from vector database/RAG index first, then delete local files
@@ -1103,6 +1111,10 @@ async def delete_workspace(workspace_id: str, request: Request):
     workspace = await request.json()
     print(f"🗑️ Deleting workspace: {workspace_id}")
     print(f"🗑️ Workspace data: {workspace}")
+    
+    # Extract user UUID
+    user_uuid = workspace.get('user_uuid')
+    print(f"👤 User UUID: {user_uuid}")
     
     try:
         # First attempt: Use vector database workspace deletion (efficient bulk deletion)
@@ -1155,6 +1167,7 @@ async def delete_workspace(workspace_id: str, request: Request):
 @app.post("/upload/workspace")
 async def upload_workspace(
     workspaceId: Optional[str] = Form(None),
+    user_uuid: Optional[str] = Form(None),
     urls: Optional[str] = Form(None),
     files: List[UploadFile] = File(default= [])
 ):
@@ -1165,6 +1178,7 @@ async def upload_workspace(
 
         print(f"📤 Mixed upload request received - Mode: {mode}")
         print(f"🏢 Workspace ID: {effective_workspace_id}")
+        print(f"👤 User UUID: {user_uuid}")
         print(f"📄 Number of device files: {len(files)}")
 
         # Parse URLs from FormData
