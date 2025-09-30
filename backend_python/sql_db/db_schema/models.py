@@ -11,6 +11,9 @@ class Workspace(Base):
 
     # Primary key only
     id = Column(String(255), primary_key=True)
+    
+    # Total size of all files in workspace (in bytes)
+    total_size = Column(BigInteger, default=0, nullable=False)
 
     # Relationships
     files = relationship("File", back_populates="workspace", cascade="all, delete-orphan")
@@ -30,6 +33,9 @@ class File(Base):
 
     # File type only (pdf, webpage, text, etc.)
     content_type = Column(String(100), nullable=False)
+    
+    # File size in bytes
+    file_size = Column(BigInteger, default=0, nullable=False)
 
     # Relationships
     workspace = relationship("Workspace", back_populates="files")

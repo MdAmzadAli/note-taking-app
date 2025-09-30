@@ -14,15 +14,21 @@ class FileRepository(BaseRepository):
     Optimized for both single file and workspace mode queries
     """
     
-    def create_file(self, file_id: str, workspace_id: Optional[str], content_type: str) -> File:
+    def create_file(self, file_id: str, workspace_id: Optional[str], content_type: str, file_size: int = 0) -> File:
         """Create a new file record with minimal schema"""
         with self.transaction():
             file_record = File(
                 id=file_id,
                 workspace_id=workspace_id,  # Can be None for single file mode
-                content_type=content_type
+                content_type=content_type,
+                file_size=file_size
             )
             self.session.add(file_record)
+            
+            # Update workspace total size if file belongs to a workspace
+            if workspace_id and file_size > 0:
+                self._update_workspace_size(workspace_id, file_size)
+            
             return file_record
     
     def get_file(self, file_id: str) -> Optional[File]:
@@ -77,6 +83,10 @@ class FileRepository(BaseRepository):
             if not file_record:
                 return False
             
+            # Update workspace size before soft deleting
+            if file_record.workspace_id and file_record.file_size > 0:
+                self._update_workspace_size(file_record.workspace_id, -file_record.file_size)
+            
             # Soft delete the file - contexts cascade automatically
             file_record.is_deleted = True
             file_record.deleted_at = func.now()
@@ -86,11 +96,24 @@ class FileRepository(BaseRepository):
     def hard_delete_file(self, file_id: str) -> bool:
         """Permanently delete file - CASCADE handles all related data automatically"""
         with self.transaction():
-            deleted_count = self.session.query(File).filter(
+            # Get file info before deletion to update workspace size
+            file_record = self.session.query(File).filter(
                 File.id == file_id
-            ).delete()
+            ).first()
             
-            return deleted_count > 0
+            if file_record:
+                # Update workspace size before hard deleting
+                if file_record.workspace_id and file_record.file_size > 0:
+                    self._update_workspace_size(file_record.workspace_id, -file_record.file_size)
+                
+                # Delete the file
+                deleted_count = self.session.query(File).filter(
+                    File.id == file_id
+                ).delete()
+                
+                return deleted_count > 0
+            
+            return False
     
     def search_files(self, workspace_id: Optional[str] = None, 
                     file_name_pattern: Optional[str] = None,
@@ -127,3 +150,30 @@ class FileRepository(BaseRepository):
             'actual_context_count': context_count,
             'content_type': file_record.content_type
         }
+    
+    def _update_workspace_size(self, workspace_id: str, size_delta: int):
+        """Update workspace total size by adding/subtracting size delta"""
+        from ..db_schema.models import Workspace
+        self.session.query(Workspace).filter(
+            Workspace.id == workspace_id
+        ).update({
+            Workspace.total_size: Workspace.total_size + size_delta
+        })
+    
+    def update_file_size(self, file_id: str, new_size: int):
+        """Update file size and adjust workspace total accordingly"""
+        with self.transaction():
+            file_record = self.session.query(File).filter(
+                File.id == file_id
+            ).first()
+            
+            if file_record:
+                old_size = file_record.file_size
+                size_delta = new_size - old_size
+                
+                # Update file size
+                file_record.file_size = new_size
+                
+                # Update workspace total size if file belongs to a workspace
+                if file_record.workspace_id and size_delta != 0:
+                    self._update_workspace_size(file_record.workspace_id, size_delta)

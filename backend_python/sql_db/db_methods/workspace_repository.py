@@ -19,7 +19,8 @@ class WorkspaceRepository(BaseRepository):
         """Create a new workspace (minimal schema - only id)"""
         with self.transaction():
             workspace = Workspace(
-                id=workspace_id
+                id=workspace_id,
+                total_size=0
             )
             self.session.add(workspace)
             return workspace
@@ -113,3 +114,25 @@ class WorkspaceRepository(BaseRepository):
             'total_chunks': file_stats.total_chunks or 0,
             'context_by_type': {stat.content_type: stat.context_count for stat in context_stats}
         }
+    
+    def recalculate_workspace_size(self, workspace_id: str) -> bool:
+        """Recalculate and update workspace total size based on current files"""
+        with self.transaction():
+            # Calculate actual total size from files
+            actual_size = self.session.query(
+                func.sum(File.file_size).label('total_size')
+            ).filter(
+                and_(
+                    File.workspace_id == workspace_id,
+                    File.is_deleted == False
+                )
+            ).scalar() or 0
+            
+            # Update workspace total_size
+            updated_count = self.session.query(Workspace).filter(
+                Workspace.id == workspace_id
+            ).update({
+                Workspace.total_size: actual_size
+            })
+            
+            return updated_count > 0
