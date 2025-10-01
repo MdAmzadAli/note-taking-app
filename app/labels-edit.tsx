@@ -112,6 +112,10 @@ export default function EditScreen() {
     try {
       const storedItems = await config.getFunction();
       
+      // Define old default category names to detect and remove
+      const oldNoteDefaults = ['Work', 'Personal', 'Ideas', 'Projects', 'Shopping', 'Health', 'Travel', 'Finance', 'Learning', 'Family', 'Goals'];
+      const oldTaskDefaults = ['Personal', 'Work', 'Shopping', 'Health', 'Learning'];
+      
       // If no items exist, create default ones
       if (storedItems.length === 0) {
         // Save default items to storage
@@ -121,7 +125,48 @@ export default function EditScreen() {
         
         setItems(config.defaultItems);
       } else {
-        setItems(storedItems);
+        // Check if we need to migrate from old defaults to new defaults
+        let needsMigration = false;
+        
+        if (type === 'categories' && storedItems.length >= 11) {
+          // Check if stored items contain old note defaults
+          const storedNames = storedItems.map(item => item.name);
+          const hasOldDefaults = oldNoteDefaults.every(name => storedNames.includes(name));
+          needsMigration = hasOldDefaults;
+        } else if (type === 'task-categories' && storedItems.length >= 5) {
+          // Check if stored items contain old task defaults
+          const storedNames = storedItems.map(item => item.name);
+          const hasOldDefaults = oldTaskDefaults.every(name => storedNames.includes(name));
+          needsMigration = hasOldDefaults;
+        }
+        
+        if (needsMigration) {
+          // Get the old default names for this type
+          const oldDefaults = type === 'categories' ? oldNoteDefaults : oldTaskDefaults;
+          
+          // Keep only user-created categories (not in old defaults) and new defaults
+          const userCreated = storedItems.filter(item => !oldDefaults.includes(item.name));
+          
+          // Delete all old items from storage
+          for (const item of storedItems) {
+            await config.deleteFunction(item.id);
+          }
+          
+          // Save new defaults
+          for (const item of config.defaultItems) {
+            await config.saveFunction(item);
+          }
+          
+          // Save user-created categories back
+          for (const item of userCreated) {
+            await config.saveFunction(item);
+          }
+          
+          // Combine new defaults with user-created categories
+          setItems([...config.defaultItems, ...userCreated]);
+        } else {
+          setItems(storedItems);
+        }
       }
     } catch (error) {
       console.error(`Error loading ${config.createText}s:`, error);
