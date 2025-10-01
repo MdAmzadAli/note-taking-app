@@ -1209,7 +1209,7 @@ export default function TasksScreen() {
             onEdit: () => {
               router.push('/labels-edit?type=task-categories');
             },
-            items: taskCategories.map(category => ({
+            items: [...taskCategories].reverse().map(category => ({
               id: category.id,
               name: category.name,
               icon: "folder-outline",

@@ -50,14 +50,6 @@ const getDataConfig = (type: string): DataConfig => {
           { id: '1', name: 'Work', createdAt: new Date().toISOString() },
           { id: '2', name: 'Personal', createdAt: new Date().toISOString() },
           { id: '3', name: 'Ideas', createdAt: new Date().toISOString() },
-          { id: '4', name: 'Projects', createdAt: new Date().toISOString() },
-          { id: '5', name: 'Shopping', createdAt: new Date().toISOString() },
-          { id: '6', name: 'Health', createdAt: new Date().toISOString() },
-          { id: '7', name: 'Travel', createdAt: new Date().toISOString() },
-          { id: '8', name: 'Finance', createdAt: new Date().toISOString() },
-          { id: '9', name: 'Learning', createdAt: new Date().toISOString() },
-          { id: '10', name: 'Family', createdAt: new Date().toISOString() },
-          { id: '11', name: 'Goals', createdAt: new Date().toISOString() },
         ],
         storageKey: 'categories',
         saveFunction: saveCategory,
@@ -74,8 +66,6 @@ const getDataConfig = (type: string): DataConfig => {
           { id: '1', name: 'Personal', createdAt: new Date().toISOString() },
           { id: '2', name: 'Work', createdAt: new Date().toISOString() },
           { id: '3', name: 'Shopping', createdAt: new Date().toISOString() },
-          { id: '4', name: 'Health', createdAt: new Date().toISOString() },
-          { id: '5', name: 'Learning', createdAt: new Date().toISOString() },
         ],
         storageKey: 'task-categories',
         saveFunction: saveTaskCategory,
@@ -269,7 +259,7 @@ export default function EditScreen() {
 
         {/* Items List */}
         <View style={styles.itemsContainer}>
-          {items.map((item) => (
+          {[...items].reverse().map((item) => (
             <View key={item.id} style={styles.itemRow}>
               <View style={styles.itemInfo}>
                 <Ionicons name={config.icon} size={20} color="#9AA0A6" />

@@ -873,7 +873,7 @@ export default function NotesScreen() {
               const { router } = require('expo-router');
               router.push('/labels-edit?type=categories');
             },
-            items: categories.map(category => ({
+            items: [...categories].reverse().map(category => ({
               id: category.id,
               name: category.name,
               icon: 'apps-outline',
