@@ -571,8 +571,7 @@ export default function TasksScreen() {
         { id: '1', name: 'Work', createdAt: new Date().toISOString() },
         { id: '2', name: 'Personal', createdAt: new Date().toISOString() },
         { id: '3', name: 'Shopping', createdAt: new Date().toISOString() },
-        { id: '4', name: 'Health', createdAt: new Date().toISOString() },
-        { id: '5', name: 'Projects', createdAt: new Date().toISOString() },
+
       ];
       setCategories(defaultCategories);
     } catch (error) {

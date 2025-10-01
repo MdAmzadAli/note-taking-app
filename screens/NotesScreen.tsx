@@ -629,14 +629,7 @@ export default function NotesScreen() {
           { id: '1', name: 'Work', createdAt: new Date().toISOString() },
           { id: '2', name: 'Personal', createdAt: new Date().toISOString() },
           { id: '3', name: 'Ideas', createdAt: new Date().toISOString() },
-          { id: '4', name: 'Projects', createdAt: new Date().toISOString() },
-          { id: '5', name: 'Shopping', createdAt: new Date().toISOString() },
-          { id: '6', name: 'Health', createdAt: new Date().toISOString() },
-          { id: '7', name: 'Travel', createdAt: new Date().toISOString() },
-          { id: '8', name: 'Finance', createdAt: new Date().toISOString() },
-          { id: '9', name: 'Learning', createdAt: new Date().toISOString() },
-          { id: '10', name: 'Family', createdAt: new Date().toISOString() },
-          { id: '11', name: 'Goals', createdAt: new Date().toISOString() },
+        
         ];
 
         // Import saveCategory function

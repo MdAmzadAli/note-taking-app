@@ -582,7 +582,7 @@ async def process_transcription_job(job_id: str, audio_file_path: Path, user_uui
                 'message': 'File received by backend...'
             })
         
-        await asyncio.sleep(0.3)  # Brief delay to show stage
+        # await asyncio.sleep(0.3)  # Brief delay to show stage
         
         # Step 1.2: Preparing for AssemblyAI upload (15%)
         if sio:
@@ -644,7 +644,7 @@ async def process_transcription_job(job_id: str, audio_file_path: Path, user_uui
                 transcription_jobs[job_id]['updated_at'] = datetime.now().isoformat()
             
             # Transition delay to show upload completion
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.4)
             
             # Stage 2: Transcribing (33-90%)
             print(f"🎧 [Job {job_id}] Starting transcription...")
@@ -734,7 +734,7 @@ async def process_transcription_job(job_id: str, audio_file_path: Path, user_uui
                             })
                         
                         # Transition delay to show transcription completion
-                        await asyncio.sleep(0.7)
+                        await asyncio.sleep(0.4)
                         
                         # Stage 3: Cleaning (85-100%)
                         print(f"✨ [Job {job_id}] Starting text cleaning...")
@@ -748,7 +748,7 @@ async def process_transcription_job(job_id: str, audio_file_path: Path, user_uui
                                 'message': 'Starting text cleanup...'
                             })
                         
-                        await asyncio.sleep(0.5)
+                        # await asyncio.sleep(0.5)
                         
                         # Step 3.2: Text formatting (92%)
                         if sio:
@@ -760,7 +760,7 @@ async def process_transcription_job(job_id: str, audio_file_path: Path, user_uui
                             })
                         
                         # Simulate text cleaning process
-                        await asyncio.sleep(0.8)
+                        # await asyncio.sleep(0.8)
                         
                         # Step 3.3: Finalization (96%)
                         if sio:
@@ -771,7 +771,7 @@ async def process_transcription_job(job_id: str, audio_file_path: Path, user_uui
                                 'message': 'Finalizing transcript...'
                             })
                         
-                        await asyncio.sleep(0.4)
+                        # await asyncio.sleep(0.4)
                         
                         # Step 3.4: Complete (100%) - STAGE COMPLETION
                         if sio:
@@ -784,7 +784,7 @@ async def process_transcription_job(job_id: str, audio_file_path: Path, user_uui
                             })
                         
                         # Brief pause to show completion
-                        await asyncio.sleep(0.3)
+                        # await asyncio.sleep(0.3)
                         
                         # Update job with success
                         async with job_lock:
