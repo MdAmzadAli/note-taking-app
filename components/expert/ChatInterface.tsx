@@ -1050,10 +1050,13 @@ export default function ChatInterface({
 // git pushing
   const handleFilePreview = (file: SingleFile) => {
     console.log('🔍 Opening file preview in chat interface for:', {
+      fileId: file.id,
       fileName: file.name,
       mimetype: file.mimetype,
+      source: file.source,
       isUploaded: file.isUploaded,
-      fileId: file.id
+      hasLocalUri: !!file.localUri,
+      hasOriginalUrl: !!file.originalUrl
     });
     setPreviewFile(file);
     setIsFilePreviewVisible(true);

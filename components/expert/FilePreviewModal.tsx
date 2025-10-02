@@ -55,31 +55,55 @@ export default function FilePreviewModal({ isVisible, file, onClose }: FilePrevi
       setIsLoadingPdf(true);
       
       try {
+        // ALWAYS retrieve local metadata - this is the source of truth
         const localMetadata = await getLocalFileMetadata(file.id);
-        const effectiveSource = file.source || localMetadata?.source || 'device';
         
-        console.log('🔍 File preview - ID:', file.id, 'Source:', effectiveSource, 'Has localMetadata:', !!localMetadata);
+        console.log('🔍 File preview - Attempting to load file:', file.id);
+        console.log('📋 File object source:', file.source);
+        console.log('📋 Local metadata found:', !!localMetadata);
         
-        // Check file source type
+        if (localMetadata) {
+          console.log('📋 Local metadata details:', {
+            source: localMetadata.source,
+            hasLocalUri: !!localMetadata.localUri,
+            hasOriginalUrl: !!localMetadata.originalUrl
+          });
+        }
+        
+        // If no local metadata found, cannot preview
+        if (!localMetadata) {
+          console.error('❌ No local metadata found for file:', file.id);
+          console.error('📋 This file may not have been properly saved to local storage during upload');
+          setPdfSource(null);
+          setIsLoadingPdf(false);
+          return;
+        }
+        
+        // Use local metadata source as the source of truth
+        const effectiveSource = localMetadata.source;
+        
+        // Handle based on actual source type
         if (effectiveSource === 'device') {
-          // Device file - get local URI from storage
-          if (localMetadata && localMetadata.localUri) {
-            console.log('📕 Loading device PDF from local URI:', localMetadata.localUri);
+          // Device file - MUST have local URI
+          if (localMetadata.localUri) {
+            console.log('✅ Loading device PDF from local URI:', localMetadata.localUri);
             setPdfSource({ uri: localMetadata.localUri });
           } else {
-            console.warn('⚠️ No local URI found for device file:', file.id);
-            console.log('📋 Local metadata:', localMetadata);
+            console.error('❌ Device file missing localUri in metadata:', file.id);
             setPdfSource(null);
           }
         } else if (effectiveSource === 'from_url') {
-          // URL file - get original URL from storage
-          if (localMetadata && localMetadata.originalUrl) {
-            console.log('📕 Loading URL PDF from original URL:', localMetadata.originalUrl);
+          // URL file - MUST have original URL
+          if (localMetadata.originalUrl) {
+            console.log('✅ Loading URL PDF from original URL:', localMetadata.originalUrl);
             setPdfSource({ uri: localMetadata.originalUrl, cache: true });
           } else {
-            console.warn('⚠️ No original URL found for URL file:', file.id);
+            console.error('❌ URL file missing originalUrl in metadata:', file.id);
             setPdfSource(null);
           }
+        } else {
+          console.error('❌ Unknown source type:', effectiveSource);
+          setPdfSource(null);
         }
       } catch (error) {
         console.error('❌ Error loading PDF source:', error);
