@@ -161,7 +161,7 @@ export default function ExpertTab() {
       
       if (workspacesData) {
         const workspaces: Workspace[] = JSON.parse(workspacesData);
-        const { getLocalFileMetadata } = await import('../utils/fileLocalStorage');
+        const { getLocalFileMetadata } = await import('../../utils/fileLocalStorage');
         
         const migratedWorkspaces = await Promise.all(workspaces.map(async workspace => {
           const migratedFiles = await Promise.all(workspace.files.map(async file => {
