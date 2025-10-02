@@ -31,6 +31,7 @@ const formatUploadDate = (utcTimestamp: string): string => {
   }
 };
 import fileService, { FileUploadResponse } from '../../services/fileService';
+import { getLocalFileMetadata } from '../../utils/fileLocalStorage';
 
 // Import expert components
 import ExpertHeader from '../../components/expert/ExpertHeader';
@@ -151,10 +152,51 @@ export default function ExpertTab() {
       const workspacesData = await AsyncStorage.getItem('expert_workspaces');
 
       if (filesData) {
-        setSingleFiles(JSON.parse(filesData));
+        const parsedFiles = JSON.parse(filesData);
+        // Enrich files with local storage metadata
+        const enrichedFiles = await Promise.all(
+          parsedFiles.map(async (file: SingleFile) => {
+            const localMetadata = await getLocalFileMetadata(file.id);
+            if (localMetadata) {
+              return {
+                ...file,
+                localUri: localMetadata.localUri,
+                originalUrl: localMetadata.originalUrl,
+                source: localMetadata.source,
+              };
+            }
+            return file;
+          })
+        );
+        setSingleFiles(enrichedFiles);
       }
+      
       if (workspacesData) {
-        setWorkspaces(JSON.parse(workspacesData));
+        const parsedWorkspaces = JSON.parse(workspacesData);
+        // Enrich workspace files with local storage metadata
+        const enrichedWorkspaces = await Promise.all(
+          parsedWorkspaces.map(async (workspace: Workspace) => {
+            const enrichedFiles = await Promise.all(
+              workspace.files.map(async (file: SingleFile) => {
+                const localMetadata = await getLocalFileMetadata(file.id);
+                if (localMetadata) {
+                  return {
+                    ...file,
+                    localUri: localMetadata.localUri,
+                    originalUrl: localMetadata.originalUrl,
+                    source: localMetadata.source,
+                  };
+                }
+                return file;
+              })
+            );
+            return {
+              ...workspace,
+              files: enrichedFiles,
+            };
+          })
+        );
+        setWorkspaces(enrichedWorkspaces);
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -665,6 +707,11 @@ export default function ExpertTab() {
       if (uploadResponse && uploadResponse.length > 0) {
         // Use the actual file details returned by the backend
         const backendFile = uploadResponse[0]; // Get the first uploaded file
+        
+        // Retrieve local storage metadata for preview
+        const localMetadata = await getLocalFileMetadata(backendFile.id);
+        console.log('📦 Retrieved local metadata for workspace file:', localMetadata);
+        
         const processedFile: SingleFile = {
           id: backendFile.id, // Use the ACTUAL file ID from backend
           name: backendFile.originalName || fileItem.file?.name || 'uploaded_file.pdf',
@@ -672,11 +719,13 @@ export default function ExpertTab() {
           mimetype: backendFile.mimetype || 'application/pdf',
           size: backendFile.size || 0,
           isUploaded: true,
-          source: fileItem.type === 'device' ? 'device' : fileItem.type, // Store the source type
+          source: (localMetadata?.source || (fileItem.type === 'device' ? 'device' : fileItem.type)) as 'device' | 'from_url' | 'webpage',
           cloudinary: backendFile.cloudinary,
+          localUri: localMetadata?.localUri,
+          originalUrl: localMetadata?.originalUrl,
         };
 
-        console.log('✅ Processed file for workspace:', processedFile);
+        console.log('✅ Processed file for workspace with local metadata:', processedFile);
 
         const updatedWorkspaces = workspaces.map(workspace => {
           if (workspace.id === workspaceId && workspace.files.length < 5) {

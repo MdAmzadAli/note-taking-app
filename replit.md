@@ -61,11 +61,19 @@ This is a React Native Expo note-taking app with features including:
    - Updated SingleFile interface with: source ('device' | 'from_url' | 'webpage'), localUri, originalUrl
    - Removed dependency on Cloudinary data structure for PDFs
 
+6. **Workspace mode integration** (Same day):
+   - File: `app/(tabs)/expert.tsx` - Integrated local storage for workspace mode (multiple files)
+   - handleAddWorkspaceFile: Now retrieves and includes local storage metadata (localUri, originalUrl) when adding files
+   - loadData: Enriches workspace files with local storage metadata when loading from AsyncStorage
+   - handleDeleteWorkspaceFile: Already uses fileService.deleteFile which cleans up local storage
+   - Workspace files now support same PDF preview functionality as single file mode
+
 **Key Benefits**:
 - Files viewable immediately after upload (local storage)
 - No backend dependency for PDF preview
 - Automatic cleanup of failed uploads
 - Robust error handling with guaranteed storage consistency
+- **Works for both single file mode AND workspace mode (multiple files)**
 
 ## Recent Changes (September 2025)
 
