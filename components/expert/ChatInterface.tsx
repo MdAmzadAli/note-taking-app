@@ -37,6 +37,9 @@ interface SingleFile {
   mimetype?: string;
   size?: number;
   isUploaded?: boolean;
+  source: 'device' | 'from_url' | 'webpage';
+  localUri?: string;
+  originalUrl?: string;
   cloudinary?: {
     thumbnailUrl: string;
     pageUrls: string[];
