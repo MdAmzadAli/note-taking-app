@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ScrollView, Alert, TextInput } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { summaryService } from '../../services/summaryService';
 import FileActionsModal from './FileActionsModal';
 import RenameModal from './RenameModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -98,7 +97,7 @@ export default function FilesList({
   // Get file type display text
   const getFileTypeText = (file: SingleFile) => {
     if (file.source === 'webpage') return 'WEBPAGE';
-    if (file.source === 'url') return 'URL';
+    if (file.source === 'from_url') return 'URL';
     if (file.mimetype?.includes('pdf')) return 'PDF';
     if (file.mimetype?.includes('text')) return 'TXT';
     if (file.mimetype?.includes('csv')) return 'CSV';
@@ -109,7 +108,6 @@ export default function FilesList({
   const getBorderColor = (file: SingleFile) => {
     switch (file.source) {
       case 'device': return '#00D4AA'; // Teal for device files
-      case 'url':
       case 'from_url': return '#FFD9B3'; // Red for URL files
       case 'webpage': return '#D8B4F8'; // Light blue for webpage files
       default: return '#00D4AA'; // Default to teal

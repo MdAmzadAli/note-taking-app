@@ -191,9 +191,10 @@ class FileService {
       }
     } catch (error) {
       console.error('❌ Mixed file upload error occurred');
-      console.error('❌ Error type:', error.constructor.name);
-      console.error('❌ Error message:', error.message);
-      console.error('❌ Error stack:', error.stack);
+      const err = error as Error;
+      console.error('❌ Error type:', err.constructor.name);
+      console.error('❌ Error message:', err.message);
+      console.error('❌ Error stack:', err.stack);
       
       // Ensure cleanup on any error
       console.log('🗑️ Ensuring local storage cleanup on error...');
@@ -270,9 +271,10 @@ class FileService {
 
     } catch (error) {
       console.error('❌ Complete file deletion failed:');
-      console.error('❌ Error type:', error.constructor.name);
-      console.error('❌ Error message:', error.message);
-      console.error('❌ Error stack:', error.stack);
+      const err = error as Error;
+      console.error('❌ Error type:', err.constructor.name);
+      console.error('❌ Error message:', err.message);
+      console.error('❌ Error stack:', err.stack);
       throw error;
     }
   }
@@ -313,9 +315,10 @@ class FileService {
 
     } catch (error) {
       console.error('❌ Complete workspace deletion failed:');
-      console.error('❌ Error type:', error.constructor.name);
-      console.error('❌ Error message:', error.message);
-      console.error('❌ Error stack:', error.stack);
+      const err = error as Error;
+      console.error('❌ Error type:', err.constructor.name);
+      console.error('❌ Error message:', err.message);
+      console.error('❌ Error stack:', err.stack);
       throw error;
     }
   }
@@ -342,9 +345,10 @@ class FileService {
       }
     } catch (error) {
       console.error('❌ Health check failed:');
-      console.error('❌ Error type:', error.constructor.name);
-      console.error('❌ Error message:', error.message);
-      console.error('❌ Error stack:', error.stack);
+      const err = error as Error;
+      console.error('❌ Error type:', err.constructor.name);
+      console.error('❌ Error message:', err.message);
+      console.error('❌ Error stack:', err.stack);
       if (error instanceof TypeError && error.message.includes('fetch')) {
         console.error('🌐 Network error - check if backend is running and accessible.');
       }
