@@ -158,15 +158,16 @@ class FileService {
           // Backend provided actual file details with real IDs
           const tempIds = Array.from(tempIdMap.keys());
           
-          result.files.forEach((backendFile: any, index: number) => {
+          // Process all files with proper async/await
+          for (let index = 0; index < result.files.length; index++) {
+            const backendFile = result.files[index];
             const tempId = tempIds[index];
             const source = tempId ? tempSourceMap.get(tempId) : undefined;
             
             if (tempId) {
-              // Update temp ID to real backend ID in local storage
-              updateFileIdInLocalStorage(tempId, backendFile.id);
-              // Mark file as successfully indexed
-              markFileAsIndexed(backendFile.id);
+              // CRITICAL: Await both async operations to prevent race conditions
+              await updateFileIdInLocalStorage(tempId, backendFile.id);
+              await markFileAsIndexed(backendFile.id);
               console.log(`✅ Updated local storage: ${tempId} -> ${backendFile.id} (indexed)`);
             }
             
@@ -178,7 +179,7 @@ class FileService {
               uploadDate: backendFile.uploadDate || new Date().toISOString(),
               source: source || 'device'
             });
-          });
+          }
           
           console.log('✅ All files uploaded and indexed successfully');
         } else {
