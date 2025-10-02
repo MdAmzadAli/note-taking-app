@@ -258,8 +258,14 @@ class FileService {
       }
 
       const result = await response.json();
-      console.log('✅ Complete file deletion successful:', result);
+      console.log('✅ Complete file deletion successful from backend:', result);
       console.log('✅ File removed from: Vector DB + Uploads + Metadata + Cloudinary');
+      
+      // Clean up local storage
+      console.log('🗑️ Cleaning up local storage for file:', fileId);
+      await deleteLocalFileMetadata(fileId);
+      console.log('✅ File metadata removed from local storage');
+      
       return true;
 
     } catch (error) {
