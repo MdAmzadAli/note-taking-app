@@ -1543,7 +1543,9 @@ export default function ChatInterface({
                   {selectedFile.name}
                 </Text>
                 <View style={styles.pdfFileStatus}>
-                  <Text style={styles.pdfFileType}>PDF</Text>
+                  <Text style={styles.pdfFileType}>
+                    {selectedFile.source === 'webpage' ? 'WEBPAGE' : 'PDF'}
+                  </Text>
                   <View style={styles.pdfIndexedBadge}>
                     <IconSymbol size={12} name="checkmark" color="#000000" />
                     <Text style={styles.pdfIndexedText}>FULLY INDEXED</Text>
@@ -1551,7 +1553,9 @@ export default function ChatInterface({
                 </View>
               </View>
             </View>
-            <Text style={styles.pdfFileSizeText}>{getFileSize(selectedFile)}</Text>
+            <Text style={styles.pdfFileSizeText}>
+              {selectedFile.source === 'webpage' ? 'Small File' : getFileSize(selectedFile)}
+            </Text>
           </TouchableOpacity>
         )}
 
