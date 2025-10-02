@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, TextInput, Alert } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { WORKSPACE_MAX_FILES } from '@/app/(tabs)/expert';
@@ -145,8 +145,43 @@ export default function UploadModal({
     }
   };
 
+  const validateUrlForMode = (url: string): { isValid: boolean; error?: string } => {
+    const trimmedUrl = url.trim().toLowerCase();
+    
+    // Check if it's a PDF URL (ends with .pdf or contains pdf in query params)
+    const isPdfUrl = trimmedUrl.endsWith('.pdf') || trimmedUrl.includes('.pdf?') || trimmedUrl.includes('pdf=');
+    
+    if (uploadMode === 'url') {
+      // PDF URL mode - should be a PDF
+      if (!isPdfUrl) {
+        return {
+          isValid: false,
+          error: 'This appears to be a webpage, not a PDF URL.\n\nPlease use "Add Webpage" option for webpages, or provide a direct PDF URL (ending with .pdf)'
+        };
+      }
+    } else if (uploadMode === 'webpage') {
+      // Webpage mode - should NOT be a PDF
+      if (isPdfUrl) {
+        return {
+          isValid: false,
+          error: 'This appears to be a PDF URL, not a webpage.\n\nPlease use "Upload from URL" option for PDF files, or provide a webpage URL (without .pdf)'
+        };
+      }
+    }
+    
+    return { isValid: true };
+  };
+
   const handleUrlUpload = () => {
     if (urlInput.trim()) {
+      // Validate URL matches the selected mode
+      const validation = validateUrlForMode(urlInput);
+      
+      if (!validation.isValid) {
+        alert(validation.error || 'Invalid URL for selected mode');
+        return;
+      }
+      
       if (mode === 'singleFile') {
         // Single file mode - original behavior
         const fileItem = {

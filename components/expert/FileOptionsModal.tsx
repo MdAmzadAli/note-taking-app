@@ -110,8 +110,43 @@ export default function FileOptionsModal({
     setUrlInput('');
   };
 
+  const validateUrlForMode = (url: string): { isValid: boolean; error?: string } => {
+    const trimmedUrl = url.trim().toLowerCase();
+    
+    // Check if it's a PDF URL (ends with .pdf or contains pdf in query params)
+    const isPdfUrl = trimmedUrl.endsWith('.pdf') || trimmedUrl.includes('.pdf?') || trimmedUrl.includes('pdf=');
+    
+    if (activeUrlInput === 'url') {
+      // PDF URL mode - should be a PDF
+      if (!isPdfUrl) {
+        return {
+          isValid: false,
+          error: 'This appears to be a webpage, not a PDF URL.\n\nPlease use "Add Webpage" option for webpages, or provide a direct PDF URL (ending with .pdf)'
+        };
+      }
+    } else if (activeUrlInput === 'webpage') {
+      // Webpage mode - should NOT be a PDF
+      if (isPdfUrl) {
+        return {
+          isValid: false,
+          error: 'This appears to be a PDF URL, not a webpage.\n\nPlease use "From URL" option for PDF files, or provide a webpage URL (without .pdf)'
+        };
+      }
+    }
+    
+    return { isValid: true };
+  };
+
   const handleAddUrl = () => {
     if (urlInput.trim() && activeUrlInput) {
+      // Validate URL matches the selected mode
+      const validation = validateUrlForMode(urlInput);
+      
+      if (!validation.isValid) {
+        Alert.alert('Wrong URL Type', validation.error || 'Invalid URL for selected mode');
+        return;
+      }
+      
       const backendType = activeUrlInput === 'url' ? 'from_url' : 'webpage';
 
       const newFile: FileItem = {
