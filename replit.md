@@ -26,6 +26,47 @@ This is a React Native Expo note-taking app with features including:
 - Focus strictly on the given requirements only
 - No additional features or improvements unless asked
 
+## Recent Changes (October 2025)
+
+### PDF Preview System with Local Storage
+**Date**: October 2, 2025
+**Changes Made**:
+1. **New local storage system for files**:
+   - File: `utils/fileLocalStorage.ts` (NEW) - Complete local storage management for device files and URL metadata
+   - Stores file metadata including local URIs for device files and original URLs for URL-based PDFs
+   - Tracks indexing status to enable cleanup of failed uploads
+   - Functions: saveLocalFileMetadata, getLocalFileMetadata, deleteLocalFileMetadata, updateFileIdInLocalStorage, markFileAsIndexed, cleanupUnindexedFiles
+
+2. **Upload flow changes - Save to local storage BEFORE backend**:
+   - File: `services/fileService.ts` - Completely rewritten uploadWorkspaceMixed method
+   - **CRITICAL**: Files now saved to local storage FIRST, then sent to backend for indexing
+   - On backend success: Update temp IDs with real backend IDs and mark as indexed
+   - On backend failure: Automatically delete from local storage (no orphaned files)
+   - Ensures complete cleanup on any error condition
+
+3. **PDF preview using react-native-pdf**:
+   - File: `components/expert/FilePreviewModal.tsx` - Replaced Cloudinary-based preview with react-native-pdf
+   - Device PDFs: Loaded from local URI using saved metadata
+   - URL PDFs: Use original user-provided URL directly (no backend dependency)
+   - Webpages: Show alert that they cannot be previewed
+   - No longer relies on Cloudinary for PDF rendering
+
+4. **File deletion with local storage cleanup**:
+   - File: `services/fileService.ts` - deleteFile method now cleans up local storage
+   - Ensures complete synchronization between backend and local storage
+   - Prevents storage leaks from deleted files
+
+5. **Interface updates for file sources**:
+   - Files: `components/expert/ChatInterface.tsx`, `components/expert/FilesList.tsx`, `components/expert/FilePreviewModal.tsx`
+   - Updated SingleFile interface with: source ('device' | 'from_url' | 'webpage'), localUri, originalUrl
+   - Removed dependency on Cloudinary data structure for PDFs
+
+**Key Benefits**:
+- Files viewable immediately after upload (local storage)
+- No backend dependency for PDF preview
+- Automatic cleanup of failed uploads
+- Robust error handling with guaranteed storage consistency
+
 ## Recent Changes (September 2025)
 
 ### File Usage Tracking System
