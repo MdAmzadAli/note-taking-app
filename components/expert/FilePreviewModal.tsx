@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -13,8 +13,9 @@ import {
   Alert
 } from 'react-native';
 import { WebView } from 'react-native-webview';
-import PDFViewer from '../PDFViewer';
+import Pdf from 'react-native-pdf';
 import fileService from '../../services/fileService';
+import { getLocalFileMetadata } from '../../utils/fileLocalStorage';
 
 interface SingleFile {
   id: string;
@@ -42,6 +43,51 @@ interface FilePreviewModalProps {
 }
 
 export default function FilePreviewModal({ isVisible, file, onClose }: FilePreviewModalProps) {
+  const [pdfSource, setPdfSource] = useState<any>(null);
+  const [isLoadingPdf, setIsLoadingPdf] = useState(false);
+
+  useEffect(() => {
+    const loadPdfSource = async () => {
+      if (!file || !file.mimetype?.includes('pdf')) {
+        return;
+      }
+
+      setIsLoadingPdf(true);
+      
+      try {
+        // Check file source type
+        if (file.source === 'device') {
+          // Device file - get local URI from storage
+          const localMetadata = await getLocalFileMetadata(file.id);
+          if (localMetadata && localMetadata.localUri) {
+            console.log('📕 Loading device PDF from local URI:', localMetadata.localUri);
+            setPdfSource({ uri: localMetadata.localUri });
+          } else {
+            console.warn('⚠️ No local URI found for device file:', file.id);
+            setPdfSource(null);
+          }
+        } else if (file.source === 'from_url') {
+          // URL file - get original URL from storage
+          const localMetadata = await getLocalFileMetadata(file.id);
+          if (localMetadata && localMetadata.originalUrl) {
+            console.log('📕 Loading URL PDF from original URL:', localMetadata.originalUrl);
+            setPdfSource({ uri: localMetadata.originalUrl, cache: true });
+          } else {
+            console.warn('⚠️ No original URL found for URL file:', file.id);
+            setPdfSource(null);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error loading PDF source:', error);
+        setPdfSource(null);
+      } finally {
+        setIsLoadingPdf(false);
+      }
+    };
+
+    loadPdfSource();
+  }, [file]);
+
   const getFileIcon = (mimeType?: string, fileName?: string) => {
     if (!mimeType && !fileName) return '📄';
 
@@ -67,89 +113,82 @@ export default function FilePreviewModal({ isVisible, file, onClose }: FilePrevi
   };
 
   const renderFullFileContent = () => {
-    if (!file || !file.isUploaded) {
+    if (!file) {
+      return null;
+    }
+
+    // WEBPAGE: Show alert and placeholder
+    if (file.source === 'webpage') {
       return (
         <View style={styles.fullPreviewPlaceholder}>
-          <Text style={styles.fullPreviewIcon}>{getFileIcon(file?.mimetype, file?.name)}</Text>
-          <Text style={styles.fullPreviewText}>{file?.name}</Text>
-          <Text style={styles.fullPreviewSubtext}>File not uploaded to backend</Text>
+          <Text style={styles.fullPreviewIcon}>🌐</Text>
+          <Text style={styles.fullPreviewText}>{file.name}</Text>
+          <Text style={styles.fullPreviewSubtext}>Webpages cannot be previewed</Text>
+          <TouchableOpacity 
+            style={styles.openExternallyButton}
+            onPress={() => {
+              Alert.alert(
+                'Cannot Preview Webpage',
+                'Webpages cannot be viewed directly in the app. This file is indexed for search and chat purposes only.',
+                [{ text: 'OK' }]
+              );
+            }}
+          >
+            <Text style={styles.openExternallyButtonText}>Why can't I view this?</Text>
+          </TouchableOpacity>
         </View>
       );
     }
 
-    const fileUrl = fileService.getFileUrl(file.id);
-
-    // For PDF files, use PDFViewer if Cloudinary data is available, otherwise use WebView
+    // PDF FILES: Use react-native-pdf with local URI or original URL
     if (file.mimetype?.includes('pdf')) {
-      if (file.cloudinary) {
-        const pdfViewerCloudinaryData = {
-          pageUrls: file.cloudinary.pageUrls || [],
-          totalPages: file.cloudinary.totalPages || 1,
-          fullPdfUrl: file.cloudinary.secureUrl || fileUrl,
-          secureUrl: file.cloudinary.secureUrl || fileUrl
-        };
+      if (isLoadingPdf) {
+        return (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#000000" />
+            <Text>Loading PDF...</Text>
+          </View>
+        );
+      }
 
-        return <PDFViewer 
-                 file={{
-                   id: file.id,
-                   name: file.name,
-                   cloudinary: pdfViewerCloudinaryData
-                 }}
-               />;
+      if (!pdfSource) {
+        return (
+          <View style={styles.fullPreviewPlaceholder}>
+            <Text style={styles.fullPreviewIcon}>📕</Text>
+            <Text style={styles.fullPreviewText}>Unable to load PDF</Text>
+            <Text style={styles.fullPreviewSubtext}>PDF source not available</Text>
+          </View>
+        );
       }
 
       return (
-        <View style={styles.webViewContainer}>
-          <WebView
-            source={{ uri: fileUrl }}
-            style={styles.webViewContainer}
-            startInLoadingState={true}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            allowsInlineMediaPlayback={true}
-            mediaPlaybackRequiresUserAction={false}
-            scalesPageToFit={true}
-            showsHorizontalScrollIndicator={true}
-            showsVerticalScrollIndicator={true}
-            originWhitelist={['*']}
-            mixedContentMode="compatibility"
-            renderLoading={() => (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#000000" />
-                <Text>Loading PDF...</Text>
-              </View>
-            )}
-            renderError={(errorDomain, errorCode, errorDesc) => (
-              <View style={styles.fullPreviewPlaceholder}>
-                <Text style={styles.fullPreviewIcon}>📕</Text>
-                <Text style={styles.fullPreviewText}>Unable to display PDF</Text>
-                <Text style={styles.fullPreviewSubtext}>The PDF couldn't be loaded in the viewer</Text>
-                <Text style={styles.fullPreviewSubtext}>Error: {errorDesc}</Text>
-                <TouchableOpacity 
-                  style={styles.openExternallyButton}
-                  onPress={() => {
-                    const downloadUrl = fileService.getDownloadUrl(file.id);
-                    Alert.alert(
-                      'Download PDF',
-                      `You can download the PDF using this URL: ${downloadUrl}`,
-                      [
-                        { text: 'Copy URL', onPress: () => {/* Copy to clipboard logic */ } },
-                        { text: 'OK' }
-                      ]
-                    );
-                  }}
-                >
-                  <Text style={styles.openExternallyButtonText}>Download PDF</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+        <View style={styles.pdfContainer}>
+          <Pdf
+            source={pdfSource}
+            style={styles.pdf}
+            onLoadComplete={(numberOfPages, filePath) => {
+              console.log(`✅ PDF loaded: ${numberOfPages} pages`);
+            }}
+            onPageChanged={(page, numberOfPages) => {
+              console.log(`📄 Page ${page}/${numberOfPages}`);
+            }}
+            onError={(error) => {
+              console.error('❌ PDF loading error:', error);
+            }}
+            onPressLink={(uri) => {
+              console.log('🔗 Link pressed:', uri);
+            }}
+            trustAllCerts={false}
+            enablePaging={true}
+            spacing={10}
           />
         </View>
       );
     }
 
-    // For text and CSV files, show in WebView
+    // TEXT and CSV FILES: Show in WebView
     if (file.mimetype?.includes('text') || file.mimetype?.includes('csv')) {
+      const fileUrl = fileService.getFileUrl(file.id);
       return (
         <View style={styles.webViewContainer}>
           <WebView
@@ -191,8 +230,9 @@ export default function FilePreviewModal({ isVisible, file, onClose }: FilePrevi
       );
     }
 
-    // For images, show directly
+    // IMAGES: Show directly
     if (file.mimetype?.startsWith('image/')) {
+      const fileUrl = fileService.getFileUrl(file.id);
       return (
         <Image 
           source={{ uri: fileUrl }} 
@@ -205,7 +245,7 @@ export default function FilePreviewModal({ isVisible, file, onClose }: FilePrevi
       );
     }
 
-    // For other file types, show download option
+    // OTHER FILE TYPES: Show download option
     return (
       <View style={styles.fullPreviewPlaceholder}>
         <Text style={styles.fullPreviewIcon}>{getFileIcon(file.mimetype, file.name)}</Text>
@@ -373,5 +413,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     fontFamily: 'Inter',
+  },
+  pdfContainer: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  pdf: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
   },
 });
