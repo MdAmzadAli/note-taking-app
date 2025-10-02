@@ -1496,11 +1496,11 @@ async def upload_workspace(
                     print(f"🌐 Skipping local file deletion for webpage item: {item_metadata['id']} (no local file to delete)")
 
                 # Start background summary generation (non-blocking)
-                asyncio.create_task(generate_file_summary_background(
-                    item_metadata['id'],
-                    item_metadata['originalName'],
-                    effective_workspace_id
-                ))
+                # asyncio.create_task(generate_file_summary_background(
+                #     item_metadata['id'],
+                #     item_metadata['originalName'],
+                #     effective_workspace_id
+                # ))
             except Exception as rag_index_error:
                 print(f"❌ RAG indexing failed for item {item_metadata['id']}: {rag_index_error}")
                 # Add to errors if needed, or handle gracefully
