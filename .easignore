@@ -25,6 +25,14 @@ dist/
 .env.*
 .env.local
 .env.*.local
+backend_python/
+attached_assets/
+.replit
+pyproject.toml
+uv.lock
+replit.md
+README.md
+
 
 # Tool caches
 node_modules/.cache/

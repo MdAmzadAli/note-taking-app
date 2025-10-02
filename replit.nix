@@ -1,5 +1,6 @@
 { pkgs }: {
   deps = [
+    pkgs.eas-cli
     pkgs.python312Full
     pkgs.python312Packages.pip
     pkgs.python312Packages.brotli

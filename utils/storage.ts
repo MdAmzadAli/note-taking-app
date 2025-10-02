@@ -653,7 +653,7 @@ export const getCategoryById = async (categoryId: string): Promise<Category | nu
 
 // Remove duplicate UserSettings interface - using the one from types/index.ts
 export const updateNote = saveNote; // Alias for backward compatibility
-export { mockSpeechToText } from './speech';
+
 
 // User UUID Management
 interface BetaUserData {
