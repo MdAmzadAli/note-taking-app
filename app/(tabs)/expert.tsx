@@ -16,13 +16,13 @@ const formatUploadDate = (utcTimestamp: string): string => {
       // Backend timestamps come without timezone info, treat as UTC
       normalizedTimestamp = utcTimestamp + 'Z';
     }
-    
+
     // Parse the UTC timestamp - JavaScript will convert to local timezone
     const localDate = new Date(normalizedTimestamp);
     if (isNaN(localDate.getTime())) {
       return new Date().toLocaleDateString('en-GB'); // Fallback to current date in DD/MM/YYYY format
     }
-    
+
     // Format as DD/MM/YYYY in the user's local timezone
     return localDate.toLocaleDateString('en-GB');
   } catch (error) {
@@ -31,7 +31,6 @@ const formatUploadDate = (utcTimestamp: string): string => {
   }
 };
 import fileService, { FileUploadResponse } from '../../services/fileService';
-import { getLocalFileMetadata } from '../../utils/fileLocalStorage';
 
 // Import expert components
 import ExpertHeader from '../../components/expert/ExpertHeader';
@@ -91,7 +90,7 @@ interface ChatMessage {
 export default function ExpertTab() {
   // Get tab bar context for safety measures
   const { showTabBar } = useTabBar();
-  
+
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [preserveMenuState, setPreserveMenuState] = useState(false);
   const [isUploadModalVisible, setIsUploadModalVisible] = useState(false);
@@ -152,51 +151,10 @@ export default function ExpertTab() {
       const workspacesData = await AsyncStorage.getItem('expert_workspaces');
 
       if (filesData) {
-        const parsedFiles = JSON.parse(filesData);
-        // Enrich files with local storage metadata
-        const enrichedFiles = await Promise.all(
-          parsedFiles.map(async (file: SingleFile) => {
-            const localMetadata = await getLocalFileMetadata(file.id);
-            if (localMetadata) {
-              return {
-                ...file,
-                localUri: localMetadata.localUri,
-                originalUrl: localMetadata.originalUrl,
-                source: localMetadata.source,
-              };
-            }
-            return file;
-          })
-        );
-        setSingleFiles(enrichedFiles);
+        setSingleFiles(JSON.parse(filesData));
       }
-      
       if (workspacesData) {
-        const parsedWorkspaces = JSON.parse(workspacesData);
-        // Enrich workspace files with local storage metadata
-        const enrichedWorkspaces = await Promise.all(
-          parsedWorkspaces.map(async (workspace: Workspace) => {
-            const enrichedFiles = await Promise.all(
-              workspace.files.map(async (file: SingleFile) => {
-                const localMetadata = await getLocalFileMetadata(file.id);
-                if (localMetadata) {
-                  return {
-                    ...file,
-                    localUri: localMetadata.localUri,
-                    originalUrl: localMetadata.originalUrl,
-                    source: localMetadata.source,
-                  };
-                }
-                return file;
-              })
-            );
-            return {
-              ...workspace,
-              files: enrichedFiles,
-            };
-          })
-        );
-        setWorkspaces(enrichedWorkspaces);
+        setWorkspaces(JSON.parse(workspacesData));
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -222,7 +180,7 @@ export default function ExpertTab() {
     setIsMenuVisible(false);
   };
 
- 
+
 
   const handleUploadSingleFile = async (fileItem?: any) => {
     if (!fileItem) return;
@@ -494,7 +452,7 @@ export default function ExpertTab() {
             sources: [],
             timestamp: new Date().toISOString()
           };
-          
+
           await ChatSessionStorage.addMessageToSession(selectedFile.id, chatMessageForStorage);
           console.log('✅ Error message saved to localStorage for file:', selectedFile.id);
         } catch (storageError) {
@@ -507,7 +465,7 @@ export default function ExpertTab() {
   const handleDeleteSingleFile = async (fileId: string) => {
     try {
       console.log('🗑️ Deleting single file:', fileId);
-      
+
       // Delete from backend if connected
       if (isBackendConnected) {
         await fileService.deleteFile(fileId);
@@ -517,7 +475,7 @@ export default function ExpertTab() {
       const updatedFiles = singleFiles.filter(file => file.id !== fileId);
       setSingleFiles(updatedFiles);
       await AsyncStorage.setItem('expert_single_files', JSON.stringify(updatedFiles));
-      
+
       console.log('✅ Single file deleted successfully');
       Alert.alert('Success', 'File deleted successfully');
     } catch (error) {
@@ -529,15 +487,15 @@ export default function ExpertTab() {
   const handleRenameSingleFile = async (fileId: string, newName: string) => {
     try {
       console.log('✏️ Renaming single file:', fileId, 'to:', newName);
-      
+
       // Update file name in local storage (frontend only as requested)
       const updatedFiles = singleFiles.map(file => 
         file.id === fileId ? { ...file, name: newName } : file
       );
-      
+
       setSingleFiles(updatedFiles);
       await AsyncStorage.setItem('expert_single_files', JSON.stringify(updatedFiles));
-      
+
       console.log('✅ Single file renamed successfully');
       Alert.alert('Success', `File renamed to "${newName}"`);
     } catch (error) {
@@ -549,7 +507,7 @@ export default function ExpertTab() {
   const handleDeleteWorkspaceFile = async (workspaceId: string, fileId: string) => {
     try {
       console.log('🗑️ Deleting workspace file:', fileId, 'from workspace:', workspaceId);
-      
+
       // Delete from backend if connected
       if (isBackendConnected) {
         await fileService.deleteFile(fileId);
@@ -585,7 +543,7 @@ export default function ExpertTab() {
   const handleRenameWorkspaceFile = async (workspaceId: string, fileId: string, newName: string) => {
     try {
       console.log('✏️ Renaming workspace file:', fileId, 'in workspace:', workspaceId, 'to:', newName);
-      
+
       // Update file name in the workspace
       const updatedWorkspaces = workspaces.map(workspace => {
         if (workspace.id === workspaceId) {
@@ -615,7 +573,7 @@ export default function ExpertTab() {
 
       // Save to AsyncStorage
       await saveData(singleFiles, updatedWorkspaces);
-      
+
       console.log('✅ Workspace file renamed successfully');
     } catch (error) {
       console.error('❌ Error renaming workspace file:', error);
@@ -626,7 +584,7 @@ export default function ExpertTab() {
   const handleRenameWorkspace = async (workspaceId: string, newName: string) => {
     try {
       console.log('✏️ Renaming workspace:', workspaceId, 'to:', newName);
-      
+
       // Update workspace name in local state
       const updatedWorkspaces = workspaces.map(workspace => {
         if (workspace.id === workspaceId) {
@@ -650,7 +608,7 @@ export default function ExpertTab() {
 
       // Save to AsyncStorage
       await saveData(singleFiles, updatedWorkspaces);
-      
+
       console.log('✅ Workspace renamed successfully');
       Alert.alert('Success', `Workspace renamed to "${newName}"`);
     } catch (error) {
@@ -662,7 +620,7 @@ export default function ExpertTab() {
   const handleDeleteWorkspace = async (workspaceId: string) => {
     try {
       console.log('🗑️ Deleting workspace:', workspaceId);
-      
+
       // Delete all files in the workspace from backend if connected
       const workspaceToDelete = workspaces.find(w => w.id === workspaceId);
       if (isBackendConnected && workspaceToDelete) {
@@ -678,7 +636,7 @@ export default function ExpertTab() {
       const updatedWorkspaces = workspaces.filter(workspace => workspace.id !== workspaceId);
       setWorkspaces(updatedWorkspaces);
       await saveData(singleFiles, updatedWorkspaces);
-      
+
       console.log('✅ Workspace deleted successfully');
       Alert.alert('Success', 'Workspace deleted successfully');
     } catch (error) {
@@ -707,11 +665,6 @@ export default function ExpertTab() {
       if (uploadResponse && uploadResponse.length > 0) {
         // Use the actual file details returned by the backend
         const backendFile = uploadResponse[0]; // Get the first uploaded file
-        
-        // Retrieve local storage metadata for preview
-        const localMetadata = await getLocalFileMetadata(backendFile.id);
-        console.log('📦 Retrieved local metadata for workspace file:', localMetadata);
-        
         const processedFile: SingleFile = {
           id: backendFile.id, // Use the ACTUAL file ID from backend
           name: backendFile.originalName || fileItem.file?.name || 'uploaded_file.pdf',
@@ -719,13 +672,11 @@ export default function ExpertTab() {
           mimetype: backendFile.mimetype || 'application/pdf',
           size: backendFile.size || 0,
           isUploaded: true,
-          source: (localMetadata?.source || (fileItem.type === 'device' ? 'device' : fileItem.type)) as 'device' | 'from_url' | 'webpage',
+          source: fileItem.type === 'device' ? 'device' : fileItem.type, // Store the source type
           cloudinary: backendFile.cloudinary,
-          localUri: localMetadata?.localUri,
-          originalUrl: localMetadata?.originalUrl,
         };
 
-        console.log('✅ Processed file for workspace with local metadata:', processedFile);
+        console.log('✅ Processed file for workspace:', processedFile);
 
         const updatedWorkspaces = workspaces.map(workspace => {
           if (workspace.id === workspaceId && workspace.files.length < 5) {
@@ -766,7 +717,7 @@ export default function ExpertTab() {
     setSelectedWorkspace(null);
     setChatMessages([]);
     setIsChatVisible(false);
-    
+
     // Restore menu state if it was preserved
     if (preserveMenuState) {
       setPreserveMenuState(false);
