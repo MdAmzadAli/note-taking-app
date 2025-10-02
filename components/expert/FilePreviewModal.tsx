@@ -55,20 +55,24 @@ export default function FilePreviewModal({ isVisible, file, onClose }: FilePrevi
       setIsLoadingPdf(true);
       
       try {
+        const localMetadata = await getLocalFileMetadata(file.id);
+        const effectiveSource = file.source || localMetadata?.source || 'device';
+        
+        console.log('🔍 File preview - ID:', file.id, 'Source:', effectiveSource, 'Has localMetadata:', !!localMetadata);
+        
         // Check file source type
-        if (file.source === 'device') {
+        if (effectiveSource === 'device') {
           // Device file - get local URI from storage
-          const localMetadata = await getLocalFileMetadata(file.id);
           if (localMetadata && localMetadata.localUri) {
             console.log('📕 Loading device PDF from local URI:', localMetadata.localUri);
             setPdfSource({ uri: localMetadata.localUri });
           } else {
             console.warn('⚠️ No local URI found for device file:', file.id);
+            console.log('📋 Local metadata:', localMetadata);
             setPdfSource(null);
           }
-        } else if (file.source === 'from_url') {
+        } else if (effectiveSource === 'from_url') {
           // URL file - get original URL from storage
-          const localMetadata = await getLocalFileMetadata(file.id);
           if (localMetadata && localMetadata.originalUrl) {
             console.log('📕 Loading URL PDF from original URL:', localMetadata.originalUrl);
             setPdfSource({ uri: localMetadata.originalUrl, cache: true });

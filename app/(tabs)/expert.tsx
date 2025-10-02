@@ -151,10 +151,38 @@ export default function ExpertTab() {
       const workspacesData = await AsyncStorage.getItem('expert_workspaces');
 
       if (filesData) {
-        setSingleFiles(JSON.parse(filesData));
+        const files: SingleFile[] = JSON.parse(filesData);
+        const migratedFiles = files.map(file => ({
+          ...file,
+          source: file.source || 'device'
+        }));
+        setSingleFiles(migratedFiles);
       }
+      
       if (workspacesData) {
-        setWorkspaces(JSON.parse(workspacesData));
+        const workspaces: Workspace[] = JSON.parse(workspacesData);
+        const { getLocalFileMetadata } = await import('../utils/fileLocalStorage');
+        
+        const migratedWorkspaces = await Promise.all(workspaces.map(async workspace => {
+          const migratedFiles = await Promise.all(workspace.files.map(async file => {
+            if (file.source) return file;
+            
+            const localMetadata = await getLocalFileMetadata(file.id);
+            const source = localMetadata?.source || 'device';
+            
+            return {
+              ...file,
+              source
+            };
+          }));
+          
+          return {
+            ...workspace,
+            files: migratedFiles
+          };
+        }));
+        
+        setWorkspaces(migratedWorkspaces);
       }
     } catch (error) {
       console.error('Error loading data:', error);
