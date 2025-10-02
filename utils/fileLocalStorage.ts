@@ -12,6 +12,7 @@ export interface LocalFileMetadata {
   uploadDate: string;
   size?: number;
   isIndexed: boolean;
+  workspaceId?: string;
 }
 
 interface LocalFilesMap {
@@ -155,6 +156,56 @@ export const cleanupUnindexedFiles = async (): Promise<number> => {
     return deletedCount;
   } catch (error) {
     console.error('❌ Error cleaning up unindexed files:', error);
+    return 0;
+  }
+};
+
+export const updateFileNameInLocalStorage = async (fileId: string, newName: string): Promise<void> => {
+  try {
+    console.log('✏️ Updating file name in local storage:', fileId, '->', newName);
+    const existingData = await AsyncStorage.getItem(LOCAL_FILES_KEY);
+    if (!existingData) {
+      console.warn('⚠️ No local storage data found during name update');
+      return;
+    }
+    
+    const filesMap: LocalFilesMap = JSON.parse(existingData);
+    if (filesMap[fileId]) {
+      filesMap[fileId].originalName = newName;
+      await AsyncStorage.setItem(LOCAL_FILES_KEY, JSON.stringify(filesMap));
+      console.log('✅ File name updated in local storage successfully');
+    } else {
+      console.warn('⚠️ File not found in local storage during name update:', fileId);
+    }
+  } catch (error) {
+    console.error('❌ Error updating file name in local storage:', error);
+    throw error;
+  }
+};
+
+export const deleteWorkspaceFiles = async (fileIds: string[]): Promise<number> => {
+  try {
+    console.log('🗑️ Deleting multiple workspace file metadata from local storage:', fileIds.length, 'files');
+    const existingData = await AsyncStorage.getItem(LOCAL_FILES_KEY);
+    if (!existingData) {
+      return 0;
+    }
+    
+    const filesMap: LocalFilesMap = JSON.parse(existingData);
+    let deletedCount = 0;
+    
+    for (const fileId of fileIds) {
+      if (filesMap[fileId]) {
+        delete filesMap[fileId];
+        deletedCount++;
+      }
+    }
+    
+    await AsyncStorage.setItem(LOCAL_FILES_KEY, JSON.stringify(filesMap));
+    console.log(`✅ Deleted ${deletedCount} file metadata from local storage successfully`);
+    return deletedCount;
+  } catch (error) {
+    console.error('❌ Error deleting workspace files from local storage:', error);
     return 0;
   }
 };

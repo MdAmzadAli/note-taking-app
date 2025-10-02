@@ -273,6 +273,7 @@ export default function ExpertTab() {
               mimetype: uploadedFile.mimetype,
               size: uploadedFile.size,
               isUploaded: true,
+              source: uploadedFile.source || 'device',
               cloudinary: uploadedFile.cloudinary,
             };
             processedFiles.push(singleFile);
@@ -571,6 +572,11 @@ export default function ExpertTab() {
         });
       }
 
+      // Update local storage metadata with new name
+      const { updateFileNameInLocalStorage } = await import('../utils/fileLocalStorage');
+      await updateFileNameInLocalStorage(fileId, newName);
+      console.log('✅ Updated file name in local storage');
+
       // Save to AsyncStorage
       await saveData(singleFiles, updatedWorkspaces);
 
@@ -632,6 +638,14 @@ export default function ExpertTab() {
         }
       }
 
+      // Clean up local storage for all workspace files
+      if (workspaceToDelete && workspaceToDelete.files.length > 0) {
+        const { deleteWorkspaceFiles } = await import('../utils/fileLocalStorage');
+        const fileIds = workspaceToDelete.files.map(f => f.id);
+        const deletedCount = await deleteWorkspaceFiles(fileIds);
+        console.log(`✅ Cleaned up ${deletedCount} file metadata from local storage`);
+      }
+
       // Remove workspace from local storage
       const updatedWorkspaces = workspaces.filter(workspace => workspace.id !== workspaceId);
       setWorkspaces(updatedWorkspaces);
@@ -672,7 +686,7 @@ export default function ExpertTab() {
           mimetype: backendFile.mimetype || 'application/pdf',
           size: backendFile.size || 0,
           isUploaded: true,
-          source: fileItem.type === 'device' ? 'device' : fileItem.type, // Store the source type
+          source: backendFile.source || 'device',
           cloudinary: backendFile.cloudinary,
         };
 

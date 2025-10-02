@@ -10,6 +10,7 @@ export interface FileUploadResponse {
   mimetype: string;
   size: number;
   uploadDate: string;
+  source?: 'device' | 'from_url' | 'webpage';
   cloudinary?: {
     thumbnailUrl?: string;
     pageUrls?: string[];
@@ -21,6 +22,7 @@ export interface FileUploadResponse {
 class FileService {
   async uploadWorkspaceMixed(fileItems: any[], workspaceId: string): Promise<FileUploadResponse[]> {
     const tempIdMap = new Map<string, string>();
+    const tempSourceMap = new Map<string, 'device' | 'from_url' | 'webpage'>();
     
     try {
       console.log('📤 Starting mixed workspace file/URL upload...');
@@ -46,9 +48,11 @@ class FileService {
             source: 'device',
             uploadDate: new Date().toISOString(),
             size: item.file.size,
-            isIndexed: false
+            isIndexed: false,
+            workspaceId: workspaceId || undefined
           });
           tempIdMap.set(tempId, item.file.name);
+          tempSourceMap.set(tempId, 'device');
         } else if (item.type === 'from_url') {
           console.log(`💾 Saving URL file to local storage: ${item.source}`);
           await saveLocalFileMetadata({
@@ -58,9 +62,11 @@ class FileService {
             mimeType: 'application/pdf',
             source: 'from_url',
             uploadDate: new Date().toISOString(),
-            isIndexed: false
+            isIndexed: false,
+            workspaceId: workspaceId || undefined
           });
           tempIdMap.set(tempId, item.source);
+          tempSourceMap.set(tempId, 'from_url');
         } else if (item.type === 'webpage') {
           console.log(`💾 Saving webpage to local storage: ${item.source}`);
           await saveLocalFileMetadata({
@@ -70,9 +76,11 @@ class FileService {
             mimeType: 'text/html',
             source: 'webpage',
             uploadDate: new Date().toISOString(),
-            isIndexed: false
+            isIndexed: false,
+            workspaceId: workspaceId || undefined
           });
           tempIdMap.set(tempId, item.source);
+          tempSourceMap.set(tempId, 'webpage');
         }
       }
       console.log('✅ All files saved to local storage successfully');
@@ -152,6 +160,8 @@ class FileService {
           
           result.files.forEach((backendFile: any, index: number) => {
             const tempId = tempIds[index];
+            const source = tempId ? tempSourceMap.get(tempId) : undefined;
+            
             if (tempId) {
               // Update temp ID to real backend ID in local storage
               updateFileIdInLocalStorage(tempId, backendFile.id);
@@ -165,7 +175,8 @@ class FileService {
               originalName: backendFile.originalName || backendFile.name,
               mimetype: backendFile.mimetype || 'application/pdf',
               size: backendFile.size || 0,
-              uploadDate: backendFile.uploadDate || new Date().toISOString()
+              uploadDate: backendFile.uploadDate || new Date().toISOString(),
+              source: source || 'device'
             });
           });
           
