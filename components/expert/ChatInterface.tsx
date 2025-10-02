@@ -1599,14 +1599,18 @@ export default function ChatInterface({
                       onPress={() => handleFilePreview(file)}
                     >
                       <View style={styles.workspaceFileIconContainer}>
-                        <IconSymbol size={16} name="doc.text" color="#FFFFFF" />
+                        <IconSymbol 
+                          size={16} 
+                          name={file.source === 'webpage' ? 'globe' : 'doc.text'} 
+                          color="#FFFFFF" 
+                        />
                       </View>
                       <View style={styles.workspaceFileDetails}>
                         <Text style={styles.workspaceFileName} numberOfLines={1}>
                           {file.name}
                         </Text>
                         <Text style={styles.workspaceFileSize}>
-                          {getFileSize(file)}
+                          {file.source === 'webpage' ? 'Small File' : getFileSize(file)}
                         </Text>
                       </View>
                     </TouchableOpacity>
