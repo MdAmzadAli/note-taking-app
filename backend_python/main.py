@@ -273,7 +273,7 @@ async def generate_file_summary_background(file_id: str, file_name: str, workspa
         print(f"🔄 Starting background summary generation for file: {file_id}")
 
         # Generate a summary query
-        summary_query = f"Provide a comprehensive summary of the document '{file_name}'. Include key topics, main points, and important information."
+        summary_query = f"Provide a comprehensive summary of the provided document. Include key topics, main points, and important information."
 
         print(f"🔍 Running summary search for: {file_id}")
 
@@ -1496,11 +1496,11 @@ async def upload_workspace(
                     print(f"🌐 Skipping local file deletion for webpage item: {item_metadata['id']} (no local file to delete)")
 
                 # Start background summary generation (non-blocking)
-                # asyncio.create_task(generate_file_summary_background(
-                #     item_metadata['id'],
-                #     item_metadata['originalName'],
-                #     effective_workspace_id
-                # ))
+                asyncio.create_task(generate_file_summary_background(
+                    item_metadata['id'],
+                    item_metadata['originalName'],
+                    effective_workspace_id
+                ))
             except Exception as rag_index_error:
                 print(f"❌ RAG indexing failed for item {item_metadata['id']}: {rag_index_error}")
                 # Add to errors if needed, or handle gracefully
@@ -1871,17 +1871,17 @@ async def generate_summary(file_id: str, request: RAGIndexRequest):
     Generate summary for a specific file (manual trigger)
     """
     try:
-        print(f"🔄 Manual summary generation requested for file: {file_id}")
+        print(f"🔄 Manual summary generation requested for file: {file_id}, request:{request}")
 
         # Get file metadata
-        file_info = await file_service.get_file_metadata(file_id)
-        if not file_info:
-            raise HTTPException(status_code=404, detail="File not found")
+        # file_info = await file_service.get_file_metadata(file_id)
+        # if not file_info:
+        #     raise HTTPException(status_code=404, detail="File not found")
 
         # Start background summary generation
         asyncio.create_task(generate_file_summary_background(
             file_id,
-            file_info['originalName'],
+            "Document",
             request.workspaceId
         ))
 

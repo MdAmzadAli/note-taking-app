@@ -173,7 +173,7 @@ export default function FilePreviewModal({ isVisible, file, onClose }: FilePrevi
       if (isLoadingPdf) {
         return (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#000000" />
+            <ActivityIndicator size="large" color="#ffffff" />
             <Text>Loading PDF...</Text>
           </View>
         );
@@ -208,7 +208,7 @@ export default function FilePreviewModal({ isVisible, file, onClose }: FilePrevi
             }}
             trustAllCerts={false}
             enablePaging={true}
-            spacing={10}
+            
           />
         </View>
       );
@@ -226,7 +226,7 @@ export default function FilePreviewModal({ isVisible, file, onClose }: FilePrevi
             javaScriptEnabled={false}
             renderLoading={() => (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#000000" />
+                <ActivityIndicator size="large" color="#ffffff" />
                 <Text>Loading file...</Text>
               </View>
             )}
@@ -342,14 +342,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    
   },
   previewModalContent: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    // backgroundColor: '#FFFFFF',
+    backgroundColor: '#333333',
+    borderWidth: 1,
+    borderColor:'#555555',
+    borderRadius: 8,
     width: '90%',
     maxWidth: 500,
-    height: Dimensions.get('window').height * 0.8,
+    height: Dimensions.get('window').height * 0.9,
     overflow: 'hidden',
   },
   previewModalHeader: {
@@ -361,10 +364,10 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E7EB',
   },
   previewModalTitle: {
-    fontSize: 18,
+    fontSize: 10,
     fontWeight: 'bold',
-    color: '#000000',
-    fontFamily: 'Inter',
+    color: '#ffffff',
+
     flex: 1,
     marginRight: 12,
   },
@@ -372,13 +375,14 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#F3F4F6',
+
+    // backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
   },
   closeButtonText: {
     fontSize: 16,
-    color: '#6B7280',
+    color: '#ffffff',
     fontWeight: 'bold',
   },
   previewModalBody: {
@@ -402,14 +406,14 @@ const styles = StyleSheet.create({
   fullPreviewText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#ffffff',
     textAlign: 'center',
     marginBottom: 8,
     fontFamily: 'Inter',
   },
   fullPreviewSubtext: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#d3d3d3',
     textAlign: 'center',
     marginBottom: 4,
     fontFamily: 'Inter',
@@ -426,7 +430,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#00FFA7',
     gap: 8,
   },
   openExternallyButton: {
@@ -446,10 +450,12 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
+  
   },
   pdf: {
     flex: 1,
     width: '100%',
     height: '100%',
+    backgroundColor:'#333333'
   },
 });
