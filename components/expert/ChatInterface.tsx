@@ -1601,7 +1601,11 @@ export default function ChatInterface({
                       <View style={styles.workspaceFileIconContainer}>
                         <IconSymbol 
                           size={16} 
-                          name={file.source === 'webpage' ? 'globe' : 'doc.text'} 
+                          name={
+                            file.source === 'webpage' ? 'globe' : 
+                            file.source === 'from_url' ? 'link' : 
+                            'doc.text'
+                          } 
                           color="#FFFFFF" 
                         />
                       </View>
