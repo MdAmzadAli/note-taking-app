@@ -207,7 +207,7 @@ export default function FilePreviewModal({ isVisible, file, onClose }: FilePrevi
               console.log('🔗 Link pressed:', uri);
             }}
             trustAllCerts={false}
-            enablePaging={true}
+            
             
           />
         </View>
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor:'#555555',
     borderRadius: 8,
-    width: '90%',
+    width: '95%',
     maxWidth: 500,
     height: Dimensions.get('window').height * 0.9,
     overflow: 'hidden',
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
