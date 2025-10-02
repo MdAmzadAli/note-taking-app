@@ -573,7 +573,7 @@ export default function ExpertTab() {
       }
 
       // Update local storage metadata with new name
-      const { updateFileNameInLocalStorage } = await import('../utils/fileLocalStorage');
+      const { updateFileNameInLocalStorage } = await import('../../utils/fileLocalStorage');
       await updateFileNameInLocalStorage(fileId, newName);
       console.log('✅ Updated file name in local storage');
 
@@ -640,7 +640,7 @@ export default function ExpertTab() {
 
       // Clean up local storage for all workspace files
       if (workspaceToDelete && workspaceToDelete.files.length > 0) {
-        const { deleteWorkspaceFiles } = await import('../utils/fileLocalStorage');
+        const { deleteWorkspaceFiles } = await import('../../utils/fileLocalStorage');
         const fileIds = workspaceToDelete.files.map(f => f.id);
         const deletedCount = await deleteWorkspaceFiles(fileIds);
         console.log(`✅ Cleaned up ${deletedCount} file metadata from local storage`);
