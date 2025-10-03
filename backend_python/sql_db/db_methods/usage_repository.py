@@ -57,10 +57,14 @@ class UsageRepository(BaseRepository):
             Dict with usage data
         """
         try:
-            # Check if user exists
+            # Check if user exists, create if not
             user = self.session.query(User).filter(User.id == user_uuid).first()
             if not user:
-                raise ValueError(f"User with UUID {user_uuid} not found")
+                logger.info(f"User {user_uuid} not found in database, creating user entry")
+                new_user = User(id=user_uuid)
+                self.session.add(new_user)
+                self.session.flush()
+                logger.info(f"User {user_uuid} created successfully")
 
             # Check if usage record exists
             usage = self.session.query(Usage).filter(Usage.user_id == user_uuid).first()
@@ -176,10 +180,14 @@ class UsageRepository(BaseRepository):
             Dict with usage data
         """
         try:
-            # Check if user exists
+            # Check if user exists, create if not
             user = self.session.query(User).filter(User.id == user_uuid).first()
             if not user:
-                raise ValueError(f"User with UUID {user_uuid} not found")
+                logger.info(f"User {user_uuid} not found in database, creating user entry")
+                new_user = User(id=user_uuid)
+                self.session.add(new_user)
+                self.session.flush()
+                logger.info(f"User {user_uuid} created successfully")
 
             # Check if usage record exists
             usage = self.session.query(Usage).filter(Usage.user_id == user_uuid).first()
