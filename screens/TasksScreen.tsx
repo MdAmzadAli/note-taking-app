@@ -385,54 +385,7 @@ export default function TasksScreen() {
   }
 
   const generateSampleTasks = (): Task[] => {
-    const sampleTaskData = [
-      // Regular tasks
-      { title: "Complete project proposal", description: "Finish the quarterly project proposal for the marketing team", completed: true },
-      { title: "Schedule dentist appointment", description: "Call dental office to book cleaning appointment", completed: true },
-      { title: "Review team performance", description: "Conduct quarterly performance reviews for direct reports", completed: false },
-      { title: "Update website content", description: "Refresh homepage content and product descriptions", completed: true },
-      { title: "Prepare presentation slides", description: "Create slides for next week's board meeting", completed: true },
-      { title: "Order office supplies", description: "Restock printer paper, pens, and sticky notes", completed: true },
-      { title: "Plan team building event", description: "Organize quarterly team outing and activities", completed: false },
-      { title: "Fix kitchen sink leak", description: "Call plumber to repair the dripping faucet", completed: true },
-      { title: "Submit expense reports", description: "File Q1 business expense reports with accounting", completed: true },
-      { title: "Learn new programming language", description: "Start Python course on online learning platform", completed: false },
-
-      // August-specific tasks for testing search
-      { title: "August vacation planning", description: "Plan summer vacation for August holidays", completed: true },
-      { title: "Back to school shopping", description: "Buy school supplies for August school start", completed: false },
-      { title: "August birthday party", description: "Organize birthday celebration in August", completed: true },
-      { title: "Summer heat maintenance", description: "Service air conditioning for August heat wave", completed: true },
-      { title: "August report submission", description: "Submit monthly reports due in August", completed: false },
-
-      // Tasks with old dates (for 60-day deletion testing)
-      { title: "Old task from 70 days ago", description: "This task should be auto-deleted", completed: true, isOldTask: true, daysAgo: 70 },
-      { title: "Old task from 80 days ago", description: "This task should also be auto-deleted", completed: true, isOldTask: true, daysAgo: 80 },
-      { title: "Old task from 90 days ago", description: "Very old completed task", completed: true, isOldTask: true, daysAgo: 90 },
-      { title: "Old task from 100 days ago", description: "Extremely old completed task", completed: true, isOldTask: true, daysAgo: 100 },
-
-      // Regular remaining tasks
-      { title: "Organize photo albums", description: "Sort through vacation photos and create digital albums", completed: true },
-      { title: "Research vacation destinations", description: "Look into summer vacation options for the family", completed: true },
-      { title: "Clean garage", description: "Sort through boxes and donate unused items", completed: true },
-      { title: "Update resume", description: "Add recent accomplishments and skills to LinkedIn profile", completed: false },
-      { title: "Plan birthday party", description: "Organize surprise party for spouse's 30th birthday", completed: true },
-      { title: "Buy groceries", description: "Weekly grocery shopping for meal prep", completed: true },
-      { title: "Schedule car maintenance", description: "Book oil change and tire rotation appointment", completed: true },
-      { title: "Write blog post", description: "Draft article about productivity tips for remote work", completed: false },
-      { title: "Organize closet", description: "Sort clothes by season and donate unused items", completed: true },
-      { title: "Learn guitar", description: "Practice basic chords for 30 minutes daily", completed: false },
-      { title: "Set up home office", description: "Arrange desk, monitor, and ergonomic accessories", completed: true },
-      { title: "Read business book", description: "Finish reading 'Atomic Habits' by James Clear", completed: true },
-      { title: "Plan garden layout", description: "Design vegetable garden for spring planting", completed: false },
-      { title: "Update password security", description: "Change passwords for all important accounts", completed: true },
-      { title: "Call old friend", description: "Catch up with college roommate who moved abroad", completed: true },
-      { title: "Exercise routine", description: "Start morning workout routine with yoga", completed: false },
-      { title: "Backup computer files", description: "Create backup of important documents and photos", completed: true },
-      { title: "Plan weekend getaway", description: "Research nearby hiking trails and book accommodation", completed: true },
-      { title: "Study for certification", description: "Prepare for AWS cloud practitioner exam", completed: false },
-      { title: "Volunteer at shelter", description: "Sign up for weekend shifts at local animal shelter", completed: true }
-    ];
+    const sampleTaskData: Array<{ title: string; description: string; completed: boolean; isOldTask?: boolean; daysAgo?: number }> = [];
 
     const now = new Date();
     const tasks: Task[] = [];
