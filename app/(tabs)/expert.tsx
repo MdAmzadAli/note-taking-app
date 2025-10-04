@@ -857,6 +857,7 @@ export default function ExpertTab() {
         title="Expert AI"
         titleIcon="folder-outline"
         sections={getMenuSections()}
+        autoCloseOnItemPress={false} 
       />
 
       <UploadModal

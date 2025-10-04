@@ -43,6 +43,7 @@ interface SlideMenuProps {
   titleIcon?: string;
   sections: MenuSection[];
   selectedItemId?: string | null;
+  autoCloseOnItemPress?: boolean; 
 }
 
 export default function SlideMenu({ 
@@ -51,7 +52,8 @@ export default function SlideMenu({
   title = "Menu",
   titleIcon = "menu-outline",
   sections,
-  selectedItemId
+  selectedItemId,
+  autoCloseOnItemPress = true
 }: SlideMenuProps) {
   const slideAnim = useRef(new Animated.Value(-Dimensions.get('window').width)).current;
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -156,7 +158,10 @@ export default function SlideMenu({
     if (item.onPress) {
       item.onPress();
     }
-    handleClose();
+    // Only auto-close if the prop allows it (default: true for backward compatibility)
+    if (autoCloseOnItemPress !== false) {
+      handleClose();
+    }
   };
 
   return (
