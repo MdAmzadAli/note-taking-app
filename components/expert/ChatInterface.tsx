@@ -1466,11 +1466,7 @@ export default function ChatInterface({
 
   return (
     <View style={styles.pdfChatContainer}>
-      <KeyboardAvoidingView 
-        style={styles.pdfChatKeyboardContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
+
         {/* Custom Header */}
         <View style={styles.pdfChatHeader}>
           <TouchableOpacity onPress={handleBack}>
@@ -2068,6 +2064,11 @@ export default function ChatInterface({
         {/* Chat Input Section - Only show for chat tab */}
         {activeTab === 'chat' && (
           <View style={styles.pdfChatInputContainer}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 10}
+              style={{ width: '100%' }}
+            >
             {/* Follow-up Questions */}
             {followUpQuestions.length > 0 && (
               <View style={styles.followUpContainer}>
@@ -2132,9 +2133,10 @@ export default function ChatInterface({
             <IconSymbol size={12} name="lock" color="#10B981" />
             <Text style={styles.pdfStrictlyFromFileText}>Strictly from file (Faster)</Text>
           </View> */}
+              </KeyboardAvoidingView>
         </View>
         )}
-      </KeyboardAvoidingView>
+ 
 
 
       {/* Workspace Delete Confirmation Modal */}
