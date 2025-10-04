@@ -152,8 +152,28 @@ export default function TasksScreen() {
 
   const loadTaskCategories = useCallback(async () => {
     try {
-      const categories = await getTaskCategories();
-      setTaskCategories(categories);
+      let categoriesData = await getTaskCategories();
+
+      // If no categories exist, create default ones
+      if (categoriesData.length === 0) {
+        const defaultCategories = [
+          { id: '1', name: 'Work', createdAt: new Date().toISOString() },
+          { id: '2', name: 'Personal', createdAt: new Date().toISOString() },
+          { id: '3', name: 'Shopping', createdAt: new Date().toISOString() },
+        ];
+
+        // Import saveTaskCategory function
+        const { saveTaskCategory } = await import('@/utils/storage');
+
+        // Save default categories to storage
+        for (const category of defaultCategories) {
+          await saveTaskCategory(category);
+        }
+
+        setTaskCategories(defaultCategories);
+      } else {
+        setTaskCategories(categoriesData);
+      }
     } catch (error) {
       console.error('Error loading task categories:', error);
       setTaskCategories([]);
