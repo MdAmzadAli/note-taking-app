@@ -66,7 +66,7 @@ export default function BetaSignupModal({
       if (response.ok && result.success) {
         Alert.alert(
           'Welcome to Beta!',
-          'Thank you for signing up! You\'ll be notified when the app launches with your 40% lifetime discount.',
+          'Thank you for signing up! You\'ll be notified when the app launches with your 40% discount for the first year.',
           [
             {
               text: 'Great!',
@@ -122,9 +122,9 @@ export default function BetaSignupModal({
         <View style={styles.overlay}>
           <View style={styles.container}>
             <View style={styles.content}>
-              <Text style={styles.title}>🎉 Get 40% OFF Lifetime!</Text>
+              <Text style={styles.title}>🎉 Get 40% OFF First Year!</Text>
               <Text style={styles.subtitle}>
-                Be the first to know when we launch and get an exclusive 40% lifetime discount!
+                Be the first to know when we launch and get an exclusive 40% discount for the first year!
               </Text>
               
               <Text style={styles.description}>

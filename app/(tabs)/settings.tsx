@@ -325,7 +325,7 @@ export default function SettingsTab() {
           <View style={styles.betaEmailSection}>
             <Text style={styles.sectionTitle}>Beta Access</Text>
             <Text style={styles.sectionDescription}>
-              Get notified when we launch with 40% lifetime discount
+              Get notified when we launch with 40% discount for first year
             </Text>
             
             {isLoadingBetaData ? (
@@ -400,7 +400,7 @@ export default function SettingsTab() {
                 
                 {betaUserEmail && (
                   <Text style={styles.betaStatusText}>
-                    ✅ You're registered for beta access with 40% lifetime discount!
+                    ✅ You're registered for beta access with 40% discount for first year!
                   </Text>
                 )}
               </View>
