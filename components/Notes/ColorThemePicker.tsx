@@ -133,13 +133,9 @@ export default function ColorThemePicker({
                           style={styles.gradientBackground}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 1 }}
-                        >
-                          <Text style={styles.themeText}>{theme.name}</Text>
-                        </LinearGradient>
+                        />
                       ) : (
-                        <View style={[styles.solidBackground, { backgroundColor: theme.color }]}>
-                          <Text style={styles.themeText}>{theme.name}</Text>
-                        </View>
+                        <View style={[styles.solidBackground, { backgroundColor: theme.color }]} />
                       )}
                     </TouchableOpacity>
                   );
@@ -214,9 +210,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   themeItem: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
+    width: 50,
+    height: 50,
+    borderRadius: 100,
     marginRight: 12,
     elevation: 4,
     shadowColor: '#000000',
@@ -272,6 +268,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 2,
     borderColor: 'transparent',
+    flex: 1,
+    minWidth: '45%',
   },
   selectedFontStyle: {
     borderColor: '#007AFF',
