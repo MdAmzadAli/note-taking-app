@@ -228,7 +228,7 @@ export default function TaskCard({
 
       {celebrationTaskId === task.id && (
         <Animated.View style={styles.celebrationOverlay}>
-          <Text style={styles.celebrationText}>🎉 Great job! 🎉</Text>
+          <Text style={styles.celebrationText}>Task has rejoined the party! 🎉</Text>
         </Animated.View>
       )}
     </TouchableOpacity>
@@ -241,8 +241,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#555555',
+    borderWidth: 0,
+    borderColor: 'transparent',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
     position: 'relative',
   },
   celebrationTask: {

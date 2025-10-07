@@ -34,6 +34,8 @@ import TickBoxComponent from './TickBoxComponent';
 import ImageViewerModal from './ImageViewerModal';
 import { getCategories } from '@/utils/storage';
 import { EditorBlock } from '@/types';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 
 interface ImageAttachment {
   id: string;
@@ -891,7 +893,7 @@ export default function NoteEditorScreen({
     <View style={[styles.container, { backgroundColor: selectedGradient ? 'transparent' : selectedTheme }]}>
       {renderBackground()}
 
-      <View style={styles.safeAreaContainer}>
+      <SafeAreaView style={styles.safeAreaContainer} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>
@@ -985,11 +987,11 @@ export default function NoteEditorScreen({
           </ScrollView>
         </KeyboardAvoidingView>
 
-
+         </SafeAreaView>
         {/* Bottom Toolbar - Hidden for read-only/deleted notes */}
         {!readOnly && (
 
-          <View style={styles.bottomBar}>
+      <SafeAreaView edges={['bottom']} style={styles.bottomBar}>
 
             <View style={styles.bottomLeft}>
               <TouchableOpacity
@@ -1014,10 +1016,10 @@ export default function NoteEditorScreen({
               <Ionicons name="share-outline" size={20} color="#FFFFFF" />
             </TouchableOpacity>
 
-            </View> 
+            </SafeAreaView> 
 
         )}
-      </View>
+     
 
       {/* Media Attachment Modal */}
       <MediaAttachmentModal
@@ -1160,7 +1162,12 @@ export default function NoteEditorScreen({
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: 0, 
     // paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   keyboardAvoidingContainer: {
@@ -1169,6 +1176,7 @@ const styles = StyleSheet.create({
   safeAreaContainer: {
     flex: 1,
     backgroundColor: 'transparent',
+    // paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
     flexDirection: 'row',
@@ -1225,7 +1233,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    paddingBottom: 20, // Ensure proper spacing at bottom
+    // paddingBottom: 20, // Ensure proper spacing at bottom
     backgroundColor: 'rgba(0,0,0,0.1)',
   },
   bottomLeft: {

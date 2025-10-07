@@ -243,7 +243,7 @@ export default function TaskCreationModal({
                 }, 100);
               }}
             >
-              <IconSymbol size={24} name="brush" color="#FFFFFF" />
+              <IconSymbol size={18} name="brush" color="#FFFFFF" />
             </TouchableOpacity>
             
             <TouchableOpacity
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
   },
   backIconButton: {
     padding: 8,
-    backgroundColor: '#2A2A2A',
+    // backgroundColor: '#2A2A2A',
     borderRadius: 8,
   },
   rightButtonsContainer: {
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
   },
   brushIconButton: {
     padding: 8,
-    backgroundColor: '#2A2A2A',
+    // backgroundColor: '#2A2A2A',
     borderRadius: 8,
   },
   saveIconButton: {
@@ -401,32 +401,35 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: 8,
     color: '#FFFFFF',
-    fontFamily: 'Inter',
+  
   },
   transparentInput: {
-    borderWidth: 1,
+    borderWidth: 0.1,
     borderColor: '#FFFFFF',
+    // backgroundColor:'#333333',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
     // backgroundColor: '#1F2937',
     color: '#FFFFFF',
-    fontFamily: 'Inter',
+  
   },
   transparentTextArea: {
-    borderWidth: 1,
+    // borderWidth: 1,
+    borderWidth: 0.1,
     borderColor: '#FFFFFF',
     borderRadius: 8,
+    // backgroundColor:'#333333',
     padding: 12,
     fontSize: 16,
     // backgroundColor: '#1F2937',
     color: '#FFFFFF',
-    fontFamily: 'Inter',
+    
     minHeight: 80,
     textAlignVertical: 'top',
   },
   transparentDateButton: {
-    borderWidth: 1,
+    borderWidth: 0.1,
     borderColor: '#FFFFFF',
     borderRadius: 8,
     padding: 12,
@@ -444,7 +447,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   transparentTimeButton: {
-    borderWidth: 1,
+    borderWidth: 0.1,
     borderColor: '#FFFFFF',
     borderRadius: 8,
     padding: 12,

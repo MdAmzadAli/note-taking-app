@@ -124,7 +124,7 @@ export default function NotesGrid({ notes, onEditNote, onDeleteNote, selectedCat
       {/* Others section - Column layout */}
       {otherNotes.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Others</Text>
+          {pinnedNotes.length>0&&<Text style={styles.sectionTitle}>Others</Text>}
           <View style={styles.notesContainer}>
             {otherColumns.map((column, columnIndex) => (
               <View key={`others-column-${columnIndex}`} style={styles.column}>

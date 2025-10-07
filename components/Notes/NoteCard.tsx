@@ -313,13 +313,13 @@ export default function NoteCard({ note, onPress, onLongPress, selectedCategoryI
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#2A2A2A',
-    borderRadius: 12,
+    borderRadius: 10,
     marginHorizontal: 0,
     marginVertical: 0,
-    borderWidth: 1,
+    // borderWidth: 0.5,
     borderColor: '#D1D5DB',
-    elevation: 6,
-    shadowColor: '#000000',
+    elevation: 16,
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 3,
