@@ -268,8 +268,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 2,
     borderColor: 'transparent',
-    flex: 1,
-    minWidth: '45%',
+    width: '30%',
   },
   selectedFontStyle: {
     borderColor: '#007AFF',
